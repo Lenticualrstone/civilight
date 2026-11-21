@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -40,6 +41,20 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:ui"))
+    implementation(project(":feature:library"))
+    implementation(project(":feature:story"))
+    implementation(project(":feature:script"))
+    implementation(project(":feature:cast"))
+    implementation(project(":feature:world"))
+    implementation(project(":feature:map"))
+    implementation(project(":feature:canvas"))
+    implementation(project(":feature:recorder"))
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.navigation3.ui)
+    implementation(libs.compose.material.icons.core)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.compose.bom))

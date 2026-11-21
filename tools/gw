@@ -1,0 +1,19 @@
+#!/bin/bash
+# Serialised Gradle runner: only one Gradle build runs at a time on this machine (8 GB RAM).
+# Usage: tools/gw <gradle args...>   e.g. tools/gw :feature:script:compileDebugKotlin
+# Exits with Gradle's own exit status. Output is printed in full; pipe it yourself if needed.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOCK="${TMPDIR:-/tmp}/civilight-gradle.lock"
+waited=0
+while ! mkdir "$LOCK" 2>/dev/null; do
+  holder="$(cat "$LOCK/pid" 2>/dev/null)"
+  if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+    rm -rf "$LOCK"; continue
+  fi
+  if [ $((waited % 60)) -eq 0 ]; then echo "[gw] waiting for another build (pid $holder) …" >&2; fi
+  sleep 3; waited=$((waited + 3))
+done
+echo $$ > "$LOCK/pid"
+trap 'rm -rf "$LOCK"' EXIT INT TERM
+cd "$ROOT"
+./gradlew --console=plain "$@"
