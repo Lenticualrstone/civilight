@@ -151,6 +151,38 @@ class SettingsAndContainerTest {
     }
 
     @Test
+    fun deleteUnreferencedBlobsDeletesOnlyListedHashesNobodyHolds() = runTest {
+        val dataScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        try {
+            val clock = ManualClock.at("2026-11-22T00:00:00Z")
+            val container = StoreContainer(
+                tmp.root,
+                PreferenceDataStoreFactory.create(scope = dataScope, produceFile = { File(tmp.root, "datastore/settings.preferences_pb") }),
+                testEnv(clock, StoreTiming(blobGraceMs = 0)),
+            )
+            container.start()
+            val held = container.blobs.import("held".toByteArray().inputStream(), "image/png", BlobSource.GALLERY)
+            val freed = container.blobs.import("freed".toByteArray().inputStream(), "image/png", BlobSource.GALLERY)
+            val unlisted = container.blobs.import("unlisted".toByteArray().inputStream(), "image/png", BlobSource.GALLERY)
+            for (blob in listOf(held, freed, unlisted)) container.blobs.fileOf(blob)!!.setLastModified(clock.now() - 1_000)
+            // A trashed project the purge was not given still holds its cover.
+            val trashed = container.library.create("유리 정원") { doc ->
+                doc.copy(assets = doc.assets.copy(imageUses = listOf(ImageUse(key = "IU", ownerKind = ImageOwnerKind.PROJECT.open(),
+                    ownerKey = doc.key, slot = ImageSlot.PROJECT_COVER.open(), source = held.hash))))
+            }
+            container.library.moveToTrash(trashed.key)
+
+            assertEquals(emptyList<String>(), container.deleteUnreferencedBlobs(emptyList()))
+            assertEquals(listOf(freed.hash), container.deleteUnreferencedBlobs(listOf(held.hash, freed.hash)))
+            assertTrue(container.blobs.contains(held.hash))
+            assertFalse(container.blobs.contains(freed.hash))
+            assertTrue(container.blobs.contains(unlisted.hash))
+        } finally {
+            dataScope.cancel()
+        }
+    }
+
+    @Test
     fun aProjectWithADamagedFileHoldsBlobCollection() = runTest {
         val dataScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {

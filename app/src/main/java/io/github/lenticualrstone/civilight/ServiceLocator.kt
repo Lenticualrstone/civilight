@@ -5,6 +5,7 @@ import io.github.lenticualrstone.civilight.model.app.AppSettings
 import io.github.lenticualrstone.civilight.navigation.NavResults
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.shell.Startup
+import io.github.lenticualrstone.civilight.shell.StartupPurge
 import io.github.lenticualrstone.civilight.store.StoreContainer
 import io.github.lenticualrstone.civilight.ui.feature.StartupHooks
 import io.github.lenticualrstone.civilight.ui.project.ProjectSessions
@@ -61,6 +62,7 @@ class ServiceLocator(context: Context) {
             _start.value = result.routes
             stores.settings.settings.collect { _settings.value = it }
         }
-        appScope.launch(Dispatchers.IO) { runCatching { stores.runMaintenance() } }
+        // Start-up maintenance off the main thread: whole projects, records, rows trashed inside projects, blobs.
+        appScope.launch(Dispatchers.IO) { StartupPurge(stores, projects).run() }
     }
 }

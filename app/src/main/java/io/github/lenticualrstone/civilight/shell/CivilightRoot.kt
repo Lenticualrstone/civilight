@@ -39,6 +39,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.Motion
 import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.feature.library.tour.ModuleTourFrame
 import io.github.lenticualrstone.civilight.navigation.BackStackNavigator
 import io.github.lenticualrstone.civilight.navigation.HiddenProjectLock
 import io.github.lenticualrstone.civilight.navigation.ProjectRoute
@@ -236,8 +237,8 @@ private fun exposureOf(route: Route?, deps: FeatureDeps): ScreenExposure {
 
 /**
  * Every route's entry: the feature's (or the placeholder), with the route in its metadata, project
- * routes wrapped in [ProjectEntryFrame] (open store, protection, hidden lock) and the script in the
- * STO-16 lens hook.
+ * routes wrapped in [ProjectEntryFrame] (open store, protection, hidden lock), the script in the
+ * STO-16 lens hook, and each module's entry route in its first-entry tour (LIB-19, [ModuleTourFrame]).
  */
 private fun shellEntryProvider(deps: FeatureDeps): (NavKey) -> NavEntry<NavKey> {
     val features = entryProvider<NavKey>(fallback = { key -> placeholderEntry(key, deps) }) {
@@ -248,11 +249,11 @@ private fun shellEntryProvider(deps: FeatureDeps): (NavKey) -> NavEntry<NavKey> 
         val projectKey = (key as? ProjectRoute)?.projectKey?.takeIf { key !is HiddenProjectLock }
         NavEntry(key, entry.contentKey, entry.metadata + RouteMetadata.of(key)) {
             if (projectKey == null) {
-                entry.Content()
+                ModuleTourFrame(key, deps) { entry.Content() }
             } else {
                 ProjectEntryFrame(projectKey, deps) {
                     if (key is Script) ScriptLensEffect()
-                    entry.Content()
+                    ModuleTourFrame(key, deps) { entry.Content() }
                 }
             }
         }

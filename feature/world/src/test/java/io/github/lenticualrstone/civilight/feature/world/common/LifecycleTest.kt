@@ -59,6 +59,7 @@ class LifecycleTest {
         val impact = ItemLifecycle.impact(doc, ItemId.term(T1))
         assertTrue(impact.needsSheet)
         val sheet = MergePlan.deleteSheet(impact)
+        assertEquals(sheet.owned, MergePlan.deleteSheet(impact, hiddenLocked = false).owned)
         assertEquals("‘오리지늄 등불’ 지우기", sheet.title)
         assertTrue(sheet.sub, sheet.sub.startsWith("용어 · 참조 "))
         assertTrue(sheet.owned.any { it.label == "◇ 첫 공개 1" })

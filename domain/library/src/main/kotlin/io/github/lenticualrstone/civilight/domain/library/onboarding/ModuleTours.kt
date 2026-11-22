@@ -13,7 +13,7 @@ enum class TourModule(val id: String, val rowTitle: String, val label: String?) 
     CAST("CAST", "인물", "인물 안내"),
     WORLD_TIMELINE("WORLD_TIMELINE", "세계 · 연표", "세계 안내"),
     RECORDER("RECORDER", "라이프 레코더", "레코더 안내"),
-    LIBRARY_HIDING("LIBRARY_HIDING", "서재 · 숨기기", TODO_COPY_LIB19_LIBRARY_LABEL),
+    LIBRARY_HIDING("LIBRARY_HIDING", "서재 · 숨기기", "서재 안내"),
     MAP("MAP", "지도 만들기", "지도 안내"),
     ROUTE_PLACE_TIME("ROUTE_PLACE_TIME", "인물 동선 · 장소와 때", "장소와 때 안내"),
 }
@@ -24,15 +24,14 @@ data class TourStep(val title: String, val sub: String) {
     val hasCopy: Boolean get() = !title.startsWith(TODO_PREFIX) && !sub.startsWith(TODO_PREFIX)
 }
 
-/** The 서재 · 숨기기 tour has no board (§6 Q15). */
-const val TODO_COPY_LIB19_LIBRARY_LABEL = "TODO_COPY_LIB19_LIBRARY_LABEL"
 private const val TODO_PREFIX = "TODO_COPY_"
 
 /**
- * Tooltip tours (LIB-19): the step copy drawn on the boards, the seen flags and the card buttons.
- * Each module area supplies the targets (where the hole goes) and calls [shouldStart] on its first
- * entry; the shade, hole and card are DS `TourDim` + `TourCard`. Undrawn steps are `TODO_COPY_`
- * constants; a tour whose copy is incomplete does not start on its own ([shouldStart]).
+ * Tooltip tours (LIB-19): the step copy, the seen flags and the card buttons. Each module area
+ * supplies the targets (where the hole goes) and calls [shouldStart] on its first entry; the shade,
+ * hole and card are DS `TourDim` + `TourCard`. Steps the boards draw are verbatim; the undrawn steps
+ * and the whole 서재 · 숨기기 tour (§6 Q15) were worded by the orchestrator on 2026-11-23 from each
+ * area's own copy. A tour whose copy is incomplete would not start on its own ([shouldStart]).
  */
 object ModuleTours {
     const val SKIP = "건너뛰기"
@@ -40,72 +39,44 @@ object ModuleTours {
     const val NEXT = "다음"
     const val FINISH = "마치기"
 
-    const val TODO_COPY_LIB19_SCRIPT_3_TITLE = "TODO_COPY_LIB19_SCRIPT_3_TITLE"
-    const val TODO_COPY_LIB19_SCRIPT_3_SUB = "TODO_COPY_LIB19_SCRIPT_3_SUB"
-    const val TODO_COPY_LIB19_CAST_2_TITLE = "TODO_COPY_LIB19_CAST_2_TITLE"
-    const val TODO_COPY_LIB19_CAST_2_SUB = "TODO_COPY_LIB19_CAST_2_SUB"
-    const val TODO_COPY_LIB19_CAST_3_TITLE = "TODO_COPY_LIB19_CAST_3_TITLE"
-    const val TODO_COPY_LIB19_CAST_3_SUB = "TODO_COPY_LIB19_CAST_3_SUB"
-    const val TODO_COPY_LIB19_WORLD_2_TITLE = "TODO_COPY_LIB19_WORLD_2_TITLE"
-    const val TODO_COPY_LIB19_WORLD_2_SUB = "TODO_COPY_LIB19_WORLD_2_SUB"
-    const val TODO_COPY_LIB19_WORLD_3_TITLE = "TODO_COPY_LIB19_WORLD_3_TITLE"
-    const val TODO_COPY_LIB19_WORLD_3_SUB = "TODO_COPY_LIB19_WORLD_3_SUB"
-    const val TODO_COPY_LIB19_RECORDER_1_TITLE = "TODO_COPY_LIB19_RECORDER_1_TITLE"
-    const val TODO_COPY_LIB19_RECORDER_1_SUB = "TODO_COPY_LIB19_RECORDER_1_SUB"
-    const val TODO_COPY_LIB19_RECORDER_3_TITLE = "TODO_COPY_LIB19_RECORDER_3_TITLE"
-    const val TODO_COPY_LIB19_RECORDER_3_SUB = "TODO_COPY_LIB19_RECORDER_3_SUB"
-    const val TODO_COPY_LIB19_LIBRARY_1_TITLE = "TODO_COPY_LIB19_LIBRARY_1_TITLE"
-    const val TODO_COPY_LIB19_LIBRARY_1_SUB = "TODO_COPY_LIB19_LIBRARY_1_SUB"
-    const val TODO_COPY_LIB19_LIBRARY_2_TITLE = "TODO_COPY_LIB19_LIBRARY_2_TITLE"
-    const val TODO_COPY_LIB19_LIBRARY_2_SUB = "TODO_COPY_LIB19_LIBRARY_2_SUB"
-    const val TODO_COPY_LIB19_LIBRARY_3_TITLE = "TODO_COPY_LIB19_LIBRARY_3_TITLE"
-    const val TODO_COPY_LIB19_LIBRARY_3_SUB = "TODO_COPY_LIB19_LIBRARY_3_SUB"
-    const val TODO_COPY_LIB19_MAP_2_TITLE = "TODO_COPY_LIB19_MAP_2_TITLE"
-    const val TODO_COPY_LIB19_MAP_2_SUB = "TODO_COPY_LIB19_MAP_2_SUB"
-    const val TODO_COPY_LIB19_MAP_3_TITLE = "TODO_COPY_LIB19_MAP_3_TITLE"
-    const val TODO_COPY_LIB19_MAP_3_SUB = "TODO_COPY_LIB19_MAP_3_SUB"
-    const val TODO_COPY_LIB19_WHEN_2_TITLE = "TODO_COPY_LIB19_WHEN_2_TITLE"
-    const val TODO_COPY_LIB19_WHEN_2_SUB = "TODO_COPY_LIB19_WHEN_2_SUB"
-    const val TODO_COPY_LIB19_WHEN_3_TITLE = "TODO_COPY_LIB19_WHEN_3_TITLE"
-    const val TODO_COPY_LIB19_WHEN_3_SUB = "TODO_COPY_LIB19_WHEN_3_SUB"
 
     /** Steps per module, in order (spec LIB-19 table; boards `Tour1`, `Tour2`, `Tour4`, `TourCast`, `TourWorld`, `TourLr`, `TourMap`, `TourWhen`). */
     fun steps(module: TourModule): List<TourStep> = when (module) {
         TourModule.SCRIPT -> listOf(
             TourStep("명령 칸", "이동 · 검색 · 블록 추가 · 마이크"),
             TourStep("블록을 왼쪽으로", "시간 · 참고 · 속성 → 옆 패널 탭"),
-            TourStep(TODO_COPY_LIB19_SCRIPT_3_TITLE, TODO_COPY_LIB19_SCRIPT_3_SUB),
+            TourStep("씬 머리", "장소와 때 · 전환 문구 · ⋯ 메뉴"),
             TourStep("시점 렌즈", "고른 시점까지의 인물 · 관계 · 용어"),
         )
         TourModule.CAST -> listOf(
             TourStep("시점 렌즈", "이 시점까지의 필드 · 관계만"),
-            TourStep(TODO_COPY_LIB19_CAST_2_TITLE, TODO_COPY_LIB19_CAST_2_SUB),
-            TourStep(TODO_COPY_LIB19_CAST_3_TITLE, TODO_COPY_LIB19_CAST_3_SUB),
+            TourStep("값이 바뀌는 때", "이 값 고치기 · 여기서부터 바뀜"),
+            TourStep("관계", "사이 · 양쪽 마음 · 호칭"),
         )
         TourModule.WORLD_TIMELINE -> listOf(
             TourStep("공개 시점", "앞에서 쓰이면 ▲ 점검 센터"),
-            TourStep(TODO_COPY_LIB19_WORLD_2_TITLE, TODO_COPY_LIB19_WORLD_2_SUB),
-            TourStep(TODO_COPY_LIB19_WORLD_3_TITLE, TODO_COPY_LIB19_WORLD_3_SUB),
+            TourStep("용어 잇기", "원고 속 후보 · 잇기 · 아님"),
+            TourStep("연표", "사건을 때 순서로 · 쓰인 곳"),
         )
         TourModule.RECORDER -> listOf(
-            TourStep(TODO_COPY_LIB19_RECORDER_1_TITLE, TODO_COPY_LIB19_RECORDER_1_SUB),
+            TourStep("기록 남기기", "녹음 · 글로 쓰기 · 멈추고 저장"),
             TourStep("연결", "보던 곳 · 넣기 전까지 내용은 그대로"),
-            TourStep(TODO_COPY_LIB19_RECORDER_3_TITLE, TODO_COPY_LIB19_RECORDER_3_SUB),
+            TourStep("기록함", "원고에 넣기 · 카드에 넣기 · 페이지로 만들기"),
         )
         TourModule.LIBRARY_HIDING -> listOf(
-            TourStep(TODO_COPY_LIB19_LIBRARY_1_TITLE, TODO_COPY_LIB19_LIBRARY_1_SUB),
-            TourStep(TODO_COPY_LIB19_LIBRARY_2_TITLE, TODO_COPY_LIB19_LIBRARY_2_SUB),
-            TourStep(TODO_COPY_LIB19_LIBRARY_3_TITLE, TODO_COPY_LIB19_LIBRARY_3_SUB),
+            TourStep("프로젝트 숨기기", "⋯ 메뉴 · 지문 · PIN으로 열림"),
+            TourStep("숨긴 프로젝트", "한 묶음 · 연 뒤 다시 잠그기"),
+            TourStep("설정 › 숨기기", "위젯 · 최근 항목 · 검색에서 빠짐"),
         )
         TourModule.MAP -> listOf(
             TourStep("도구 줄", "이동 · 핀 · 영역 · 경로 · 라벨 · 레이어 · 고른 것만 동작"),
-            TourStep(TODO_COPY_LIB19_MAP_2_TITLE, TODO_COPY_LIB19_MAP_2_SUB),
-            TourStep(TODO_COPY_LIB19_MAP_3_TITLE, TODO_COPY_LIB19_MAP_3_SUB),
+            TourStep("경로", "거리 · 이동 수단 → 걸리는 날"),
+            TourStep("보이는 시점", "이 시점부터 지도에 나옴 · 쓰인 곳"),
         )
         TourModule.ROUTE_PLACE_TIME -> listOf(
             TourStep("장소와 때", "직전 씬 기준 · 시간대 · 정확/대략 → 이동 점검"),
-            TourStep(TODO_COPY_LIB19_WHEN_2_TITLE, TODO_COPY_LIB19_WHEN_2_SUB),
-            TourStep(TODO_COPY_LIB19_WHEN_3_TITLE, TODO_COPY_LIB19_WHEN_3_SUB),
+            TourStep("▲ 이동 시간", "못 닿으면 표시 · +일 · 다른 수단 · 맞음"),
+            TourStep("인물 동선", "씬 순서대로 지도 위에"),
         )
     }
 

@@ -228,7 +228,7 @@ internal fun LibraryScreen(services: LibraryServices) {
         }
     }
 
-    // LIB-19 `서재 · 숨기기` tour: dormant until its copy and anchors exist (§6 Q15).
+    // LIB-19 `서재 · 숨기기` tour (copy 2026-11-23; no anchors yet, so its card sits mid-screen).
     ModuleTourHost(TourModule.LIBRARY_HIDING, deps) {
     CenterColumn {
         CivilightScreen(

@@ -26,6 +26,16 @@ class ItemTrashTest {
     )
 
     @Test
+    fun `locked hidden items show as counts on the impact sheet`() {
+        val doc = io.github.lenticualrstone.civilight.model.sample.ExampleGallery.build()
+        val impact = ItemTrash.impact(doc, EntityKind.CHARACTER, K.RIEN, null)!!
+        val open = ItemTrash.sheet(EntityKind.CHARACTER, impact)
+        val locked = ItemTrash.sheet(EntityKind.CHARACTER, impact, hiddenLocked = true)
+        assertTrue(open.owned.any { it.label == "이미지" && it.count == "10" })
+        assertTrue(locked.owned.any { "${it.label} ${it.count}" == "이미지 8 · 숨김 2" })
+    }
+
+    @Test
     fun `CST-40 노아's sheet splits counts and keeps the board's rows`() {
         val doc = noahLive()
         val impact = ItemTrash.impact(doc, EntityKind.CHARACTER, K.NOAH, recorder)!!

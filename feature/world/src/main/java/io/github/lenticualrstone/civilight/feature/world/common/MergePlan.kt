@@ -69,8 +69,8 @@ data class MergeSheetUi(
  * (`경로 끝`, two `첫 공개`) from `domain:world`.
  */
 object MergePlan {
-    fun deleteSheet(impact: DeleteImpact): DeleteSheetUi {
-        val sheet = Messages.impactSheet(impact)
+    fun deleteSheet(impact: DeleteImpact, hiddenLocked: Boolean = false): DeleteSheetUi {
+        val sheet = Messages.impactSheet(impact, hiddenLocked)
         return DeleteSheetUi(
             title = sheet.title,
             sub = sheet.sub,

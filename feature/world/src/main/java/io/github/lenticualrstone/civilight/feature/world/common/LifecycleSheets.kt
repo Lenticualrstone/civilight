@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -91,7 +92,8 @@ fun SheetScope.DeleteSheetContent(key: DeleteSheet, vm: WorldViewModel, readOnly
     val impact by produceState<io.github.lenticualrstone.civilight.domain.trash.DeleteImpact?>(null, key) { value = vm.impact(item) }
     val scope = rememberCoroutineScope()
     val sheet = this
-    val ui = impact?.let(MergePlan::deleteSheet) ?: return
+    val hiddenOpen by vm.hiddenOpen.collectAsState()
+    val ui = impact?.let { MergePlan.deleteSheet(it, hiddenLocked = !hiddenOpen) } ?: return
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     SheetHeader(title = ui.title, onClose = ::close, subtitle = ui.sub)

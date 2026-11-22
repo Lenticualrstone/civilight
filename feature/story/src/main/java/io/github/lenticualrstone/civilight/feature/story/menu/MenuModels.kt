@@ -94,7 +94,7 @@ object UnitMenuModel {
     /**
      * Scene ⋯. On a scene head it is `domain:story` `SceneHeads.menu` as is (SCR-47). In the 스토리
      * list (STO-07): `장소와 때 · 전환 문구 · 앞 씬과 합치기` (disabled for an episode's first scene) `·
-     * 여기서 나누기 · 옮기기 · 씬 지우기`, then `완료` (copy not drawn, so left out for now).
+     * 여기서 나누기 · 옮기기 · 씬 지우기`, then `완료 표시` (`완료 표시 빼기` when set).
      */
     private fun sceneMenu(doc: ProjectDoc, scene: StoryUnit, surface: MenuSurface, readOnly: Boolean): MenuModel? {
         val head = SceneHeads(doc).menu(scene.key, readOnly) ?: return null
@@ -115,14 +115,13 @@ object UnitMenuModel {
 
     /**
      * Episode ⋯: `번호 다시 매기기 · 1-7` (the drawn item, STO-07 → SCR-22), `옮기기` (STO-08), then
-     * `새 에피소드` and `완료` (copy not drawn, Q34, left out). Units above the episode level: `옮기기`
-     * and `새 장` (copy not drawn, left out).
+     * `새 에피소드` and `완료 표시` / `완료 표시 빼기`. Units above the episode level: `옮기기` and `새 장`.
      */
     private fun unitMenu(doc: ProjectDoc, unit: StoryUnit, readOnly: Boolean): MenuModel {
         val view = StoryOverview(doc)
         val isEpisode = unit.level == doc.project.structure.episodeLevel
         val title = if (isEpisode) "${view.codes.episodeCode(unit)} · ${unit.title ?: StoryCopy.UNTITLED}" else view.codes.chapterHeader(unit)
-        val newLabel = if (isEpisode) StoryCopy.TODO_COPY_STO_NEW_EPISODE else StoryCopy.TODO_COPY_STO_NEW_CHAPTER
+        val newLabel = if (isEpisode) StoryCopy.NEW_EPISODE else StoryCopy.NEW_CHAPTER
         val rows = buildList {
             if (isEpisode) add(mutating(MenuAction.RENUMBER, "${MenuCopy.RENUMBER} · ${view.codes.episodeCode(unit)}", null, readOnly))
             // `옮기기` (STO-08): the explicit path for reordering episodes and chapters (no drag needed).
@@ -139,9 +138,9 @@ object UnitMenuModel {
         val isScene = unit.level == doc.project.structure.sceneLevel
         val status = if (isScene) view.status(unit).word else view.episodeStatus(unit)
         return if (unit.doneMarked) {
-            mutating(MenuAction.UNMARK_DONE, StoryCopy.TODO_COPY_STO_UNMARK_DONE, status, readOnly)
+            mutating(MenuAction.UNMARK_DONE, StoryCopy.UNMARK_DONE, status, readOnly)
         } else {
-            mutating(MenuAction.MARK_DONE, StoryCopy.TODO_COPY_STO_MARK_DONE, status, readOnly)
+            mutating(MenuAction.MARK_DONE, StoryCopy.MARK_DONE, status, readOnly)
         }
     }
 
@@ -151,8 +150,7 @@ object UnitMenuModel {
 
 /**
  * The structure ⋯ on the 스토리 head (STO-07): `장소 · 때 한꺼번에`, `단계 이름 | 장 › 에피소드 › 씬`
- * (board `ProjSettings` row), and `새 장` at the end (copy not drawn; `새 에피소드` at 2 levels,
- * absent at 1 level).
+ * (board `ProjSettings` row), and `새 장` at the end (`새 에피소드` at 2 levels, absent at 1 level).
  */
 object StructureMenuModel {
     fun build(doc: ProjectDoc, readOnly: Boolean): MenuModel {
@@ -161,8 +159,8 @@ object StructureMenuModel {
             add(MenuRow(MenuAction.BULK, StructureCopy.BULK, null))
             add(MenuRow(MenuAction.LEVEL_NAMES, StructureCopy.LEVEL_NAMES, levels.joinToString(" › ")))
             when {
-                levels.size >= 3 -> add(UnitMenuModel.mutating(MenuAction.NEW_TOP_UNIT, StoryCopy.TODO_COPY_STO_NEW_CHAPTER, null, readOnly))
-                levels.size == 2 -> add(UnitMenuModel.mutating(MenuAction.NEW_TOP_UNIT, StoryCopy.TODO_COPY_STO_NEW_EPISODE, null, readOnly))
+                levels.size >= 3 -> add(UnitMenuModel.mutating(MenuAction.NEW_TOP_UNIT, StoryCopy.NEW_CHAPTER, null, readOnly))
+                levels.size == 2 -> add(UnitMenuModel.mutating(MenuAction.NEW_TOP_UNIT, StoryCopy.NEW_EPISODE, null, readOnly))
             }
         }
         return MenuModel(StructureCopy.TITLE, rows).drawnOnly()

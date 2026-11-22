@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.story
 
 import io.github.lenticualrstone.civilight.domain.story.scene.SceneHeads
 import io.github.lenticualrstone.civilight.feature.story.Fx.node
+import io.github.lenticualrstone.civilight.feature.story.common.StoryActions
 import io.github.lenticualrstone.civilight.feature.story.menu.MenuAction
 import io.github.lenticualrstone.civilight.feature.story.menu.MenuSurface
 import io.github.lenticualrstone.civilight.feature.story.menu.StructureMenuModel
@@ -26,10 +27,11 @@ class MenuModelTest {
         val menu = UnitMenuModel.build(doc, K.SCENE_1_7_4, MenuSurface.STORY_LIST, readOnly = false)!!
         assertEquals("씬 4 · 1-7", menu.title)
         assertEquals(
-            listOf(MenuAction.PLACE_TIME, MenuAction.TRANSITION, MenuAction.MERGE_PREVIOUS, MenuAction.SPLIT_HERE, MenuAction.MOVE, MenuAction.DELETE_SCENE),
+            listOf(MenuAction.PLACE_TIME, MenuAction.TRANSITION, MenuAction.MERGE_PREVIOUS, MenuAction.SPLIT_HERE, MenuAction.MOVE, MenuAction.DELETE_SCENE, MenuAction.MARK_DONE),
             menu.rows.map { it.action },
         )
         val byAction = menu.rows.associateBy { it.action }
+        assertEquals("완료 표시", byAction.getValue(MenuAction.MARK_DONE).label)
         assertEquals("장소와 때" to "결사의 문 · 2일째 아침 06:10", byAction.getValue(MenuAction.PLACE_TIME).let { it.label to it.value })
         assertEquals("직접 · 결사의 문 앞 · 06:10", byAction.getValue(MenuAction.TRANSITION).value)
         assertEquals("앞 씬과 합치기" to "씬 3 · 꺼진 등불", byAction.getValue(MenuAction.MERGE_PREVIOUS).let { it.label to it.value })
@@ -73,16 +75,19 @@ class MenuModelTest {
         val episode = UnitMenuModel.build(doc, K.EPISODE_1_7, MenuSurface.STORY_LIST, readOnly = true)!!
         assertTrue(episode.rows.none { it.enabled })
         val structure = StructureMenuModel.build(doc, readOnly = true)
-        assertEquals(listOf(true, true), structure.rows.map { it.enabled })
+        assertEquals(listOf(true, true, false), structure.rows.map { it.enabled })
+        assertEquals("읽기 전용", structure.rows[2].value)
     }
 
     @Test
     fun episodeMenu() {
         val menu = UnitMenuModel.build(doc, K.EPISODE_1_7, MenuSurface.STORY_LIST, readOnly = false)!!
         assertEquals("1-7 · 잿빛 새벽의 등불", menu.title)
-        // `새 에피소드` and `완료` have no drawn copy (Q34), so only the drawn row shows.
-        assertEquals(listOf(MenuAction.RENUMBER, MenuAction.MOVE), menu.rows.map { it.action })
+        // `새 에피소드` and `완료 표시` follow the drawn rows (Q34 words, 2026-11-23).
+        assertEquals(listOf(MenuAction.RENUMBER, MenuAction.MOVE, MenuAction.NEW_UNIT_AFTER, MenuAction.MARK_DONE), menu.rows.map { it.action })
         assertEquals("번호 다시 매기기 · 1-7", menu.rows[0].label)
+        assertEquals("새 에피소드", menu.rows[2].label)
+        assertEquals("완료 표시", menu.rows[3].label)
         assertEquals("1-8 · 미정", UnitMenuModel.build(doc, K.EPISODE_1_8, MenuSurface.STORY_LIST, readOnly = false)!!.title)
     }
 
@@ -90,7 +95,8 @@ class MenuModelTest {
     fun chapterMenuAndGoneUnits() {
         val menu = UnitMenuModel.build(doc, K.CHAPTER_1, MenuSurface.STORY_LIST, readOnly = false)!!
         assertEquals("Ⅰ 1장 · 등불지기", menu.title)
-        assertEquals(listOf(MenuAction.MOVE), menu.rows.map { it.action })
+        assertEquals(listOf(MenuAction.MOVE, MenuAction.NEW_UNIT_AFTER), menu.rows.map { it.action })
+        assertEquals("새 장", menu.rows[1].label)
         assertNull(UnitMenuModel.build(doc, "unknown", MenuSurface.STORY_LIST, readOnly = false))
     }
 
@@ -98,13 +104,23 @@ class MenuModelTest {
     fun structureMenuFollowsTheLevelCount() {
         val three = StructureMenuModel.build(doc, readOnly = false)
         assertEquals("스토리", three.title)
-        assertEquals(listOf(MenuAction.BULK, MenuAction.LEVEL_NAMES), three.rows.map { it.action })
+        assertEquals(listOf(MenuAction.BULK, MenuAction.LEVEL_NAMES, MenuAction.NEW_TOP_UNIT), three.rows.map { it.action })
         assertEquals("장소 · 때 한꺼번에", three.rows[0].label)
         assertEquals("단계 이름" to "장 › 에피소드 › 씬", three.rows[1].let { it.label to it.value })
+        assertEquals("새 장", three.rows[2].label)
         val two = StructureMenuModel.build(Fx.mini(listOf("막", "장면"), node("A1")), readOnly = false)
-        assertEquals(listOf(MenuAction.BULK, MenuAction.LEVEL_NAMES), two.rows.map { it.action })
+        assertEquals(listOf(MenuAction.BULK, MenuAction.LEVEL_NAMES, MenuAction.NEW_TOP_UNIT), two.rows.map { it.action })
+        assertEquals("새 에피소드", two.rows[2].label)
         val one = StructureMenuModel.build(Fx.mini(listOf("씬"), node("S1")), readOnly = false)
         assertEquals(listOf(MenuAction.BULK, MenuAction.LEVEL_NAMES), one.rows.map { it.action })
+    }
+
+    @Test
+    fun aDoneUnitOffersToTakeTheMarkOff() {
+        val done = StoryActions.setDone(doc, K.EPISODE_1_7, true, Fx.ctx())
+        val row = UnitMenuModel.build(done, K.EPISODE_1_7, MenuSurface.STORY_LIST, readOnly = false)!!.rows.last()
+        assertEquals(MenuAction.UNMARK_DONE to "완료 표시 빼기", row.action to row.label)
+        assertEquals("완료", row.value)
     }
 
     @Test

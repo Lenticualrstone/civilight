@@ -59,6 +59,7 @@ fun SheetScope.DeleteImpactContent(sheet: DeleteImpactSheet) {
     val editor = rememberCastEditor(sheet.projectKey)
     val load by editor.state.collectAsState()
     val recorder by deps.stores.recorder.state.collectAsState()
+    val unlock by deps.unlock.state.collectAsState()
     val flow = rememberItemTrash(sheet.projectKey)
     // Set once this sheet closes itself, so the item leaving the doc cannot close it (or the sheet below) twice.
     var done by remember { mutableStateOf(false) }
@@ -91,7 +92,7 @@ fun SheetScope.DeleteImpactContent(sheet: DeleteImpactSheet) {
         }
         return
     }
-    val view = remember(impact) { ItemTrash.sheet(sheet.kind, impact) }
+    val view = remember(impact, unlock) { ItemTrash.sheet(sheet.kind, impact, hiddenLocked = !unlock.itemsOpen(sheet.projectKey)) }
     ImpactSheetBody(
         view,
         onCancel = {

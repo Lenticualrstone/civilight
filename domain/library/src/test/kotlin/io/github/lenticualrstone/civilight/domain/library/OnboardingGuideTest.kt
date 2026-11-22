@@ -38,14 +38,22 @@ class OnboardingGuideTest {
     }
 
     @Test
-    fun `LIB-19 a tour runs once, and not while its copy is missing`() {
+    fun `LIB-19 every tour has its copy and runs once, and 다시 보기 runs it again`() {
         val fresh = OnboardingState()
-        // Every module has at least one undrawn step today, so none starts on its own yet.
-        TourModule.entries.forEach { assertFalse(it.name, ModuleTours.shouldStart(fresh, it)) }
-        assertFalse(ModuleTours.copyComplete(TourModule.LIBRARY_HIDING))
+        // Every step has words now (2026-11-23), so every tour starts on its first entry.
+        TourModule.entries.forEach {
+            assertTrue(it.name, ModuleTours.copyComplete(it))
+            assertTrue(it.name, ModuleTours.shouldStart(fresh, it))
+            assertTrue(it.name, ModuleTours.steps(it).all { s -> s.title.isNotBlank() && s.sub.isNotBlank() && !s.title.startsWith("TODO_COPY_") && !s.sub.startsWith("TODO_COPY_") })
+        }
+        assertEquals("서재 안내", TourModule.LIBRARY_HIDING.label)
         val seen = ModuleTours.markSeen(fresh, TourModule.CAST)
         assertTrue(ModuleTours.seen(seen, TourModule.CAST))
-        assertFalse(ModuleTours.seen(ModuleTours.reset(seen, TourModule.CAST), TourModule.CAST))
+        assertFalse(ModuleTours.shouldStart(seen, TourModule.CAST))
+        // LIB-21 `다시 보기`: the flag is reset, so the tour starts again on the next entry.
+        val replay = ModuleTours.reset(seen, TourModule.CAST)
+        assertFalse(ModuleTours.seen(replay, TourModule.CAST))
+        assertTrue(ModuleTours.shouldStart(replay, TourModule.CAST))
     }
 
     @Test

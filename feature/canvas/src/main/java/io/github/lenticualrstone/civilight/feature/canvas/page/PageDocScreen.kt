@@ -363,11 +363,7 @@ private fun pageSheet(
                     } else {
                         add(SheetAction(PageCopy.BTN_HIDE, {
                             close()
-                            vm.setHidden(key.pageKey, true) { r ->
-                                done(r)
-                                // Like a project just hidden (LIB-33): it stays open until the next re-lock.
-                                if (r == EditResult.APPLIED) deps.unlock.unlockItems(key.projectKey)
-                            }
+                            vm.setHidden(key.pageKey, true, done)
                         }))
                     }
                     add(SheetAction(PageCopy.BTN_DELETE, {

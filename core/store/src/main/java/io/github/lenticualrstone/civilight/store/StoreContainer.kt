@@ -93,7 +93,7 @@ class StoreContainer(
     /**
      * Daily job and app start (LIB-39 `ED`): purges trashed projects and recorder records whose
      * date has come, then collects unused blobs. Rows trashed inside a project are purged by the
-     * trash domain when that project is open.
+     * app right after this (`domain:actions` `PurgeActions.runDue`, then [deleteUnreferencedBlobs]).
      */
     suspend fun runMaintenance() {
         for (entry in library.purgeExpired()) {
@@ -111,17 +111,35 @@ class StoreContainer(
      * project directory, damaged recorder files): its missing rows may still name blobs.
      */
     suspend fun collectBlobGarbage(): List<String> {
+        val referenced = referencedBlobs() ?: return emptyList()
+        return blobs.collectGarbage(referenced, env.timing.blobGraceMs)
+    }
+
+    /**
+     * Deletes exactly [hashes] (the daily purge's `PurgeRun.blobsToDelete`, `domain:actions`) once the
+     * same full scan as [collectBlobGarbage] confirms that no project row (live or trashed, any
+     * project, not only the ones the purge was given) and no recorder record still references them.
+     * Same safeguards: nothing while any project cannot be read completely; recent imports are kept.
+     */
+    suspend fun deleteUnreferencedBlobs(hashes: Collection<String>): List<String> {
+        if (hashes.isEmpty()) return emptyList()
+        val referenced = referencedBlobs() ?: return emptyList()
+        return blobs.collectGarbage(referenced, env.timing.blobGraceMs, only = hashes.toSet())
+    }
+
+    /** Every blob hash a project row or a record references, or null when a project cannot be read completely. */
+    private suspend fun referencedBlobs(): Set<String>? {
         library.ensureLoaded()
         recorder.ensureLoaded()
-        if (library.reconcileReport.unreadable.isNotEmpty() || recorder.hasSetAsideFiles()) return emptyList()
+        if (library.reconcileReport.unreadable.isNotEmpty() || recorder.hasSetAsideFiles()) return null
         val referenced = HashSet<String>()
         for (entry in library.state.value.entries) {
-            val scan = runCatching { library.scan(entry.key) }.getOrNull() ?: return emptyList()
-            if (scan.incomplete) return emptyList()
+            val scan = runCatching { library.scan(entry.key) }.getOrNull() ?: return null
+            if (scan.incomplete) return null
             referenced += BlobReferences.of(scan.doc)
         }
         referenced += BlobReferences.of(recorder.state.value.library)
-        return blobs.collectGarbage(referenced, env.timing.blobGraceMs)
+        return referenced
     }
 
     companion object {

@@ -64,11 +64,11 @@ class LibraryCopyLintTest {
         add(OnboardingCopy.exploreLine(OnboardingCopy.EXPLORE_SCRIPT, "1-7 씬 3"))
         add(HelpCopy.stepsLine(3, seen = true))
         add(HelpCopy.stepsLine(4, seen = false))
-        // LIB-19 tour copy drawn on the boards (domain:library), and the card words.
+        // LIB-19 tour copy (domain:library: drawn steps and the 2026-11-23 words), and the card words.
         TourModule.entries.forEach { m ->
-            m.label?.takeUnless { it.startsWith("TODO_COPY_") }?.let(::add)
+            m.label?.let(::add)
             add(m.rowTitle)
-            ModuleTours.steps(m).filter { it.hasCopy }.forEach { add(it.title); add(it.sub) }
+            ModuleTours.steps(m).forEach { add(it.title); add(it.sub) }
         }
         addAll(listOf(ModuleTours.SKIP, ModuleTours.PREVIOUS, ModuleTours.NEXT, ModuleTours.FINISH))
         // 0.1.0 motion wave: copy that lives outside the copy objects (domain:library constants, notices, the export gallery row).

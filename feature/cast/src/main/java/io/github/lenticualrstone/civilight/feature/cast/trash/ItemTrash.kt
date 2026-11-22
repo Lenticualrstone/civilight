@@ -82,8 +82,8 @@ object ItemTrash {
         impact(doc, kind, key, recorder)?.needsSheet
 
     /** The sheet for [impact] (`RCDeleteImpact`). A hidden item shows counts only (no scene list). */
-    fun sheet(kind: EntityKind, impact: DeleteImpact): ImpactSheetView {
-        val sheet = Messages.impactSheet(impact)
+    fun sheet(kind: EntityKind, impact: DeleteImpact, hiddenLocked: Boolean = false): ImpactSheetView {
+        val sheet = Messages.impactSheet(impact, hiddenLocked)
         val word = kind.label
         return ImpactSheetView(
             title = sheet.title,

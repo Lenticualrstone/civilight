@@ -125,13 +125,15 @@ class BlobStore(
 
     /**
      * Deletes every blob not in [referenced] whose last import is older than [graceMs] (a blob
-     * just imported and not yet referenced is kept). Returns the deleted hashes.
+     * just imported and not yet referenced is kept). [only] limits the candidates to those hashes
+     * (null = every stored blob). Returns the deleted hashes.
      */
-    suspend fun collectGarbage(referenced: Set<String>, graceMs: Long): List<String> = withContext(io) {
+    suspend fun collectGarbage(referenced: Set<String>, graceMs: Long, only: Set<String>? = null): List<String> = withContext(io) {
         ensureScanned()
         val cutoff = clock.now() - graceMs
         val deleted = mutableListOf<String>()
         for ((hash, ext) in extByHash.entries.toList()) {
+            if (only != null && hash !in only) continue
             if (hash in referenced) continue
             val file = File(dir, "$hash.$ext")
             if (file.isFile && file.lastModified() > cutoff) continue
