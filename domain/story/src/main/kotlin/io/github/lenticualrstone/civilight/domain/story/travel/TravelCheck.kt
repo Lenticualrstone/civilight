@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.story.travel
 
+import io.github.lenticualrstone.civilight.domain.story.checks.AckSubject
 import io.github.lenticualrstone.civilight.domain.story.checks.Fingerprints
 import io.github.lenticualrstone.civilight.domain.story.scene.Appearance
 import io.github.lenticualrstone.civilight.domain.story.scene.EditContext
@@ -61,7 +62,7 @@ data class TravelWarning(
     val rangeDriven: Boolean,
     val timeChip: TimeChip,
     val modeChips: List<ModeChip>,
-    val fingerprint: String,
+    override val fingerprint: String,
     /** `▲ 이동 시간 부족`. */
     val headline: String,
     /** `1-7 씬 2 상층 관문 → 씬 3 결사의 문`. */
@@ -78,9 +79,9 @@ data class TravelWarning(
     val straightNote: String?,
     /** Compact row: `같은 때 두 장소 · 세라 | 1-7 씬 2 기록실 · 씬 4 잿더미 시장 · 둘 다 2일째 아침`. */
     val compactLine: String,
-) {
-    val checkType: String get() = verdict.checkType
-    val subjectKeys: List<Key> get() = listOf(characterKey, fromSceneKey, toSceneKey)
+) : AckSubject {
+    override val checkType: String get() = verdict.checkType
+    override val subjectKeys: List<Key> get() = listOf(characterKey, fromSceneKey, toSceneKey)
     val straightLine: Boolean get() = distance is Distance.Straight
 }
 

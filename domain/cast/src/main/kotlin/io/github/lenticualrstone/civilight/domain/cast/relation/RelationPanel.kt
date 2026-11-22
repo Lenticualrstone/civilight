@@ -87,6 +87,22 @@ object RelationPanel {
             )
         }.sortedBy { row -> doc.index.character(row.partnerKey)?.order }
 
+    /**
+     * The `참고` panel's 호칭 rows (`CSheetRef`): `리엔을 | ‘꼬마’` for each partner the speaker calls
+     * something just before the block.
+     */
+    fun addressRows(doc: ProjectDoc, speakerKey: Key, blockKey: Key, hiddenUnlocked: Boolean = false): List<Pair<String, String>> =
+        rows(doc, speakerKey, blockKey, hiddenUnlocked).mapNotNull { row ->
+            row.address?.let { "${row.partnerName}${objectParticle(row.partnerName)}" to "‘$it’" }
+        }
+
+    /** `을` after a final consonant (`리엔을`), `를` otherwise (`세라를`). */
+    fun objectParticle(word: String): String {
+        val last = word.lastOrNull() ?: return "를"
+        val hasFinal = last.code in 0xAC00..0xD7A3 && (last.code - 0xAC00) % 28 != 0
+        return if (hasFinal) "을" else "를"
+    }
+
     /** The row with [partnerKey], or null. */
     fun row(doc: ProjectDoc, speakerKey: Key, partnerKey: Key, blockKey: Key): PanelRelationRow? =
         rows(doc, speakerKey, blockKey, hiddenUnlocked = true).firstOrNull { it.partnerKey == partnerKey }

@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.domain.cast.timed
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
 import io.github.lenticualrstone.civilight.domain.cast.EditContext
 import io.github.lenticualrstone.civilight.domain.cast.StoryLabels
+import io.github.lenticualrstone.civilight.domain.story.lens.LensEdit
 import io.github.lenticualrstone.civilight.model.change.Anchor
 import io.github.lenticualrstone.civilight.model.change.ChangeRecord
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
@@ -40,7 +41,9 @@ data class HistoryRow(
 /**
  * The timed-value engine shared by fields, display names and relation slots (rule 11 §1, CST-10):
  * reading with the base fallback, history rows, and the two edit buttons
- * `이 값 고치기` / `여기서부터 바뀜`.
+ * `이 값 고치기` / `여기서부터 바뀜`. Where `여기서부터 바뀜` anchors is decided by `domain:story`
+ * [LensEdit] (the single anchor authority, DECISIONS §1); this object only adds cast's base writers
+ * and sheet copy.
  */
 object TimedValues {
     /** History rows of [target] at [lens] in story order. */
@@ -69,20 +72,18 @@ object TimedValues {
     }
 
     /**
-     * Where `여기서부터 바뀜` puts its record (CST-10, §2.4): at `최신` after the scene holding the
-     * 집필 선 (`unitEnd`), at a past lens from the start of that lens unit (`unitStart`, `1-5 #—`).
-     * Null at `최신` when nothing is written (no 집필 선): then only `이 값 고치기` is offered.
+     * Where `여기서부터 바뀜` puts its record (CST-10, §2.4): [LensEdit.newAnchor]. At `최신` after the
+     * scene holding the 집필 선 (`unitEnd`), with nothing written the start of the first top-level
+     * unit; at a past lens from the start of that lens unit (`unitStart`, `1-5 #—`). Never null since
+     * it follows `LensEdit`; the nullable type is kept for callers.
      */
-    fun changeFromHereAnchor(doc: ProjectDoc, lens: LensPoint): Anchor? = when (lens) {
-        LensPoint.Latest -> doc.manuscript.writingLineSceneKey?.let { Anchor.UnitEnd(it) }
-        is LensPoint.UnitEnd -> if (doc.index.unit(lens.unitKey) != null) Anchor.UnitStart(lens.unitKey) else null
-    }
+    fun changeFromHereAnchor(doc: ProjectDoc, lens: LensPoint): Anchor? = LensEdit.newAnchor(doc, lens)
 
     /** A new live record. */
     fun newRecord(target: ChangeTarget, value: JsonElement?, anchor: Anchor, note: String?, ctx: EditContext): ChangeRecord =
         ChangeRecord(
             key = ctx.newKey(), target = target, value = value, note = note, anchor = anchor,
-            createdAt = ctx.now, updatedAt = ctx.now, updatedBy = ctx.by,
+            createdAt = ctx.now, updatedAt = ctx.now, updatedBy = ctx.device,
         )
 
     /** Adds a record (`시점 추가`, change sheet `기록`, canvas `관계로 만들기`). */
@@ -103,7 +104,7 @@ object TimedValues {
         doc.copy(
             changes = doc.changes.copy(
                 records = doc.changes.records.map { r ->
-                    if (r.key != recordKey) r else r.copy(value = value, note = note ?: r.note, updatedAt = ctx.now, updatedBy = ctx.by)
+                    if (r.key != recordKey) r else r.copy(value = value, note = note ?: r.note, updatedAt = ctx.now, updatedBy = ctx.device)
                 },
             ),
         )
@@ -125,8 +126,9 @@ object TimedValues {
     }
 
     /**
-     * `여기서부터 바뀜`: a new `◆` at [changeFromHereAnchor]. When that is not available (nothing
-     * written), falls back to [correctInEffect].
+     * `여기서부터 바뀜`: a new `◆` at [changeFromHereAnchor], written by [LensEdit.changeFromHere].
+     * There is always an anchor (with nothing written, the first top-level unit's start), so
+     * [setBase] is no longer used; it stays for callers.
      */
     fun changeFromHere(
         doc: ProjectDoc,
@@ -134,12 +136,9 @@ object TimedValues {
         value: JsonElement?,
         lens: LensPoint,
         ctx: EditContext,
-        setBase: (ProjectDoc) -> ProjectDoc,
+        @Suppress("UNUSED_PARAMETER") setBase: (ProjectDoc) -> ProjectDoc,
         note: String? = null,
-    ): ProjectDoc {
-        val anchor = changeFromHereAnchor(doc, lens) ?: return correctInEffect(doc, target, value, lens, ctx, setBase)
-        return addRecord(doc, target, value, anchor, ctx, note).first
-    }
+    ): ProjectDoc = LensEdit.changeFromHere(doc, target, lens, value, ctx, note)
 
     /** The two-button sheet copy for a value with history (`RTEditTwo`, `LensEdit`). */
     fun editSheet(doc: ProjectDoc, target: ChangeTarget, lens: LensPoint, currentText: String, valueText: (ChangeRecord) -> String): EditSheet {
@@ -156,7 +155,8 @@ object TimedValues {
             "처음 값을 고침"
         }
         val changeSub = when (lens) {
-            LensPoint.Latest -> StoryLabels.writingLineScene(doc)?.let { "새 ◆ · 집필 선 $it 뒤" }
+            // Nothing written: LensEdit's sub for the same case.
+            LensPoint.Latest -> StoryLabels.writingLineScene(doc)?.let { "새 ◆ · 집필 선 $it 뒤" } ?: "새 ◆"
             is LensPoint.UnitEnd -> "새 ◆ · ${StoryLabels.lensPoint(doc, lens)}부터"
         }
         val banner = when (lens) {
@@ -208,7 +208,7 @@ data class EditSheet(
     val historyLine: String,
     val correctLabel: String,
     val correctSub: String,
-    /** `여기서부터 바뀜 · 1-7`; null when nothing is written. */
+    /** `여기서부터 바뀜 · 1-7` (`· 전체` when nothing is written). Always set since the anchor follows `LensEdit`. */
     val changeLabel: String?,
     val changeSub: String?,
     val banner: PastLensBanner?,

@@ -15,7 +15,14 @@ import io.github.lenticualrstone.civilight.model.cast.Character
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.cast.Relation
 import io.github.lenticualrstone.civilight.model.cast.SlotValue
+import io.github.lenticualrstone.civilight.model.cast.FieldValue
+import io.github.lenticualrstone.civilight.model.change.ChangeRecord
+import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.change.RelationSlotName
+import io.github.lenticualrstone.civilight.model.doc.history
+import io.github.lenticualrstone.civilight.model.doc.recordAt
+import io.github.lenticualrstone.civilight.model.position.LensPoint
+import kotlinx.serialization.builtins.serializer
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLink
 import io.github.lenticualrstone.civilight.model.script.VoiceMode
@@ -140,10 +147,40 @@ object MergePlanner {
         MergeSlot.Secret -> c.secretBody.takeIf { it.docText.isNotBlank() }
     }
 
+    /** The change-record target behind a cell (fields and the display name have `◆` history), or null. */
+    fun ownerTarget(slot: MergeSlot, characterKey: Key): ChangeTarget? = when (slot) {
+        is MergeSlot.Field -> ChangeTarget.Field(EntityKind.CHARACTER, characterKey, slot.defKey)
+        MergeSlot.DisplayName -> ChangeTarget.DisplayName(characterKey)
+        else -> null
+    }
+
+    /** Live `◆` records of a cell of [characterKey], in story order. */
+    fun history(doc: ProjectDoc, characterKey: Key, slot: MergeSlot): List<ChangeRecord> =
+        ownerTarget(slot, characterKey)?.let { doc.history(it) }.orEmpty()
+
+    /**
+     * A cell as comparable data: its base value and its history (point and value of each live
+     * record). Null only when the cell holds nothing at all, so a target whose value lives only in
+     * `◆` records (리엔's 소속) is never "empty".
+     */
+    fun data(doc: ProjectDoc, c: Character, slot: MergeSlot): Any? {
+        val base = value(c, slot)
+        val history = history(doc, c.key, slot).map { doc.manuscript.rankOf(it.anchor) to it.value }
+        return if (base == null && history.isEmpty()) null else base to history
+    }
+
+    /** A cell as the sheet prints it: the value in effect at `최신` (the base when no record applies). */
     fun text(doc: ProjectDoc, c: Character, slot: MergeSlot): String = when (slot) {
-        is MergeSlot.Field -> doc.index.fieldDef(slot.defKey)?.let { FieldText.format(doc, it, c.fields[slot.defKey]).text }.orEmpty()
+        is MergeSlot.Field -> doc.index.fieldDef(slot.defKey)?.let { def ->
+            val record = doc.recordAt(ownerTarget(slot, c.key)!!, LensPoint.Latest)
+            val shown = if (record != null) record.valueAs(FieldValue.serializer()) else c.fields[slot.defKey]
+            FieldText.format(doc, def, shown).text
+        }.orEmpty()
         MergeSlot.OneLiner -> c.oneLiner.orEmpty()
-        MergeSlot.DisplayName -> c.displayNameBase.orEmpty()
+        MergeSlot.DisplayName -> {
+            val record = doc.recordAt(ownerTarget(slot, c.key)!!, LensPoint.Latest)
+            (if (record != null) record.valueAs(String.serializer()) else c.displayNameBase) ?: c.name
+        }
         MergeSlot.Tags -> CastCopy.joinAll(c.tagKeys.map { doc.index.tag(it)?.name })
         MergeSlot.Speech -> c.speechBody.docText
         MergeSlot.Secret -> c.secretBody.docText
@@ -210,8 +247,8 @@ object MergePlanner {
         val filled = mutableListOf<Pair<MergeSlot, String>>()
         var same = 0
         for (slot in cells(doc, mergedKey, targetKey)) {
-            val m = value(merged, slot)
-            val t = value(target, slot)
+            val m = data(doc, merged, slot)
+            val t = data(doc, target, slot)
             when {
                 m == null -> Unit
                 t == null -> filled += slot to label(doc, slot)

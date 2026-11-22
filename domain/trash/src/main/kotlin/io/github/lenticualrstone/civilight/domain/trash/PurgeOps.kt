@@ -49,7 +49,7 @@ object PurgeOps {
      * while their gate is open ([hiddenUnlocked]), locked ones stay (LIB-39 `ED`).
      */
     fun emptyTrash(doc: ProjectDoc, ctx: TrashContext, hiddenUnlocked: Boolean): PurgeResult =
-        purgeEntries(doc, doc.trash.entries.filter { hiddenUnlocked || !it.hiddenAtDelete }.map { it.key }, ctx)
+        purgeEntries(doc, doc.trash.entries.filter { hiddenUnlocked || !TrashGates.needsAuth(doc, it) }.map { it.key }, ctx)
 
     fun purgeEntries(doc: ProjectDoc, entryKeys: List<Key>, ctx: TrashContext): PurgeResult {
         val state = State(doc, ctx)

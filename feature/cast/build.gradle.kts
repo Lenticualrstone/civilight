@@ -25,6 +25,7 @@ dependencies {
     implementation(project(":domain:library"))
     implementation(project(":domain:recorder"))
     implementation(project(":domain:checks"))
+    implementation(project(":domain:actions"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
@@ -37,6 +38,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.documentfile)
+    implementation(libs.navigation3.runtime)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

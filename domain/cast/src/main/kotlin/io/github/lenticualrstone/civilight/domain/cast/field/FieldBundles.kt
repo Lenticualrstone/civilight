@@ -172,7 +172,7 @@ object FieldBundles {
                 calc = if (f.type == FieldType.CALC) calcSource?.let { CalcSpec(sourceFieldDefKey = it) } else null,
                 bundleOrigin = keepOrigin(b),
                 updatedAt = ctx.now,
-                updatedBy = ctx.by,
+                updatedBy = ctx.device,
             )
         }
         return BundleResult(FieldDefinitions.withDefs(doc, doc.project.fieldDefs + added, ctx), added)

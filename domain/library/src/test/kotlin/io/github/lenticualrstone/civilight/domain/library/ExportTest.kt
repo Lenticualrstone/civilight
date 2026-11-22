@@ -9,6 +9,9 @@ import io.github.lenticualrstone.civilight.domain.library.export.ExportDefaults
 import io.github.lenticualrstone.civilight.domain.library.export.ExportGate
 import io.github.lenticualrstone.civilight.domain.library.export.ExportPlanner
 import io.github.lenticualrstone.civilight.domain.library.export.ExportRow
+import io.github.lenticualrstone.civilight.domain.library.export.ExportRun
+import io.github.lenticualrstone.civilight.domain.library.export.ExportRunOutcome
+import io.github.lenticualrstone.civilight.domain.library.export.ExportSerializer
 import io.github.lenticualrstone.civilight.domain.library.export.ExportSheets
 import io.github.lenticualrstone.civilight.domain.library.export.ExportStart
 import io.github.lenticualrstone.civilight.domain.library.export.ExportWarning
@@ -326,6 +329,9 @@ class ExportTest {
         assertTrue(s.blocks.isEmpty())
         val time = s.time as SceneTime.Relative
         assertEquals("06:10", time.clock.toString())
+        assertEquals(io.github.lenticualrstone.civilight.model.story.TimePrecision.EXACT, time.precision.known)
+        // No scene head among the blocks: the scene has none, and heads are never blocks (R22 §6).
+        // Resolved day 2 · band 아침 come from the story area's resolver (base + interval), not this plan.
     }
 
     @Test
@@ -357,5 +363,28 @@ class ExportTest {
         assertEquals("연출 · 괄호 지문 포함", pdf.row<ExportRow.Layers>()!!.value)
         assertEquals("에피소드 1-7", ExportSheets.rangeLabel(base, listOf(ExampleKeys.EPISODE_1_7)))
         assertNotNull(pdf.row<ExportRow.FileName>())
+    }
+
+    @Test
+    fun `export run - one gate, the script area's writer, then voice fixation`() {
+        var calls = 0
+        val serializer = ExportSerializer { _, plan -> calls++; plan.scenes.size.toString().toByteArray() }
+        val o = options(hiddenS4, ExportFormat.ENGINE_JSON)
+        assertEquals(ExportRunOutcome.Cancelled, ExportRun.run(hiddenS4, o, authenticated = false, serializer = serializer, voiceIdOf = voiceIdOf(hiddenS4), now = Fixtures.NOW))
+        assertEquals(0, calls)
+        val done = ExportRun.run(hiddenS4, o, authenticated = true, serializer = serializer, voiceIdOf = voiceIdOf(hiddenS4), now = Fixtures.NOW) as ExportRunOutcome.Done
+        assertEquals(1, calls)
+        assertEquals("잿빛 새벽의 등불.json", done.file.fileName)
+        assertEquals("application/json", done.file.mimeType)
+        assertEquals(done.plan.scenes.size.toString(), done.file.bytes.toString(Charsets.UTF_8))
+        assertEquals("HRT_0107_043", done.doc.index.block(ExampleKeys.BLOCK_043)!!.voice!!.fixedId)
+        assertTrue(done.plan.recorderRecordKeys.isEmpty())
+
+        val pdf = ExportRun.run(base, options(base, ExportFormat.PDF), authenticated = false, serializer = serializer, voiceIdOf = voiceIdOf(base), now = Fixtures.NOW) as ExportRunOutcome.Done
+        assertEquals(base, pdf.doc)
+        assertEquals("잿빛 새벽의 등불.pdf", pdf.file.fileName)
+        assertEquals("application/pdf", pdf.file.mimeType)
+        assertEquals("표.csv", ExportRun.fileName("표.csv", ExportFormat.CSV))
+        assertEquals("civilight-내보내기-1122.csv", ExportRun.fileName("civilight-내보내기-1122", ExportFormat.CSV))
     }
 }

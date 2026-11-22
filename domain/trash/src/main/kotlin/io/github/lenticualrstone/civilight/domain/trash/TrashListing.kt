@@ -95,7 +95,7 @@ object TrashListing {
             TrashRow(
                 entryKey = entry.key, kind = entry.kind, projectKey = entry.projectKey ?: doc.key,
                 title = title, sub = sub, daysLeft = ctx.daysLeft(entry.deletedAt), deletedAt = entry.deletedAt,
-                masked = masked, restoreNeedsAuth = hiddenItem || doc.project.protections.hidden,
+                masked = masked, restoreNeedsAuth = TrashGates.needsAuth(doc, entry),
                 lines = if (kind == ItemKind.BLOCK && !masked) blockLines(doc, entry) else emptyList(),
             )
         }

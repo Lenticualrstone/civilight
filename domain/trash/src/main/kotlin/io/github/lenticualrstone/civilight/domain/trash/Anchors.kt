@@ -58,4 +58,38 @@ internal object Anchors {
         if (back.isEmpty()) return after to emptyList()
         return after.copy(changes = after.changes.copy(records = records)) to back
     }
+
+    /**
+     * Records that come back from their own trash mark (`기록 지우기` undone, §5.4) missed every
+     * relocation and re-attachment while they were in the trash. Each one is settled against the
+     * current manuscript: an `orphaned` record whose original referent is live again re-attaches;
+     * otherwise a record whose anchor referent is not live relocates (§5.5). An orphaned record
+     * whose original is still gone stays as it is.
+     */
+    fun settleRestored(doc: ProjectDoc, recordKeys: Set<Key>, at: Timestamp, by: String): Pair<ProjectDoc, SettledRecords> {
+        val moves = mutableListOf<Relocation>()
+        val back = mutableListOf<Key>()
+        val records = doc.changes.records.map { record ->
+            if (record.key !in recordKeys || record.deletedAt != null) return@map record
+            val original = record.originalAnchor
+            when {
+                record.anchorState.known == AnchorState.ORPHANED && original != null && referentLive(doc, original) -> {
+                    back += record.key
+                    record.copy(anchor = original, anchorState = AnchorState.NORMAL.open(), originalAnchor = null, updatedAt = at, updatedBy = by)
+                }
+                !referentLive(doc, record.anchor) -> {
+                    val target = doc.manuscript.relocationTarget(record.anchor)
+                    moves += Relocation(record.key, record.anchor, target)
+                    val first = if (record.anchorState.known == AnchorState.ORPHANED) original ?: record.anchor else record.anchor
+                    record.copy(anchor = target, anchorState = AnchorState.ORPHANED.open(), originalAnchor = first, updatedAt = at, updatedBy = by)
+                }
+                else -> record
+            }
+        }
+        if (moves.isEmpty() && back.isEmpty()) return doc to SettledRecords(emptyList(), emptyList())
+        return doc.copy(changes = doc.changes.copy(records = records)) to SettledRecords(moves, back)
+    }
 }
+
+/** What [Anchors.settleRestored] did. */
+internal data class SettledRecords(val relocations: List<Relocation>, val reattached: List<Key>)

@@ -114,7 +114,7 @@ object DisplayNames {
     /** Base override (`displayNameBase`); null or blank = show `이름`. */
     fun setBase(doc: ProjectDoc, characterKey: Key, value: String?, ctx: EditContext): ProjectDoc = doc.copy(
         cast = doc.cast.copy(characters = doc.cast.characters.map { c ->
-            if (c.key != characterKey) c else c.copy(displayNameBase = value?.takeIf { it.isNotBlank() }, updatedAt = ctx.now, updatedBy = ctx.by)
+            if (c.key != characterKey) c else c.copy(displayNameBase = value?.takeIf { it.isNotBlank() }, updatedAt = ctx.now, updatedBy = ctx.device)
         }),
     )
 

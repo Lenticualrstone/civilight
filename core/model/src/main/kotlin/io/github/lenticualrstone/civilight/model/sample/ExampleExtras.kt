@@ -137,22 +137,22 @@ internal object ExampleExtras {
     )
 
     /**
-     * Two acknowledgements (`맞다고 표시한 것 2`). Fingerprints are fixture placeholders: the checks
-     * domain owns the real fingerprint function and treats a mismatch as void (STO-41).
+     * Two acknowledgements (`맞다고 표시한 것 2`). Fingerprints are the real values of the domain:story
+     * Fingerprints scheme (computed by domain:checks), so both stay acknowledged (STO-41).
      */
     fun checks(): ChecksFile = ChecksFile(
         acknowledgements = listOf(
             Acknowledgement(
                 key = K.ACK_TRAVEL_HART, checkType = CheckType.TRAVEL_SHORTAGE,
                 subjectKeys = listOf(K.HART, K.SCENE_1_7_2, K.SCENE_1_7_3),
-                fingerprint = "fixture:travel.shortage:도보:38km:1일째 저녁→2일째 05:40",
+                fingerprint = "sha256-1f4bd89577870ca8310efdafc13f2015eb611d792c8d1bfe4310cc4f5e192f26",
                 kind = AckKind.MATCH.open(), createdAt = at("2026-11-21T13:00:00Z"),
                 updatedAt = at("2026-11-21T13:00:00Z"), updatedBy = DEVICE,
             ),
             Acknowledgement(
                 key = K.ACK_CLOCK_BAND, checkType = CheckType.TIME_CLOCK_BAND_MISMATCH,
                 subjectKeys = listOf(K.SCENE_1_5_1),
-                fingerprint = "fixture:time.clockBandMismatch:새벽:06:20",
+                fingerprint = "sha256-abbd7af894cac54d25b10f6cd6059928464eec05286a01f9383afba6a3f65d11",
                 kind = AckKind.MATCH.open(), createdAt = at("2026-06-02T12:00:00Z"),
                 updatedAt = at("2026-06-02T12:00:00Z"), updatedBy = DEVICE,
             ),

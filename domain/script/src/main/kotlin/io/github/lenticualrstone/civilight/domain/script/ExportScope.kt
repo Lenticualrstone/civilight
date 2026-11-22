@@ -31,6 +31,20 @@ data class ExportScope(
         if (hidden.isEmpty()) return null
         return "숨긴 씬 ${hidden.size} · " + hidden.joinToString(" · ") { Labels.sceneLocation(doc, it.key) }
     }
+
+    /** The preselected chip of the hidden-scene row: `넣기` or `빼기`. */
+    val hiddenChoice: String get() = if (includeHiddenScenes) "넣기" else "빼기"
+
+    companion object {
+        /** Engine JSON: hidden scenes `넣기` by default (one biometric confirmation, export area). */
+        fun json(unitKeys: List<Key> = emptyList()) = ExportScope(unitKeys, includeHiddenScenes = true)
+
+        /** Dialogue CSV: hidden scenes `넣기` by default. */
+        fun csv(unitKeys: List<Key> = emptyList()) = ExportScope(unitKeys, includeHiddenScenes = true)
+
+        /** Script PDF (SCR-65): hidden scenes `빼기` by default. */
+        fun pdf(unitKeys: List<Key> = emptyList()) = ExportScope(unitKeys, includeHiddenScenes = false)
+    }
 }
 
 /** Voice-ID fixing shared by the JSON and CSV exports (LIB-46): only what is written gets fixed. */

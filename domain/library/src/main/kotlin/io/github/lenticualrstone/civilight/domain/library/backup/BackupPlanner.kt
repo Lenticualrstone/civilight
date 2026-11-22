@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.library.backup
 
+import io.github.lenticualrstone.civilight.domain.library.hiding.HiddenItems
 import io.github.lenticualrstone.civilight.domain.library.masking.ProjectProfile
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Timestamp
@@ -8,6 +9,7 @@ import io.github.lenticualrstone.civilight.model.app.BackupEntry
 import io.github.lenticualrstone.civilight.model.app.BackupKind
 import io.github.lenticualrstone.civilight.model.app.BackupRun
 import io.github.lenticualrstone.civilight.model.app.LockKind
+import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 
 /** A project considered for the daily backup. */
 data class BackupCandidate(
@@ -16,7 +18,13 @@ data class BackupCandidate(
     val hiddenItemCount: Int,
     /** Last change of the project's content. */
     val updatedAt: Timestamp,
-)
+) {
+    companion object {
+        /** A candidate from the project document: hidden items counted by [HiddenItems]. */
+        fun of(doc: ProjectDoc, updatedAt: Timestamp = doc.project.updatedAt, trashed: Boolean = false, isExample: Boolean = false) =
+            BackupCandidate(ProjectProfile.of(doc, trashed, isExample), HiddenItems(doc).count, updatedAt)
+    }
+}
 
 enum class BackupAction {
     /** Upload a new version. */

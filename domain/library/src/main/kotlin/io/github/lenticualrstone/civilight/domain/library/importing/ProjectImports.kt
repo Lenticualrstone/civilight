@@ -6,6 +6,7 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.app.LibraryEntry
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.file.PackageLockType
 import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.model.trash.TrashEntry
@@ -44,6 +45,16 @@ object ProjectImports {
     ): ImportPlan {
         val replaced = trashedSameKey?.let { ReplacedProject(it.key, newKey(), trashEntry = null) }
         return plan(pkg, pkg.doc, recorder, newKey, now, replaced)
+    }
+
+    /**
+     * First-run install of the bundled example (LIB-17, §6): the current-version `.civilight` asset,
+     * imported with `isExample = readOnly = true`. The flag lives only in the 서재 row; a file never
+     * carries it, so a project opened from a file is never read-only.
+     */
+    fun installExample(pkg: ImportedPackage, recorder: RecorderLibrary, now: Timestamp, newKey: () -> Key): ImportPlan {
+        val plan = direct(pkg, recorder, now, newKey)
+        return ImportPlan(plan.doc, plan.entry.copy(isExample = true, readOnly = true), plan.recorder, plan.blobs, null, plan.failedMessage)
     }
 
     /** `새 프로젝트로`: a new project key, the name `<name> (n)`, item keys kept. */
@@ -95,8 +106,11 @@ object ProjectImports {
         now: Timestamp,
         replaced: ReplacedProject?,
     ): ImportPlan {
-        // An encrypted file lands hidden on this device and is re-locked with its biometrics (LIB-51, LIB-54).
-        val finalDoc = if (pkg.decrypted && !doc.project.protections.hidden) {
+        // A file locked with an export `암호` lands hidden on this device and is re-locked with its
+        // biometrics (LIB-51, LIB-54). A 복구 암호 backup keeps its own flag: a visible project locked
+        // only for its hidden items (§6 Q5) comes back visible (`ED`). An unknown lock counts as export.
+        val forceHidden = pkg.decrypted && pkg.lockType?.known != PackageLockType.RECOVERY
+        val finalDoc = if (forceHidden && !doc.project.protections.hidden) {
             doc.copy(project = doc.project.copy(protections = doc.project.protections.copy(hidden = true)))
         } else {
             doc

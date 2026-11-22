@@ -35,7 +35,7 @@ object RelationEdits {
         RelationReader.between(doc, a, b)?.let { return doc to it }
         val relation = Relation(
             key = ctx.newKey(), endA = RelationReader.characterRef(a), endB = RelationReader.characterRef(b),
-            updatedAt = ctx.now, updatedBy = ctx.by,
+            updatedAt = ctx.now, updatedBy = ctx.device,
         )
         return doc.copy(cast = doc.cast.copy(relations = doc.cast.relations + relation)) to relation
     }
@@ -163,7 +163,7 @@ object RelationEdits {
 
     internal fun updateRelation(doc: ProjectDoc, relationKey: Key, ctx: EditContext?, change: (Relation) -> Relation): ProjectDoc = doc.copy(
         cast = doc.cast.copy(relations = doc.cast.relations.map { r ->
-            if (r.key != relationKey) r else change(r).let { if (ctx == null) it else it.copy(updatedAt = ctx.now, updatedBy = ctx.by) }
+            if (r.key != relationKey) r else change(r).let { if (ctx == null) it else it.copy(updatedAt = ctx.now, updatedBy = ctx.device) }
         }),
     )
 }

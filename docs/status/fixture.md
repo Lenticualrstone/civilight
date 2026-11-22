@@ -23,12 +23,13 @@ Sources (`core/model/src/main/kotlin/io/github/lenticualrstone/civilight/model/s
 | `ExampleCast.kt` | `cast.json` |
 | `ExampleWorld.kt` | `world.json` |
 | `ExampleMaps.kt` | the three maps |
+| `ExampleMapResults.kt` | the stored `generation.result` JSON of the two generated maps (real `gen-1` output, see Maps below) |
 | `ExampleChanges.kt` | `changes.json` |
 | `ExampleExtras.kt` | canvas, pages, assets, checks, trash, deletion log, `_app` state |
 | `ExampleRecorder.kt` | recorder library slice |
 | `ExampleProject.kt` | `build()` |
 
-Tests (`core/model/src/test/kotlin/io/github/lenticualrstone/civilight/model/sample/`): 32 tests, all passing. `tools/gw :core:model:test` passes with 119 tests (87 existing + 32 new), 0 failures.
+Tests (`core/model/src/test/kotlin/io/github/lenticualrstone/civilight/model/sample/`): 32 tests, all passing. `tools/gw :core:model:test` passes with 123 tests (87 model + 32 fixture + 4 `PlaceAliasesJsonTest`), 0 failures.
 
 **`ExampleProjectInvariantsTest`**
 
@@ -230,11 +231,13 @@ Expected readings:
 
 **Maps**
 
-*세계 지도* (`MAP_WORLD`; hex 6×4, generated, scale 400 km per 0.8)
+*Generated maps (both):* `generatorVersion = gen-1`, steps 해안선 (locked) · 산 · 강 · 숲·기후 · 마을·길 with no choices and no text conditions. Since 2026-11-22 `generation.result` is the real `gen-1` output of `domain:world` (`TerrainGenerator.generate` + `GenResults.encode`) for the stored kind, land ratio and seeds, stored as JSON text in `ExampleMapResults.kt`; before, it was a minimal stand-in (`towns` a number, `coastline` a flat point list) that `MapGenerator.storedWorld` read as null although `StepReroll` accepted it as the same version (domain-world request). `domain:world` `FixtureGenResultsTest` checks each result equals a fresh generation; regenerate the file if the generator or the stored inputs change. The maps' overlays (세계 지도's hand-made 6×4 hex cells, 하층 구역 지도's drawn road and stamps) are unchanged and are not generator output.
+
+*세계 지도* (`MAP_WORLD`; hex 6×4, generated 대륙 · 반반 with seeds 4827 · 112 · 31 · 907 · 215 (6 towns, 4 rivers in the stored result), scale 400 km per 0.8)
 - Pins: 상층 `PIN_WORLD_UPPER_CITY`; 송전탑 폐허, revealed from 2-3.
 - Region 상층 경비대 (faction, layer 정치, from 1-7), with a `◆` shape at 1-9.
 
-*하층 구역 지도* (`MAP_LOWER_DISTRICT`; child of pin 상층, detail)
+*하층 구역 지도* (`MAP_LOWER_DISTRICT`; child of pin 상층, detail, generated 한 지역 · 땅 많음 with seeds 5120 · 77 · 3021 · 18 · 640 (5 towns, 3 rivers in the stored result))
 - Scale `2일` 도보 between 결사의 문 (0.20, 0.40) and 잿더미 시장 (0.45, 0.40), so 120 km per unit.
 - Pins: 결사의 문 (no point), 하층 거리 (0.22, 0.43; from 1-1), 잿더미 시장 (from 1-3), 기록실 (0.26, 0.36; from 1-5), 상층 관문 (0.416667, 0.30; from 1-7).
 - Region 하층 구역 (from 1-1; contains every pin except 상층 관문).
@@ -272,9 +275,9 @@ Recorder trash: a voice record of 0:12, deleted 2026-10-24, purged 2026-11-23. T
 
 **Checks**
 
-Acknowledged (fingerprints are placeholders):
-- `ACK_TRAVEL_HART`: `travel.shortage` [하르트, 1-7 씬 2, 1-7 씬 3]. 도보 3,136 min needed > 760 available.
-- `ACK_CLOCK_BAND`: `time.clockBandMismatch` [1-5 씬 1].
+Acknowledged (`맞다고 표시한 것 2`; fingerprints are the real values of the `domain:story` `Fingerprints` scheme, computed by `domain:checks`, so both stay acknowledged):
+- `ACK_TRAVEL_HART`: `travel.shortage` [하르트, 1-7 씬 2, 1-7 씬 3]. 도보 3,136 min needed > 760 available. Fingerprint `sha256-1f4bd89577870ca8310efdafc13f2015eb611d792c8d1bfe4310cc4f5e192f26`.
+- `ACK_CLOCK_BAND`: `time.clockBandMismatch` [1-5 씬 1]. Fingerprint `sha256-abbd7af894cac54d25b10f6cd6059928464eec05286a01f9383afba6a3f65d11`.
 
 Open items a correct engine should raise at 최신 with default settings:
 
@@ -612,7 +615,7 @@ Named constants (`ExampleKeys.<NAME>` = value):
 
 ## Partial
 
-- **Acknowledgement fingerprints** are placeholders (`fixture:travel.shortage:…`). `domain:checks` owns the fingerprint function, which `core:model` cannot call. Until the fixture uses that scheme, a checks engine will treat both acknowledgements as void.
+- **Acknowledgement fingerprints** are stored values, not computed here: `core:model` cannot call the `domain:story` `Fingerprints` scheme. They are the values `domain:checks` computed for the example as built. If the story engine changes its fingerprint parts, or a fixture edit changes 하르트's 1-7 씬 2 → 씬 3 pair or 1-5 씬 1's time, both acknowledgements turn void; `domain:checks` `FixtureChecksTest.fixtureRaisesEightOpenItemsAndTwoAcknowledged` then fails, and the values must be recomputed.
 - **No blob rows.** Nothing references image or audio bytes. The cover is `preset:ash-dawn`, script assets have no `fileHash`, and recorder records have no audio. An exporter test therefore needs no asset files.
 - **Recorder records R5 … R12** of LRC fixture P2 (「유리 정원」) are not included. They belong to another project.
 - **The bundled `.civilight` regression file** (§8.1, LIB-17) is not written here. Producing it needs the exporter (`app`/`core:store`).
@@ -679,5 +682,7 @@ Named constants (`ExampleKeys.<NAME>` = value):
 
 ## Requests
 
-- **domain:checks:** publish the fingerprint scheme for `travel.shortage` and `time.clockBandMismatch` so the fixture's two acknowledgements can carry real fingerprints. Until then, treat them as placeholders: recompute them, or replace them in tests.
+- **domain:library owner:** the fixture's encoded JSON changed on 2026-11-22 (`maps/01JZ000000MAPS000000000001.json` and `maps/01JZ000000MAPS000000000002.json`: both generated maps' `generation.result` now hold real `gen-1` output), so the §8.1 regression file `domain/library/src/test/resources/format/1.0/잿빛 새벽의 등불.civilight` must be regenerated from `ExampleProject.build()`; until then `FormatRegressionTest` `the current-version file holds the example project` fails. (`Place.aliases`, added the same day, is not written when empty, so it does not change the encoded fixture.)
+
+- **domain:checks:** keep `FixtureChecksTest` guarding the fixture's two stored fingerprints (`travel.shortage`, `time.clockBandMismatch`), and report new values here when the story engine's fingerprint parts change.
 - **App / exporter owner:** write `ExampleProject.build()` plus `ExampleRecorder.projectFile()` as the bundled example `.civilight` (LIB-17) and as the §8.1 regression file `app/src/test/resources/format/1.0/`.

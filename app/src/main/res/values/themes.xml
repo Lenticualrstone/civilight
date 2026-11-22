@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App window theme: background = design-system `bg` (light here, dark in values-night). -->
+    <style name="Theme.Civilight" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/civilight_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <!-- LIB-08 / CNV-38 system splash: `bg`, no icon plate, only the mark. -->
+    <style name="Theme.Civilight.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/civilight_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.Civilight</item>
+    </style>
+</resources>

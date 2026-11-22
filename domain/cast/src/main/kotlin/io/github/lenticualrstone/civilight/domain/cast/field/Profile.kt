@@ -30,6 +30,8 @@ data class FieldRow(
     val planned: Pair<String, String>? = null,
     val defKey: Key? = null,
     val display: FieldDisplay? = null,
+    /** An `이 인물만` field: shown with a small mark (CST-22). */
+    val characterOnly: Boolean = false,
 )
 
 /** The record header (CST-07). */
@@ -94,6 +96,7 @@ object Profile {
             planned = planned,
             defKey = def.key,
             display = display,
+            characterOnly = def.scopeCharacterKey != null,
         )
     }
 

@@ -84,7 +84,11 @@ class Moments(private val doc: ProjectDoc, private val times: SceneTimeSource) {
         val a = of(subject) ?: return null
         val b = of(anchor) ?: return null
         if (a is Moment.StoryDays && b is Moment.StoryDays) {
-            return TimeLabels.dayOffset(a.dayMin - b.dayMax, a.dayMax - b.dayMin)
+            val sa = sceneOf(subject)
+            val sb = sceneOf(anchor)
+            val engine = if (sa != null && sb != null) times.daysBetween(sb, sa) else null
+            return if (engine != null) TimeLabels.dayOffset(engine.first, engine.last)
+            else TimeLabels.dayOffset(a.dayMin - b.dayMax, a.dayMax - b.dayMin)
         }
         val ya = yearOf(a) ?: return null
         val yb = yearOf(b) ?: return null

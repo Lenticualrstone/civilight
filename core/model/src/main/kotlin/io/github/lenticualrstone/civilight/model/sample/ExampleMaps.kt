@@ -36,9 +36,6 @@ import io.github.lenticualrstone.civilight.model.position.PointRef
 import io.github.lenticualrstone.civilight.model.sample.ExampleClock.DEVICE
 import io.github.lenticualrstone.civilight.model.sample.ExampleClock.LAST_EDIT
 import io.github.lenticualrstone.civilight.model.sample.ExampleClock.at
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import io.github.lenticualrstone.civilight.model.sample.ExampleKeys as K
 
 /**
@@ -73,17 +70,6 @@ internal object ExampleMaps {
             GenerationStepKind.COAST, GenerationStepKind.MOUNTAIN, GenerationStepKind.RIVER,
             GenerationStepKind.FOREST_CLIMATE, GenerationStepKind.TOWN_ROAD,
         ).zip(seeds.toList()) { kind, seed -> GenerationStep(step = kind.open(), seed = seed, locked = kind == GenerationStepKind.COAST) }
-
-    /** A minimal stored generator result (the generator owns this shape). */
-    private fun result(towns: Int): JsonObject = JsonObject(
-        mapOf(
-            "coastline" to JsonArray(listOf(JsonArray(listOf(JsonPrimitive(0.05), JsonPrimitive(0.5))), JsonArray(listOf(JsonPrimitive(0.95), JsonPrimitive(0.5))))),
-            "rivers" to JsonArray(emptyList()),
-            "towns" to JsonPrimitive(towns),
-            "roads" to JsonArray(emptyList()),
-            "stamps" to JsonArray(emptyList()),
-        ),
-    )
 
     fun maps(): List<WorldMap> {
         val orders = OrderKeys.evenlySpaced(3)
@@ -126,7 +112,7 @@ internal object ExampleMaps {
             ),
             generation = GeneratedMapRecord(
                 generatorVersion = "gen-1", kind = GeneratedMapKind.CONTINENT.open(), landRatio = LandRatio.HALF.open(),
-                steps = steps(4827, 112, 31, 907, 215), result = result(towns = 4),
+                steps = steps(4827, 112, 31, 907, 215), result = ExampleMapResults.world,
             ),
             updatedAt = GENERATED_AT, updatedBy = DEVICE,
         )
@@ -184,7 +170,7 @@ internal object ExampleMaps {
             ),
             generation = GeneratedMapRecord(
                 generatorVersion = "gen-1", kind = GeneratedMapKind.REGION.open(), landRatio = LandRatio.LAND_MORE.open(),
-                steps = steps(5120, 77, 3021, 18, 640), result = result(towns = 2),
+                steps = steps(5120, 77, 3021, 18, 640), result = ExampleMapResults.lowerDistrict,
             ),
             updatedAt = LAST_EDIT, updatedBy = DEVICE,
         )

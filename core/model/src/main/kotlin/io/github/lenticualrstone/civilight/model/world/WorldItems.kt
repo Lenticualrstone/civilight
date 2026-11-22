@@ -78,6 +78,11 @@ data class Place(
     override val key: Key,
     override val order: OrderKey,
     val name: String,
+    /**
+     * Other names of the place, matched like the name (STO-34 `제안 받기`, SUG-02: 송전탑 폐허 · 송전탑).
+     * Written only when not empty (no `@EncodeDefault`), so files without it stay byte-identical.
+     */
+    val aliases: List<String> = emptyList(),
     @EncodeDefault val description: RichDoc = emptyList(),
     /** 지역 / 소속 (WLD Q-03). */
     val parentPlaceKey: Key? = null,

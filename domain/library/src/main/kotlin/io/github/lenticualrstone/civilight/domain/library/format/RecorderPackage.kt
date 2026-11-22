@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.domain.library.format
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.asset.Blob
 import io.github.lenticualrstone.civilight.model.asset.BlobSource
+import io.github.lenticualrstone.civilight.model.file.EncryptionHeader
 import io.github.lenticualrstone.civilight.model.file.FileManifest
 import io.github.lenticualrstone.civilight.model.file.ManifestFeatures
 import io.github.lenticualrstone.civilight.model.file.PackagePaths
@@ -16,6 +17,12 @@ class RecorderPackageContent(val manifest: FileManifest, val library: RecorderLi
 
 sealed interface RecorderPackageOpen {
     data class NotAPackage(val reason: String) : RecorderPackageOpen
+
+    /**
+     * Locked with the 복구 암호 (hidden records in a Drive backup, §7.11); decrypt with
+     * `PackageCrypto` and read the inner bytes again.
+     */
+    data class Encrypted(val header: EncryptionHeader) : RecorderPackageOpen
 
     data class Newer(val check: NewerFileCheck) : RecorderPackageOpen
 
@@ -77,6 +84,13 @@ object RecorderPackage {
         val first = zip.items.first()
         if (first.path != PackagePaths.MIMETYPE || first.bytes.toString(Charsets.US_ASCII).trim() != PackagePaths.MIME_RECORDER) {
             return RecorderPackageOpen.NotAPackage("not a recorder library file")
+        }
+        zip[PackagePaths.ENCRYPTION]?.let { headerBytes ->
+            return try {
+                RecorderPackageOpen.Encrypted(CivilightJson.decode(EncryptionHeader.serializer(), headerBytes.toString(Charsets.UTF_8)))
+            } catch (e: IllegalArgumentException) {
+                RecorderPackageOpen.Damaged("encryption header: ${e.message}")
+            }
         }
         val manifest = try {
             CivilightJson.decode(FileManifest.serializer(), (zip[PackagePaths.MANIFEST] ?: return RecorderPackageOpen.Damaged("manifest.json missing")).toString(Charsets.UTF_8))

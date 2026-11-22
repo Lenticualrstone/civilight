@@ -42,6 +42,7 @@ android {
 
 dependencies {
     implementation(project(":core:ui"))
+    implementation(project(":domain:actions"))
     implementation(project(":feature:library"))
     implementation(project(":feature:story"))
     implementation(project(":feature:script"))
@@ -60,4 +61,6 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
+    implementation(libs.androidx.window)
+    testImplementation(libs.junit)
 }

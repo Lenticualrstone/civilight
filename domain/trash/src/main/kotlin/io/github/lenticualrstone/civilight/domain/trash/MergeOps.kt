@@ -9,12 +9,15 @@ import io.github.lenticualrstone.civilight.model.cast.PairHolder
 import io.github.lenticualrstone.civilight.model.cast.Relation
 import io.github.lenticualrstone.civilight.model.cast.RelationEndKind
 import io.github.lenticualrstone.civilight.model.cast.SlotValue
+import io.github.lenticualrstone.civilight.model.change.ChangeRecord
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.change.RelationSlotName
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.doc.history
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
 import io.github.lenticualrstone.civilight.model.nfc
 import io.github.lenticualrstone.civilight.model.open
+import io.github.lenticualrstone.civilight.model.position.LensPoint
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.model.script.BlockKind
 import io.github.lenticualrstone.civilight.model.script.VoiceMode
@@ -114,12 +117,21 @@ object MergeOps {
         val filled = mutableListOf<Key>()
         var same = 0
         for (def in defs) {
-            val m = mergedFields[def.key] ?: continue
+            // A field holds a value when it has a base value or live `◆` records (a value that lives
+            // only in records, like 리엔's 소속, is not empty and is never filled over, CST-45).
+            val m = mergedFields[def.key]
             val t = targetFields[def.key]
+            val mHistory = fieldHistory(doc, kind, mergedKey, def.key)
+            val tHistory = fieldHistory(doc, kind, targetKey, def.key)
+            if (m == null && mHistory.isEmpty()) continue
             when {
-                t == null -> filled += def.key
-                t == m -> same++
-                else -> conflicts += FieldConflict(def.key, def.name, m, t)
+                t == null && tHistory.isEmpty() -> filled += def.key
+                t == m && sameHistory(doc, mHistory, tHistory) -> same++
+                else -> {
+                    val mShown = shownValue(doc, m, mHistory) ?: continue
+                    val tShown = shownValue(doc, t, tHistory) ?: continue
+                    conflicts += FieldConflict(def.key, def.name, mShown, tShown)
+                }
             }
         }
         val endKind = endKindOf(kind)
@@ -192,12 +204,19 @@ object MergeOps {
         // 1. References.
         d = rewriteReferences(d, kind, mergedKey, targetKey, ctx, moved)
 
-        // 2. Field values: target-empty filled, chosen ones taken.
+        // 2. Field values: target-empty filled, chosen ones taken (the merged base value, or none when
+        // its value lives only in records), and the merged item's `◆` records of a taken field move
+        // to the target; the target's own records stay, except one at the very same point.
         val mergedFields = fieldsOf(d, mergedItem)
-        val taken = preview.filled.associateWith { mergedFields.getValue(it) } +
-            preview.fieldConflicts.filter { it.fieldDefKey in choices.fieldsFromMerged }.associate { it.fieldDefKey to it.mergedValue }
+        val takenKeys = preview.filled + preview.fieldConflicts.filter { it.fieldDefKey in choices.fieldsFromMerged }.map { it.fieldDefKey }
+        val taken: Map<Key, FieldValue?> = takenKeys.associateWith { mergedFields[it] }
         chosen += preview.fieldConflicts.filter { it.fieldDefKey in choices.fieldsFromMerged }.map { MergeChoice(fieldDefKey = it.fieldDefKey) }
-        if (taken.isNotEmpty()) d = d.updateFields(ItemId(kind, targetKey), ctx) { it + taken }
+        if (taken.isNotEmpty()) {
+            d = d.updateFields(ItemId(kind, targetKey), ctx) { fields ->
+                taken.entries.fold(fields) { acc, (key, value) -> if (value == null) acc - key else acc + (key to value) }
+            }
+            d = moveFieldRecords(d, kind, mergedKey, targetKey, takenKeys, ctx, moved)
+        }
 
         // 3. Relations.
         val endKind = endKindOf(kind)
@@ -535,6 +554,59 @@ object MergeOps {
 
     private fun fieldsOf(doc: ProjectDoc, item: ItemId): Map<Key, FieldValue> =
         item.kind.entityKind?.let { doc.index.fieldsOf(it, item.key) }.orEmpty()
+
+    private fun fieldTarget(kind: ItemKind, key: Key, defKey: Key): ChangeTarget.Field? =
+        kind.entityKind?.let { ChangeTarget.Field(it, key, defKey) }
+
+    /** Live `◆` records of a field of an item, in story order. */
+    private fun fieldHistory(doc: ProjectDoc, kind: ItemKind, key: Key, defKey: Key): List<ChangeRecord> =
+        fieldTarget(kind, key, defKey)?.let { doc.history(it) }.orEmpty()
+
+    /** Two histories hold the same values at the same points. */
+    private fun sameHistory(doc: ProjectDoc, a: List<ChangeRecord>, b: List<ChangeRecord>): Boolean =
+        a.map { doc.manuscript.rankOf(it.anchor) to it.value } == b.map { doc.manuscript.rankOf(it.anchor) to it.value }
+
+    /** The value a comparison row shows: the record in effect at `최신`, else the base, else the last record. */
+    private fun shownValue(doc: ProjectDoc, base: FieldValue?, history: List<ChangeRecord>): FieldValue? {
+        val latest = history.lastOrNull { doc.manuscript.rankOf(it.anchor) <= doc.manuscript.rankOf(LensPoint.Latest) }
+        return latest?.valueAs(FieldValue.serializer()) ?: base ?: history.lastOrNull()?.valueAs(FieldValue.serializer())
+    }
+
+    /**
+     * The merged item's live `◆` records of the taken fields now belong to the target; a live target
+     * record at the very same point as a moved one is dropped (the taken value wins there).
+     */
+    private fun moveFieldRecords(
+        doc: ProjectDoc,
+        kind: ItemKind,
+        mergedKey: Key,
+        targetKey: Key,
+        defKeys: List<Key>,
+        ctx: TrashContext,
+        moved: MutableList<MovedRef>,
+    ): ProjectDoc {
+        val pairs = defKeys.mapNotNull { def ->
+            val from = fieldTarget(kind, mergedKey, def) ?: return@mapNotNull null
+            val to = fieldTarget(kind, targetKey, def) ?: return@mapNotNull null
+            from to to
+        }
+        if (pairs.isEmpty()) return doc
+        val movedAnchors = pairs.associate { (from, to) ->
+            to.targetId to doc.changes.records.filter { it.deletedAt == null && it.target.sameAs(from) }.map { it.anchor }
+        }
+        if (movedAnchors.values.all { it.isEmpty() }) return doc
+        val records = doc.changes.records.mapNotNull { r ->
+            val pair = pairs.firstOrNull { (from, to) -> r.target.sameAs(from) || r.target.sameAs(to) } ?: return@mapNotNull r
+            if (r.target.sameAs(pair.second)) {
+                val clash = r.deletedAt == null && movedAnchors[pair.second.targetId].orEmpty().any { it.sameAs(r.anchor) }
+                if (clash) null else r
+            } else {
+                moved += MovedRef("record", r.key, "target.entityKey")
+                r.copy(target = pair.second, updatedAt = ctx.now, updatedBy = ctx.deviceId)
+            }
+        }
+        return doc.copy(changes = doc.changes.copy(records = records))
+    }
 
     private fun ProjectDoc.updateFields(item: ItemId, ctx: TrashContext, f: (Map<Key, FieldValue>) -> Map<Key, FieldValue>): ProjectDoc = when (item.kind) {
         ItemKind.CHARACTER -> copy(cast = cast.copy(characters = cast.characters.mapIf({ it.key == item.key }) { it.copy(fields = f(it.fields), updatedAt = ctx.now, updatedBy = ctx.deviceId) }))

@@ -1,8 +1,11 @@
 package io.github.lenticualrstone.civilight.domain.library.format
 
+import io.github.lenticualrstone.civilight.domain.library.common.TimeLabels
 import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
+import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.file.Features
 import io.github.lenticualrstone.civilight.model.file.FileManifest
+import java.time.ZoneId
 
 /**
  * Newer-file detection (LIB-50 promise 4, LIB-53). A file is refused when its `minReaderVersion` is
@@ -39,10 +42,20 @@ data class NewerFileSheet(
     val ratingBadge: String?,
     /** Label · value rows. */
     val rows: List<Pair<String, String>>,
+    /** `writtenAt` of the manifest, the `<date>` of the summary line. */
+    val writtenAt: Timestamp = 0L,
 ) {
     val heading: String get() = HEADING
     val note: String get() = NOTE
     val buttons: List<String> get() = listOf(CLOSE, UPDATE)
+
+    /**
+     * Summary line under the title: `<size> · <date>` (`1.2 MB · 11월 22일`). The scene and
+     * character counts of the LIB-52 line are left out (`ED`): a refused file is never decoded, so
+     * its content cannot be counted reliably.
+     */
+    fun summary(sizeBytes: Long, zone: ZoneId): String =
+        "${TimeLabels.size(sizeBytes)} · ${TimeLabels.monthDay(writtenAt, zone)}"
 
     companion object {
         const val HEADING = "새 버전 앱에서 만든 파일"
@@ -62,6 +75,7 @@ data class NewerFileSheet(
                 title = manifest.project?.title.orEmpty(),
                 ratingBadge = manifest.project?.rating?.let { RatingLabels.badge(it) },
                 rows = rows,
+                writtenAt = manifest.writtenAt,
             )
         }
     }

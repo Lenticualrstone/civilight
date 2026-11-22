@@ -34,19 +34,22 @@ internal data class LiveRows(
     }
 
     companion object {
+        /** Keys of the unmarked top-level items (characters, world items, events, field definitions, maps, pages, canvases). */
+        fun itemKeys(doc: ProjectDoc): Set<Key> = buildSet {
+            doc.cast.characters.filter { it.deletedAt == null }.forEach { add(it.key) }
+            doc.world.places.filter { it.deletedAt == null }.forEach { add(it.key) }
+            doc.world.terms.filter { it.deletedAt == null }.forEach { add(it.key) }
+            doc.world.factions.filter { it.deletedAt == null }.forEach { add(it.key) }
+            doc.world.events.filter { it.deletedAt == null }.forEach { add(it.key) }
+            doc.project.fieldDefs.filter { it.deletedAt == null }.forEach { add(it.key) }
+            doc.maps.values.filter { it.deletedAt == null }.forEach { add(it.key) }
+            doc.pages.values.filter { it.deletedAt == null }.forEach { add(it.key) }
+            doc.canvases.values.filter { it.deletedAt == null }.forEach { add(it.key) }
+        }
+
         fun of(doc: ProjectDoc): LiveRows {
             val live = doc.liveness
-            val items = buildSet {
-                doc.cast.characters.filter { it.deletedAt == null }.forEach { add(it.key) }
-                doc.world.places.filter { it.deletedAt == null }.forEach { add(it.key) }
-                doc.world.terms.filter { it.deletedAt == null }.forEach { add(it.key) }
-                doc.world.factions.filter { it.deletedAt == null }.forEach { add(it.key) }
-                doc.world.events.filter { it.deletedAt == null }.forEach { add(it.key) }
-                doc.project.fieldDefs.filter { it.deletedAt == null }.forEach { add(it.key) }
-                doc.maps.values.filter { it.deletedAt == null }.forEach { add(it.key) }
-                doc.pages.values.filter { it.deletedAt == null }.forEach { add(it.key) }
-                doc.canvases.values.filter { it.deletedAt == null }.forEach { add(it.key) }
-            }
+            val items = itemKeys(doc)
             val pins = HashSet<Key>()
             val overlays = HashSet<Key>()
             for (map in doc.maps.values) {

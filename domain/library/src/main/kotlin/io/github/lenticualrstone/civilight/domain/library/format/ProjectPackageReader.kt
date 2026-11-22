@@ -2,11 +2,14 @@ package io.github.lenticualrstone.civilight.domain.library.format
 
 import io.github.lenticualrstone.civilight.domain.library.common.UnitCodes
 import io.github.lenticualrstone.civilight.model.app.UnknownFile
+import io.github.lenticualrstone.civilight.model.OpenEnum
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.doc.ProjectFileSet
 import io.github.lenticualrstone.civilight.model.file.EncryptionHeader
 import io.github.lenticualrstone.civilight.model.file.Features
 import io.github.lenticualrstone.civilight.model.file.FileManifest
+import io.github.lenticualrstone.civilight.model.file.ManifestProject
+import io.github.lenticualrstone.civilight.model.file.PackageLockType
 import io.github.lenticualrstone.civilight.model.file.PackagePaths
 import io.github.lenticualrstone.civilight.model.file.RecorderFile
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
@@ -34,15 +37,19 @@ class ImportedPackage(
     val appliedUpgrades: List<String>,
     /** Size of the package file. */
     val sizeBytes: Long,
-    /** True when this package came out of an encrypted container. */
-    val decrypted: Boolean = false,
+    /** Lock of the encrypted container this package came out of; null for a plain file. */
+    val lockType: OpenEnum<PackageLockType>? = null,
 ) {
+    /** True when this package came out of an encrypted container. */
+    val decrypted: Boolean get() = lockType != null
+
     /** `열지 못한 부분 · 1-7` (one line, parts joined by ` · `), or null when nothing failed. */
     val failedMessage: String?
         get() = if (failed.isEmpty()) null else (listOf(FAILED_PREFIX) + failed.map { it.label }).joinToString(" · ")
 
-    fun copyDecrypted(): ImportedPackage = ImportedPackage(
-        manifest, doc, recorder, blobs, preview, failed, skippedOptionalFeatures, appliedUpgrades, sizeBytes, decrypted = true,
+    /** This package as read out of a container locked with [lock]. */
+    fun copyDecrypted(lock: OpenEnum<PackageLockType>): ImportedPackage = ImportedPackage(
+        manifest, doc, recorder, blobs, preview, failed, skippedOptionalFeatures, appliedUpgrades, sizeBytes, lockType = lock,
     )
 
     companion object {
@@ -188,7 +195,7 @@ object ProjectPackageReader {
         val failed = failedPaths.map { path -> FailedPart(path, labelOf(path, codes)) }
         return PackageOpen.Ready(
             ImportedPackage(
-                manifest = manifest,
+                manifest = describingContent(manifest, doc),
                 doc = doc,
                 recorder = recorder,
                 blobs = blobs,
@@ -199,6 +206,18 @@ object ProjectPackageReader {
                 sizeBytes = bytes.size.toLong(),
             ),
         )
+    }
+
+    /**
+     * The manifest's `project` block is a description of `project.json`; when the two disagree (an
+     * edited or forged manifest) the content wins (`ED`), so the same-project check (LIB-52) and the
+     * import always use the key that is actually imported.
+     */
+    private fun describingContent(manifest: FileManifest, doc: ProjectDoc): FileManifest {
+        val p = doc.project
+        val described = manifest.project
+        if (described != null && described.key == p.key && described.title == p.name && described.rating == p.rating) return manifest
+        return manifest.copy(project = ManifestProject(p.key, p.name, p.rating, described?.ext))
     }
 
     /** `assets/<64 hex>.<ext>`. */

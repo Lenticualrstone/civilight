@@ -13,6 +13,15 @@ import io.github.lenticualrstone.civilight.model.sample.ExampleProject
 import io.github.lenticualrstone.civilight.model.story.SceneTime
 import io.github.lenticualrstone.civilight.model.story.StoryUnit
 import io.github.lenticualrstone.civilight.model.story.TimePrecision
+import io.github.lenticualrstone.civilight.model.OrderKeys
+import io.github.lenticualrstone.civilight.model.cast.FieldPayload
+import io.github.lenticualrstone.civilight.model.cast.FieldValue
+import io.github.lenticualrstone.civilight.model.change.ChangeRecord
+import io.github.lenticualrstone.civilight.model.file.EpisodeFile
+import io.github.lenticualrstone.civilight.model.script.Block
+import io.github.lenticualrstone.civilight.model.script.BlockKind
+import io.github.lenticualrstone.civilight.model.script.DirectionCue
+import io.github.lenticualrstone.civilight.model.text.TextRun
 import org.junit.Assert.assertEquals
 
 /** Shared fixture access: the example project and Fixture T scene ids (20-story-time §4.1). */
@@ -49,6 +58,37 @@ object Fx {
         copy(story = story.copy(units = story.units.map { if (it.key == key) change(it) else it }))
 
     fun ProjectDoc.withTime(key: Key, time: SceneTime): ProjectDoc = withUnit(key) { it.copy(time = time) }
+
+    /**
+     * Adds a block (narration with [text] unless [kind] says otherwise) at the end of [sceneKey],
+     * filed under the scene's numbering unit.
+     */
+    fun ProjectDoc.withBlock(
+        sceneKey: Key,
+        blockKey: Key,
+        text: String,
+        kind: BlockKind = BlockKind.NARRATION,
+        number: Int = 900,
+        runs: List<TextRun> = listOf(TextRun.Plain(text)),
+        speakerKey: Key? = null,
+        cues: List<DirectionCue> = emptyList(),
+    ): ProjectDoc {
+        val unitKey = index.numberingUnitKeyOfScene(sceneKey)!!
+        val last = index.blocksOfScene(sceneKey).lastOrNull()?.order
+        val block = Block(
+            key = blockKey, sceneKey = sceneKey, order = OrderKeys.after(last), number = number,
+            kind = kind.open(), speakerKey = speakerKey, runs = runs, cues = cues,
+        )
+        val file = episodes[unitKey] ?: EpisodeFile(unitKey = unitKey)
+        return copy(episodes = episodes + (unitKey to file.copy(blocks = file.blocks + block)))
+    }
+
+    /** Spec Fixture R: the example project with R3 holding `등불지기장` as in 20-story-time §4.1. */
+    fun fixtureR(): ProjectDoc {
+        val doc = doc()
+        val r3 = ChangeRecord.encodeValue(FieldValue.serializer(), FieldValue.of(FieldPayload.Texts(listOf("등불지기장"))))
+        return doc.copy(changes = doc.changes.copy(records = doc.changes.records.map { if (it.key == ExampleKeys.R3) it.copy(value = r3) else it }))
+    }
 
     /** A deterministic edit context: keys `01JZ000000TEST` + counter. */
     fun ctx(): EditContext {

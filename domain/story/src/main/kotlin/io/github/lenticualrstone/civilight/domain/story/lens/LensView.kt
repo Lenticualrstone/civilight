@@ -7,6 +7,7 @@ import io.github.lenticualrstone.civilight.model.change.ChangeRecord
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.doc.history
+import io.github.lenticualrstone.civilight.model.doc.isLinkBeforeReveal
 import io.github.lenticualrstone.civilight.model.doc.isPlanned
 import io.github.lenticualrstone.civilight.model.doc.recordAt
 import io.github.lenticualrstone.civilight.model.doc.recordBeforeBlock
@@ -103,6 +104,39 @@ class LensView(val doc: ProjectDoc, val codes: UnitCodes = UnitCodes(doc)) {
 
     /** `예정 · 집필 선(1-7 씬 3) 뒤 기록`, or null without a 집필 선. */
     fun plannedFootnote(): String? = writingLineScene?.let { "예정 · 집필 선(${codes.sceneRef(it)}) 뒤 기록" }
+
+    /**
+     * The value before the record in force at [point], with the last point it held: `??? (1-8까지)`
+     * (LENS-06, cast list). Null when no record is in force or nothing precedes it in the story.
+     * The end point is the episode before a unit-start anchor, the block before a block anchor, the
+     * scene itself for a unit-end anchor (`ED`).
+     */
+    fun previousValueLabel(target: ChangeTarget, point: LensPoint, values: ValueText = ValueText(doc)): String? {
+        val current = recordAt(target, point) ?: return null
+        val all = history(target)
+        val before = all.getOrNull(all.indexOfFirst { it.key == current.key } - 1)
+        val previous = before?.let { values.of(target, it.value) } ?: values.base(target)
+        val until = untilPoint(current.anchor) ?: return null
+        return "$previous (${until}까지)"
+    }
+
+    private fun untilPoint(anchor: Anchor): String? = when (anchor) {
+        is Anchor.UnitStart -> doc.index.unit(anchor.unitKey)?.let { u ->
+            val episode = codes.episodeOf(u) ?: u
+            val all = episodes()
+            all.getOrNull(all.indexOfFirst { it.key == episode.key } - 1)?.let(codes::unitLabel)
+        }
+        is Anchor.AtBlock -> {
+            val blocks = manuscript.liveBlocks
+            val i = blocks.indexOfFirst { it.key == anchor.blockKey }
+            blocks.getOrNull(i - 1)?.let { anchorLabel(Anchor.AtBlock(it.key)) }
+        }
+        is Anchor.UnitEnd -> codes.unitLabel(anchor.unitKey)
+        else -> null
+    }
+
+    /** `▲ 공개 전 사용` for a link to [termKey] in [blockKey] (block order, LENS-08). */
+    fun isLinkBeforeReveal(termKey: Key, blockKey: Key): Boolean = doc.isLinkBeforeReveal(termKey, blockKey)
 
     /**
      * Script panel row for a block (LENS-07): `만나기 전`, `만나기 전 → 경계 · ◆ 여기서`, `경계`.

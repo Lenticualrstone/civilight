@@ -135,6 +135,24 @@ class TravelTest {
         assertNotEquals(fp, hart(boat)!!.fingerprint)
     }
 
+    @Test
+    fun trv07_acknowledgementLeavesTheOpenListUntilAnInputChanges() {
+        val w = hart(doc)!!
+        val acked = io.github.lenticualrstone.civilight.domain.story.checks.Acks.acknowledge(doc, w, ctx)
+        assertTrue(io.github.lenticualrstone.civilight.domain.story.checks.Acks.open(acked, TravelCheck(acked).warnings).isEmpty())
+        val reopened = listOf(
+            acked.withTime(S8, rel(Fx.S7, 0, Band.NIGHT)),
+            withRouteKm(acked, 40.0),
+            TravelModes.setOverride(acked, ExampleKeys.HART, S8, S9, ExampleKeys.TRAVEL_SHIP, ctx),
+        )
+        for (d in reopened) {
+            assertEquals(1, io.github.lenticualrstone.civilight.domain.story.checks.Acks.open(d, TravelCheck(d).warnings).size)
+        }
+        // A new place for S9 that still falls short (상층 관문 → 하층 거리) re-opens it as well.
+        val moved = acked.withUnit(S9) { it.copy(place = PlaceRef(PlaceRefKind.PLACE, ExampleKeys.PLACE_LOWER_STREET)) }
+        hart(moved)?.let { assertFalse(io.github.lenticualrstone.civilight.domain.story.checks.Acks.isAcknowledged(moved, it)) }
+    }
+
     /** The 하층 구역 지도 scale set so the 결사의 문 → 상층 관문 route measures [km]. */
     private fun withRouteKm(d: ProjectDoc, km: Double): ProjectDoc {
         val map = d.maps.getValue(ExampleKeys.MAP_LOWER_DISTRICT)

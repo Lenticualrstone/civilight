@@ -66,6 +66,9 @@ data class RelationStep(
             StepStatus.AFTER_LENS -> CastCopy.AFTER_LENS
             else -> null
         }
+
+    /** The step as one line: `예정 · 1-9 · 사이 동료 · → 신뢰` (status word first, as `RTPlanned` rows read). */
+    val line: String get() = statusLabel?.let { "$it${CastCopy.SEP}$text" } ?: text
 }
 
 /** `ink` for the step in effect, `ink3` for the others. */
@@ -124,6 +127,14 @@ object RelationViews {
 
     fun view(doc: ProjectDoc, a: Key, b: Key, lens: LensPoint): ViewerRelation? =
         RelationReader.between(doc, a, b)?.let { view(doc, it, a, ReadPoint.AtLens(lens)) }
+
+    /** [viewerKey]'s summary toward [partnerKey] at the lens; `만나기 전` when the pair has no relation yet. */
+    fun summary(doc: ProjectDoc, viewerKey: Key, partnerKey: Key, lens: LensPoint): String =
+        view(doc, viewerKey, partnerKey, lens)?.summary ?: CastCopy.NOT_MET
+
+    /** Planned steps of a relation as `RTPlanned` rows (`예정 · 1-9 · 사이 동료 · → 신뢰`). */
+    fun plannedRows(doc: ProjectDoc, relation: Relation, viewerKey: Key, lens: LensPoint): List<String> =
+        steps(doc, relation, viewerKey, lens).filter { it.status == StepStatus.PLANNED }.map { it.line }
 
     /** Character relations of [characterKey] (both ends characters), live or not. */
     fun relationsOf(doc: ProjectDoc, characterKey: Key): List<Relation> =

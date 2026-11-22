@@ -45,6 +45,9 @@ sealed interface DecryptResult {
  *   is also kept by the Android Keystore, outside this module) and any device opens them with the
  *   password.
  *
+ * The outer `mimetype` is the one of the inner package (`.civilight` or `.civilight-recorder`), so
+ * a file manager still routes the file to the right reader.
+ *
  * Passwords are `CharArray` so callers can wipe them; this object never stores them.
  */
 object PackageCrypto {
@@ -64,6 +67,7 @@ object PackageCrypto {
         iterations: Int = DEFAULT_ITERATIONS,
         random: SecureRandom = SecureRandom(),
         time: Long = 0L,
+        mimetype: String = PackagePaths.MIME_PROJECT,
     ): ByteArray {
         val salt = random.bytes(SALT_BYTES)
         val nonce = random.bytes(NONCE_BYTES)
@@ -72,7 +76,7 @@ object PackageCrypto {
             salt = b64(salt), cipher = CIPHER, nonce = b64(nonce),
         )
         val key = deriveKey(password, salt, iterations)
-        return container(header, key, nonce, inner, time)
+        return container(header, key, nonce, inner, time, mimetype)
     }
 
     /** Encrypts [inner] with the backup data key of [recovery] (lock type `recovery`). */
@@ -81,13 +85,14 @@ object PackageCrypto {
         recovery: RecoveryKey,
         random: SecureRandom = SecureRandom(),
         time: Long = 0L,
+        mimetype: String = PackagePaths.MIME_PROJECT,
     ): ByteArray {
         val nonce = random.bytes(NONCE_BYTES)
         val header = EncryptionHeader(
             lockType = PackageLockType.RECOVERY.open(), kdf = KDF, iterations = recovery.iterations,
             salt = b64(recovery.salt), cipher = CIPHER, nonce = b64(nonce), wrappedDataKey = recovery.wrappedDataKey,
         )
-        return container(header, recovery.dataKey, nonce, inner, time)
+        return container(header, recovery.dataKey, nonce, inner, time, mimetype)
     }
 
     /** The header of an encrypted container, or null when [outer] is not one. */
@@ -173,11 +178,11 @@ object PackageCrypto {
         }
     }
 
-    private fun container(header: EncryptionHeader, key: ByteArray, nonce: ByteArray, inner: ByteArray, time: Long): ByteArray {
+    private fun container(header: EncryptionHeader, key: ByteArray, nonce: ByteArray, inner: ByteArray, time: Long, mimetype: String): ByteArray {
         val headerBytes = CivilightJson.encode(EncryptionHeader.serializer(), header).toByteArray(Charsets.UTF_8)
         val payload = gcm(Cipher.ENCRYPT_MODE, key, nonce, headerBytes, inner)
         return ZipCodec.write(
-            PackagePaths.MIME_PROJECT,
+            mimetype,
             linkedMapOf(PackagePaths.ENCRYPTION to headerBytes, PackagePaths.PAYLOAD to payload),
             time,
         )

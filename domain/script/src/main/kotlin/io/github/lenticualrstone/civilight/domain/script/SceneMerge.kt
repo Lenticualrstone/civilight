@@ -2,7 +2,6 @@ package io.github.lenticualrstone.civilight.domain.script
 
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.OrderKeys
-import io.github.lenticualrstone.civilight.model.change.Anchor
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.project.TransitionMode
@@ -87,8 +86,10 @@ object SceneMerge {
             Choice("때 · 하나 고르기", "씬 $na 것 · ${SceneText.headTime(time.timeOf(a.key))}", "씬 $nb 것 · ${SceneText.headTime(time.timeOf(b.key))}")
         } else null
         val changes = mutableListOf<String>()
+        val unit = doc.numberingUnitOfScene(b.key)
         for (s in dependentsOf(doc, b.key)) {
-            changes += "씬 ${Labels.sceneOrdinal(doc, s.key)} 때 · 기준 씬 $nb → 씬 $na · 간격 다시 적음 · 절대 때 그대로"
+            val name = if (doc.numberingUnitOfScene(s.key) == unit) "씬 ${Labels.sceneOrdinal(doc, s.key)}" else Labels.sceneLocation(doc, s.key)
+            changes += "$name 때 · 기준 씬 $nb → 씬 $na · 간격 다시 적음 · 절대 때 그대로"
         }
         changes += if (b.title.isNullOrBlank()) "제목 · ${Labels.titleOrUndecided(a)} · 씬 $nb 제목 없음"
         else "제목 · ${Labels.titleOrUndecided(a)} · 씬 $nb 제목 ${b.title} → 씬 메모"
@@ -149,7 +150,7 @@ object SceneMerge {
             val (numbered, numbers) = Numbering.issue(out, out.numberingUnitOfScene(a.key), 1)
             val block = io.github.lenticualrstone.civilight.model.script.Block(
                 key = ctx.newKey(), sceneKey = a.key, order = orders[0], number = numbers.single(),
-                kind = BlockKind.SYSTEM.open(), runs = Runs.normalize(directText!!), createdAt = ctx.now,
+                kind = BlockKind.SYSTEM.open(), runs = Runs.normalize(directText), createdAt = ctx.now,
                 updatedAt = ctx.now, updatedBy = ctx.device,
             )
             out = numbered.addBlocks(listOf(block))
@@ -184,29 +185,23 @@ object SceneMerge {
             updatedAt = ctx.now, updatedBy = ctx.device,
         )
         // Scenes based on A keep their absolute time when A's time moved.
-        if (shiftOfA != null) for (s in dependentsOf(doc, a.key)) {
-            if (s.key == b.key) continue
+        if (shiftOfA != null) for (s in doc.story.units.filter { (it.time as? SceneTime.Relative)?.baseKey == a.key }) {
+            if (s.key == b.key || s.key == a.key) continue
             val t = s.time as SceneTime.Relative
             units[s.key] = s.copy(time = TimeChains.rebased(t, a.key, TimeChains.Offset.ZERO - shiftOfA, null), updatedAt = ctx.now, updatedBy = ctx.device)
         }
-        // Scenes based on B switch to A: absolute time kept.
+        // Scenes based on B (live or in the trash) switch to A: absolute time kept.
         val bOffset = if (takeB) TimeChains.Offset.ZERO else TimeChains.offset(doc, a.key, b.key)
-        for (s in dependentsOf(doc, b.key)) {
+        for (s in doc.story.units.filter { it.key != b.key && (it.time as? SceneTime.Relative)?.baseKey == b.key }) {
             val t = s.time as SceneTime.Relative
             val shift = bOffset ?: TimeChains.Offset(0, 0, true)
             units[s.key] = s.copy(time = TimeChains.rebased(t, a.key, shift, null), updatedAt = ctx.now, updatedBy = ctx.device)
         }
         out = out.updateUnits(units)
         out = out.copy(story = out.story.copy(units = out.story.units.filterNot { it.key == b.key }))
-        // Point anchors of B: its start is now B's first former block; its end is A's end.
+        // Everything else that named B now names A (anchors, reveal points, lens, events, checks).
         val firstB = bBlocks.firstOrNull { doc.manuscript.isLiveBlock(it.key) }
-        out = out.mapRecords { r ->
-            when (val an = r.anchor) {
-                is Anchor.UnitStart -> if (an.unitKey == b.key) r.copy(anchor = firstB?.let { Anchor.AtBlock(it.key) } ?: Anchor.UnitEnd(a.key)) else r
-                is Anchor.UnitEnd -> if (an.unitKey == b.key) r.copy(anchor = Anchor.UnitEnd(a.key)) else r
-                else -> r
-            }
-        }
+        out = SceneRefs.retarget(out, b.key, a.key, firstB?.key)
         return Result(out, systemKey)
     }
 

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The DS-13 mark at 96 of the 288 dp splash icon area (no plate; CNV-38). -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/civilight_mark"
+    android:inset="33.3%" />

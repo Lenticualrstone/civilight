@@ -38,7 +38,15 @@ data class DeleteResult(
     val change: DocChange,
 )
 
-/** Delete, undo, restore and purge (§5.2, §5.3) as pure functions over a [ProjectDoc]. */
+/** What [TrashOps.settleDelete] did after the direct marks were set. */
+data class SettledDelete(
+    val doc: ProjectDoc,
+    val relocations: List<Relocation>,
+    /** Acknowledgements dropped because a subject stopped being live (STO-41). */
+    val removedAcks: List<Acknowledgement>,
+)
+
+/** Delete and its undo (§5.2) as pure functions over a [ProjectDoc]. */
 object TrashOps {
     /** Key in [TrashEntry.ext] of the reference sites that pointed at the item when it was deleted. */
     const val REF_SITES = "refSites"
@@ -140,10 +148,10 @@ object TrashOps {
         )
 
         // Anchors and acknowledgements.
-        val (relocated, moves) = Anchors.relocate(before, d, now, ctx.deviceId)
-        d = relocated
-        val (withoutAcks, removedAcks) = dropAcksOfNonLive(before, d)
-        d = withoutAcks
+        val settled = settleDelete(before, d, ctx)
+        d = settled.doc
+        val moves = settled.relocations
+        val removedAcks = settled.removedAcks
 
         // Reference snapshot (restore report, TC-20-05).
         val scanner = ReferenceScanner(d)
@@ -177,6 +185,18 @@ object TrashOps {
 
     /** `되돌리기` of a delete: everything it changed goes back (marks, entries, anchors, acks, discarded IDs, empty blocks). */
     fun undo(current: ProjectDoc, result: DeleteResult): ProjectDoc = result.change.revert(current)
+
+    /**
+     * The steps every delete runs after the direct marks are set, for marks set elsewhere too
+     * (domain:story's `SceneTrash.delete`, which also rebases 때, STO-10): records whose anchor
+     * referent was live in [before] and is not in [marked] relocate (§5.5), and acknowledgements
+     * whose subject stopped being live are dropped, except `deleted.item` (§2.9).
+     */
+    fun settleDelete(before: ProjectDoc, marked: ProjectDoc, ctx: TrashContext): SettledDelete {
+        val (relocated, moves) = Anchors.relocate(before, marked, ctx.now, ctx.deviceId)
+        val (withoutAcks, removedAcks) = dropAcksOfNonLive(before, relocated)
+        return SettledDelete(withoutAcks, moves, removedAcks)
+    }
 
     /** Reference site ids stored with an entry at delete time. */
     fun refSitesOf(entry: TrashEntry): List<String> =

@@ -1,28 +1,11 @@
 package io.github.lenticualrstone.civilight.domain.cast
 
-import io.github.lenticualrstone.civilight.model.Key
-import io.github.lenticualrstone.civilight.model.Timestamp
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-
 /**
- * Everything a mutating cast function needs from the outside world. Main code never reads a clock
- * or mints keys on its own, so every edit is reproducible in tests.
+ * Injected clock, device id and key source of every mutating cast function: the story domain's
+ * context, so one value serves story, script and cast edits. Main code never reads a clock or mints
+ * keys on its own.
  */
-data class EditContext(
-    /** Time written to `updatedAt` / `createdAt`. */
-    val now: Timestamp,
-    /** Device id written to `updatedBy`. */
-    val by: String,
-    /** Zone of local dates (trash purge day). */
-    val zone: ZoneId,
-    /** Source of new ULID keys. */
-    val newKey: () -> Key,
-) {
-    /** Local date of [now]. */
-    val today: LocalDate get() = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-}
+typealias EditContext = io.github.lenticualrstone.civilight.domain.story.scene.EditContext
 
 /** Shared copy fragments of this area (UI copy, verbatim from 30-cast.md). */
 object CastCopy {

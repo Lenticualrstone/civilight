@@ -22,6 +22,8 @@ dependencies {
     api(libs.androidx.lifecycle.runtime.compose)
     api(libs.androidx.lifecycle.viewmodel.compose)
     api(libs.navigation3.ui)
+    api(libs.androidx.window)
+    api(libs.compose.material3.adaptive)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)

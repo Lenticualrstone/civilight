@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.trash
 
+import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.change.Anchor
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
@@ -155,17 +156,23 @@ object Messages {
     /** SCR-43 scene toast: `씬 3 지움 · ◆ 3 · ◇ 1은 씬 4 처음으로` (scene words as before the delete). */
     fun sceneDeleteToast(result: DeleteResult): Toast? {
         val scene = result.trashed.singleOrNull { it.kind == ItemKind.UNIT } ?: return null
-        val before = result.change.before
+        return sceneDeleteToast(result.change.before, result.doc, scene.key, result.relocations)
+    }
+
+    /**
+     * The same toast for a scene deleted elsewhere (domain:story's `SceneTrash.delete` followed by
+     * [TrashOps.settleDelete]): [before] is the project before the delete, [after] after it.
+     */
+    fun sceneDeleteToast(before: ProjectDoc, after: ProjectDoc, sceneKey: Key, moves: List<Relocation>): Toast {
         val codes = UnitCodes(before)
-        val subject = "${codes.sceneShort(scene.key)} 지움"
-        val moves = result.relocations
+        val subject = "${codes.sceneShort(sceneKey)} 지움"
         if (moves.isEmpty()) return Toast(subject, TrashCopy.UNDO)
         val reveals = moves.count { before.index.record(it.recordKey)?.target is ChangeTarget.TermReveal }
         val changes = moves.size - reveals
         val target = moves.first().to
         val place = if (target is Anchor.AtBlock) {
-            val targetScene = result.doc.index.block(target.blockKey)?.sceneKey
-            val sameParent = targetScene != null && before.index.unit(targetScene)?.parentKey == before.index.unit(scene.key)?.parentKey
+            val targetScene = after.index.block(target.blockKey)?.sceneKey
+            val sameParent = targetScene != null && before.index.unit(targetScene)?.parentKey == before.index.unit(sceneKey)?.parentKey
             val label = targetScene?.let { if (sameParent) codes.sceneShort(it) else codes.code(it) }
             "$label 처음으로"
         } else {
@@ -179,7 +186,7 @@ object Messages {
         return Toast(TrashCopy.join(subject, counts), TrashCopy.UNDO)
     }
 
-    private fun number(doc: ProjectDoc, blockKey: String): String =
+    private fun number(doc: ProjectDoc, blockKey: Key): String =
         "#" + (doc.index.block(blockKey)?.number ?: 0).toString().padStart(3, '0')
 
     private fun row(label: String, count: Int, sub: String? = null): SheetRow? =

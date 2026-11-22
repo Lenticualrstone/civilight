@@ -121,6 +121,15 @@ object SceneLifecycle {
     }
 
     /**
+     * The same preview with `◇ {o} 순서와 어긋남` computed by the place & time engine on a simulated
+     * move (notices that the move would add). Nothing is changed: the simulated doc is dropped.
+     */
+    fun movePreview(doc: ProjectDoc, sceneKey: Key, destParentKey: Key, afterSiblingKey: Key?, ctx: EditContext): MovePreview? {
+        val after = move(doc, sceneKey, destParentKey, afterSiblingKey, ctx)
+        return movePreview(doc, sceneKey, destParentKey, afterSiblingKey, StoryTimes.newOrderMismatches(doc, after))
+    }
+
+    /**
      * Moves a scene (`옮기기`): the scene keeps its key and its 때; within the episode numbers stay;
      * into another numbering unit every block of the scene gets the destination's next numbers
      * (live blocks in manuscript order, then trashed ones), automatic IDs follow, fixed IDs stay.

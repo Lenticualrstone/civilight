@@ -60,7 +60,7 @@ object ArchiveDocs {
         val archive = ArchiveDoc(
             key = ctx.newKey(), characterKey = characterKey,
             order = OrderKeys.after(docs(doc, characterKey).lastOrNull()?.order),
-            title = title.trim(), unlockPoint = unlockPoint, updatedAt = ctx.now, updatedBy = ctx.by,
+            title = title.trim(), unlockPoint = unlockPoint, updatedAt = ctx.now, updatedBy = ctx.device,
         )
         return doc.copy(cast = doc.cast.copy(archiveDocs = doc.cast.archiveDocs + archive)) to archive
     }
@@ -76,6 +76,6 @@ object ArchiveDocs {
     fun remove(doc: ProjectDoc, key: Key): ProjectDoc = doc.copy(cast = doc.cast.copy(archiveDocs = doc.cast.archiveDocs.filterNot { it.key == key }))
 
     private fun update(doc: ProjectDoc, key: Key, ctx: EditContext, change: (ArchiveDoc) -> ArchiveDoc): ProjectDoc = doc.copy(
-        cast = doc.cast.copy(archiveDocs = doc.cast.archiveDocs.map { if (it.key == key) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.by) else it }),
+        cast = doc.cast.copy(archiveDocs = doc.cast.archiveDocs.map { if (it.key == key) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.device) else it }),
     )
 }

@@ -75,13 +75,20 @@ data class TextMemoDraft(
     val updatedAt: Long,
 )
 
-/** Inbox filter state for one app session (RT). */
+/** Inbox filter state for one app session (RT). Runtime only: never written to a file. */
 data class InboxFilterState(
     val status: StatusFilter = StatusFilter.ALL,
     val kind: KindFilter = KindFilter.NONE,
     val project: ProjectFilter = ProjectFilter.All,
-    val target: Pair<RecorderTargetKind, Key>? = null,
+    val target: InboxTarget? = null,
 )
+
+/**
+ * The target of the inbox target filter. Item keys are unique only inside a project (§1.1) and
+ * repeat across projects after a `새 프로젝트로` import, so the filter carries the project key. For a
+ * project target [key] equals [projectKey].
+ */
+data class InboxTarget(val projectKey: Key, val kind: RecorderTargetKind, val key: Key)
 
 enum class StatusFilter { ALL, UNSORTED, PUT, DONE }
 

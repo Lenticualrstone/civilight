@@ -33,6 +33,15 @@ data class RestoreReport(
     val reattached: List<Key>,
 )
 
+/** What [RestoreOps.settleRestore] did after the direct marks were cleared. */
+data class SettledRestore(
+    val doc: ProjectDoc,
+    /** Records that went back to their original anchor (§5.5). */
+    val reattached: List<Key>,
+    /** Restored records whose anchor referent went away while they were in the trash. */
+    val relocations: List<Relocation>,
+)
+
 sealed interface RestoreOutcome {
     data class Restored(val doc: ProjectDoc, val report: RestoreReport, val change: DocChange) : RestoreOutcome
 
@@ -60,7 +69,7 @@ object RestoreOps {
         sceneChoice: SceneChoice? = null,
     ): RestoreOutcome {
         val entry = doc.index.trashEntry(entryKey) ?: return RestoreOutcome.NotFound
-        if (entry.hiddenAtDelete && !authenticated) return RestoreOutcome.NeedsAuth
+        if (TrashGates.needsAuth(doc, entry) && !authenticated) return RestoreOutcome.NeedsAuth
         if (entry.kind.known == TrashKind.BLOCK_GROUP) {
             return restoreBlocks(doc, entryKey, entry.targetKeys, ctx, authenticated, sceneChoice)
         }
@@ -72,11 +81,28 @@ object RestoreOps {
             d = if (entry.reason.known == TrashReason.MERGED) MergeOps.restoreMerged(d, item, ctx) else d.setMark(item, null, null, ctx.now, ctx.deviceId)
         }
         d = d.removeEntry(entry.key)
-        d = d.dropDeletedItemAcks(entry.targetKeys.toSet())
+        val settled = settleRestore(before, d, ctx)
+        val item = entry.targetKeys.singleOrNull()?.let { ItemId(kind, it) }
+        return RestoreOutcome.Restored(settled.doc, report(settled.doc, entry, item, settled.reattached), DocChange(before, settled.doc))
+    }
+
+    /**
+     * The steps every restore runs after the direct marks are cleared, for marks cleared elsewhere
+     * too (domain:story's `SceneTrash.restore`): `deleted.item` acknowledgements of items that are
+     * live again are deleted (§2.9); records still `orphaned` towards a referent that is live again
+     * re-attach (§5.5); records that come back from their own mark are settled against the
+     * manuscript as it is now ([Anchors.settleRestored]).
+     */
+    fun settleRestore(before: ProjectDoc, unmarked: ProjectDoc, ctx: TrashContext): SettledRestore {
+        val liveBefore = LiveRows.itemKeys(before)
+        val liveAfter = LiveRows.itemKeys(unmarked)
+        var d = unmarked.dropDeletedItemAcks(liveAfter - liveBefore)
         val (reattached, back) = Anchors.reattach(before, d, ctx.now, ctx.deviceId)
         d = reattached
-        val item = entry.targetKeys.singleOrNull()?.let { ItemId(kind, it) }
-        return RestoreOutcome.Restored(d, report(d, entry, item, back), DocChange(before, d))
+        val unmarkedRecords = before.changes.records.filter { it.deletedAt != null }.map { it.key }
+            .filter { key -> d.index.record(key)?.deletedAt == null }.toSet()
+        val (settled, records) = Anchors.settleRestored(d, unmarkedRecords, ctx.now, ctx.deviceId)
+        return SettledRestore(settled, back + records.reattached, records.relocations)
     }
 
     /**
@@ -95,7 +121,7 @@ object RestoreOps {
         sceneChoice: SceneChoice? = null,
     ): RestoreOutcome {
         val entry = doc.index.trashEntry(entryKey) ?: return RestoreOutcome.NotFound
-        if (entry.hiddenAtDelete && !authenticated) return RestoreOutcome.NeedsAuth
+        if (TrashGates.needsAuth(doc, entry) && !authenticated) return RestoreOutcome.NeedsAuth
         val keys = blockKeys.filter { it in entry.targetKeys && doc.index.block(it) != null }
         if (keys.isEmpty()) return RestoreOutcome.NotFound
         val before = doc
@@ -120,10 +146,9 @@ object RestoreOps {
         }
         val remaining = entry.targetKeys - keys.toSet()
         d = if (remaining.isEmpty()) d.removeEntry(entry.key) else d.replaceEntry(entry.copy(targetKeys = remaining))
-        val (reattached, back) = Anchors.reattach(before, d, ctx.now, ctx.deviceId)
-        d = reattached
-        val report = RestoreReport(null, null, emptyMap(), emptyMap(), back)
-        return RestoreOutcome.Restored(d, report, DocChange(before, d))
+        val settled = settleRestore(before, d, ctx)
+        val report = RestoreReport(null, null, emptyMap(), emptyMap(), settled.reattached)
+        return RestoreOutcome.Restored(settled.doc, report, DocChange(before, settled.doc))
     }
 
     /** Clears the marks of [unitKey] and its trashed ancestors, deleting their entries. */

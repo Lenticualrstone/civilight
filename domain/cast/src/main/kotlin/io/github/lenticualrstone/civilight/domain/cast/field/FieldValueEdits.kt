@@ -42,7 +42,7 @@ object FieldValueEdits {
         transform: (Map<Key, FieldValue>) -> Map<Key, FieldValue>,
     ): ProjectDoc {
         val at = ctx?.now
-        val by = ctx?.by
+        val by = ctx?.device
         return when (kind) {
             EntityKind.CHARACTER -> doc.copy(cast = doc.cast.copy(characters = doc.cast.characters.map { c ->
                 if (c.key != entityKey) c else c.copy(fields = transform(c.fields), updatedAt = at ?: c.updatedAt, updatedBy = by ?: c.updatedBy)

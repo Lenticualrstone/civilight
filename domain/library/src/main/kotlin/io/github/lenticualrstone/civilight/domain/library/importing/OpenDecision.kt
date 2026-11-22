@@ -2,8 +2,10 @@ package io.github.lenticualrstone.civilight.domain.library.importing
 
 import io.github.lenticualrstone.civilight.domain.library.common.TimeLabels
 import io.github.lenticualrstone.civilight.domain.library.format.FormatVersion
+import io.github.lenticualrstone.civilight.domain.library.format.ImportedPackage
 import io.github.lenticualrstone.civilight.domain.library.format.NewerFileCheck
 import io.github.lenticualrstone.civilight.domain.library.format.NewerFileSheet
+import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.LibraryEntry
 import io.github.lenticualrstone.civilight.model.file.Features
 import io.github.lenticualrstone.civilight.model.file.FileManifest
@@ -66,11 +68,22 @@ object OpenDecisions {
     ): OpenDecision {
         val check = NewerFileCheck.of(manifest, appMax, knownFeatures)
         if (check.refused) return OpenDecision.RefuseNewer(NewerFileSheet.of(manifest, check, appMax))
-        val key = manifest.project?.key
+        return sameProject(manifest.project?.key, manifest.project?.title, library)
+    }
+
+    /**
+     * The decision for a package that was read ([ImportedPackage], already past the newer-file
+     * check): same project = the key of the imported `project.json`, which is the key the import
+     * will use.
+     */
+    fun decide(pkg: ImportedPackage, library: List<LibraryEntry>): OpenDecision =
+        sameProject(pkg.doc.key, pkg.doc.project.name, library)
+
+    private fun sameProject(key: Key?, title: String?, library: List<LibraryEntry>): OpenDecision {
         val sameKey = library.filter { it.key == key }
         val live = sameKey.firstOrNull { it.deletedAt == null }
         if (live != null) {
-            val name = manifest.project?.title ?: live.name
+            val name = title ?: live.name
             return OpenDecision.AskSameProject(live, SameProjectChoices(ProjectNames.nextFree(name, library)))
         }
         return OpenDecision.Import(sameKey.firstOrNull())

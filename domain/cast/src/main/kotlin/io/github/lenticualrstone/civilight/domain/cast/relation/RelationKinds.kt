@@ -58,11 +58,11 @@ object RelationKinds {
         val between = OrderKeys.evenlySpaced(DEFAULT_SYMMETRIC.size + DEFAULT_PAIRS.size)
         val minds = OrderKeys.evenlySpaced(DEFAULT_MINDS.size)
         return DEFAULT_SYMMETRIC.mapIndexed { i, n ->
-            RelationKind(ctx.newKey(), RelationCategory.BETWEEN.open(), RelationSymmetry.SYMMETRIC.open(), n, null, between[i], ctx.now, ctx.by)
+            RelationKind(ctx.newKey(), RelationCategory.BETWEEN.open(), RelationSymmetry.SYMMETRIC.open(), n, null, between[i], ctx.now, ctx.device)
         } + DEFAULT_PAIRS.mapIndexed { i, (n, p) ->
-            RelationKind(ctx.newKey(), RelationCategory.BETWEEN.open(), RelationSymmetry.PAIR.open(), n, p, between[DEFAULT_SYMMETRIC.size + i], ctx.now, ctx.by)
+            RelationKind(ctx.newKey(), RelationCategory.BETWEEN.open(), RelationSymmetry.PAIR.open(), n, p, between[DEFAULT_SYMMETRIC.size + i], ctx.now, ctx.device)
         } + DEFAULT_MINDS.mapIndexed { i, n ->
-            RelationKind(ctx.newKey(), RelationCategory.MIND.open(), null, n, null, minds[i], ctx.now, ctx.by)
+            RelationKind(ctx.newKey(), RelationCategory.MIND.open(), null, n, null, minds[i], ctx.now, ctx.device)
         }
     }
 
@@ -135,7 +135,7 @@ object RelationKinds {
             pairName = if (sym == RelationSymmetry.PAIR) pairName!!.trim().nfc() else null,
             order = OrderKeys.after(of(doc, category).lastOrNull()?.order),
             updatedAt = ctx.now,
-            updatedBy = ctx.by,
+            updatedBy = ctx.device,
         )
         return withKinds(doc, doc.project.relationKinds + kind, ctx) to kind
     }
@@ -159,13 +159,13 @@ object RelationKinds {
             if (v?.kindKey == kindKey) v.copy(kindKey = null, kindFallbackText = text) else v
         val relations = doc.cast.relations.map { r ->
             if (listOf(r.between, r.mindA, r.mindB).none { it?.kindKey == kindKey }) r
-            else r.copy(between = fix(r.between), mindA = fix(r.mindA), mindB = fix(r.mindB), updatedAt = ctx.now, updatedBy = ctx.by)
+            else r.copy(between = fix(r.between), mindA = fix(r.mindA), mindB = fix(r.mindB), updatedAt = ctx.now, updatedBy = ctx.device)
         }
         val records = doc.changes.records.map { r ->
             val t = r.target as? ChangeTarget.RelationSlot ?: return@map r
             if (RelationReader.isAddress(t.slot.known ?: return@map r)) return@map r
             val v = r.valueAs(SlotValue.serializer()) ?: return@map r
-            if (v.kindKey != kindKey) r else r.copy(value = ChangeRecord.encodeValue(SlotValue.serializer(), fix(v)!!), updatedAt = ctx.now, updatedBy = ctx.by)
+            if (v.kindKey != kindKey) r else r.copy(value = ChangeRecord.encodeValue(SlotValue.serializer(), fix(v)!!), updatedAt = ctx.now, updatedBy = ctx.device)
         }
         return withKinds(
             doc.copy(cast = doc.cast.copy(relations = relations), changes = doc.changes.copy(records = records)),
@@ -209,8 +209,8 @@ object RelationKinds {
     }
 
     private fun update(doc: ProjectDoc, kindKey: Key, ctx: EditContext, change: (RelationKind) -> RelationKind): ProjectDoc =
-        withKinds(doc, doc.project.relationKinds.map { if (it.key == kindKey) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.by) else it }, ctx)
+        withKinds(doc, doc.project.relationKinds.map { if (it.key == kindKey) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.device) else it }, ctx)
 
     private fun withKinds(doc: ProjectDoc, kinds: List<RelationKind>, ctx: EditContext): ProjectDoc =
-        doc.copy(project = doc.project.copy(relationKinds = kinds, updatedAt = ctx.now, updatedBy = ctx.by))
+        doc.copy(project = doc.project.copy(relationKinds = kinds, updatedAt = ctx.now, updatedBy = ctx.device))
 }

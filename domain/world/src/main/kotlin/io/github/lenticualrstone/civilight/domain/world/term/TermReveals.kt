@@ -70,7 +70,9 @@ object TermReveals {
             rank = rank,
             blockKey = block?.key,
             planned = planned,
-            orphaned = record.anchorState.known == AnchorState.ORPHANED,
+            // Stored `근거 지워짐`, or read-time: the anchor block is not live and reads at the next one.
+            orphaned = record.anchorState.known == AnchorState.ORPHANED ||
+                (record.anchor as? Anchor.AtBlock)?.let { !manuscript.isLiveBlock(it.blockKey) } == true,
             episodeLabel = episode,
             cardValue = cardValue,
         )

@@ -6,7 +6,6 @@ import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.doc.isPlanned
 import io.github.lenticualrstone.civilight.model.doc.recordsHere
 import io.github.lenticualrstone.civilight.model.open
-import io.github.lenticualrstone.civilight.model.position.PointRef
 import io.github.lenticualrstone.civilight.model.project.VoiceIdFormat
 import io.github.lenticualrstone.civilight.model.project.VoiceIdFormatMode
 import io.github.lenticualrstone.civilight.model.sample.ExampleClock
@@ -157,6 +156,8 @@ class Rule12BlocksTest {
         assertEquals(1 to 1, t.dayMin to t.dayMax)
         assertEquals("06:10", t.clock.toString())
         assertEquals(F1.S3, t.rebasedFromKey)
+        assertEquals("2일째 아침 06:10", SceneText.headTime(StoryTimes.source(doc).timeOf(F1.S4)))
+        assertEquals(StoryTimes.source(F1.build()).timeOf(F1.S4), StoryTimes.source(doc).timeOf(F1.S4))
     }
 
     @Test
@@ -261,7 +262,7 @@ class Rule12BlocksTest {
     fun `T-12-15 scene-move preview`() {
         var doc = F1.build()
         for (n in listOf(42, 43, 45, 47)) doc = doc.withBlock(b(n)) { it.copy(voice = fixed(VoiceIds.autoId(doc, it)!!)) }
-        val p = SceneLifecycle.movePreview(doc, F1.S3, F1.E18, afterSiblingKey = null, timeOrderMismatches = 1)!!
+        val p = SceneLifecycle.movePreview(doc, F1.S3, F1.E18, afterSiblingKey = null, ctx = ctx)!!
         assertEquals("씬 옮기기", p.title)
         assertEquals("미리 보기 · 옮기기 전에는 그대로", p.sub)
         assertEquals("1-7 · 씬 3" to "꺼진 등불", p.from)
@@ -278,6 +279,10 @@ class Rule12BlocksTest {
         assertEquals(listOf("취소", "옮기기"), p.buttons)
         val moved = SceneLifecycle.move(doc, F1.S3, F1.E18, null, ctx)
         assertEquals((61..73).toList(), moved.liveNumbers(F1.S3))
+        val timeBefore = StoryTimes.source(doc).timeOf(F1.S3)!!
+        val timeAfter = StoryTimes.source(moved).timeOf(F1.S3)!!
+        assertEquals(timeBefore.storyDay to timeBefore.clock, timeAfter.storyDay to timeAfter.clock)
+        assertEquals(1, StoryTimes.orderMismatches(moved))
         assertEquals(F1.S3, moved.manuscript.liveScenes.first { moved.numberingUnitOfScene(it.key) == F1.E18 }.key)
     }
 
@@ -508,7 +513,4 @@ class Rule12BlocksTest {
         assertTrue(Records.marksOn(linked, second).any { it.recordKey == p1 && it.glyph == "◆" })
         assertTrue(linked.recordsHere(second).any { it.key == p1 })
     }
-
-    @Suppress("unused")
-    private val unusedPointRef = PointRef.unitStart(F1.E17)
 }

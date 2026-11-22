@@ -49,7 +49,7 @@ object CharacterEdits {
             oneLiner = oneLiner?.trim()?.nfc()?.takeIf { it.isNotEmpty() },
             order = OrderKeys.after(doc.cast.characters.maxOfOrNull { it.order }),
             updatedAt = ctx.now,
-            updatedBy = ctx.by,
+            updatedBy = ctx.device,
         )
         val project = doc.project.copy(counters = counters.copy(nextCharacterRecordNo = counters.nextCharacterRecordNo + 1))
         return doc.copy(project = project, cast = doc.cast.copy(characters = doc.cast.characters + character)) to character
@@ -57,7 +57,7 @@ object CharacterEdits {
 
     fun update(doc: ProjectDoc, key: Key, ctx: EditContext, change: (Character) -> Character): ProjectDoc = doc.copy(
         cast = doc.cast.copy(characters = doc.cast.characters.map {
-            if (it.key == key) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.by) else it
+            if (it.key == key) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.device) else it
         }),
     )
 
@@ -91,7 +91,7 @@ object CharacterEdits {
         val n = name.trim().nfc()
         require(n.isNotEmpty()) { "tag name is empty" }
         doc.project.tags.firstOrNull { it.name.nfc() == n }?.let { return doc to it }
-        val tag = Tag(ctx.newKey(), n, OrderKeys.after(doc.project.tags.maxOfOrNull { it.order }), ctx.now, ctx.by)
+        val tag = Tag(ctx.newKey(), n, OrderKeys.after(doc.project.tags.maxOfOrNull { it.order }), ctx.now, ctx.device)
         return doc.copy(project = doc.project.copy(tags = doc.project.tags + tag)) to tag
     }
 

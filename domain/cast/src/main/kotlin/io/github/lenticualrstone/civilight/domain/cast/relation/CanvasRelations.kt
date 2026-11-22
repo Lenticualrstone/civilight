@@ -125,8 +125,8 @@ object CanvasRelations {
     private fun updateEdge(doc: ProjectDoc, canvasKey: Key, edgeKey: Key, ctx: EditContext, change: (CanvasEdge) -> CanvasEdge): ProjectDoc {
         val canvas = doc.canvases[canvasKey] ?: return doc
         val updated = canvas.copy(
-            edges = canvas.edges.map { if (it.key == edgeKey) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.by) else it },
-            updatedAt = ctx.now, updatedBy = ctx.by,
+            edges = canvas.edges.map { if (it.key == edgeKey) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.device) else it },
+            updatedAt = ctx.now, updatedBy = ctx.device,
         )
         return doc.copy(canvases = doc.canvases + (canvasKey to updated))
     }

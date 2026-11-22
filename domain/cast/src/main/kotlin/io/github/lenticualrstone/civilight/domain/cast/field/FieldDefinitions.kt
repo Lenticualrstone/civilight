@@ -103,7 +103,7 @@ object FieldDefinitions {
             calc = if (field.type == FieldType.CALC) field.calcSourceKey?.let { CalcSpec(sourceFieldDefKey = it) } else null,
             bundleOrigin = field.bundleOrigin,
             updatedAt = ctx.now,
-            updatedBy = ctx.by,
+            updatedBy = ctx.device,
         )
         return withDefs(doc, doc.project.fieldDefs + def, ctx) to def
     }
@@ -262,10 +262,10 @@ object FieldDefinitions {
     // --- Helpers ---
 
     internal fun update(doc: ProjectDoc, defKey: Key, ctx: EditContext, change: (FieldDef) -> FieldDef): ProjectDoc =
-        withDefs(doc, doc.project.fieldDefs.map { if (it.key == defKey) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.by) else it }, ctx)
+        withDefs(doc, doc.project.fieldDefs.map { if (it.key == defKey) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.device) else it }, ctx)
 
     internal fun withDefs(doc: ProjectDoc, defs: List<FieldDef>, ctx: EditContext): ProjectDoc =
-        doc.copy(project = doc.project.copy(fieldDefs = defs, updatedAt = ctx.now, updatedBy = ctx.by))
+        doc.copy(project = doc.project.copy(fieldDefs = defs, updatedAt = ctx.now, updatedBy = ctx.device))
 
     internal fun newOptions(labels: List<String>, ctx: EditContext): List<FieldOption> {
         val clean = labels.map { it.trim().nfc() }.filter { it.isNotEmpty() }.distinct()

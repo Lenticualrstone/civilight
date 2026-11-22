@@ -33,7 +33,8 @@ object RecorderTrash {
     /** `되살리기`: the record and with it its links and placements come back. Hidden records need [authenticated]. */
     fun restore(state: RecorderTrashState, entryKey: Key, ctx: TrashContext, authenticated: Boolean = false): RecorderTrashState? {
         val entry = state.entries.firstOrNull { it.key == entryKey } ?: return null
-        if (entry.hiddenAtDelete && !authenticated) return null
+        val hidden = entry.hiddenAtDelete || entry.targetKeys.any { state.library.record(it)?.hidden == true }
+        if (hidden && !authenticated) return null
         val targets = entry.targetKeys.toSet()
         val records = state.library.records.map {
             if (it.key in targets) it.copy(deletedAt = null, trashEntryKey = null, updatedAt = ctx.now, updatedBy = ctx.deviceId) else it
@@ -55,6 +56,20 @@ object RecorderTrash {
         )
         return RecorderTrashState(library, state.entries.filter { it.key != entryKey }) to
             targets.map { DeletionLogEntry(it, "recorder", ctx.now) }
+    }
+
+    /** `비우기` for recorder rows (LIB-39 `ED`): hidden records stay while their gate is locked. */
+    fun emptyTrash(state: RecorderTrashState, ctx: TrashContext, recordsUnlocked: Boolean): Pair<RecorderTrashState, List<DeletionLogEntry>> {
+        var current = state
+        val log = mutableListOf<DeletionLogEntry>()
+        for (entry in state.entries) {
+            val hidden = entry.hiddenAtDelete || entry.targetKeys.any { state.library.record(it)?.hidden == true }
+            if (hidden && !recordsUnlocked) continue
+            val (next, rows) = purge(current, entry.key, ctx)
+            current = next
+            log += rows
+        }
+        return current to log
     }
 
     /** The daily purge of recorder entries (T-07, T-08). */

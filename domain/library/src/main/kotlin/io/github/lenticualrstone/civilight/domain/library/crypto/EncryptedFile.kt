@@ -47,8 +47,8 @@ sealed interface EncryptedOpen {
     data class NotEncrypted(val reason: String) : EncryptedOpen
 
     /**
-     * The inner package, then the same checks as an unencrypted file (LIB-52, LIB-53). A [PackageOpen.Ready]
-     * result is marked `decrypted`, so the import lands hidden on this device.
+     * The inner package, then the same checks as an unencrypted file (LIB-52, LIB-53). A
+     * [PackageOpen.Ready] result carries the container's lock type.
      */
     data class Opened(val result: PackageOpen) : EncryptedOpen
 }
@@ -61,12 +61,13 @@ object EncryptedFiles {
         chain: UpgradeChain = UpgradeChain.CURRENT,
         knownFeatures: Set<String> = Features.KNOWN,
     ): EncryptedOpen = when (val d = PackageCrypto.decrypt(outer, password)) {
-        is DecryptResult.Ok -> EncryptedOpen.Opened(markDecrypted(ProjectPackageReader.open(d.inner, chain, knownFeatures)))
+        is DecryptResult.Ok -> EncryptedOpen.Opened(markDecrypted(ProjectPackageReader.open(d.inner, chain, knownFeatures), d.header))
         DecryptResult.WrongPassword -> EncryptedOpen.WrongPassword
         is DecryptResult.Unsupported -> EncryptedOpen.Unsupported(d.kdf, d.cipher)
         is DecryptResult.NotEncrypted -> EncryptedOpen.NotEncrypted(d.reason)
     }
 
-    private fun markDecrypted(result: PackageOpen): PackageOpen =
-        if (result is PackageOpen.Ready) PackageOpen.Ready(result.pkg.copyDecrypted()) else result
+    /** The inner package carries the lock it came out of (export files land hidden, LIB-54). */
+    fun markDecrypted(result: PackageOpen, header: EncryptionHeader): PackageOpen =
+        if (result is PackageOpen.Ready) PackageOpen.Ready(result.pkg.copyDecrypted(header.lockType)) else result
 }

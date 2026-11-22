@@ -218,7 +218,7 @@ object DeletedItems {
                         }
                     })
                 }
-                if (changed !== b) changed.copy(updatedAt = ctx.now, updatedBy = ctx.by) else b
+                if (changed !== b) changed.copy(updatedAt = ctx.now, updatedBy = ctx.device) else b
             })
         }
         return doc.copy(episodes = episodes) to SpeakerChange(from, to, blocks, options)

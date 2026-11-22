@@ -109,7 +109,7 @@ object VoiceLines {
         val line = VoiceLine(
             key = ctx.newKey(), characterKey = characterKey,
             order = OrderKeys.after(lines(doc, characterKey).lastOrNull()?.order),
-            title = title.trim(), updatedAt = ctx.now, updatedBy = ctx.by,
+            title = title.trim(), updatedAt = ctx.now, updatedBy = ctx.device,
         )
         return doc.copy(cast = doc.cast.copy(voiceLines = doc.cast.voiceLines + line)) to line
     }
@@ -135,7 +135,7 @@ object VoiceLines {
 
     private fun update(doc: ProjectDoc, lineKey: Key, ctx: EditContext, change: (VoiceLine) -> VoiceLine): ProjectDoc = doc.copy(
         cast = doc.cast.copy(voiceLines = doc.cast.voiceLines.map {
-            if (it.key == lineKey) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.by) else it
+            if (it.key == lineKey) change(it).copy(updatedAt = ctx.now, updatedBy = ctx.device) else it
         }),
     )
 }
