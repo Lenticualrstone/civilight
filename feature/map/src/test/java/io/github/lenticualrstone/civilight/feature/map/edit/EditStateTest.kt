@@ -1,0 +1,135 @@
+package io.github.lenticualrstone.civilight.feature.map.edit
+
+import io.github.lenticualrstone.civilight.feature.map.MapFx
+import io.github.lenticualrstone.civilight.feature.map.MapFx.K
+import io.github.lenticualrstone.civilight.model.Point
+import io.github.lenticualrstone.civilight.model.position.LensPoint
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class EditStateTest {
+    private val doc = MapFx.doc()
+
+    private fun build(s: EditorState, mapKey: String = K.MAP_LOWER_DISTRICT) = EditState.build(doc, mapKey, LensPoint.Latest, false, s)!!
+
+    @Test
+    fun `header reads 하층 구역 지도 · 편집 with the breadcrumb`() {
+        val ui = build(EditorState())
+        assertEquals("하층 구역 지도 · 편집", ui.title)
+        assertEquals("세계 지도 › 하층 구역 지도", ui.small)
+        assertEquals("1일 · 15 km", ui.scale)
+        assertEquals(listOf("길"), ui.layers.map { it.name })
+        assertTrue(ui.items.any { it.text == "핀 · 결사의 문" })
+        assertTrue(ui.items.any { it.text == "경로 · 결사의 문 → 상층 관문" })
+        assertNull(ui.props)
+    }
+
+    @Test
+    fun `rule 19 - a hidden place's pin is neither listed nor shown while locked`() {
+        val hidden = doc.copy(world = doc.world.copy(places = doc.world.places.map { if (it.key == K.PLACE_ASH_MARKET) it.copy(hidden = true) else it }))
+        val ui = EditState.build(hidden, K.MAP_LOWER_DISTRICT, LensPoint.Latest, false, Editor.select(EditorState(), K.PIN_ASH_MARKET))!!
+        assertTrue(ui.items.none { it.key == K.PIN_ASH_MARKET })
+        assertNull(ui.props)
+        val open = EditState.build(hidden, K.MAP_LOWER_DISTRICT, LensPoint.Latest, true, Editor.select(EditorState(), K.PIN_ASH_MARKET))!!
+        assertTrue(open.props is PropsUi.PinProps)
+    }
+
+    @Test
+    fun `vertex handles only while the base shape is in force`() {
+        val atLatest = build(Editor.select(EditorState(), K.REGION_UPPER_GUARD), K.MAP_WORLD).props as PropsUi.RegionProps
+        assertEquals(4, atLatest.vertices.size)
+        val later = EditState.build(doc, K.MAP_WORLD, LensPoint.UnitEnd(K.EPISODE_1_9), false, Editor.select(EditorState(), K.REGION_UPPER_GUARD))!!.props as PropsUi.RegionProps
+        assertTrue(later.vertices.isEmpty())
+    }
+
+    @Test
+    fun `WLD-43 route sheet of 결사의 문 → 상층 관문`() {
+        val props = build(Editor.select(EditorState(), K.ROUTE_GATE_TO_UPPER_GATE)).props as PropsUi.RouteProps
+        assertEquals("결사의 문 → 상층 관문", props.title)
+        assertEquals("2일 4시간", props.sheet.duration)
+        assertEquals("38 km · 지점 3", props.sheet.detail)
+        assertEquals(listOf("도보 15 km · 8시간", "말", "배", "직접"), props.modes.map { it.label })
+        assertEquals(listOf(true, false, false, false), props.modes.map { it.selected })
+        assertNull(props.modes.last().modeKey)
+        assertEquals("길", props.layer)
+        assertEquals("없음", props.reveal)
+    }
+
+    @Test
+    fun `route without a scale offers 축척 맞추기`() {
+        val world = doc.maps.getValue(K.MAP_LOWER_DISTRICT).copy(scale = null)
+        val d = doc.copy(maps = doc.maps + (world.key to world))
+        val props = EditState.build(d, world.key, LensPoint.Latest, false, Editor.select(EditorState(), K.ROUTE_GATE_TO_UPPER_GATE))!!.props as PropsUi.RouteProps
+        assertEquals("축척 없음", props.sheet.detail)
+        assertEquals("축척 맞추기", props.sheet.action)
+        assertNull(props.sheet.duration)
+    }
+
+    @Test
+    fun `pin, region and label properties`() {
+        val pin = build(Editor.select(EditorState(), K.PIN_UPPER_GATE)).props as PropsUi.PinProps
+        assertEquals("상층 관문", pin.title)
+        assertEquals("1-7부터", pin.reveal)
+        assertEquals("없음", pin.layer)
+        val region = build(Editor.select(EditorState(), K.REGION_UPPER_GUARD), K.MAP_WORLD).props as PropsUi.RegionProps
+        assertEquals("상층 경비대", region.title)
+        assertEquals("세력 영역", region.kind)
+        assertEquals("세력 · 상층 경비대", region.faction)
+        assertEquals("정치", region.layer)
+        assertEquals(4, region.vertices.size)
+        val label = build(Editor.select(EditorState(), K.mapLabel(2))).props as PropsUi.LabelProps
+        assertTrue(label.canCurve)
+        val worldLabel = build(Editor.select(EditorState(), K.mapLabel(1)), K.MAP_WORLD).props as PropsUi.LabelProps
+        assertFalse(worldLabel.canCurve)
+    }
+
+    @Test
+    fun `WLD-42 새 영역 · 그리는 중 shows the draft and its vertex bar`() {
+        var s = Editor.chooseTool(EditorState(), EditTool.REGION)
+        val lower = doc.maps.getValue(K.MAP_LOWER_DISTRICT)
+        listOf(Point(0.1f, 0.1f), Point(0.2f, 0.1f)).forEach { s = Editor.tap(s, lower, it, null).state }
+        s = Editor.editRegionDraft(s) { it.copy(factionKey = K.FACTION_UPPER_GUARD, revealUnitKey = K.EPISODE_1_7, layerKey = K.mapLayer(2)) }
+        val props = build(s).props as PropsUi.RegionDraftProps
+        assertEquals("새 영역 · 그리는 중", props.title)
+        assertEquals("꼭짓점 2 · 되돌리기 · 닫기", props.vertexBar)
+        assertFalse(props.canClose)
+        assertEquals("세력 · 상층 경비대", props.faction)
+        assertEquals("1-7부터", props.reveal)
+        assertEquals("길", props.layer)
+        assertEquals("세력 영역", props.kind)
+        assertEquals(2, build(s).regionDraft.size)
+    }
+
+    @Test
+    fun `route draft bar counts points and km on a scaled map`() {
+        var s = Editor.chooseTool(EditorState(), EditTool.ROUTE)
+        val lower = doc.maps.getValue(K.MAP_LOWER_DISTRICT)
+        s = Editor.tap(s, lower, Point(0.20f, 0.40f), null).state
+        s = Editor.tap(s, lower, Point(0.45f, 0.40f), null).state
+        val props = build(s).props as PropsUi.RouteDraftProps
+        assertEquals("지점 2 · 30 km", props.bar)
+        assertTrue(props.canFinish)
+        assertEquals(2, build(s).routeDraft.size)
+    }
+
+    @Test
+    fun `a moving pin is drawn at its new spot before 완료`() {
+        val s = Editor.startMovePin(EditorState(), K.PIN_ASH_MARKET).copy(movingTo = Point(0.5f, 0.5f))
+        val ui = build(s)
+        assertEquals("핀 옮기기 · 잿더미 시장" to Point(0.5f, 0.5f), ui.moving)
+        assertEquals(Point(0.5f, 0.5f), ui.scene.pin(K.PIN_ASH_MARKET)!!.at)
+    }
+
+    @Test
+    fun `WLD-41 the pin picker lists places with scene counts and leaves out places pinned here`() {
+        val model = PinPick.model(doc, K.MAP_LOWER_DISTRICT, "", hiddenOpen = false)
+        assertTrue(model.rows.none { it.placeKey == K.PLACE_SOCIETY_GATE })
+        val ruins = model.rows.first { it.placeKey == K.PLACE_PYLON_RUINS }
+        assertFalse(ruins.pinned)
+        assertTrue(ruins.sub.startsWith("씬 "))
+        assertEquals(listOf("송전탑 폐허"), PinPick.model(doc, K.MAP_LOWER_DISTRICT, "송전탑", false).rows.map { it.name })
+    }
+}

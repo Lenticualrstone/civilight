@@ -1,0 +1,200 @@
+package io.github.lenticualrstone.civilight.feature.recorder.capture
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightSheetLayout
+import io.github.lenticualrstone.civilight.designsystem.component.GlowMode
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.feature.recorder.link.LinkPickerContent
+import io.github.lenticualrstone.civilight.feature.recorder.memo.MemoActions
+import io.github.lenticualrstone.civilight.feature.recorder.memo.TextMemoSheetContent
+import io.github.lenticualrstone.civilight.model.recorder.RecordingPhase
+import io.github.lenticualrstone.civilight.navigation.Recording
+import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
+import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
+import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
+import kotlinx.coroutines.flow.first
+
+/** Whether the app may record audio now. */
+fun micGranted(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+/**
+ * The `Recording` overlay route (LRC-01 … LRC-20): `녹음 중`, `정리 중`, `마이크 꺼짐`, the reason
+ * line, the text memo (`startTyped`) and the link picker, over the screen the user was on (the
+ * shell keeps it composed underneath, blurred).
+ *
+ * The start is consumed once ([rememberSaveable]): a back stack restored after process death never
+ * turns the mic on by itself; it closes when no capture is running. The route closes when the
+ * capture goes idle. System back on `녹음 중` only leaves the screen (the recording keeps running and
+ * the mic reopens it, LRC-01); elsewhere it acts like the screen's own close.
+ */
+@Composable
+fun RecordingRoute(route: Recording, deps: FeatureDeps) {
+    val hub = remember(deps) { CaptureHubs.of(deps) }
+    val state by hub.state.collectAsState()
+    val context = LocalContext.current
+    var consumed by rememberSaveable { mutableStateOf(false) }
+    val close = {
+        if (deps.navigator.current == route) deps.navigator.pop()
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hub.launch { permissionResult(granted) }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!consumed) {
+            hub.begin(EntryRoutes.entryOf(route), route.startTyped, micGranted(context))
+            consumed = true
+        }
+        hub.state.first { !it.active }
+        close()
+    }
+
+    // `마이크 꺼짐`: back from the system settings with the permission granted closes the screen; recording does not start by itself (LRC-06).
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && hub.state.value.stage == CaptureStage.MIC_OFF && micGranted(context)) hub.dismissMic()
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+
+    BackHandler(enabled = state.stage != CaptureStage.RECORDING && state.stage != CaptureStage.IDLE) {
+        hub.launch { back() }
+    }
+
+    ProtectWindow(CaptureProtection.of(state.env, CaptureProtection.projectsShown(state)))
+
+    val inner = LocalWindowLayout.current.isInner
+    val reduced = CivilightTheme.reducedMotion
+    val glowOn = deps.settings.collectAsState().value.recorderGlow
+
+    CivilightSheetLayout(
+        sheetVisible = state.picker != null,
+        onDismissRequest = hub::closePicker,
+        centered = inner,
+        sheet = { LinkPickerContent(hub, onClose = hub::closePicker) },
+    ) {
+        CivilightSheetLayout(
+            sheetVisible = state.stage == CaptureStage.TYPING || state.stage == CaptureStage.MIC_REASON,
+            onDismissRequest = { hub.launch { back() } },
+            centered = inner,
+            sheet = {
+                if (state.stage == CaptureStage.MIC_REASON) {
+                    MicReasonContent(onAllow = { permission.launch(Manifest.permission.RECORD_AUDIO) }, onClose = hub::dismissMic)
+                } else {
+                    TextMemoSheetContent(state, memoActions(hub, context, onOpenPicker = hub::openPicker))
+                }
+            },
+        ) {
+            val glow = when {
+                !glowOn -> null
+                state.stage == CaptureStage.RECORDING -> if (reduced || state.session?.phase != RecordingPhase.RECORDING) GlowMode.STILL else GlowMode.RECORDING
+                state.stage == CaptureStage.PROCESSING && state.finalising -> if (reduced) GlowMode.STILL else GlowMode.PROCESSING
+                else -> null
+            }
+            val glass = state.stage == CaptureStage.RECORDING || state.stage == CaptureStage.PROCESSING || state.stage == CaptureStage.MIC_OFF
+            CaptureFrame(glow = glow, level = { hub.level.value }, glass = glass) {
+                when (state.stage) {
+                    CaptureStage.RECORDING -> CaptureViews.recording(state)?.let { view ->
+                        RecordingPane(
+                            view = view,
+                            onCancel = {
+                                hub.launch {
+                                    val outcome = cancel()
+                                    if (outcome is CancelOutcome.Discarded) {
+                                        deps.toasts.show(outcome.cancelled.toast.text, RecorderCopy.UNDO) {
+                                            hub.launch {
+                                                undoCancel(outcome.cancelled)
+                                                deps.navigator.push(EntryRoutes.routeOf(outcome.cancelled.session.entry))
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            onAddLink = { hub.openPicker(PickerRequest(PickerTarget.SESSION)) },
+                            onReplaceLink = { chip -> hub.openPicker(PickerRequest(PickerTarget.SESSION, chip.links.map { it.key })) },
+                            onRemoveLink = { chip -> hub.removeLinks(PickerTarget.SESSION, chip.links.map { it.key }) },
+                            onToText = hub::toText,
+                            onStop = { hub.launch { stopAndSave() } },
+                            onPause = hub::togglePause,
+                        )
+                    }
+                    CaptureStage.PROCESSING -> CaptureViews.processing(state)?.let { view ->
+                        ProcessingPane(
+                            view = view,
+                            onAddLink = { hub.openPicker(PickerRequest(PickerTarget.SESSION)) },
+                            onReplaceLink = { chip -> hub.openPicker(PickerRequest(PickerTarget.SESSION, chip.links.map { it.key })) },
+                            onRemoveLink = { chip -> hub.removeLinks(PickerTarget.SESSION, chip.links.map { it.key }) },
+                            onHide = hub::setHide,
+                            onPutHere = {
+                                hub.launch {
+                                    val done = putHere() ?: return@launch
+                                    deps.toasts.show(done.insertion.toast.text, RecorderCopy.UNDO) { hub.launch { undoPut(done) } }
+                                }
+                            },
+                            onContinue = hub::continueSpeaking,
+                            onKeep = { hub.launch { keepInInbox() } },
+                        )
+                    }
+                    CaptureStage.MIC_OFF -> MicOffPane(
+                        onClose = hub::dismissMic,
+                        onOpenSettings = {
+                            context.startActivity(
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        },
+                        onToText = { hub.launch { micOffToText() } },
+                    )
+                    CaptureStage.TYPING, CaptureStage.MIC_REASON, CaptureStage.IDLE -> Unit
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The memo's actions. [onOpenPicker] opens the link picker where the memo is shown (the overlay
+ * draws it itself; a shared sheet stacks the registered picker sheet). The memo's mic asks for the
+ * permission through the reason line first (LRC-06).
+ */
+fun memoActions(hub: CaptureHub, context: Context, onOpenPicker: (PickerRequest) -> Unit, onToVoice: (() -> Unit)? = null) = MemoActions(
+    onTextChange = hub::memoTextChanged,
+    onCaret = hub::memoCaretMoved,
+    onPickAt = hub::memoPickAt,
+    onOpenPicker = onOpenPicker,
+    onRemoveLinks = { chip -> hub.removeLinks(PickerTarget.MEMO, chip.links.map { it.key }) },
+    onHide = hub::setHide,
+    onToVoice = onToVoice ?: {
+        val granted = micGranted(context)
+        hub.launch { memoToVoice(granted) }
+        Unit
+    },
+    onSave = { hub.launch { memoSave() } },
+    onClose = { hub.launch { memoClose() } },
+)

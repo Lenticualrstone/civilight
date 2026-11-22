@@ -1,0 +1,231 @@
+package io.github.lenticualrstone.civilight.feature.library.newproject
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import io.github.lenticualrstone.civilight.designsystem.component.BottomGlassBar
+import io.github.lenticualrstone.civilight.designsystem.component.ButtonRow
+import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.component.GlassScaffold
+import io.github.lenticualrstone.civilight.designsystem.component.StepBars
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
+import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.feature.library.LibraryServices
+import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
+import io.github.lenticualrstone.civilight.navigation.NewProject
+import io.github.lenticualrstone.civilight.navigation.NewProjectStep
+import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
+import io.github.lenticualrstone.civilight.ui.scaffold.SheetHostLayout
+import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
+import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
+
+/**
+ * One step of 새 프로젝트 (LIB-09 … LIB-12). Each step is its own back-stack entry; the values live in
+ * the shared draft, so `이전` (a pop) and `다음` (a push) keep them. Cover: full page with the 4-bar
+ * progress, small `새 프로젝트 · k/4`, title, fields, glass bottom bar. Inner (`NewWide`, LIB-14):
+ * form column 380 with `취소` beside the progress and a 300-wide `미리 보기` aside.
+ */
+@Composable
+internal fun NewProjectScreen(route: NewProject, services: LibraryServices) {
+    val deps = services.deps
+    val vm = entryViewModel { NewProjectViewModel(services) }
+    var snapshot by rememberSaveable { mutableStateOf<String?>(null) }
+    remember { services.draft.restore(snapshot) }
+    val form by services.draft.form.collectAsState()
+    LaunchedEffect(form) { snapshot = NewProjectDraftHolder.encode(form) }
+    val settings by deps.settings.collectAsState()
+    val inputs by vm.inputs.collectAsState()
+    val creating by vm.creating.collectAsState()
+    val step = route.step
+    val navigator = deps.navigator
+    val sheets = rememberSheetHost()
+    val inner = LocalWindowLayout.current.isInner
+    fun update(transform: (NewProjectForm) -> NewProjectForm) = services.draft.update(transform)
+
+    fun cancel() {
+        services.draft.reset()
+        navigator.popTo { it !is NewProject }
+    }
+
+    fun back() {
+        if (step == NewProjectStep.NAME) cancel() else navigator.pop()
+    }
+
+    fun next() {
+        val following = NewProjectRules.next(step)
+        if (following != null) {
+            navigator.push(NewProject(following))
+        } else {
+            vm.create(form) { stack ->
+                services.draft.reset()
+                navigator.resetTo(stack)
+            }
+        }
+    }
+
+    val enabled = NewProjectRules.canProceed(form, step) && !creating
+    val leftLabel = if (step == NewProjectStep.NAME) NewProjectCopy.CANCEL else NewProjectCopy.PREVIOUS
+    val rightLabel = if (step == NewProjectStep.START) NewProjectCopy.CREATE else NewProjectCopy.NEXT
+    val body: @Composable ColumnScope.() -> Unit = {
+        when (step) {
+            NewProjectStep.NAME -> NameStep(form, settings.ratingDefaults, services.facts.recoverySet(), ::update)
+            NewProjectStep.STRUCTURE -> StructureStep(form, wide = inner, showPreview = !inner, update = ::update)
+            NewProjectStep.TIME -> TimeStep(form, ::update)
+            NewProjectStep.START -> StartStep(
+                form = form,
+                hideSwitch = NewProjectRules.hideSwitch(form, settings.ratingDefaults),
+                inputs = inputs,
+                update = ::update,
+                onPickBundle = { sheets.open(BundlePickerSheet) },
+            )
+        }
+    }
+
+    SheetHostLayout(
+        sheets,
+        localSheets = { key ->
+            when (key) {
+                is BundlePickerSheet -> sheetBody {
+                    BundlePickerContent(form, inputs.bundleSources) { bundle, source ->
+                        update { it.copy(bundle = bundle, bundleSourceKey = source) }
+                    }
+                }
+                else -> null
+            }
+        },
+    ) {
+        if (inner) {
+            WideFrame(step, form, enabled, leftLabel, rightLabel, ::back, ::next, ::cancel, body)
+        } else {
+            CoverFrame(step, enabled, leftLabel, rightLabel, ::back, ::next, body)
+        }
+    }
+}
+
+@Composable
+private fun StepHeading(step: NewProjectStep) {
+    val type = CivilightTheme.type
+    CivilightText(NewProjectRules.smallLine(step), type.sec, color = CivilightTheme.colors.ink3)
+    CivilightText(NewProjectRules.title(step), type.pageTitle, Modifier.padding(top = 4.dp), color = CivilightTheme.colors.ink)
+}
+
+@Composable
+private fun StepButtons(enabled: Boolean, leftLabel: String, rightLabel: String, onLeft: () -> Unit, onRight: () -> Unit, modifier: Modifier = Modifier) {
+    ButtonRow(modifier.fillMaxWidth()) {
+        CivilightButton(leftLabel, onLeft, Modifier.weight(1f), variant = ButtonVariant.GHOST)
+        CivilightButton(rightLabel, onRight, Modifier.weight(1f), variant = ButtonVariant.PRIMARY_LARGE, enabled = enabled)
+    }
+}
+
+@Composable
+private fun CoverFrame(
+    step: NewProjectStep,
+    enabled: Boolean,
+    leftLabel: String,
+    rightLabel: String,
+    onLeft: () -> Unit,
+    onRight: () -> Unit,
+    body: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = CivilightTheme.colors
+    GlassScaffold(
+        topBar = {
+            Box(Modifier.fillMaxWidth().background(colors.bg).statusBarsPadding().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp)) {
+                StepBars(NewProjectRules.STEPS, NewProjectRules.index(step), Modifier.fillMaxWidth())
+            }
+        },
+        bottomBar = {
+            BottomGlassBar(barHeight = 120.dp) { StepButtons(enabled, leftLabel, rightLabel, onLeft, onRight) }
+        },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 18.dp, bottom = padding.calculateBottomPadding() + 16.dp),
+        ) {
+            StepHeading(step)
+            Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = body)
+        }
+    }
+}
+
+@Composable
+private fun WideFrame(
+    step: NewProjectStep,
+    form: NewProjectForm,
+    enabled: Boolean,
+    leftLabel: String,
+    rightLabel: String,
+    onLeft: () -> Unit,
+    onRight: () -> Unit,
+    onCancel: () -> Unit,
+    body: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = CivilightTheme.colors
+    Box(Modifier.fillMaxSize().background(colors.bg).statusBarsPadding().navigationBarsPadding()) {
+        Row(
+            Modifier.align(Alignment.TopCenter).fillMaxHeight().padding(horizontal = 32.dp, vertical = 28.dp),
+            horizontalArrangement = Arrangement.spacedBy(40.dp),
+        ) {
+            Column(Modifier.width(380.dp).fillMaxHeight()) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StepBars(NewProjectRules.STEPS, NewProjectRules.index(step), Modifier.weight(1f))
+                    TextAction(NewProjectCopy.CANCEL, onCancel)
+                }
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 18.dp)) {
+                    StepHeading(step)
+                    Column(Modifier.padding(top = 18.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = body)
+                }
+                StepButtons(enabled, leftLabel, rightLabel, onLeft, onRight, Modifier.padding(top = 12.dp))
+            }
+            PreviewAside(form, Modifier.width(300.dp).padding(top = 44.dp))
+        }
+    }
+}
+
+/** `NewWide` aside: `미리 보기`, the name, the format, the live tree, `실시간 미리 보기`. */
+@Composable
+private fun PreviewAside(form: NewProjectForm, modifier: Modifier = Modifier) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val shape = RoundedCornerShape(22.dp)
+    Column(
+        modifier.clip(shape).background(colors.raise).insetOutline(colors.line, 1.dp, shape).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        CivilightText(NewProjectCopy.PREVIEW, type.sec, color = colors.ink3)
+        if (form.name.isNotBlank()) CivilightText(form.name.trim(), type.emptyTitle, color = colors.ink)
+        CivilightText(formatLabel(form.format), type.small, color = colors.ink3)
+        PreviewTree(NewProjectRules.preview(form), Modifier.padding(top = 8.dp))
+        CivilightText(NewProjectCopy.PREVIEW_LIVE, type.small, Modifier.padding(top = 6.dp), color = colors.ink3)
+    }
+}
