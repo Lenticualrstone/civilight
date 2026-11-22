@@ -17,6 +17,14 @@ android {
 
 dependencies {
     implementation(project(":core:ui"))
+    implementation(project(":domain:story"))
+    implementation(project(":domain:script"))
+    implementation(project(":domain:cast"))
+    implementation(project(":domain:world"))
+    implementation(project(":domain:trash"))
+    implementation(project(":domain:library"))
+    implementation(project(":domain:recorder"))
+    implementation(project(":domain:checks"))
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.documentfile)
     implementation(platform(libs.compose.bom))

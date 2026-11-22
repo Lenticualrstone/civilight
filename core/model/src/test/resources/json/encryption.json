@@ -1,0 +1,10 @@
+{
+  "format": "civilight-encrypted",
+  "lockType": "recovery",
+  "kdf": "PBKDF2-HMAC-SHA256",
+  "iterations": 310000,
+  "salt": "c2FsdA==",
+  "cipher": "AES-256-GCM",
+  "nonce": "bm9uY2U=",
+  "wrappedDataKey": "a2V5"
+}

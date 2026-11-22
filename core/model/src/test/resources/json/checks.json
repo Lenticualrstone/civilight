@@ -1,0 +1,16 @@
+{
+  "acknowledgements": [
+    { "key": "01JDAK0000000000000000000A", "checkType": "travel.shortage",
+      "subjectKeys": ["01JDCH0000000000000000000H", "01JDUN000000000000000000S8", "01JDUN000000000000000000S9"],
+      "fingerprint": "fp-1", "kind": "match", "createdAt": "2026-11-21T23:41:00Z",
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDAK0000000000000000000B", "checkType": "future.check", "subjectKeys": ["01JDBK00000000000000000042"],
+      "fingerprint": "fp-2", "kind": "snooze", "createdAt": "2026-11-21T23:41:00Z",
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a", "until": "2027-01-01" }
+  ],
+  "travelOverrides": [
+    { "key": "01JDTO0000000000000000000A", "characterKey": "01JDCH0000000000000000000H",
+      "fromSceneKey": "01JDUN000000000000000000S8", "toSceneKey": "01JDUN000000000000000000S9",
+      "modeKey": "01JDTM0000000000000000000B", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ]
+}

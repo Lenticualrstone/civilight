@@ -1,0 +1,6 @@
+{
+  "entries": [
+    { "key": "01JDBK00000000000000000054", "kind": "block", "deletedAt": "2026-11-10T00:00:00Z" },
+    { "key": "01JDCH0000000000000000000O", "kind": "character", "deletedAt": "2026-11-21T00:00:00Z", "reason": "purge" }
+  ]
+}

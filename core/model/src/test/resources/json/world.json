@@ -1,0 +1,40 @@
+{
+  "places": [
+    { "key": "01JDPL0000000000000000GATE", "order": "V", "name": "결사의 문",
+      "description": [{ "key": "01JDDB0000000000000000000F", "order": "V", "kind": "paragraph",
+                        "runs": [{ "t": "하층 구역 끝의 " }, { "k": "link", "id": "01JDLK0000000000000000000C",
+                                  "to": { "kind": "faction", "key": "01JDFA0000000000000000000A" }, "t": "등불 결사" }, { "t": " 거점." }] }],
+      "parentPlaceKey": "01JDPL0000000000000000LOWR", "hidden": false,
+      "fields": { "01JDFD0000000000000000000D": { "state": "value", "payload": { "date": { "year": 1101 } } } },
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "terms": [
+    { "key": "01JDTR0000000000000000000A", "order": "V", "name": "오리지늄 등불", "aliases": ["오리지늄", "빛돌"],
+      "description": [],
+      "related": [{ "kind": "place", "key": "01JDPL0000000000000000GATE" }, { "kind": "creature", "key": "01JDXX0000000000000000000A" }],
+      "textSearch": false, "hidden": false, "fields": {},
+      "rejections": [
+        { "key": "01JDTJ0000000000000000000A", "containerKind": "block", "containerKey": "01JDBK00000000000000000045",
+          "optionKey": "01JDOP0000000000000000000B", "matchedText": "오리지", "occurrence": 0, "createdAt": "2026-11-21T23:41:00Z" },
+        { "key": "01JDTJ0000000000000000000B", "containerKind": "sceneTransition", "containerKey": "01JDUN000000000000000000S9",
+          "matchedText": "빛돌", "occurrence": 1, "createdAt": "2026-11-21T23:41:00Z", "confidence": 0.5 }
+      ],
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "factions": [
+    { "key": "01JDFA0000000000000000000A", "order": "V", "name": "등불 결사", "description": [], "hidden": true, "fields": {},
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "events": [
+    { "key": "01JDEV0000000000000000000A", "order": "V", "kind": "world", "title": "대정전", "description": [],
+      "worldDate": { "year": 1195, "month": 11 }, "place": { "kind": "region", "key": "01JDRG0000000000000000000A" },
+      "relatedTermKeys": ["01JDTR0000000000000000000A"], "revealPoint": { "kind": "unitStart", "unitKey": "01JDUN00000000000000000CH1" },
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDEV0000000000000000000B", "order": "k", "kind": "story", "title": "결사 합류", "description": [],
+      "sceneKey": "01JDUN00000000000000000S04", "relatedTermKeys": [],
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDEV0000000000000000000C", "order": "s", "kind": "prophecy", "title": "예언", "description": [],
+      "relatedTermKeys": [], "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "regions": [{ "note": "a future top-level list" }]
+}

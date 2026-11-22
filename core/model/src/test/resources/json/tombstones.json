@@ -1,0 +1,18 @@
+{
+  "nameTags": [
+    { "key": "01JDCH0000000000000000000N", "kind": "character", "name": "노아", "voiceCode": "NOA", "hidden": false, "state": "notExported" },
+    { "key": "01JDCH0000000000000000000O", "kind": "character", "name": "오웬", "hidden": true, "state": "purged",
+      "purgedAt": "2026-11-21T00:00:00Z" },
+    { "key": "01JDXX0000000000000000000B", "kind": "creature", "name": "그림자", "hidden": false, "state": "archived" }
+  ],
+  "mergeRecords": [
+    { "key": "01JDMR0000000000000000000A", "kind": "character", "mergedKey": "01JDCH0000000000000000000K",
+      "targetKey": "01JDCH0000000000000000000N", "at": "2026-11-21T00:00:00Z",
+      "movedRefs": [{ "ownerKind": "block", "ownerKey": "01JDBK00000000000000000042", "field": "speakerKey" }],
+      "filledFieldDefKeys": ["01JDFD0000000000000000000A"],
+      "chosenFromMerged": [{ "fieldDefKey": "01JDFD0000000000000000000B" },
+                           { "relationKey": "01JDRL0000000000000000000A", "slot": "between" }],
+      "deletedMutualRelationKey": "01JDRL0000000000000000000C",
+      "mergedOriginal": { "key": "01JDCH0000000000000000000K", "name": "시장 꼬마", "recordNo": 9 } }
+  ]
+}

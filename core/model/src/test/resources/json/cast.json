@@ -1,0 +1,58 @@
+{
+  "characters": [
+    { "key": "01JDCH0000000000000000000H", "recordNo": 7, "name": "하르트", "displayNameBase": "???", "oneLiner": "등불을 싫어하는 남자",
+      "tagKeys": ["01JDTG0000000000000000000A"],
+      "speechBody": [
+        { "key": "01JDDB0000000000000000000A", "order": "V", "kind": "heading", "runs": [{ "t": "말투" }] },
+        { "key": "01JDDB0000000000000000000B", "order": "k", "kind": "memo", "runs": [{ "t": "짧게 끊어 말함" }],
+          "recorderSource": { "recordKey": "01JDRR0000000000000000000A", "recordedAt": "2026-11-21T23:41:00Z" } },
+        { "key": "01JDDB0000000000000000000C", "order": "s", "kind": "quote", "runs": [{ "t": "인용" }] }
+      ],
+      "secretBody": [],
+      "voiceCode": "HRT", "hidden": false, "order": "k",
+      "fields": {
+        "01JDFD0000000000000000000A": { "state": "value", "payload": { "texts": ["등불 결사"] } },
+        "01JDFD0000000000000000000B": { "state": "value", "payload": { "choice": { "optionKeys": ["01JDFO0000000000000000000A"], "freeText": "무뚝뚝" } } },
+        "01JDFD0000000000000000000C": { "state": "value", "payload": { "number": "1.5" } },
+        "01JDFD0000000000000000000D": { "state": "value", "payload": { "date": { "year": 1170, "month": 3 } } },
+        "01JDFD0000000000000000000E": { "state": "value", "payload": { "anniversary": { "month": 3, "day": 14 } } },
+        "01JDFD0000000000000000000F": { "state": "value", "payload": { "link": { "targetKeys": ["01JDFA0000000000000000000A"] } } },
+        "01JDFD0000000000000000000G": { "state": "value", "payload": { "rich": [{ "key": "01JDDB0000000000000000000D", "order": "V", "kind": "paragraph", "runs": [{ "t": "긴 글" }] }] } },
+        "01JDFD0000000000000000000J": { "state": "unknown" },
+        "01JDFD0000000000000000000K": { "state": "fallbackText", "fallbackText": "옛 보기", "fallbackReason": "optionRemoved" },
+        "01JDFD0000000000000000000M": { "state": "value", "payload": { "color": "#fff" } },
+        "01JDFD0000000000000000000N": { "state": "estimated", "payload": { "texts": ["약 30"] } }
+      },
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDCH0000000000000000000N", "recordNo": 6, "name": "노아", "tagKeys": [], "speechBody": [], "secretBody": [],
+      "voiceCode": "NOA", "hidden": true, "order": "s", "fields": {},
+      "deletedAt": "2026-11-22T01:00:00Z", "trashEntryKey": "01JDTE0000000000000000000C",
+      "updatedAt": "2026-11-22T01:00:00Z", "updatedBy": "device-b", "pronouns": "he" }
+  ],
+  "relations": [
+    { "key": "01JDRL0000000000000000000A",
+      "endA": { "kind": "character", "key": "01JDCH0000000000000000000A" },
+      "endB": { "kind": "character", "key": "01JDCH0000000000000000000H" },
+      "between": { "kindKey": "01JDRK0000000000000000000A", "description": "같은 결사", "pairFirstHolder": "b" },
+      "mindA": { "kindFallbackText": "경계" },
+      "addressB": "꼬마",
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDRL0000000000000000000B",
+      "endA": { "kind": "faction", "key": "01JDFA0000000000000000000A" },
+      "endB": { "kind": "guild", "key": "01JDFA0000000000000000000B" },
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "voiceLines": [
+    { "key": "01JDVL0000000000000000000A", "characterKey": "01JDCH0000000000000000000H", "order": "V", "title": "임명",
+      "text": [{ "key": "01JDDB0000000000000000000E", "order": "V", "kind": "paragraph", "runs": [{ "t": "맡겨 둬." }] }],
+      "status": "done", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "archiveDocs": [
+    { "key": "01JDAD0000000000000000000A", "characterKey": "01JDCH0000000000000000000H", "order": "V", "title": "등불지기의 일지",
+      "body": [], "unlockPoint": { "kind": "unitEnd", "unitKey": "01JDUN000000000000000000E7" },
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDAD0000000000000000000B", "characterKey": "01JDCH0000000000000000000H", "order": "k", "title": "봉인된 편지",
+      "body": [], "unlockPoint": { "kind": "afterEnding", "unitKey": "01JDUN00000000000000000CH1" },
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ]
+}

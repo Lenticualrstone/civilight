@@ -15,14 +15,6 @@ android {
 
 dependencies {
     api(project(":core:model"))
-    api(project(":domain:story"))
-    api(project(":domain:script"))
-    api(project(":domain:cast"))
-    api(project(":domain:world"))
-    api(project(":domain:trash"))
-    api(project(":domain:library"))
-    api(project(":domain:recorder"))
-    api(project(":domain:checks"))
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)

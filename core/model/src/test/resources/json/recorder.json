@@ -1,0 +1,48 @@
+{
+  "records": [
+    {
+      "key": "01JDRR0000000000000000000A",
+      "kind": "voice",
+      "createdAt": "2026-11-21T23:41:00Z",
+      "updatedAt": "2026-11-21T23:41:30Z",
+      "updatedBy": "device-a",
+      "runs": [{ "t": "하르트가 등불을 싫어하는 이유. " },
+               { "k": "link", "id": "01JDLK0000000000000000000E", "to": { "kind": "character", "key": "01JDCH0000000000000000000H",
+                 "projectKey": "01JDPROJ00000000000000000A" }, "t": "하르트" }],
+      "textRevision": 2,
+      "durationMs": 24000,
+      "transcribedBy": "onDevice",
+      "doneMarked": false,
+      "hidden": false,
+      "audio": { "hash": "cc33", "mime": "audio/mp4", "bytes": 52000, "durationMs": 24000 },
+      "links": [
+        { "key": "01JDRL1000000000000000000A", "targetKind": "unit", "targetKey": "01JDUN000000000000000000S9", "origin": "entry",
+          "createdAt": "2026-11-21T23:41:00Z", "lastLabelHidden": false, "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+        { "key": "01JDRL1000000000000000000B", "targetKind": "character", "targetKey": "01JDCH0000000000000000000O", "origin": "manual",
+          "createdAt": "2026-11-21T23:41:10Z", "lastLabel": "오웬", "purgedAt": "2026-11-22T00:00:00Z", "lastLabelHidden": true,
+          "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+      ],
+      "placements": [
+        { "key": "01JDPM0000000000000000000A", "kind": "scriptBlock", "targetKey": "01JDBK00000000000000000046",
+          "containerKey": "01JDUN000000000000000000S9", "copiedRevision": 1, "createdAt": "2026-11-22T00:00:00Z",
+          "lastLabel": "1-7 씬 3 · #046", "updatedAt": "2026-11-22T00:00:00Z", "updatedBy": "device-a" },
+        { "key": "01JDPM0000000000000000000B", "kind": "cardParagraph", "targetKey": "01JDDB0000000000000000000B",
+          "containerKey": "01JDCH0000000000000000000H", "tabId": "speech", "copiedRevision": 2, "createdAt": "2026-11-22T00:00:00Z",
+          "lastLabel": "하르트 · 말투", "updatedAt": "2026-11-22T00:00:00Z", "updatedBy": "device-a", "highlight": true }
+      ]
+    },
+    {
+      "key": "01JDRR0000000000000000000B",
+      "kind": "sketch",
+      "createdAt": "2026-11-22T01:00:00Z",
+      "updatedAt": "2026-11-22T01:00:00Z",
+      "updatedBy": "device-a",
+      "runs": [],
+      "textRevision": 1,
+      "doneMarked": true,
+      "hidden": true,
+      "links": [],
+      "placements": []
+    }
+  ]
+}

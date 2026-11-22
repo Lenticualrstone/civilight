@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DS-13 mark (96-unit box): three manuscript lines in ink and a caret in acc; no plate. Splash icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <path android:fillColor="@color/civilight_ink" android:pathData="M15,22 h66 a3,3 0 0 1 0,6 h-66 a3,3 0 0 1 0,-6 z" />
+    <path android:fillColor="@color/civilight_ink" android:pathData="M15,44 h54 a3,3 0 0 1 0,6 h-54 a3,3 0 0 1 0,-6 z" />
+    <path android:fillColor="@color/civilight_ink" android:pathData="M15,66 h34 a3,3 0 0 1 0,6 h-34 a3,3 0 0 1 0,-6 z" />
+    <path android:fillColor="@color/civilight_acc" android:pathData="M60,62 a2,2 0 0 1 2,2 v12 a2,2 0 0 1 -4,0 v-12 a2,2 0 0 1 2,-2 z" />
+</vector>

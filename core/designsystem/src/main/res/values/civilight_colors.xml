@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DS-01 / DS-13: theme colours for window, splash and the mark (light theme; dark in values-night). -->
+<resources>
+    <color name="civilight_bg">#FFF6F5F1</color>
+    <color name="civilight_ink">#FF16171A</color>
+    <color name="civilight_acc">#FF1F5590</color>
+    <!-- Launcher icon (DS-13 proposed): dark bg plate behind the dark-theme mark, in both themes. -->
+    <color name="civilight_launcher_background">#FF0B0C0E</color>
+</resources>

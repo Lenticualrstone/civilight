@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DS-13 proposed launcher foreground: the 96-unit mark in dark-theme colours, scaled into the 66 dp safe zone of 108 dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:translateX="21" android:translateY="21" android:scaleX="0.6875" android:scaleY="0.6875">
+        <path android:fillColor="#FFECECEF" android:pathData="M15,22 h66 a3,3 0 0 1 0,6 h-66 a3,3 0 0 1 0,-6 z" />
+        <path android:fillColor="#FFECECEF" android:pathData="M15,44 h54 a3,3 0 0 1 0,6 h-54 a3,3 0 0 1 0,-6 z" />
+        <path android:fillColor="#FFECECEF" android:pathData="M15,66 h34 a3,3 0 0 1 0,6 h-34 a3,3 0 0 1 0,-6 z" />
+        <path android:fillColor="#FF8FB8E6" android:pathData="M60,62 a2,2 0 0 1 2,2 v12 a2,2 0 0 1 -4,0 v-12 a2,2 0 0 1 2,-2 z" />
+    </group>
+</vector>

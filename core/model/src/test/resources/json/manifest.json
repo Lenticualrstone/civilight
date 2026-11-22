@@ -1,0 +1,12 @@
+{
+  "format": "civilight-project",
+  "formatVersion": "1.0",
+  "minReaderVersion": "1.0",
+  "features": { "required": ["story.blocks", "changes", "time.base-interval"], "optional": ["fields.custom", "checks.ack", "x.new"] },
+  "writtenBy": "Civilight 1.0.0 (Android)",
+  "writtenAt": "2026-11-22T00:00:00Z",
+  "project": { "key": "01JDPROJ00000000000000000A", "title": "잿빛 새벽의 등불", "rating": "r15" },
+  "encrypted": false,
+  "files": { "project.json": "sha256-00ff", "story/index.json": "sha256-11ee" },
+  "signature": "future"
+}

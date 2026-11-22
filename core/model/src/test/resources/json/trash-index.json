@@ -1,0 +1,14 @@
+{
+  "entries": [
+    { "key": "01JDTE0000000000000000000A", "kind": "blockGroup", "projectKey": "01JDPROJ00000000000000000A",
+      "targetKeys": ["01JDBK00000000000000000038", "01JDBK00000000000000000039"],
+      "groupSceneKey": "01JDUN000000000000000000S9", "groupDate": "2026-11-22",
+      "reason": "deleted", "hiddenAtDelete": false, "deletedAt": "2026-11-21T23:41:00Z", "purgeOn": "2026-12-22" },
+    { "key": "01JDTE0000000000000000000C", "kind": "character", "projectKey": "01JDPROJ00000000000000000A",
+      "targetKeys": ["01JDCH0000000000000000000K"], "reason": "merged", "mergedIntoKey": "01JDCH0000000000000000000N",
+      "hiddenAtDelete": true, "deletedAt": "2026-11-21T23:41:00Z", "purgeOn": "2026-12-22" },
+    { "key": "01JDTE0000000000000000000E", "kind": "soundtrack", "targetKeys": ["01JDAS0000000000000000000B"],
+      "reason": "archived", "hiddenAtDelete": false, "deletedAt": "2026-11-21T23:41:00Z", "purgeOn": "2026-12-22",
+      "restoredBy": "nobody" }
+  ]
+}

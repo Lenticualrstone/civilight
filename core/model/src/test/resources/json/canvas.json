@@ -1,0 +1,21 @@
+{
+  "key": "01JDCV0000000000000000000A",
+  "order": "V",
+  "name": "관계도",
+  "createdAt": "2026-11-20T00:00:00Z",
+  "nodes": [
+    { "key": "01JDCN0000000000000000000A", "kind": "character", "refKey": "01JDCH0000000000000000000H", "x": 120.5, "y": 80.0,
+      "groupKey": "01JDCN0000000000000000000G", "z": "V", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDCN0000000000000000000G", "kind": "group", "text": "결사", "x": 0.0, "y": 0.0, "w": 400.0, "h": 300.0, "z": "F",
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDCN0000000000000000000S", "kind": "sticker", "text": "★", "x": 10.0, "y": 10.0, "z": "k",
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "edges": [
+    { "key": "01JDCE0000000000000000000A", "fromNodeKey": "01JDCN0000000000000000000A", "toNodeKey": "01JDCN0000000000000000000B",
+      "labelText": "보호", "relationKey": "01JDRL0000000000000000000A", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a",
+      "style": "dashed" }
+  ],
+  "updatedAt": "2026-11-21T23:41:00Z",
+  "updatedBy": "device-a"
+}

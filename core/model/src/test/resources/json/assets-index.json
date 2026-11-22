@@ -1,0 +1,30 @@
+{
+  "blobs": [
+    { "hash": "aa11", "ext": "webp", "mime": "image/webp", "bytes": 120034, "width": 2048, "height": 1536,
+      "source": "generated", "importedAt": "2026-11-21T23:41:00Z" },
+    { "hash": "cc33", "ext": "m4a", "mime": "audio/mp4", "bytes": 52000, "durationMs": 24000,
+      "source": "dictaphone", "importedAt": "2026-11-21T23:41:00Z" }
+  ],
+  "imageUses": [
+    { "key": "01JDIU0000000000000000000A", "ownerKind": "character", "ownerKey": "01JDCH0000000000000000000H",
+      "slot": "characterPortrait", "source": "aa11",
+      "crops": { "r4x5": { "x": 10, "y": 20, "w": 400, "h": 500, "rotation": 90, "flipH": true, "zoom": 1.5 },
+                 "r1x1": { "x": 0, "y": 0, "w": 300, "h": 300, "rotation": 0, "flipH": false, "zoom": 1.0 } },
+      "holo": true, "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDIU0000000000000000000B", "ownerKind": "project", "ownerKey": "01JDPROJ00000000000000000A",
+      "slot": "projectCover", "source": "preset:ash-dawn", "crops": {}, "holo": false,
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDIU0000000000000000000C", "ownerKind": "timelineEvent", "ownerKey": "01JDEV0000000000000000000A",
+      "slot": "eventBanner", "source": "aa11", "crops": {}, "holo": false,
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "scriptAssets": [
+    { "key": "01JDAS0000000000000000000A", "kind": "background", "name": "하층 거리(새벽)", "fileName": "bg_lower_dawn",
+      "fileHash": "aa11", "loop": false, "placeKey": "01JDPL0000000000000000LOWR",
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDAS0000000000000000000B", "kind": "bgm", "name": "잔불", "fileName": "bgm_embers", "durationMs": 161000,
+      "loop": true, "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDAS0000000000000000000C", "kind": "voiceOver", "name": "내레이션", "fileName": "vo_01", "loop": false,
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "key": "01JDPG0000000000000000000A",
+  "order": "V",
+  "name": "등불의 원리",
+  "sectionLabel": "설정",
+  "blocks": [
+    { "key": "01JDDB0000000000000000000P", "order": "V", "kind": "heading", "runs": [{ "t": "원리" }] },
+    { "key": "01JDDB0000000000000000000Q", "order": "k", "kind": "paragraph",
+      "runs": [{ "k": "link", "id": "01JDLK0000000000000000000D", "to": { "kind": "page", "key": "01JDPG0000000000000000000B" }, "t": "다른 페이지" }] }
+  ],
+  "hidden": true,
+  "sourceRecord": { "recordKey": "01JDRR0000000000000000000A", "recordedAt": "2026-11-21T23:41:00Z" },
+  "createdAt": "2026-11-21T23:50:00Z",
+  "updatedAt": "2026-11-21T23:50:00Z",
+  "updatedBy": "device-a",
+  "ext": { "pinned": true }
+}

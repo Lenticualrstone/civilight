@@ -1,0 +1,79 @@
+{
+  "key": "01JDPROJ00000000000000000A",
+  "name": "잿빛 새벽의 등불",
+  "oneLiner": "등불지기들의 이야기",
+  "format": "anthology",
+  "rating": "r15",
+  "protections": { "hidden": false, "captureBlock": true, "nameMask": false, "recorderLinkMask": true },
+  "structure": { "preset": "chapterEpisodeScene", "levels": ["장", "에피소드", "씬"] },
+  "worldTime": {
+    "mode": "calendar",
+    "storyStartYear": 1200,
+    "calendar": {
+      "months": [{ "name": "서리달", "days": 30 }, { "name": "잿달", "days": 31, "moon": "full" }],
+      "weekdays": ["해", "달"],
+      "storyStart": { "month": 1, "day": 3 },
+      "storyStartWeekday": 1
+    }
+  },
+  "sceneTime": {
+    "notation": "storyStart",
+    "dayBoundary": "midnight",
+    "bandStarts": { "dawn": "04:00", "morning": "06:30", "day": "10:00", "evening": "17:00", "night": "20:00" }
+  },
+  "script": {
+    "stagePositionEnabled": true,
+    "voiceIdEnabled": true,
+    "voiceIdFormat": { "mode": "manual", "pattern": "{code}_{chapter2}{episode2}_{number3}" },
+    "transitionDefault": "auto",
+    "transitionTemplate": "placeOnly"
+  },
+  "cast": {
+    "bundleName": { "character": "게임 프로필" },
+    "showFirstAppearanceInHeader": true,
+    "showVoiceProgressInHeader": false,
+    "relationExportAddress": true
+  },
+  "travelModes": [
+    { "key": "01JDTM0000000000000000000A", "order": "V", "name": "도보", "kmPerDay": 15.0, "movingHoursPerDay": 8.0,
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDTM0000000000000000000B", "order": "k", "name": "말", "kmPerDay": 40.5, "movingHoursPerDay": 8.0,
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "defaultTravelModeKey": "01JDTM0000000000000000000A",
+  "termMatching": { "extraParticles": ["께서"] },
+  "fieldBundleAtCreation": "gameProfile",
+  "counters": { "nextCharacterRecordNo": 8 },
+  "fieldDefs": [
+    { "key": "01JDFD0000000000000000000A", "entityKind": "character", "name": "소속", "exportName": "affiliation",
+      "type": "shortText", "order": "V", "inHeader": true, "inList": false, "inFilter": false, "isSecret": false,
+      "definitionHidden": false, "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDFD0000000000000000000B", "entityKind": "character", "name": "성격", "type": "multiChoice",
+      "order": "k", "inHeader": false, "inList": true, "inFilter": true, "isSecret": true, "definitionHidden": true,
+      "scopeCharacterKey": "01JDCH0000000000000000000A", "options": [
+        { "key": "01JDFO0000000000000000000A", "label": "다정함", "order": "V" }
+      ], "allowFreeText": true, "bundleOrigin": "game.personality",
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDFD0000000000000000000C", "entityKind": "character", "name": "나이", "type": "calc", "order": "s",
+      "inHeader": false, "inList": false, "inFilter": false, "isSecret": false, "definitionHidden": false,
+      "calc": { "formula": "age", "sourceFieldDefKey": "01JDFD0000000000000000000D" },
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDFD0000000000000000000D", "entityKind": "place", "name": "세운 해", "type": "date", "order": "w",
+      "inHeader": false, "inList": false, "inFilter": false, "isSecret": false, "definitionHidden": false,
+      "datePrecision": "year", "unit": "년", "shortTextMultiple": false, "linkTargetKind": "faction",
+      "deletedAt": "2026-11-20T01:00:00Z", "trashEntryKey": "01JDTE0000000000000000000A",
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a", "futureFlag": true }
+  ],
+  "tags": [{ "key": "01JDTG0000000000000000000A", "name": "주연", "order": "V", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }],
+  "relationKinds": [
+    { "key": "01JDRK0000000000000000000A", "category": "between", "symmetry": "pair", "name": "선배", "pairName": "후배",
+      "order": "V", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDRK0000000000000000000B", "category": "mind", "name": "경계", "order": "k",
+      "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "createdAt": "2026-11-01T00:00:00Z",
+  "updatedAt": "2026-11-21T23:41:00Z",
+  "updatedBy": "device-a",
+  "ext": { "vendor": { "theme": 3 } },
+  "futureSetting": { "x": [1, 2] }
+}

@@ -1,0 +1,40 @@
+{
+  "unitKey": "01JDUN000000000000000000E7",
+  "blocks": [
+    { "key": "01JDBK00000000000000000042", "sceneKey": "01JDUN000000000000000000S9", "order": "V", "number": 42,
+      "kind": "dialogue", "speakerKey": "01JDCH0000000000000000000A",
+      "runs": [{ "k": "paren", "t": "작게" }, { "t": "저기… 불빛이 보여요." }, { "k": "break" },
+               { "k": "link", "id": "01JDLK0000000000000000000B", "to": { "kind": "term", "key": "01JDTR0000000000000000000A" }, "t": "오리지늄" },
+               { "k": "ruby", "t": "등불", "r": "とうか" }],
+      "stage": "left",
+      "voice": { "mode": "fixed", "fixedId": "RIE_0107_042", "fixedAt": "2026-11-20T03:00:00Z",
+                 "lastExport": { "at": "2026-11-20T03:00:00Z", "textHash": "sha256-ab12", "speakerKey": "01JDCH0000000000000000000A" } },
+      "createdAt": "2026-11-19T10:00:00Z", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDBK00000000000000000041", "sceneKey": "01JDUN000000000000000000S9", "order": "U", "number": 41,
+      "kind": "direction", "runs": [],
+      "cues": [{ "key": "01JDCU0000000000000000000A", "kind": "background", "assetKey": "01JDAS0000000000000000000A" },
+               { "key": "01JDCU0000000000000000000B", "kind": "screenEffect", "effect": "fade" },
+               { "key": "01JDCU0000000000000000000C", "kind": "hologram", "assetKey": "01JDAS0000000000000000000B" }],
+      "createdAt": "2026-11-19T10:00:00Z", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDBK00000000000000000045", "sceneKey": "01JDUN000000000000000000S9", "order": "W", "number": 45,
+      "kind": "choice", "runs": [],
+      "options": [
+        { "key": "01JDOP0000000000000000000A", "order": "V", "runs": [{ "t": "따라간다" }],
+          "speakerKey": "01JDCH0000000000000000000H", "voice": { "mode": "auto", "manualId": "HRT_A_01" } },
+        { "key": "01JDOP0000000000000000000B", "order": "k", "runs": [{ "t": "불빛 쪽을 한 번 더 본다" }] }
+      ],
+      "createdAt": "2026-11-19T10:00:00Z", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDBK00000000000000000046", "sceneKey": "01JDUN000000000000000000S9", "order": "X", "number": 46,
+      "kind": "memo", "runs": [{ "t": "여기서 등불이 두 번째로 깜박이게 할지" }],
+      "recorderSource": { "recordKey": "01JDRR0000000000000000000A", "recordedAt": "2026-11-21T23:41:00Z" },
+      "createdAt": "2026-11-19T10:00:00Z", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" },
+    { "key": "01JDBK00000000000000000047", "sceneKey": "01JDUN000000000000000000S9", "order": "Y", "number": 47,
+      "kind": "minigame", "runs": [{ "t": "자물쇠 풀기" }], "puzzle": { "pieces": 4 },
+      "createdAt": "2026-11-19T10:00:00Z", "updatedAt": "2026-11-21T23:41:00Z", "updatedBy": "device-a" }
+  ],
+  "discardedVoiceIds": [
+    { "id": "HRT_0107_043", "blockKey": "01JDBK00000000000000000043", "discardedAt": "2026-11-21T00:00:00Z", "reason": "merged" },
+    { "id": "HRT_0107_045_1", "blockKey": "01JDBK00000000000000000045", "optionKey": "01JDOP0000000000000000000A",
+      "discardedAt": "2026-11-21T00:00:00Z", "reason": "splitAway" }
+  ]
+}
