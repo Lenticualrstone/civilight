@@ -3,7 +3,9 @@ package io.github.lenticualrstone.civilight.feature.world.term
 import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.domain.world.term.CandidateIndex
 import io.github.lenticualrstone.civilight.domain.world.term.RevealTarget
+import io.github.lenticualrstone.civilight.domain.world.term.StaleRejections
 import io.github.lenticualrstone.civilight.domain.world.term.TermAccess
+import io.github.lenticualrstone.civilight.domain.world.term.TermQueries
 import io.github.lenticualrstone.civilight.domain.world.term.TermCandidate
 import io.github.lenticualrstone.civilight.domain.world.term.TermEdits
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
@@ -17,6 +19,7 @@ import io.github.lenticualrstone.civilight.model.world.ItemRef
 import io.github.lenticualrstone.civilight.ui.project.EditResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -43,12 +46,15 @@ sealed interface EditOutcome {
 class TermCardViewModel(projectKey: Key, val termKey: Key, env: WorldEnv) : WorldViewModel(projectKey, env) {
     private val indexHandle = TermIndexes.acquire(projectKey, env.appScope)
 
-    val ui: StateFlow<TermCardUi?> = combine(doc.filterNotNull(), indexHandle.index, hiddenOpen, readOnly) { d, i, h, r -> Inputs(d, i, h, r) }
-        .mapLatest { TermCardState.build(it.doc, projectKey, termKey, it.index, it.hiddenOpen, it.readOnly) }
+    /** `후보 N 새로 찾음` after the last alias change on this card (WLD-16); cleared when the card closes. */
+    private val aliasFound = MutableStateFlow<Int?>(null)
+
+    val ui: StateFlow<TermCardUi?> = combine(doc.filterNotNull(), indexHandle.index, hiddenOpen, readOnly, aliasFound) { d, i, h, r, f -> Inputs(d, i, h, r, f) }
+        .mapLatest { TermCardState.build(it.doc, projectKey, termKey, it.index, it.hiddenOpen, it.readOnly, it.aliasFound) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    private data class Inputs(val doc: ProjectDoc, val index: CandidateIndex, val hiddenOpen: Boolean, val readOnly: Boolean)
+    private data class Inputs(val doc: ProjectDoc, val index: CandidateIndex, val hiddenOpen: Boolean, val readOnly: Boolean, val aliasFound: Int?)
 
     init {
         viewModelScope.launch {
@@ -56,11 +62,24 @@ class TermCardViewModel(projectKey: Key, val termKey: Key, env: WorldEnv) : Worl
         }
     }
 
+    /**
+     * A write on this term's data: stale `아님` records (their matched text is gone, WLD-22) are
+     * released in the same undo step, from a fresh scan of their blocks. A refused write (the
+     * transform returns its input) releases nothing.
+     */
+    private suspend fun termWrite(label: String, transform: (ProjectDoc) -> ProjectDoc): EditResult {
+        val access = TermAccess(hiddenOpen.value)
+        return apply(label) { d ->
+            val next = transform(d)
+            if (next === d) d else StaleRejections.release(next, access)
+        }
+    }
+
     /** `공개 시점 옮기기` rows, the chip `1-2 씬 1을 첫 공개로`: applies at once (WLD-18). */
     suspend fun setReveal(target: RevealTarget): EditOutcome {
         var outcome: EditOutcome = EditOutcome.Done(null)
         val ctx = editContext()
-        val result = apply(WorldCopy.REVEAL_TITLE) { d ->
+        val result = termWrite(WorldCopy.REVEAL_TITLE) { d ->
             when (val r = RevealOptions.apply(d, termKey, target, ctx)) {
                 is RevealApply.Refused -> d.also { outcome = EditOutcome.Refused(r.reason) }
                 is RevealApply.Applied -> r.doc.also { outcome = EditOutcome.Done(r.toast) }
@@ -72,7 +91,7 @@ class TermCardViewModel(projectKey: Key, val termKey: Key, env: WorldEnv) : Worl
     /** `글자 찾기 꺼짐 · 켜기` and the chip `글자 찾기 끄기` (WLD-25). */
     fun setTextSearch(on: Boolean) {
         val ctx = editContext()
-        viewModelScope.launch { apply(WorldCopy.UNDO_TEXT_SEARCH) { d -> TermEdits.setTextSearch(d, termKey, on, ctx) } }
+        viewModelScope.launch { termWrite(WorldCopy.UNDO_TEXT_SEARCH) { d -> TermEdits.setTextSearch(d, termKey, on, ctx) } }
     }
 
     /**
@@ -82,14 +101,66 @@ class TermCardViewModel(projectKey: Key, val termKey: Key, env: WorldEnv) : Worl
     suspend fun linkCandidate(candidate: TermCandidate): Boolean {
         var linked = false
         val ctx = editContext()
-        val result = apply(WorldCopy.BTN_LINK) { d -> TermEdits.link(d, candidate, ctx)?.doc?.also { linked = true } ?: d }
+        val result = termWrite(WorldCopy.BTN_LINK) { d -> TermEdits.link(d, candidate, ctx)?.doc?.also { linked = true } ?: d }
         return result == EditResult.APPLIED && linked
     }
 
     /** `아님` on a card candidate (WLD-22): stores the rejection; the candidate disappears everywhere. */
     suspend fun rejectCandidate(candidate: TermCandidate): Boolean {
         val ctx = editContext()
-        return apply(WorldCopy.BTN_REJECT) { d -> TermEdits.reject(d, candidate, ctx) } == EditResult.APPLIED
+        return termWrite(WorldCopy.BTN_REJECT) { d -> TermEdits.reject(d, candidate, ctx) } == EditResult.APPLIED
+    }
+
+    /**
+     * Adds or removes an alias (WLD-16): one undo step; the count of new candidates comes from a
+     * rescan of this term against the index the card shows now. Returns the refusal line, or null.
+     */
+    suspend fun changeAliases(change: (ProjectDoc, CandidateIndex, TermAccess, io.github.lenticualrstone.civilight.domain.world.common.EditContext) -> AliasChange): String? {
+        var outcome: AliasChange? = null
+        val ctx = editContext()
+        val index = indexHandle.index.value
+        val access = TermAccess(hiddenOpen.value)
+        val result = termWrite(WorldCopy.ROW_ALIASES) { d ->
+            when (val c = change(d, index, access, ctx)) {
+                is AliasChange.Saved -> c.doc.also { outcome = c }
+                is AliasChange.Refused -> d.also { outcome = c }
+            }
+        }
+        return when (val o = outcome) {
+            is AliasChange.Refused -> o.message
+            is AliasChange.Saved -> {
+                if (result == EditResult.APPLIED) aliasFound.value = o.newlyFound
+                null
+            }
+            null -> null
+        }
+    }
+
+    suspend fun addAlias(alias: String): String? = changeAliases { d, i, a, c -> AliasEditor.add(d, termKey, alias, i, a, c) }
+
+    suspend fun removeAlias(alias: String): String? = changeAliases { d, i, a, c -> AliasEditor.remove(d, termKey, alias, i, a, c) }
+
+    /** `아님으로 둔 것 › 되돌리기` (WLD-22). */
+    fun restoreRejection(rejectionKey: io.github.lenticualrstone.civilight.model.Key) {
+        val ctx = editContext()
+        viewModelScope.launch { termWrite(WorldCopy.BTN_UNDO) { d -> RejectionRows.restore(d, termKey, rejectionKey, ctx) } }
+    }
+
+    /**
+     * `맞음` on a card `▲` row (WLD-24, Q-07): the author keeps this pre-reveal use; the link leaves
+     * every `▲` count and the row keeps a small `맞음` tag. False when the link is gone or no longer
+     * before the reveal, or the project is read-only.
+     */
+    suspend fun markIntended(linkKey: Key): Boolean {
+        var marked = false
+        val ctx = editContext()
+        val access = TermAccess(hiddenOpen.value)
+        val result = apply(WorldCopy.TAG_INTENDED) { d ->
+            val queries = TermQueries(d, CandidateIndex.pending(), access)
+            val link = queries.usage(termKey).firstOrNull { it.linkKey == linkKey && queries.isBeforeReveal(it) && !queries.isIntended(it) }
+            if (link == null) d else TermEdits.markIntended(d, link, ctx).also { marked = true }
+        }
+        return result == EditResult.APPLIED && marked
     }
 
     /** Ticks or unticks an item in `관련`. */

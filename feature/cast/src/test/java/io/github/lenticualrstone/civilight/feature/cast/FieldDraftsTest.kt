@@ -110,4 +110,14 @@ class FieldDraftsTest {
         assertEquals(after.sortedBy { it.order }.map { it.key }, after.map { it.key })
         assertTrue(LongTextEdit.apply(before, "  \n ", ctx).isEmpty())
     }
+
+    @Test
+    fun `CST-09 a 긴 글 from the rich editor keeps its @ link, unknown wins, empty is no value`() {
+        val link = TextRun.Link("l1", LinkTarget(LinkTargetKind.CHARACTER, K.SERA), "세라")
+        val rich = listOf(DocBlock(key = "p1", order = "a0", runs = listOf(TextRun.Plain("선배 "), link)))
+        val value = FieldDrafts.richValue(FieldDraft(), rich)!!
+        assertEquals(rich, (value.payload as FieldPayload.Rich).doc)
+        assertEquals(FieldValue.UNKNOWN, FieldDrafts.richValue(FieldDraft(unknown = true), rich))
+        assertNull(FieldDrafts.richValue(FieldDraft(), emptyList()))
+    }
 }

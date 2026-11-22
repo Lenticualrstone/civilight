@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.recorder.capture
 
+import io.github.lenticualrstone.civilight.designsystem.component.GlowMode
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
 import io.github.lenticualrstone.civilight.domain.recorder.capture.MemoSheetView
 import io.github.lenticualrstone.civilight.domain.recorder.capture.ProcessingScreen
@@ -13,14 +14,32 @@ import io.github.lenticualrstone.civilight.domain.recorder.text.Runs
 import io.github.lenticualrstone.civilight.feature.recorder.memo.AtMarks
 import io.github.lenticualrstone.civilight.model.recorder.RecordingPhase
 
-/** `녹음 중` as drawn: the domain screen plus the no-engine line (LRC-11, `TODO_COPY_LRC_05`). */
-data class RecordingView(val screen: RecordingScreen, val engineNote: String?, val paused: Boolean)
+/**
+ * `녹음 중` as drawn: the domain screen plus the no-engine line (LRC-11, `TODO_COPY_LRC_05`).
+ * [canToText] is false on the lock screen (no `글로 쓰기` there, LRC-05 `[PROPOSED]`).
+ */
+data class RecordingView(val screen: RecordingScreen, val engineNote: String?, val paused: Boolean, val canToText: Boolean = true)
 
 /** `정리 중` as drawn; `여기 넣기` only where it can run. */
 data class ProcessingView(val screen: ProcessingScreen)
 
 /** The text memo sheet as drawn: the domain view, the `@` candidates of the open query and the `@` marks of the field. */
 data class MemoView(val sheet: MemoSheetView, val atCandidates: List<LinkCandidate>, val atOpen: Boolean, val marks: AtMarks)
+
+/**
+ * The voice glow (LRC-10): none when `녹음 중 빛 띠` is off; bands following the level while
+ * recording, still while paused or with reduced motion (`빛 띠 정지`), the sweep while `정리 중`
+ * finalises, and none once it has finished.
+ */
+object GlowModes {
+    fun of(state: CaptureState, glowOn: Boolean, reducedMotion: Boolean): GlowMode? = when {
+        !glowOn -> null
+        state.stage == CaptureStage.RECORDING ->
+            if (reducedMotion || state.session?.phase != RecordingPhase.RECORDING) GlowMode.STILL else GlowMode.RECORDING
+        state.stage == CaptureStage.PROCESSING && state.finalising -> if (reducedMotion) GlowMode.STILL else GlowMode.PROCESSING
+        else -> null
+    }
+}
 
 /** What each capture surface shows, from [CaptureState] only (no Android, JVM-tested). */
 object CaptureViews {
@@ -34,6 +53,7 @@ object CaptureViews {
             screen = Recording.recordingScreen(session, state.env),
             engineNote = if (state.engineUnavailable) RecorderCopy.TODO_NO_ENGINE else null,
             paused = session.phase == RecordingPhase.PAUSED,
+            canToText = !session.entry.onLockScreen,
         )
     }
 

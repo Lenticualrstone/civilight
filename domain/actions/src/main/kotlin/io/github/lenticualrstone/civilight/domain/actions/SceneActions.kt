@@ -25,11 +25,14 @@ import io.github.lenticualrstone.civilight.domain.trash.Toast
 import io.github.lenticualrstone.civilight.domain.trash.TrashGates
 import io.github.lenticualrstone.civilight.domain.trash.TrashOps
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.OpenEnum
+import io.github.lenticualrstone.civilight.model.OrderKeys
 import io.github.lenticualrstone.civilight.model.checks.Acknowledgement
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.project.TransitionMode
 import io.github.lenticualrstone.civilight.model.story.PlaceRef
 import io.github.lenticualrstone.civilight.model.story.SceneTime
+import io.github.lenticualrstone.civilight.model.story.StoryUnit
 import io.github.lenticualrstone.civilight.model.trash.TrashEntry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -64,17 +67,60 @@ object SceneActions {
     /** Prefill of `새 씬` before [nextSceneKey] (STO-05). */
     fun prefillBefore(doc: ProjectDoc, nextSceneKey: Key): NewScenePrefill = NewScene.prefillBefore(doc, nextSceneKey)
 
-    /** `새 씬` under [parentKey] after [afterSceneKey] (null = first): the new doc and the new scene key. */
+    /**
+     * `새 씬` under [parentKey] after [afterSceneKey] (null = first): the new doc and the new scene key.
+     * [parentKey] null = a top-level scene, only in 1-level structures (scenes have no parent there;
+     * elsewhere it throws); no other scene's 때 changes. The prefills and [move] still take a parent.
+     */
     fun create(
         doc: ProjectDoc,
-        parentKey: Key,
+        parentKey: Key?,
         afterSceneKey: Key?,
         ctx: ActionContext,
         title: String? = null,
         place: PlaceRef? = null,
         time: SceneTime = SceneTime.None,
         transitionMode: TransitionMode = NewScene.defaultTransition(doc),
-    ): Pair<ProjectDoc, Key> = NewScene.create(doc, parentKey, afterSceneKey, ctx.edit, title, place, time, transitionMode)
+    ): Pair<ProjectDoc, Key> =
+        if (parentKey != null) {
+            NewScene.create(doc, parentKey, afterSceneKey, ctx.edit, title, place, time, transitionMode)
+        } else {
+            createTopLevel(doc, afterSceneKey, ctx, title, place, time, transitionMode)
+        }
+
+    private fun createTopLevel(
+        doc: ProjectDoc,
+        afterSceneKey: Key?,
+        ctx: ActionContext,
+        title: String?,
+        place: PlaceRef?,
+        time: SceneTime,
+        transitionMode: TransitionMode,
+    ): Pair<ProjectDoc, Key> {
+        require(doc.project.structure.sceneLevel == 0) { "a scene without a parent needs a 1-level structure" }
+        val siblings = doc.index.children(null)
+        val order = if (afterSceneKey == null) {
+            OrderKeys.before(siblings.firstOrNull()?.order)
+        } else {
+            val i = siblings.indexOfFirst { it.key == afterSceneKey }
+            require(i >= 0) { "$afterSceneKey is not a top-level unit" }
+            OrderKeys.between(siblings[i].order, siblings.getOrNull(i + 1)?.order)
+        }
+        val key = ctx.newKey()
+        val unit = StoryUnit(
+            key = key,
+            parentKey = null,
+            level = doc.project.structure.sceneLevel,
+            order = order,
+            title = title,
+            place = place,
+            time = time,
+            transitionMode = OpenEnum.of(transitionMode),
+            updatedAt = ctx.now,
+            updatedBy = ctx.device,
+        )
+        return doc.copy(story = doc.story.copy(units = doc.story.units + unit)) to key
+    }
 
     /** `씬 나누기` sheet and result (`SplitPreview.result`, STO-09). */
     fun split(

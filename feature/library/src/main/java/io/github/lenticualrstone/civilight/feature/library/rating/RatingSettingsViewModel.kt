@@ -46,7 +46,9 @@ internal class RatingSettingsViewModel(private val services: LibraryServices) : 
     /** `같이 바꾸기` on the checked rows: one prompt when hiding goes off anywhere; cancel changes nothing. */
     fun apply(rows: List<ApplyRowUi>, done: (ProtectionOutcome) -> Unit) {
         viewModelScope.launch {
-            done(services.protection.applyDefaultsAll(rows.map { Triple(it.project.key, it.project.protections, it.after) }))
+            val outcome = services.protection.applyDefaultsAll(rows.map { Triple(it.project.key, it.project.protections, it.after) })
+            services.report(outcome)
+            done(outcome)
         }
     }
 }

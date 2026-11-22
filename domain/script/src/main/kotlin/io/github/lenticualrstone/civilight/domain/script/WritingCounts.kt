@@ -78,6 +78,28 @@ object WritingCounts {
         return parts.joinToString(" · ")
     }
 
+    /**
+     * `이 씬 분량` with rule 19 (SCR-58): while hidden items are locked ([unlocked] false), the lines of
+     * hidden speakers are counted together as `숨긴 인물 n` (their names never show); unlocked it is
+     * [sceneSpeakers].
+     */
+    fun sceneSpeakers(doc: ProjectDoc, sceneKey: Key, unlocked: Boolean): String {
+        if (unlocked) return sceneSpeakers(doc, sceneKey)
+        val blocks = doc.manuscript.liveBlocksOf(sceneKey)
+        val spoken = blocks.filter { it.kind.known == BlockKind.DIALOGUE && it.speakerKey != null }
+        val hidden = spoken.count { doc.index.character(it.speakerKey!!)?.hidden == true }
+        val perSpeaker = spoken.filter { doc.index.character(it.speakerKey!!)?.hidden != true }
+            .groupingBy { it.speakerKey!! }.eachCount()
+            .map { (k, n) -> (Labels.speakerName(doc, k) ?: "?") to n }
+            .let { if (hidden > 0) it + (HIDDEN_SPEAKER to hidden) else it }
+            .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+        val narration = blocks.count { it.kind.known == BlockKind.NARRATION }
+        val parts = perSpeaker.map { "${it.first} ${it.second}" } + if (narration > 0) listOf("나레이션 $narration") else emptyList()
+        return parts.joinToString(" · ")
+    }
+
+    private const val HIDDEN_SPEAKER = "숨긴 인물"
+
     /** Live dialogue lines spoken by a character (blocks in trashed scenes are not counted). */
     fun dialogueLines(doc: ProjectDoc, characterKey: Key): Int =
         doc.manuscript.liveBlocks.count { it.kind.known == BlockKind.DIALOGUE && it.speakerKey == characterKey }

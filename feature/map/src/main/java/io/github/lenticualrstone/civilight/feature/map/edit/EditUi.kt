@@ -2,6 +2,14 @@ package io.github.lenticualrstone.civilight.feature.map.edit
 
 import io.github.lenticualrstone.civilight.domain.world.common.StoryCodes
 import io.github.lenticualrstone.civilight.domain.world.map.MapEdits
+import io.github.lenticualrstone.civilight.domain.world.map.DetailEdits
+import io.github.lenticualrstone.civilight.domain.world.map.MapGeometry
+import io.github.lenticualrstone.civilight.domain.world.map.RegionShapes
+import io.github.lenticualrstone.civilight.domain.story.lens.LensView
+import io.github.lenticualrstone.civilight.model.change.ChangeTarget
+import io.github.lenticualrstone.civilight.model.change.RegionShapeValue
+import io.github.lenticualrstone.civilight.model.map.DrawnLineKind
+import io.github.lenticualrstone.civilight.model.map.StampKind
 import io.github.lenticualrstone.civilight.domain.world.map.MapScales
 import io.github.lenticualrstone.civilight.domain.world.map.MapViews
 import io.github.lenticualrstone.civilight.domain.world.map.RouteSheet
@@ -23,14 +31,26 @@ import io.github.lenticualrstone.civilight.model.map.WorldMap
 import io.github.lenticualrstone.civilight.model.position.LensPoint
 import io.github.lenticualrstone.civilight.model.position.PointRef
 
-/** A travel-mode chip of the route sheet: `도보 15 km · 8시간` (chosen) or `말`; null key = `직접`. */
-data class ModeChipUi(val modeKey: Key?, val label: String, val selected: Boolean)
+/**
+ * A travel-mode chip of the route sheet: `도보 15 km · 8시간` (chosen) or `말`; [index] in
+ * `Travel.modes` order (null = `직접`, the mode editor). Keys are not used, because a project
+ * without stored modes reads fresh default keys each time (WLD-47).
+ */
+data class ModeChipUi(val index: Int?, val label: String, val selected: Boolean)
 
 /** `속성` of what is selected or being drawn. */
 sealed interface PropsUi {
     val title: String
 
-    data class PinProps(val key: Key, val placeKey: Key, override val title: String, val reveal: String, val layer: String) : PropsUi
+    data class PinProps(
+        val key: Key,
+        val placeKey: Key,
+        override val title: String,
+        val reveal: String,
+        val layer: String,
+        /** Live child maps of the pin (`하위 지도`, WLD-48). */
+        val childMaps: List<Pair<Key, String>> = emptyList(),
+    ) : PropsUi
 
     data class RegionProps(
         val key: Key,
@@ -40,8 +60,10 @@ sealed interface PropsUi {
         val reveal: String,
         val layer: String,
         val color: String,
-        /** Vertices of the shape, as handles. */
+        /** Vertices of the shape in force at the lens, as handles (WLD-65). */
         val vertices: List<Point>,
+        /** `◆` shapes of the region (WLD-65 `비교`): `1-9 ◆` and the shape from there. */
+        val shapes: List<Pair<String, List<Point>>> = emptyList(),
     ) : PropsUi
 
     /** `새 영역 · 그리는 중` with the vertex bar `꼭짓점 N · 되돌리기 · 닫기`. */
@@ -70,6 +92,14 @@ sealed interface PropsUi {
     /** The route being drawn: `지점 3 · 12 km`. */
     data class RouteDraftProps(override val title: String, val bar: String, val canFinish: Boolean) : PropsUi
 
+    data class StampProps(override val title: String, val data: StampPropsData) : PropsUi
+
+    /** A selected river or road (WLD-60): its points as handles. */
+    data class LineProps(val key: Key, override val title: String, val points: List<Point>) : PropsUi
+
+    /** The `강 · 길` line being drawn: `지점 3 · 12 km`. */
+    data class LineDraftProps(override val title: String, val bar: String, val canFinish: Boolean) : PropsUi
+
     data class LabelProps(
         val key: Key,
         override val title: String,
@@ -81,7 +111,27 @@ sealed interface PropsUi {
     ) : PropsUi
 }
 
-data class LayerRowUi(val key: Key, val name: String, val visible: Boolean)
+/** A selected stamp (WLD-60): chip `성 · 크기 2 · 0° · 장소 ‘결사의 문’`, size, `장소 연결`. */
+data class StampPropsData(
+    val key: Key,
+    val chip: String,
+    val size: Int,
+    val rotation: Int,
+    val place: String,
+    val reveal: String,
+    val layer: String,
+    val at: Point,
+)
+
+/** A row of the `레이어` tab (WLD-45): name, shown or not, `보이는 시점`, and order buttons. */
+data class LayerRowUi(
+    val key: Key,
+    val name: String,
+    val visible: Boolean,
+    val reveal: String = MapCopy.NONE,
+    val canUp: Boolean = false,
+    val canDown: Boolean = false,
+)
 
 /** A `목록` row: `핀 · 결사의 문`. */
 data class ItemRowUi(val key: Key, val text: String, val selected: Boolean)
@@ -102,6 +152,12 @@ data class EditUi(
     /** Draft vertices and route points to draw (0–1). */
     val regionDraft: List<Point>,
     val routeDraft: List<Point>,
+    /** The `강 · 길` line being drawn. */
+    val lineDraft: List<Point> = emptyList(),
+    /** `범례` (WLD-60): `산 · 3`, `강 · 2` …. */
+    val legend: List<String> = emptyList(),
+    /** The `◆` shape drawn for `비교` (WLD-65), and the shape in force it is compared with. */
+    val compare: Pair<List<Point>, List<Point>>? = null,
     /** The pin being moved: its name bar and new spot. */
     val moving: Pair<String, Point?>?,
 )
@@ -120,10 +176,12 @@ object EditState {
 
     /** Mode chips: the project's modes (the chosen one with its numbers) and `직접`. */
     fun modeChips(doc: ProjectDoc, route: Route): List<ModeChipUi> {
-        val chosen = Travel.mode(doc, route.shownModeKey) ?: Travel.defaultMode(doc)
-        return Travel.modes(doc).map { m ->
+        val modes = Travel.modes(doc)
+        val chosen = modes.firstOrNull { it.key == route.shownModeKey }
+            ?: modes.firstOrNull { it.key == doc.project.defaultTravelModeKey } ?: modes.first()
+        return modes.mapIndexed { i, m ->
             val on = m.key == chosen.key
-            ModeChipUi(m.key, if (on) Travel.modeLabel(m) else m.name, on)
+            ModeChipUi(i, if (on) Travel.modeLabel(m) else m.name, on)
         } + ModeChipUi(null, MapCopy.CUSTOM_MODE, false)
     }
 
@@ -143,12 +201,43 @@ object EditState {
             scene = scene,
             scale = MapScales.barLabel(doc, map),
             props = props(doc, map, scene, lens, s),
-            layers = MapEdits.layers(map).map { LayerRowUi(it.key, it.name, it.visible) },
+            layers = layerRows(doc, map),
             items = items(scene, s.selected),
             regionDraft = s.region?.vertices.orEmpty(),
             routeDraft = Routes.points(map, Route(key = "", points = s.routeDraft.points)),
+            lineDraft = s.line.orEmpty(),
+            legend = legend(map),
+            compare = compareShapes(doc, map, lens, s),
             moving = moving,
         )
+    }
+
+    /** `범례` of a detailed-terrain map: each stamp kind with its count, then `강 · N` and `길 · N`. */
+    fun legend(map: WorldMap): List<String> {
+        val stamps = map.stamps.mapNotNull { it.kind.known }.groupingBy { it }.eachCount()
+        val rows = StampKind.entries.filter { it in stamps }.map { "${DetailEdits.stampName(it)}${MapCopy.SEP}${stamps.getValue(it)}" }
+        val rivers = map.drawnLines.count { it.kind.known == DrawnLineKind.RIVER }
+        val roads = map.drawnLines.count { it.kind.known == DrawnLineKind.ROAD }
+        return rows + listOfNotNull(
+            "${MapCopy.TOOL_RIVER}${MapCopy.SEP}$rivers".takeIf { rivers > 0 },
+            "${MapCopy.TOOL_ROAD}${MapCopy.SEP}$roads".takeIf { roads > 0 },
+        )
+    }
+
+    /** `◆` shapes of a region (WLD-65): `1-9 ◆` and the vertices recorded there, in history order. */
+    fun shapeHistory(doc: ProjectDoc, mapKey: Key, regionKey: Key): List<Pair<String, List<Point>>> {
+        val view = LensView(doc)
+        return view.history(ChangeTarget.RegionShape(mapKey, regionKey)).mapNotNull { r ->
+            val v = runCatching { r.valueAs(RegionShapeValue.serializer()) }.getOrNull()?.vertices ?: return@mapNotNull null
+            "${view.anchorLabel(r.anchor)} ◆" to v
+        }
+    }
+
+    private fun compareShapes(doc: ProjectDoc, map: WorldMap, lens: LensPoint, s: EditorState): Pair<List<Point>, List<Point>>? {
+        val index = s.compare ?: return null
+        val region = map.regions.firstOrNull { it.key == s.selected } ?: return null
+        val other = shapeHistory(doc, map.key, region.key).getOrNull(index)?.second ?: return null
+        return other to RegionShapes.shapeAt(doc, map.key, region, lens)
     }
 
     private fun props(doc: ProjectDoc, map: WorldMap, scene: MapScene, lens: LensPoint, s: EditorState): PropsUi? {
@@ -171,23 +260,43 @@ object EditState {
             val km = MapScales.kmPerUnit(doc, map)?.let { Travel.number(Math.round(it * draft.length(map)).toDouble()) }
             return PropsUi.RouteDraftProps(MapCopy.ROUTE_DRAWING, MapCopy.routeDraftBar(draft.points.size, km), draft.points.size >= 2)
         }
+        val line = s.line
+        if ((s.tool == EditTool.RIVER || s.tool == EditTool.ROAD) && line != null) {
+            val km = MapScales.kmPerUnit(doc, map)?.let { k ->
+                Travel.number(Math.round(k * line.zipWithNext { a, b -> MapGeometry.distance(a, b) }.sum()).toDouble())
+            }
+            val title = if (s.tool == EditTool.RIVER) MapCopy.TOOL_RIVER else MapCopy.TOOL_ROAD
+            return PropsUi.LineDraftProps(title, MapCopy.routeDraftBar(line.size, km), line.size >= 2)
+        }
         val key = s.selected ?: return null
+        scene.stamps.firstOrNull { it.key == key }?.let { st ->
+            val stamp = map.stamps.first { it.key == key }
+            val place = stamp.placeKey?.let { doc.index.place(it)?.name } ?: MapCopy.NONE
+            return PropsUi.StampProps(
+                DetailEdits.stampName(st.kind),
+                StampPropsData(key, DetailEdits.stampChip(doc, stamp), stamp.size, stamp.rotation, place, revealLabel(doc, stamp.revealPoint), layerLabel(map, stamp.layerKey), st.at),
+            )
+        }
+        scene.lines.firstOrNull { it.key == key }?.let { l ->
+            return PropsUi.LineProps(key, if (l.kind == DrawnLineKind.RIVER) MapCopy.TOOL_RIVER else MapCopy.TOOL_ROAD, l.points)
+        }
         val drawn = scene.pin(key) != null || scene.region(key) != null || scene.routes.any { it.key == key } || scene.labels.any { it.key == key }
         if (!drawn) return null
         map.pins.firstOrNull { it.key == key }?.let { pin ->
             return PropsUi.PinProps(
                 key, pin.placeKey, doc.index.place(pin.placeKey)?.name.orEmpty(),
                 revealLabel(doc, pin.revealPoint), layerLabel(map, pin.layerKey),
+                MapViews.childMaps(doc, pin.key).map { it.key to it.name },
             )
         }
         map.regions.firstOrNull { it.key == key }?.let { r ->
-            // Vertex handles edit the base shape, so they show only while the base shape is in force
-            // at the lens (a later `◆` shape is WLD-65's to edit).
-            val shown = io.github.lenticualrstone.civilight.domain.world.map.RegionShapes.shapeAt(doc, map.key, r, lens)
+            // Vertex handles edit the shape in force at the lens; a move asks `이 값 고치기 · 여기서부터
+            // 바뀜` when the lens or the shape's `◆` history calls for it (WLD-65).
+            val shown = RegionShapes.shapeAt(doc, map.key, r, lens)
             return PropsUi.RegionProps(
                 r.key, r.name, r.kind.ifEmpty { MapCopy.NONE }, factionLabel(doc, r.factionKey),
                 revealLabel(doc, r.revealPoint), layerLabel(map, r.layerKey), r.color,
-                if (shown == r.vertices) r.vertices else emptyList(),
+                shown, shapeHistory(doc, map.key, r.key),
             )
         }
         map.routes.firstOrNull { it.key == key }?.let { r ->
@@ -201,6 +310,12 @@ object EditState {
             )
         }
         return null
+    }
+
+    /** The `레이어` tab rows in order (WLD-45). */
+    fun layerRows(doc: ProjectDoc, map: WorldMap): List<LayerRowUi> {
+        val layers = MapEdits.layers(map)
+        return layers.mapIndexed { i, l -> LayerRowUi(l.key, l.name, l.visible, revealLabel(doc, l.revealPoint), i > 0, i < layers.lastIndex) }
     }
 
     private fun items(scene: MapScene, selected: Key?): List<ItemRowUi> {

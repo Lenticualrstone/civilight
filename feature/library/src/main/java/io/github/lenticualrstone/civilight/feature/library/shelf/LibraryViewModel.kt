@@ -14,7 +14,13 @@ import io.github.lenticualrstone.civilight.store.ReadOnlyProjectException
 import io.github.lenticualrstone.civilight.ui.security.AuthCopy
 import io.github.lenticualrstone.civilight.ui.security.AuthRequest
 import io.github.lenticualrstone.civilight.ui.security.AuthResult
+import androidx.compose.runtime.snapshotFlow
+import io.github.lenticualrstone.civilight.model.Keys
+import io.github.lenticualrstone.civilight.model.app.RecentItem
+import io.github.lenticualrstone.civilight.model.app.ViewMode
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -35,11 +41,11 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
 
     val state: StateFlow<ShelfUi> = combine(
         combine(stores.library.state, libraryDocs.docs) { library, docs -> library to docs },
-        stores.recorder.state,
+        combine(stores.recorder.state, stores.appState.recents.state) { recorder, recents -> recorder to recents },
         stores.appState.onboarding.state,
         deps.unlock.state,
         deps.settings,
-    ) { (library, docs), recorder, onboarding, unlock, settings ->
+    ) { (library, docs), (recorder, recents), onboarding, unlock, settings ->
         ShelfState.build(
             projects = library.live.map { ShelfProject(it, docs[it.key]) },
             access = unlock.toAccess(),
@@ -49,14 +55,48 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
             now = deps.clock.now(),
             zone = deps.clock.zone,
             loaded = library.loaded,
+            showCards = ShelfCards.showCards(settings),
+            recentItems = recents.items,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, ShelfUi())
+
+    private val recorder = RecentsRecorder(
+        ports = object : RecentsRecorder.Ports {
+            override fun openDoc(projectKey: Key): ProjectDoc? = deps.projects.peekDoc(projectKey)
+            override fun storedDoc(projectKey: Key): ProjectDoc? = libraryDocs.docs.value[projectKey]
+            override fun isExample(projectKey: Key): Boolean = stores.library.state.value.entry(projectKey)?.isExample != false
+            override suspend fun record(item: RecentItem) = stores.appState.recordRecent(item)
+        },
+        now = { deps.clock.now() },
+        newKey = Keys::newKey,
+    )
 
     init {
         viewModelScope.launch {
             stores.recorder.ensureLoaded()
             stores.appState.ensureLoaded()
+            // LIB-18: an example left by an interrupted `온보딩 끝내기` goes now.
+            services.onboarding.cleanUpLeftover()
         }
+        // `예시 프로젝트 삭제됨` shows until the first project exists (LIB-18 `ED`).
+        viewModelScope.launch {
+            stores.appState.ensureLoaded()
+            combine(stores.library.state, stores.appState.onboarding.state) { library, _ -> library }
+                .collect { library -> if (library.loaded) services.onboarding.useUpNoticeIfDue(library.live) }
+        }
+        // 최근 연 파일 (LIB-05): the 서재 stays at the bottom of the stack while other screens are
+        // opened over it, so it records each new top route (`ED`; no area records opens itself yet).
+        viewModelScope.launch {
+            stores.appState.ensureLoaded()
+            snapshotFlow { deps.navigator.backStack.lastOrNull() }
+                .distinctUntilChanged()
+                .collectLatest { route -> if (route != null) recorder.onTop(route) }
+        }
+    }
+
+    /** `목록 | 카드` (LIB-04): remembered for the 서재 in `AppSettings.viewByScreen`. */
+    fun showCards(cards: Boolean) {
+        viewModelScope.launch { stores.settings.setViewMode(ShelfCards.SCREEN, if (cards) ViewMode.CARD else ViewMode.LIST) }
     }
 
     /** `지문으로 보기` (LIB-32): one prompt opens the whole group; cancel or failure changes nothing. */
@@ -73,7 +113,7 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
 
     /** ⋯ `프로젝트 숨기기` (LIB-31). */
     fun hide(key: Key) {
-        viewModelScope.launch { services.protection.hide(key) }
+        viewModelScope.launch { services.report(services.protection.hide(key)) }
     }
 
     /** `숨김 풀기` inside the open group (LIB-31). */

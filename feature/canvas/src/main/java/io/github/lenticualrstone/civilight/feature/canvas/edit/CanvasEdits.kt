@@ -1,9 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.canvas.edit
 
 import io.github.lenticualrstone.civilight.domain.cast.EditContext
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Pt
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Rect
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Sz
+import io.github.lenticualrstone.civilight.ui.graph.Pt
+import io.github.lenticualrstone.civilight.ui.graph.Rect
+import io.github.lenticualrstone.civilight.ui.graph.Sz
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.OrderKeys
 import io.github.lenticualrstone.civilight.model.canvas.Canvas
@@ -47,6 +47,12 @@ object CanvasEdits {
      */
     fun resolve(doc: ProjectDoc, requested: Key?): Canvas? =
         requested?.let { canvas(doc, it) } ?: canvases(doc).firstOrNull()
+
+    /**
+     * The canvas a `CanvasBoard(canvasKey)` route opens (CNV-02): the requested one; without one (the
+     * home shortcut) the most recently opened canvas (`_app/view.json` `lastCanvasKey`), else the first.
+     */
+    fun resolveForRoute(doc: ProjectDoc, requested: Key?): Canvas? = resolve(doc, requested ?: doc.app.view.lastCanvasKey)
 
     /** A new empty canvas after the others (CNV-02 [PROPOSED]: made when a project has none). */
     fun createCanvas(doc: ProjectDoc, name: String, ctx: EditContext): Pair<ProjectDoc, Key> {

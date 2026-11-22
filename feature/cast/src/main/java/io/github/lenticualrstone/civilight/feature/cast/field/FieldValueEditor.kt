@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
@@ -38,7 +40,8 @@ import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
  * The inputs of one field value by type (CST-09, CST-20): text lines, number with its unit, radio
  * list (+ `직접 쓰기`), checkboxes, year or year · month · day, month · day, linked items, and the
  * `알 수 없음` switch. [onPickLink] opens the item picker of a `연결` field (drawn by the caller in
- * place of these inputs). [longTextEditable] is false for a `긴 글` holding links or paren runs.
+ * place of these inputs). A `긴 글` uses [richLongText] (the shared rich editor, `@` links and
+ * paren runs kept) when given; otherwise plain paragraphs, read-only when [longTextEditable] is false.
  */
 @Composable
 fun FieldValueEditor(
@@ -50,6 +53,11 @@ fun FieldValueEditor(
     longTextEditable: Boolean,
     hiddenUnlocked: Boolean,
     modifier: Modifier = Modifier,
+    richLongText: (@Composable () -> Unit)? = null,
+    /** Dotted `연결` values with their fix buttons (CST-41); empty when none is dotted. */
+    dottedLinks: List<DottedLinkRow> = emptyList(),
+    onRestoreLink: (Key) -> Unit = {},
+    onKeepLink: (Key) -> Unit = {},
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -70,7 +78,9 @@ fun FieldValueEditor(
                     )
                 }
             }
-            FieldType.LONG_TEXT -> if (longTextEditable) {
+            FieldType.LONG_TEXT -> if (richLongText != null) {
+                richLongText()
+            } else if (longTextEditable) {
                 CivilightTextField(
                     value = draft.longText,
                     onValueChange = { onDraft(draft.copy(longText = it, unknown = false)) },
@@ -80,7 +90,6 @@ fun FieldValueEditor(
                 )
             } else {
                 CivilightText(draft.longText, type.body, color = colors.ink)
-                CivilightText(CastUiCopy.TODO_COPY_CAST_LONG_TEXT_RICH, type.small, color = colors.ink3)
             }
             FieldType.NUMBER, FieldType.CALC -> CivilightTextField(
                 value = draft.number,
@@ -127,6 +136,13 @@ fun FieldValueEditor(
                         RemovableChip(label, { onDraft(draft.copy(linkKeys = draft.linkKeys - key, unknown = false)) }, CastUiCopy.BTN_REMOVE)
                     }
                     if (kind != null) AddChip(CastUiCopy.pickTitle(kind), onPickLink)
+                }
+                for (row in dottedLinks.filter { it.key in draft.linkKeys }) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        CivilightText(row.label, type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
+                        if (row.canRestore) TextAction(CastUiCopy.BTN_RESTORE, { onRestoreLink(row.key) }, color = colors.ink2, style = type.label)
+                        if (!row.kept) TextAction(CastUiCopy.BTN_KEEP, { onKeepLink(row.key) }, color = colors.ink2, style = type.label)
+                    }
                 }
             }
             null -> CivilightText(draft.longText, type.body, color = colors.ink3)

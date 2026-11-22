@@ -4,12 +4,16 @@ import io.github.lenticualrstone.civilight.domain.cast.EditContext
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldDefinitions
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldSettings
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldSettingsScreen
+import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 
 /** The kinds behind the `인물 · 장소 · 용어 · 세력` tabs, in tab order. */
 val FIELD_KINDS: List<EntityKind> = listOf(EntityKind.CHARACTER, EntityKind.PLACE, EntityKind.TERM, EntityKind.FACTION)
+
+/** The computed fixed fields a record header can hide (CST-14): `첫 등장` and `보이스`. */
+enum class HeaderFixed(val label: String) { FIRST_APPEARANCE(CastUiCopy.FIRST_APPEARANCE), VOICE(CastUiCopy.VOICE) }
 
 /** Pure model of `프로젝트 설정 › 인물 항목` (CST-19) and its grip reorder. */
 object FieldSettingsModel {
@@ -38,5 +42,24 @@ object FieldSettingsModel {
         val at = next.indexOf(defKey)
         if (next == keys) return doc
         return FieldDefinitions.move(doc, defKey, afterKey = next.getOrNull(at - 1), beforeKey = next.getOrNull(at + 1), ctx = ctx)
+    }
+
+    /** Whether the record header shows [which] (CST-14; on by default). */
+    fun showsInHeader(doc: ProjectDoc, which: HeaderFixed): Boolean = when (which) {
+        HeaderFixed.FIRST_APPEARANCE -> doc.project.cast.showFirstAppearanceInHeader
+        HeaderFixed.VOICE -> doc.project.cast.showVoiceProgressInHeader
+    }
+
+    /**
+     * The switch of a computed fixed field in the `고정 항목` box (CST-14 [PROPOSED control]): it can
+     * be hidden from the record header, never deleted.
+     */
+    fun setShowInHeader(doc: ProjectDoc, which: HeaderFixed, show: Boolean, ctx: EditContext): ProjectDoc {
+        if (showsInHeader(doc, which) == show) return doc
+        val cast = when (which) {
+            HeaderFixed.FIRST_APPEARANCE -> doc.project.cast.copy(showFirstAppearanceInHeader = show)
+            HeaderFixed.VOICE -> doc.project.cast.copy(showVoiceProgressInHeader = show)
+        }
+        return doc.copy(project = doc.project.copy(cast = cast, updatedAt = ctx.now, updatedBy = ctx.device))
     }
 }

@@ -38,11 +38,15 @@ class EditStateTest {
     }
 
     @Test
-    fun `vertex handles only while the base shape is in force`() {
+    fun `WLD-65 vertex handles follow the shape in force at the lens`() {
+        val region = doc.maps.getValue(K.MAP_WORLD).regions.first { it.key == K.REGION_UPPER_GUARD }
         val atLatest = build(Editor.select(EditorState(), K.REGION_UPPER_GUARD), K.MAP_WORLD).props as PropsUi.RegionProps
-        assertEquals(4, atLatest.vertices.size)
+        // WLD-T57: at 최신 · 1-7 the `◆` shape of 1-9 (beyond the 집필 선) is not applied.
+        assertEquals(region.vertices, atLatest.vertices)
+        assertEquals(listOf("1-9 ◆"), atLatest.shapes.map { it.first })
         val later = EditState.build(doc, K.MAP_WORLD, LensPoint.UnitEnd(K.EPISODE_1_9), false, Editor.select(EditorState(), K.REGION_UPPER_GUARD))!!.props as PropsUi.RegionProps
-        assertTrue(later.vertices.isEmpty())
+        assertEquals(atLatest.shapes.single().second, later.vertices)
+        assertTrue(later.vertices != region.vertices)
     }
 
     @Test
@@ -53,7 +57,7 @@ class EditStateTest {
         assertEquals("38 km · 지점 3", props.sheet.detail)
         assertEquals(listOf("도보 15 km · 8시간", "말", "배", "직접"), props.modes.map { it.label })
         assertEquals(listOf(true, false, false, false), props.modes.map { it.selected })
-        assertNull(props.modes.last().modeKey)
+        assertNull(props.modes.last().index)
         assertEquals("길", props.layer)
         assertEquals("없음", props.reveal)
     }

@@ -5,11 +5,12 @@ import io.github.lenticualrstone.civilight.model.cast.Character
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.story.PlaceRefKind
 import io.github.lenticualrstone.civilight.model.story.StoryUnit
+import io.github.lenticualrstone.civilight.model.world.TimelineEvent
 import io.github.lenticualrstone.civilight.ui.labels.UnitLabels
 import io.github.lenticualrstone.civilight.ui.search.KoreanSearch
 
 /** What a picker row picks. */
-enum class PickKind { CHARACTER, TERM, PLACE, REGION, FACTION, UNIT }
+enum class PickKind { CHARACTER, TERM, PLACE, REGION, FACTION, UNIT, EVENT }
 
 /**
  * One row. [insertText] is the text a link inserts (an alias when the alias matched, SCR-55);
@@ -55,6 +56,7 @@ object PickerCopy {
     const val KIND_TERM = "용어"
     const val KIND_PLACE = "장소"
     const val KIND_FACTION = "세력"
+    const val KIND_EVENT = "사건"
     const val KIND_ITEM = "항목"
     const val HIDDEN_PREFIX = "숨긴"
     const val UNLOCK = "지문으로 보기"
@@ -186,6 +188,48 @@ object PickerModels {
             hiddenKindWord = PickerCopy.KIND_FACTION,
         )
     }
+
+    /**
+     * 사건 고르기 (CNV-01 `사건`, WLD-31): live timeline events in timeline order, by title (초성). A
+     * story event's sub line is its scene (`1-7 씬 3`); events have no hidden flag.
+     */
+    fun events(doc: ProjectDoc, query: String = "", labels: UnitLabels = UnitLabels(doc)): PickerModel {
+        val rows = doc.world.events
+            .filter { it.deletedAt == null }
+            .filter { query.isBlank() || KoreanSearch.matches(it.title, query) }
+            .sortedWith(compareBy<TimelineEvent>({ it.order }, { it.key }))
+            .map { e ->
+                val scene = e.sceneKey?.let(doc.index::unit)?.takeIf { doc.liveness.isLive(it) }
+                PickerItem(PickKind.EVENT, e.key, e.title, subtitle = scene?.let { labels.reference(it) })
+            }
+        return PickerModel(listOf(PickerSection(null, rows)).filter { it.items.isNotEmpty() })
+    }
+
+    /**
+     * `@` 연결 for document text (CNV-13, WLD-17, cast long text): the sections of [kinds] in the
+     * order 인물 · 용어 · 장소 · 세력 (each titled with its kind word); the hidden row counts every
+     * listed kind. With [SCRIPT_LINK_KINDS] it equals the three-argument [links].
+     */
+    fun links(doc: ProjectDoc, query: String, hiddenOpen: Boolean, kinds: Set<PickKind>): PickerModel {
+        val parts = buildList {
+            if (PickKind.CHARACTER in kinds) add(PickerCopy.KIND_CHARACTER to characters(doc, query, hiddenOpen = hiddenOpen))
+            if (PickKind.TERM in kinds) add(PickerCopy.KIND_TERM to terms(doc, query, hiddenOpen))
+            if (PickKind.PLACE in kinds) add(PickerCopy.KIND_PLACE to places(doc, query, hiddenOpen, includeRegions = false))
+            if (PickKind.FACTION in kinds) add(PickerCopy.KIND_FACTION to factions(doc, query, hiddenOpen))
+        }
+        val hiddenKinds = parts.filter { it.second.hiddenCount > 0 }
+        return PickerModel(
+            sections = parts.map { (word, model) -> PickerSection(word, model.items) }.filter { it.items.isNotEmpty() },
+            hiddenCount = parts.sumOf { it.second.hiddenCount },
+            hiddenKindWord = hiddenKinds.singleOrNull()?.second?.hiddenKindWord ?: PickerCopy.KIND_ITEM,
+        )
+    }
+
+    /** The link kinds of the `@` picker in script text (SCR-55). */
+    val SCRIPT_LINK_KINDS: Set<PickKind> = setOf(PickKind.CHARACTER, PickKind.TERM, PickKind.PLACE)
+
+    /** The link kinds of document text (`LinkTargetKind.DOCUMENT` minus pages, which have no picker here). */
+    val DOCUMENT_LINK_KINDS: Set<PickKind> = setOf(PickKind.CHARACTER, PickKind.TERM, PickKind.PLACE, PickKind.FACTION)
 
     /**
      * `@` 연결 (SCR-55): people, terms (with aliases) and places in one list. Locked hidden items are

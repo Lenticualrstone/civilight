@@ -5,6 +5,13 @@ import io.github.lenticualrstone.civilight.feature.canvas.board.CanvasTool
 import io.github.lenticualrstone.civilight.feature.canvas.board.PlaceItemSheet
 import io.github.lenticualrstone.civilight.feature.canvas.label.LineStartSheet
 import io.github.lenticualrstone.civilight.feature.canvas.node.NodeEditSheet
+import io.github.lenticualrstone.civilight.feature.canvas.page.BlockAddSheet
+import io.github.lenticualrstone.civilight.feature.canvas.page.DeletedLinkSheet
+import io.github.lenticualrstone.civilight.feature.canvas.page.PageMenuSheet
+import io.github.lenticualrstone.civilight.feature.canvas.page.RelinkSheet
+import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
+import io.github.lenticualrstone.civilight.model.asset.ImageSlot
+import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
 import io.github.lenticualrstone.civilight.navigation.LineLabelSheet
 import io.github.lenticualrstone.civilight.navigation.RouteCodec
 import org.junit.Assert.assertEquals
@@ -23,6 +30,12 @@ class SheetKeysTest {
             PlaceItemSheet(p, CanvasFx.CANVAS, CanvasTool.CHARACTER, 0f, 0f),
             LineStartSheet(p, CanvasFx.CANVAS, CanvasFx.EDGE_RIEN_HART),
             LineLabelSheet(p, CanvasFx.CANVAS, CanvasFx.EDGE_RIEN_HART),
+            PageMenuSheet(p, K.PAGE_LOWER_LIGHT),
+            BlockAddSheet(p, K.PAGE_LOWER_LIGHT),
+            DeletedLinkSheet(p, K.PAGE_LOWER_LIGHT, K.link(7)),
+            RelinkSheet(p, K.PAGE_LOWER_LIGHT, K.link(7)),
+            ImagePickSheet(p, ImageOwnerKind.PAGE, K.PAGE_LOWER_LIGHT, ImageSlot.PAGE_HEADER),
+            ImagePickSheet(p, ImageOwnerKind.CHARACTER, K.RIEN, ImageSlot.CHARACTER_PORTRAIT),
         )
         for (key in keys) assertEquals(key, RouteCodec.decode(RouteCodec.encode(key)))
         assertEquals(keys, RouteCodec.decodeAll(RouteCodec.encodeAll(keys)))

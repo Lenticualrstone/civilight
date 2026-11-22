@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.RatingBadge
+import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
@@ -47,6 +48,7 @@ internal fun ProjectRow(
     onOpen: () -> Unit,
     onMenu: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
     extra: (@Composable () -> Unit)? = null,
 ) {
     val colors = CivilightTheme.colors
@@ -54,6 +56,7 @@ internal fun ProjectRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .selectedRowBackground(selected, colors.sel, colors.acc)
             .topHairline(colors.line)
             .pressable(onClick = onOpen, role = Role.Button, scaleOnPress = false, onClickLabel = row.title)
             .heightIn(min = 44.dp)

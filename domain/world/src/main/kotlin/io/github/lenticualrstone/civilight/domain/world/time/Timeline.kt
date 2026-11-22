@@ -73,7 +73,19 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
             .sortedWith(compareBy({ it.order }, { it.key }))
     }
 
-    fun build(lens: LensPoint = LensPoint.Latest, view: TimelineView = TimelineView.EPISODE, anchor: TimeSubject? = null): Timeline {
+    /** [rowCharacters] the reader may see: hidden characters are left out while locked. */
+    private fun rowCharactersFor(unlocked: Boolean): List<Character> = if (unlocked) rowCharacters else rowCharacters.filterNot { it.hidden }
+
+    fun build(lens: LensPoint = LensPoint.Latest, view: TimelineView = TimelineView.EPISODE, anchor: TimeSubject? = null): Timeline =
+        build(lens, view, anchor, hiddenUnlocked = true)
+
+    /**
+     * [build] for a reader whose hidden items are open ([hiddenUnlocked]) or locked (WLD-13, rule 19):
+     * while locked, ages of hidden characters are left out and hidden places (and regions of hidden
+     * places or factions) read `숨긴 항목`. Events keep their rows (they have no hidden flag).
+     */
+    fun build(lens: LensPoint, view: TimelineView, anchor: TimeSubject?, hiddenUnlocked: Boolean): Timeline {
+        val unlocked = hiddenUnlocked
         val available = clock.hasTimeline
         val infoLine = when (clock.mode) {
             WorldTimeMode.CALENDAR -> "달력: ${clock.calendar?.months?.joinToString(Copy.SEP) { it.name }.orEmpty()}"
@@ -104,7 +116,7 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
             val subParts = buildList {
                 if (span.isNotEmpty()) add(span)
                 if (planned || first == null) add("계획")
-                else year?.let { y -> ages.line(rowCharacters, y).takeIf { it.isNotEmpty() }?.let(::add) }
+                else year?.let { y -> ages.line(rowCharactersFor(unlocked), y).takeIf { it.isNotEmpty() }?.let(::add) }
             }
             val absolute = first?.absolute ?: Long.MAX_VALUE / 2
             if (first != null) lastStoryAbsolute = maxOf(lastStoryAbsolute, first.absolute)
@@ -113,7 +125,8 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
                 TimelineRow.ChapterRow(
                     chapterKey = chapter.key,
                     time = TimeLabel(year?.toString() ?: ""),
-                    title = "${codes.unitLabel(chapter.key).orEmpty()}${chapter.title?.let { Copy.SEP + it }.orEmpty()}",
+                    // A hidden chapter keeps only its code while locked (rule 19: no title text).
+                    title = "${codes.unitLabel(chapter.key).orEmpty()}${chapter.title?.takeIf { unlocked || !chapter.hidden }?.let { Copy.SEP + it }.orEmpty()}",
                     sub = subParts.joinToString(Copy.SEP),
                     planned = planned || first == null,
                     dimmed = start > lensRank,
@@ -133,7 +146,12 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
             val time = timeLabel(view, TimeSubject.Event(event.key), anchor, moment)
             items += Item(
                 moment?.absolute ?: Long.MAX_VALUE, if (isStory) 2 else 0, event.order,
-                TimelineRow.EventRow(event, time, event.title, eventSub(event, moment, view), dimmed),
+                if (!unlocked && EventMasks.sceneHidden(doc, event)) {
+                    // A story event on a hidden scene: `숨긴 씬`, its episode code only.
+                    TimelineRow.EventRow(event, time, EventMasks.HIDDEN_SCENE, event.sceneKey?.let { codes.episodeCode(it) }.orEmpty(), dimmed)
+                } else {
+                    TimelineRow.EventRow(event, time, event.title, eventSub(event, moment, view, unlocked), dimmed)
+                },
             )
         }
 
@@ -169,7 +187,7 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
         }
     }
 
-    private fun eventSub(event: TimelineEvent, moment: Moment?, view: TimelineView): String {
+    private fun eventSub(event: TimelineEvent, moment: Moment?, view: TimelineView, unlocked: Boolean): String {
         val parts = ArrayList<String>()
         val isStory = event.kind.known == EventKind.STORY
         if (isStory) {
@@ -183,8 +201,8 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
         } else {
             parts += "세계 사건"
         }
-        placeName(event.place)?.let(parts::add)
-        moment?.let(moments::yearOf)?.let { y -> ages.line(rowCharacters, y).takeIf { it.isNotEmpty() }?.let(parts::add) }
+        placeName(event.place, unlocked)?.let(parts::add)
+        moment?.let(moments::yearOf)?.let { y -> ages.line(rowCharactersFor(unlocked), y).takeIf { it.isNotEmpty() }?.let(parts::add) }
         if (!isStory) {
             flashbackEpisodes(event.key).takeIf { it.isNotEmpty() }?.let { parts += "${it.joinToString(Copy.SEP)}에서 회상" }
             event.revealPoint?.let { point ->
@@ -203,11 +221,12 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
         .mapNotNull { codes.episodeCode(it.key) }
         .distinct()
 
-    private fun placeName(ref: PlaceRef?): String? = when (ref?.kind?.known) {
-        PlaceRefKind.PLACE -> doc.index.place(ref.key)?.name
-        PlaceRefKind.REGION -> doc.index.region(ref.key)?.second?.name
-        null -> null
-    }
+    private fun placeName(ref: PlaceRef?, unlocked: Boolean): String? =
+        if (!unlocked && EventMasks.placeHidden(doc, ref)) EventMasks.HIDDEN_ITEM else when (ref?.kind?.known) {
+            PlaceRefKind.PLACE -> doc.index.place(ref.key)?.name
+            PlaceRefKind.REGION -> doc.index.region(ref.key)?.second?.name
+            null -> null
+        }
 
     companion object {
         const val LEAD_TAG = "주연"

@@ -27,6 +27,12 @@ object NewUnitCopy {
 
     const val CREATE = "만들기"
 
+    /** 때 chips (STO-20 / STO-21 words) and the base word of the line `1-7 씬 3 기준 · +1일`. */
+    const val SAME_DAY = "같은 날"
+    const val PLUS_ONE = "+1일"
+    const val PLUS_TWO = "+2일"
+    const val BASE = "기준"
+
     /** Place picker title (WLD-52). */
     const val PICK_PLACE = "장소 고르기"
 

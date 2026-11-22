@@ -3,9 +3,25 @@ package io.github.lenticualrstone.civilight.navigation
 import io.github.lenticualrstone.civilight.model.Key
 import kotlinx.serialization.Serializable
 
-/** 기록함 (LRC-25 … LRC-30, LRC-40/41); inner `TwoLr` list pane. [filter] = selected chip id. */
+/**
+ * 기록함 (LRC-25 … LRC-30, LRC-40/41); inner `TwoLr` list pane. [filter] = selected chip id.
+ *
+ * The opening context (`domain:recorder` `InboxOpening`, LRC-27 presets):
+ * - nothing set = `FromLibrary` (no filter);
+ * - [projectKey] only = `FromProject` (this project + `정리 안 됨`: LIB-13 checklist, empty cast
+ *   `라이프 레코더에서`);
+ * - [projectKey] + [targetKind] + [targetKey] = `FromTarget` (`레코더 · 정리 안 됨 n ›` on a scene,
+ *   card or profile, CST-49). [targetKind] uses the strings of [Recording.targetKind].
+ *
+ * Not a [ProjectRoute]: the inbox spans projects and is never wrapped in a project frame.
+ */
 @Serializable
-data class RecorderInbox(val filter: String? = null) : RecorderRoute, ListPaneRoute
+data class RecorderInbox(
+    val filter: String? = null,
+    val projectKey: Key? = null,
+    val targetKind: String? = null,
+    val targetKey: Key? = null,
+) : RecorderRoute, ListPaneRoute
 
 /** 기록 화면 (LRC-28), inner `TwoLr` detail pane. */
 @Serializable

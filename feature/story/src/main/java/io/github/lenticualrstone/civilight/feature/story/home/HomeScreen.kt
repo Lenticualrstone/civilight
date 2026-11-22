@@ -37,7 +37,9 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.common.storyServices
 import io.github.lenticualrstone.civilight.navigation.Library
 import io.github.lenticualrstone.civilight.navigation.LensSheet
@@ -104,6 +106,7 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
                     },
                     onStartRoute = { navigator.push(it) },
                     onDismissStart = { vm.dismissStart() },
+                    selectedKey = HomeModel.selectedKey(navigator.backStack, route.projectKey),
                 )
             }
         }
@@ -119,6 +122,7 @@ private fun HomeContent(
     onShortcut: (HomeShortcut) -> Unit,
     onStartRoute: (Route) -> Unit,
     onDismissStart: () -> Unit,
+    selectedKey: String? = null,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -147,7 +151,7 @@ private fun HomeContent(
                     ui.listHeader?.let { SectionLabel(it) }
                 }
             }
-            ui.rows.forEach { row -> item(key = "row:${row.key}") { EpisodeLine(row, onEpisode) } }
+            ui.rows.forEach { row -> item(key = "row:${row.key}") { EpisodeLine(row, onEpisode, selected = row.key == selectedKey) } }
         }
         item(key = "work") {
             Column(Modifier.padding(top = 28.dp)) {
@@ -202,7 +206,7 @@ private fun ResumeBlock(resume: HomeResume, onResume: (HomeResume) -> Unit) {
 }
 
 @Composable
-private fun EpisodeLine(row: HomeRow, onEpisode: (HomeRow) -> Unit) {
+private fun EpisodeLine(row: HomeRow, onEpisode: (HomeRow) -> Unit, selected: Boolean = false) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val titleStyle = type.itemTitle.merge(TextStyle(fontWeight = if (row.current) FontWeight.Bold else FontWeight.Normal))
@@ -210,13 +214,17 @@ private fun EpisodeLine(row: HomeRow, onEpisode: (HomeRow) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .topHairline(colors.line)
+            .selectedRowBackground(selected, colors.sel, colors.acc)
             .pressable(onClick = { onEpisode(row) }, scaleOnPress = false)
             .heightIn(min = 44.dp)
             .padding(vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CivilightText(row.code, type.number, color = colors.ink3, maxLines = 1)
-        CivilightText(row.title, titleStyle, Modifier.weight(1f).padding(start = 16.dp, end = 12.dp), color = if (row.current) colors.ink else colors.ink2, maxLines = 1)
+        CivilightText(row.title, titleStyle, Modifier.weight(1f, fill = !row.hiddenTag).padding(start = 16.dp, end = 12.dp), color = if (row.current) colors.ink else colors.ink2, maxLines = 1)
+        if (row.hiddenTag) {
+            CivilightText(StoryCopy.HIDDEN_TAG, type.small, Modifier.weight(1f).padding(end = 12.dp), color = colors.ink3, maxLines = 1)
+        }
         CivilightText(row.status, type.small, color = if (row.writing) colors.acc else colors.ink3, maxLines = 1)
     }
 }
@@ -299,7 +307,7 @@ private fun StartBlockView(start: HomeStart, onRoute: (Route) -> Unit, onDismiss
                             type.itemTitle.merge(TextStyle(fontWeight = FontWeight.Normal, textDecoration = if (item.done) TextDecoration.LineThrough else null)),
                             color = if (item.done) colors.ink3 else colors.ink,
                         )
-                        CivilightText(item.sub, type.small, color = colors.ink3, maxLines = 1)
+                        if (item.sub.isNotEmpty()) CivilightText(item.sub, type.small, color = colors.ink3, maxLines = 1)
                     }
                     CivilightIcon(IconId.Next, contentDescription = null, tint = colors.ink3)
                 }

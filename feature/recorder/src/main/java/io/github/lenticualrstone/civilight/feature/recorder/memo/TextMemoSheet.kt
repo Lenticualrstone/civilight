@@ -151,7 +151,8 @@ fun ColumnScope.TextMemoSheetContent(state: CaptureState, actions: MemoActions) 
 /**
  * The memo's text field. It edits plain text; the host turns each change into one run replace.
  * The field reloads from the runs only when [reload] changes (an `@` pick), so typing and Hangul
- * composition are never interrupted. Link runs show a leading `@` and a 2 dp `acc` underline.
+ * composition are never interrupted. Link runs show a leading `@` and a 2 dp `acc` underline; a run to
+ * a target in the trash has a dotted `ink3` line instead, and one to a deleted card shows `◇` for `@` (LRC-23).
  */
 @Composable
 fun MemoField(
@@ -162,6 +163,8 @@ fun MemoField(
     onChange: (String, Int) -> Unit,
     onCaret: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    textStyle: TextStyle? = null,
+    boxed: Boolean = true,
 ) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(16.dp)
@@ -173,7 +176,8 @@ fun MemoField(
     // The marks belong to the runs' text; while the field is a keystroke ahead, show none.
     val shownMarks = if (field.text == text && marks.fits(text.length)) marks else AtMarks.NONE
     val underline = colors.acc
-    val style = CivilightTheme.type.line.merge(TextStyle(fontSize = 18.sp, lineHeight = 30.sp, color = colors.ink))
+    val deletedLine = colors.ink3
+    val style = CivilightTheme.type.line.merge(textStyle ?: TextStyle(fontSize = 18.sp, lineHeight = 30.sp)).merge(TextStyle(color = colors.ink))
     BasicTextField(
         value = field,
         onValueChange = { next ->
@@ -187,15 +191,19 @@ fun MemoField(
         onTextLayout = { layout = it },
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 120.dp)
-            .clip(shape)
-            .background(colors.tint)
-            .insetOutline(colors.line, 1.dp, shape)
-            .padding(14.dp)
+            .then(
+                if (boxed) {
+                    Modifier.heightIn(min = 120.dp).clip(shape).background(colors.tint).insetOutline(colors.line, 1.dp, shape).padding(14.dp)
+                } else {
+                    Modifier.heightIn(min = 80.dp)
+                },
+            )
             .drawBehind {
                 val result = layout ?: return@drawBehind
                 val thickness = 2.dp.toPx()
-                for (range in shownMarks.shownRanges()) {
+                val dash = 3.dp.toPx()
+                for ((index, range) in shownMarks.shownRanges().withIndex()) {
+                    val dotted = shownMarks.isDotted(index)
                     if (range.first >= result.layoutInput.text.length) continue
                     val end = (range.last + 1).coerceAtMost(result.layoutInput.text.length)
                     val firstLine = result.getLineForOffset(range.first)
@@ -207,7 +215,18 @@ fun MemoField(
                         val left = result.getHorizontalPosition(from, usePrimaryDirection = true)
                         val right = result.getHorizontalPosition(to, usePrimaryDirection = true)
                         val y = result.getLineBaseline(line) + 4.dp.toPx()
-                        drawRect(underline, Offset(minOf(left, right), y), Size(kotlin.math.abs(right - left), thickness))
+                        val x0 = minOf(left, right)
+                        val width = kotlin.math.abs(right - left)
+                        if (dotted) {
+                            // A run to a deleted target (LRC-23): dotted `ink3`, as its chip.
+                            var x = x0
+                            while (x < x0 + width) {
+                                drawRect(deletedLine, Offset(x, y), Size(minOf(dash, x0 + width - x), thickness / 2))
+                                x += dash * 2
+                            }
+                        } else {
+                            drawRect(underline, Offset(x0, y), Size(width, thickness))
+                        }
                     }
                 }
             },

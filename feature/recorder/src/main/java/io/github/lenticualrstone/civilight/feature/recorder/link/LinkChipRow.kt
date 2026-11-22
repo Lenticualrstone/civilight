@@ -30,6 +30,8 @@ import io.github.lenticualrstone.civilight.domain.recorder.link.Chip
  * 32 high, 6 apart, wrapping. A chip with × removes its link(s) at once ([onRemove]); tapping a
  * removable chip replaces its target ([onReplace], LRC-20). An `@` chip (`세라 @`) has no × and does
  * not open the picker: it leaves with its text (rule 23 §5). A purged target is plain text.
+ * A chip of a deleted card ([hasCard], LRC-23) opens its card ([onCard]) instead of the picker,
+ * `@` chips included (their card offers `다른 항목에 잇기` · `글로 풀기`).
  */
 @Composable
 fun LinkChipRow(
@@ -38,17 +40,30 @@ fun LinkChipRow(
     onReplace: (Chip) -> Unit,
     onRemove: (Chip) -> Unit,
     modifier: Modifier = Modifier,
+    hasCard: (Chip) -> Boolean = { false },
+    onCard: (Chip) -> Unit = {},
 ) {
     ChipFlow(modifier) {
         for (chip in chips) {
             if (chip.plain) {
-                Box(Modifier.heightIn(min = 32.dp), contentAlignment = Alignment.Center) {
+                // Plain text (a purged target); a purged card still opens its card (`영구 삭제 · 노아`, LRC-23).
+                val card = hasCard(chip)
+                Box(
+                    Modifier
+                        .then(if (card) Modifier.pressable(onClick = { onCard(chip) }, hitTarget = HitTarget.CHIP) else Modifier)
+                        .heightIn(min = 32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
                     CivilightText(chip.text, CivilightTheme.type.chip, color = CivilightTheme.colors.ink3, maxLines = 1)
                 }
             } else {
                 LinkChip(
                     chip = chip,
-                    onClick = if (chip.removable) ({ onReplace(chip) }) else null,
+                    onClick = when {
+                        hasCard(chip) -> ({ onCard(chip) })
+                        chip.removable -> ({ onReplace(chip) })
+                        else -> null
+                    },
                     onRemove = if (chip.removable) ({ onRemove(chip) }) else null,
                 )
             }

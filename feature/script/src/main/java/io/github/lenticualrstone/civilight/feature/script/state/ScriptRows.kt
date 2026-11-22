@@ -1,12 +1,18 @@
 package io.github.lenticualrstone.civilight.feature.script.state
 
+import io.github.lenticualrstone.civilight.feature.script.terms.BlockTerms
+import io.github.lenticualrstone.civilight.feature.script.terms.CandidateSpan
+import io.github.lenticualrstone.civilight.feature.script.terms.TermMarksModel
 import io.github.lenticualrstone.civilight.domain.script.BlockOps
 import io.github.lenticualrstone.civilight.domain.script.BlockPosition
+import io.github.lenticualrstone.civilight.domain.script.DirectionCues
 import io.github.lenticualrstone.civilight.domain.script.Labels
 import io.github.lenticualrstone.civilight.domain.script.Links
 import io.github.lenticualrstone.civilight.domain.script.Manuscript
+import io.github.lenticualrstone.civilight.domain.script.Records
 import io.github.lenticualrstone.civilight.domain.script.Runs
 import io.github.lenticualrstone.civilight.domain.script.SceneTimeSource
+import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
 import io.github.lenticualrstone.civilight.feature.script.editor.LinkLook
 import io.github.lenticualrstone.civilight.feature.script.editor.SpanKind
 import io.github.lenticualrstone.civilight.model.Key
@@ -24,6 +30,9 @@ object ScriptRowKeys {
     fun hidden(sceneKey: Key): String = "hidden:$sceneKey"
     fun empty(sceneKey: Key): String = "empty:$sceneKey"
     fun block(blockKey: Key): String = "block:$blockKey"
+
+    /** The block key of a block row's key, else null (heads and scene rows). */
+    fun blockKeyOf(rowKey: String): Key? = rowKey.removePrefix("block:").takeIf { it != rowKey }
 }
 
 /** One row of the manuscript list (SCR-01): scene heads and blocks of one episode, in order. */
@@ -80,8 +89,15 @@ data class SpeakerModel(val text: String, val realName: String?, val look: Speak
 /** A `◆` / `◇` / `▲` mark; [dotted] when its anchor or target was deleted. */
 data class MarkModel(val glyph: Char, val dotted: Boolean = false)
 
-/** One option line of a choice block: `1` + text. */
-data class OptionLine(val index: String, val text: String)
+/** One option line of a choice block: `1` + text; [number] `#045-1` is shown while the block is selected (SCR-21). */
+data class OptionLine(val index: String, val text: String, val number: String = index, val optionKey: Key? = null)
+
+/**
+ * The speaker-line slot of a block that has no speaker (boards `Blocks`, `RSSelect`): `선택지 ·
+ * 다음 블록에서 합류`, `시스템 · 화면 문구`, and on a selected block its kind label with `· #043`
+ * (SCR-21: the number shows on the selected block only).
+ */
+data class SlotModel(val label: String, val sub: String?, val number: String?)
 
 /** A block as the manuscript draws it (SCR-04 … SCR-11, SCR-20). */
 data class BlockRow(
@@ -107,11 +123,22 @@ data class BlockRow(
     val textMarks: List<MarkModel>,
     /** `호칭 힌트` lines (layer on). */
     val addressHints: List<String>,
+    /** The block carries a `◆` (whatever the layers): the swipe row's `◆ 시간` is `acc` (SCR-30). */
+    val hasChange: Boolean = false,
+    /** `용어 후보` spans in raw offsets (SCR-56; empty while the layer is off). */
+    val termCandidates: List<CandidateSpan> = emptyList(),
+    /** A link here sits before its term's first reveal: the amber `▲` in the margin (SCR-56, always drawn). */
+    val preReveal: Boolean = false,
+    /** The memo was put in by the Life Recorder: its source record (SCR-59). */
+    val recorderRecordKey: Key? = null,
 ) : ScriptRow {
     override val key: String get() = ScriptRowKeys.block(blockKey)
 
-    /** Text kinds are typed into; direction and choice blocks are only selected in this batch. */
+    /** Text kinds are typed into; direction blocks open their cue sheet; choice options are typed into one by one. */
     val isText: Boolean get() = kind in BlockOps.TEXT_KINDS
+
+    /** The slot line drawn above the text ([selected] adds the number), or null (dialogue, unselected narration and memo). */
+    fun slot(selected: Boolean): SlotModel? = ScriptRows.slotOf(kind, number, selected, empty = kind == BlockKind.DIRECTION && text.isBlank())
 }
 
 /** Builds the manuscript rows of one numbering unit from the domain rows (`Manuscript.rows`). */
@@ -125,6 +152,7 @@ object ScriptRows {
         unlocked: Boolean,
         readOnly: Boolean,
         zone: ZoneId,
+        terms: TermMarksModel.Source? = null,
     ): List<ScriptRow> {
         val out = mutableListOf<ScriptRow>()
         val rows = Manuscript.rows(doc, unitKey, time, layers, preview, unlocked)
@@ -138,10 +166,27 @@ object ScriptRows {
                     }
                 }
                 is Manuscript.Row.HiddenScene -> out += HiddenSceneRow(row.sceneKey, row.text)
-                is Manuscript.Row.BlockRow -> out += blockRow(doc, row, layers, unlocked, zone)
+                is Manuscript.Row.BlockRow -> out += blockRow(doc, row, layers, unlocked, zone, terms)
             }
         }
         return out
+    }
+
+    /**
+     * Slot line by kind (SCR-21, SCR-09, SCR-10): choice and system text always carry theirs, the
+     * number only while selected; narration, direction and memo show their kind label with the
+     * number only while selected; dialogue uses its speaker line instead. An [empty] direction block
+     * (no cue yet) keeps its `연출` label unselected too, so the numbered row can still be found.
+     */
+    fun slotOf(kind: BlockKind?, number: String, selected: Boolean, empty: Boolean = false): SlotModel? {
+        val n = number.takeIf { selected }
+        return when (kind) {
+            BlockKind.DIALOGUE -> null
+            BlockKind.CHOICE -> SlotModel(ScriptCopy.CHOICE_LABEL, ScriptCopy.CHOICE_REJOIN, n)
+            BlockKind.SYSTEM -> SlotModel(ScriptCopy.SYSTEM_LABEL, ScriptCopy.SYSTEM_SUB, n)
+            BlockKind.NARRATION, BlockKind.DIRECTION, BlockKind.MEMO, null ->
+                if (selected || empty) SlotModel(Labels.kindLabel(kind), null, n) else null
+        }
     }
 
     /** The speaker a first line of [sceneKey] inherits (SCR-18), as a label. */
@@ -151,8 +196,9 @@ object ScriptRows {
         return SpeakerModel(name, null, SpeakerLook.NAMED, key)
     }
 
-    private fun blockRow(doc: ProjectDoc, row: Manuscript.Row.BlockRow, layers: ScriptLayers, unlocked: Boolean, zone: ZoneId): BlockRow {
+    private fun blockRow(doc: ProjectDoc, row: Manuscript.Row.BlockRow, layers: ScriptLayers, unlocked: Boolean, zone: ZoneId, terms: TermMarksModel.Source?): BlockRow {
         val block = row.block
+        val termMarks = terms?.of(block) ?: BlockTerms.NONE
         val kind = block.kind.known
         val speaker = if (kind == BlockKind.DIALOGUE) speakerOf(row.speaker, block) else null
         val marks = row.marks.map { MarkModel(it.glyph.first(), it.dotted) }
@@ -164,7 +210,12 @@ object ScriptRows {
         if (speaker?.look == SpeakerLook.MISSING) speakerMarks += MarkModel('▲')
         val options = if (kind == BlockKind.CHOICE) {
             BlockOps.orderedOptions(block).mapIndexed { i, o ->
-                OptionLine("${i + 1}", if (layers.paren) Runs.displayText(o.runs) else Runs.exportText(o.runs, includeParens = false))
+                OptionLine(
+                    index = "${i + 1}",
+                    text = if (layers.paren) Runs.displayText(o.runs) else Runs.exportText(o.runs, includeParens = false),
+                    number = Labels.optionNumber(block.number, i + 1),
+                    optionKey = o.key,
+                )
             }
         } else emptyList()
         return BlockRow(
@@ -175,12 +226,17 @@ object ScriptRows {
             speaker = speaker,
             runs = block.runs,
             linkLooks = linkLooks(doc, block, unlocked),
-            text = row.text,
+            // SCR-08: cues read with Korean effect names (`화면 효과 페이드`).
+            text = if (kind == BlockKind.DIRECTION) DirectionCues.blockLine(doc, block.cues) else row.text,
             memoPrefix = if (kind == BlockKind.MEMO) Manuscript.memoPrefix(block, zone) else null,
             options = options,
             speakerMarks = speakerMarks,
             textMarks = textMarks,
             addressHints = row.addressHints,
+            hasChange = Records.marksOn(doc, block.key).any { it.glyph == "◆" },
+            termCandidates = termMarks.candidates,
+            preReveal = termMarks.preReveal,
+            recorderRecordKey = block.recorderSource?.recordKey.takeIf { kind == BlockKind.MEMO },
         )
     }
 

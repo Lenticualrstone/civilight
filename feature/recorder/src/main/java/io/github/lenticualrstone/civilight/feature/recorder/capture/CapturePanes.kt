@@ -164,7 +164,7 @@ fun ColumnScope.RecordingPane(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        CivilightButton(screen.toText, onToText, variant = ButtonVariant.GHOST, icon = IconId.Text)
+        if (view.canToText) CivilightButton(screen.toText, onToText, variant = ButtonVariant.GHOST, icon = IconId.Text)
         CivilightButton(screen.stopAndSave, onStop, Modifier.weight(1f).heightIn(min = 56.dp), variant = ButtonVariant.PRIMARY_LARGE)
         RoundButton(
             icon = if (view.paused) IconId.Mic else IconId.Pause,

@@ -1,0 +1,107 @@
+package io.github.lenticualrstone.civilight.domain.library
+
+import io.github.lenticualrstone.civilight.domain.library.newproject.NewProjectDraft
+import io.github.lenticualrstone.civilight.domain.library.newproject.NewProjectFlow
+import io.github.lenticualrstone.civilight.domain.library.newproject.StartBlock
+import io.github.lenticualrstone.civilight.domain.library.onboarding.FirstUseTips
+import io.github.lenticualrstone.civilight.domain.library.onboarding.ModuleTours
+import io.github.lenticualrstone.civilight.domain.library.onboarding.TourModule
+import io.github.lenticualrstone.civilight.domain.library.onboarding.TourRun
+import io.github.lenticualrstone.civilight.model.app.ExampleState
+import io.github.lenticualrstone.civilight.model.app.OnboardingState
+import io.github.lenticualrstone.civilight.model.app.RatingDefaults
+import io.github.lenticualrstone.civilight.model.project.Rating
+import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** LIB-19 tours, LIB-20 tips, LIB-21 reset, LIB-13 `숨김 · 끔` from the document. */
+class OnboardingGuideTest {
+    @Test
+    fun `LIB-19 step counts and drawn copy follow the spec table`() {
+        assertEquals(4, ModuleTours.stepCount(TourModule.SCRIPT))
+        TourModule.entries.filter { it != TourModule.SCRIPT }.forEach { assertEquals(it.name, 3, ModuleTours.stepCount(it)) }
+        val script = ModuleTours.steps(TourModule.SCRIPT)
+        assertEquals("명령 칸" to "이동 · 검색 · 블록 추가 · 마이크", script[0].title to script[0].sub)
+        assertEquals("블록을 왼쪽으로" to "시간 · 참고 · 속성 → 옆 패널 탭", script[1].title to script[1].sub)
+        assertEquals("시점 렌즈" to "고른 시점까지의 인물 · 관계 · 용어", script[3].title to script[3].sub)
+        assertEquals("연결", ModuleTours.steps(TourModule.RECORDER)[1].title)
+        assertEquals("인물 안내", TourModule.CAST.label)
+        assertNull(TourModule.SCRIPT.label)
+        assertEquals(
+            listOf("스크립트", "인물", "세계 · 연표", "라이프 레코더", "서재 · 숨기기", "지도 만들기", "인물 동선 · 장소와 때"),
+            TourModule.entries.map { it.rowTitle },
+        )
+    }
+
+    @Test
+    fun `LIB-19 a tour runs once, and not while its copy is missing`() {
+        val fresh = OnboardingState()
+        // Every module has at least one undrawn step today, so none starts on its own yet.
+        TourModule.entries.forEach { assertFalse(it.name, ModuleTours.shouldStart(fresh, it)) }
+        assertFalse(ModuleTours.copyComplete(TourModule.LIBRARY_HIDING))
+        val seen = ModuleTours.markSeen(fresh, TourModule.CAST)
+        assertTrue(ModuleTours.seen(seen, TourModule.CAST))
+        assertFalse(ModuleTours.seen(ModuleTours.reset(seen, TourModule.CAST), TourModule.CAST))
+    }
+
+    @Test
+    fun `LIB-19 the card walks next, previous and finish`() {
+        var run = TourRun(TourModule.SCRIPT)
+        assertFalse(run.hasPrevious)
+        assertEquals("다음", run.primaryLabel)
+        run = run.next()!!.next()!!.next()!!
+        assertTrue(run.isLast)
+        assertEquals("마치기", run.primaryLabel)
+        assertEquals("시점 렌즈", run.step.title)
+        assertNull(run.next())
+        assertEquals(2, run.previous().index)
+        assertEquals(0, TourRun(TourModule.MAP).previous().index)
+    }
+
+    @Test
+    fun `LIB-20 a tip shows once, never while the switch is off`() {
+        val state = OnboardingState()
+        assertTrue(FirstUseTips.shouldShow(state, tipsOn = true, tipId = "script.choice"))
+        assertFalse(FirstUseTips.shouldShow(state, tipsOn = false, tipId = "script.choice"))
+        val shown = FirstUseTips.markShown(state, "script.choice")
+        assertFalse(FirstUseTips.shouldShow(shown, tipsOn = true, tipId = "script.choice"))
+        assertTrue(FirstUseTips.shouldShow(shown, tipsOn = true, tipId = "map.pin"))
+        assertEquals(shown, FirstUseTips.markShown(shown, "script.choice"))
+    }
+
+    @Test
+    fun `LIB-21 모든 안내 처음부터 resets tours, tips and the walkthrough but keeps onboarding finished`() {
+        val done = OnboardingState(
+            firstRunCompleted = true, walkthroughSeen = true, exampleState = ExampleState.DELETED,
+            moduleTourSeen = mapOf("SCRIPT" to true, "CAST" to true), tipsShown = setOf("a", "b"), emptyLibraryNoticeShown = true,
+        )
+        val reset = FirstUseTips.resetAll(done)
+        assertFalse(reset.walkthroughSeen)
+        assertTrue(reset.tipsShown.isEmpty())
+        TourModule.entries.forEach { assertFalse(ModuleTours.seen(reset, it)) }
+        assertTrue(reset.firstRunCompleted)
+        assertEquals(ExampleState.DELETED, reset.exampleState)
+        assertTrue(reset.emptyLibraryNoticeShown)
+    }
+
+    @Test
+    fun `LIB-13 R19-11 the summary says 숨김 · 끔 when an R-18 project was created visible`() {
+        val defaults = RatingDefaults()
+        val visible = NewProjectFlow.create(
+            NewProjectDraft(name = "검은 서약", rating = Rating.R18, step4Hide = false), defaults, Fixtures.NOW, Fixtures.DEVICE, Fixtures.keys(7),
+        ).doc
+        assertTrue(StartBlock.ofProject(visible, RecorderLibrary(), defaults).summary.endsWith(" · 숨김 · 끔"))
+        val hidden = NewProjectFlow.create(
+            NewProjectDraft(name = "검은 서약", rating = Rating.R18), defaults, Fixtures.NOW, Fixtures.DEVICE, Fixtures.keys(8),
+        ).doc
+        assertFalse(StartBlock.ofProject(hidden, RecorderLibrary(), defaults).summary.contains("숨김"))
+        val all = NewProjectFlow.create(NewProjectDraft(name = "유리 정원"), defaults, Fixtures.NOW, Fixtures.DEVICE, Fixtures.keys(9)).doc
+        assertFalse(StartBlock.ofProject(all, RecorderLibrary(), defaults).summary.contains("숨김"))
+        // With the R-18 hide default off in 설정, a visible R-18 project turned nothing off.
+        assertFalse(StartBlock.ofProject(visible, RecorderLibrary(), defaults.copy(r18Hide = false)).summary.contains("숨김"))
+    }
+}

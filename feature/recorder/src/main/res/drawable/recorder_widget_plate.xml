@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget plate: radius 18, `raise` (board LrEntry draws `tint` over the launcher; a launcher has no glass). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#E616181C" />
+    <corners android:radius="18dp" />
+</shape>

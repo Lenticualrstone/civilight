@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.world.common
 
 import io.github.lenticualrstone.civilight.domain.world.term.CandidateIndex
+import io.github.lenticualrstone.civilight.domain.world.term.RescanScheduler
 import io.github.lenticualrstone.civilight.domain.world.term.TermAccess
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
@@ -8,11 +9,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
@@ -32,11 +33,17 @@ data class ScanInput(val doc: ProjectDoc, val access: TermAccess) {
 /**
  * The candidate index of each open project (WLD-26 `색인`), shared by every world screen of that
  * project: list and card in two panes read one index. It is derived and app-only. The first scan
- * after a project is acquired leaves the index pending (`점검 중`, candidate numbers dimmed);
- * later scans keep the previous index until the new one is ready. Usage and `▲` never wait for it.
+ * after a project is acquired leaves the index pending (`점검 중`, candidate numbers dimmed); later
+ * scans keep the previous index until the new one is ready. Usage and `▲` never wait for it.
  *
- * Batch 1 rescans the whole manuscript when its text changes; the per-block and per-term rescans of
- * WLD-26 (`RescanScheduler`) replace [Holder.run] later without changing callers.
+ * Each new document is diffed against the last one ([RescanPlans]) and handed to the domain's
+ * [RescanScheduler]: a typed block is rescanned alone about 0.5 s after typing stops, a changed term
+ * is swept at once with its own patterns, and a change of access or particles runs a full scan. All
+ * scans of one project run on one thread, so no scan result is lost.
+ *
+ * Stale `아님` records are never written from here (that would add undo steps and touch read-only
+ * projects): readers hide them with `StaleRejections.stale`, and the world area's own term writes
+ * release them in the same step (`StaleRejections.release`).
  */
 object TermIndexes {
     /** One project's index; [release] when the screen's view model is cleared. */
@@ -45,7 +52,7 @@ object TermIndexes {
 
         val index: StateFlow<CandidateIndex> get() = holder.index.asStateFlow()
 
-        /** The document or access changed; a scan runs unless the text is the same. */
+        /** The document or access changed; scans run for what changed. */
         fun submit(doc: ProjectDoc, access: TermAccess) {
             holder.input.value = ScanInput(doc, access)
         }
@@ -56,33 +63,68 @@ object TermIndexes {
         }
     }
 
-    internal class Holder(scope: CoroutineScope, dispatcher: CoroutineDispatcher) {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    internal class Holder(scope: CoroutineScope, dispatcher: CoroutineDispatcher, debounceMs: Long) {
         val index = MutableStateFlow(CandidateIndex.pending())
         val input = MutableStateFlow<ScanInput?>(null)
         var users = 0
-        val job: Job = scope.launch(dispatcher) {
-            input.filterNotNull()
-                .distinctUntilChanged { a, b -> a.sameText(b) }
-                .conflate()
-                .collect { index.value = run(it) }
+
+        @Volatile
+        private var latest: ScanInput? = null
+        private val worker = dispatcher.limitedParallelism(1)
+        private val work = SupervisorJob(scope.coroutineContext[Job])
+        private val workScope = CoroutineScope(scope.coroutineContext + worker + work)
+        private val scheduler = RescanScheduler(
+            scope = workScope,
+            current = { latest!!.doc },
+            access = { latest!!.access },
+            debounceMs = debounceMs,
+            onScanned = { next, _ -> index.value = next },
+        )
+
+        val job: Job = workScope.launch {
+            var previous: ScanInput? = null
+            input.filterNotNull().collect { next ->
+                latest = next
+                when (val plan = RescanPlans.of(previous, next)) {
+                    RescanPlan.Full -> {
+                        scheduler.fullScan()
+                        // Pending only before the first scan; later full scans keep showing the old numbers.
+                        if (previous == null) index.value = scheduler.index
+                    }
+                    is RescanPlan.Incremental -> {
+                        plan.terms.forEach(scheduler::termChanged)
+                        plan.spots.forEach(scheduler::textChanged)
+                    }
+                    RescanPlan.None -> Unit
+                }
+                previous = next
+            }
         }
 
-        private fun run(input: ScanInput): CandidateIndex = CandidateIndex.build(input.doc, input.access)
+        fun cancel() {
+            work.cancel()
+        }
     }
 
     private val holders = HashMap<Key, Holder>()
 
     /** The index of [projectKey]; scans run on [dispatcher] in [scope] (the app scope). */
-    fun acquire(projectKey: Key, scope: CoroutineScope, dispatcher: CoroutineDispatcher = Dispatchers.Default): Handle {
+    fun acquire(
+        projectKey: Key,
+        scope: CoroutineScope,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+        debounceMs: Long = RescanScheduler.DEBOUNCE_MS,
+    ): Handle {
         val holder = synchronized(holders) {
-            holders.getOrPut(projectKey) { Holder(scope, dispatcher) }.also { it.users++ }
+            holders.getOrPut(projectKey) { Holder(scope, dispatcher, debounceMs) }.also { it.users++ }
         }
         return Handle(holder) {
             synchronized(holders) {
                 holder.users--
                 if (holder.users <= 0 && holders[projectKey] === holder) {
                     holders.remove(projectKey)
-                    holder.job.cancel()
+                    holder.cancel()
                 }
             }
         }

@@ -27,9 +27,16 @@ data class MapReveal(override val projectKey: Key, val mapKey: Key) : MapRoute, 
 @Serializable
 data class NodeMap(override val projectKey: Key, val mapKey: Key) : MapRoute, ProjectRoute
 
-/** 양식 고르기 (WLD-54, WLD-57). */
+/**
+ * 양식 고르기 (WLD-54, WLD-57). [parentMapKey] / [parentPinKey]: the map and pin of a pin's `새 지도`
+ * sheet, so a generated map keeps its `상위` line (WLD-48); null = a top-level map.
+ */
 @Serializable
-data class MapFormatPicker(override val projectKey: Key) : MapRoute, ProjectRoute
+data class MapFormatPicker(
+    override val projectKey: Key,
+    val parentMapKey: Key? = null,
+    val parentPinKey: Key? = null,
+) : MapRoute, ProjectRoute
 
 /** 단계별 만들기 (WLD-54 … WLD-56) for the chosen format id. */
 @Serializable
@@ -60,4 +67,22 @@ data class CharacterTrack(override val projectKey: Key, val characterKey: Key? =
  * `NavResults` under [requestKey]; [sceneKey] is the scene being placed, if any.
  */
 @Serializable
-data class PickOnMap(override val projectKey: Key, val requestKey: String, val sceneKey: Key? = null) : MapRoute, ProjectRoute
+data class PickOnMap(
+    override val projectKey: Key,
+    val requestKey: String,
+    val sceneKey: Key? = null,
+    /** Scenes placed at once (bulk `장소 정하기`, `씬 4개 → …`); 1 for a single scene or none. */
+    val sceneCount: Int = 1,
+) : MapRoute, ProjectRoute
+
+/**
+ * `펴기` (WLD-39): straightens a sketch photo stored as blob [photoHash] into a new map, under
+ * [parentMapKey] / [parentPinKey] when made from a pin's `새 지도`.
+ */
+@Serializable
+data class SketchStraighten(
+    override val projectKey: Key,
+    val photoHash: String,
+    val parentMapKey: Key? = null,
+    val parentPinKey: Key? = null,
+) : MapRoute, ProjectRoute

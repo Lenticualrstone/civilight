@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.cast
 
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldDefinitions
 import io.github.lenticualrstone.civilight.feature.cast.CastFx.atLens
+import io.github.lenticualrstone.civilight.feature.cast.common.toAction
 import io.github.lenticualrstone.civilight.feature.cast.profile.FixedField
 import io.github.lenticualrstone.civilight.feature.cast.profile.ProfileModel
 import io.github.lenticualrstone.civilight.feature.cast.profile.ProfileUi
@@ -87,7 +88,11 @@ class ProfileModelTest {
 
         val shown = build(d, ui = ProfileUi(showEmpty = true))!!
         assertTrue(shown.overview.items.map { it.label }.containsAll(listOf("코드네임", "출신지", "특기")))
-        assertEquals(listOf(FixedField.NAME, FixedField.DISPLAY_NAME, FixedField.ONE_LINER, FixedField.TAGS), shown.fixedRows.map { it.field })
+        assertEquals(
+            listOf(FixedField.NAME, FixedField.DISPLAY_NAME, FixedField.ONE_LINER, FixedField.PORTRAIT, FixedField.BACKGROUND, FixedField.TAGS),
+            shown.fixedRows.map { it.field },
+        )
+        assertEquals("이미지 고르기", shown.fixedRows.single { it.field == FixedField.PORTRAIT }.value)
         assertEquals("리엔", shown.fixedRows.first().value)
         assertEquals("", shown.fixedRows.single { it.field == FixedField.DISPLAY_NAME }.value)
     }
@@ -144,5 +149,19 @@ class ProfileModelTest {
         assertNull(build(hidden, key = K.OWEN))
         assertNotNull(build(hidden, key = K.OWEN, unlocked = true))
         assertFalse(build(hidden, key = K.OWEN, unlocked = true)!!.readOnly)
+    }
+
+    @Test
+    fun `CST-41 오웬's dotted 노아 row knows its relation, and 이대로 두기 hides only its buttons`() {
+        val owen = build(key = K.OWEN)!!
+        assertEquals(listOf(K.NOAH), owen.relations.deletedRows.map { it.partnerKey })
+        assertEquals(mapOf(K.NOAH to K.REL_OWEN_NOAH), owen.deletedPartnerRelations)
+        assertTrue(owen.keptPartners.isEmpty())
+        val kept = io.github.lenticualrstone.civilight.feature.cast.trash.ItemTrash.keep(
+            doc, K.NOAH, K.REL_OWEN_NOAH, CastFx.ctx().toAction(),
+        )
+        val after = build(kept, key = K.OWEN)!!
+        assertEquals(setOf(K.NOAH), after.keptPartners)
+        assertEquals(listOf(K.NOAH), after.relations.deletedRows.map { it.partnerKey })
     }
 }

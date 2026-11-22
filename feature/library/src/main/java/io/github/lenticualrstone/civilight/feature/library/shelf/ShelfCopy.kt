@@ -16,6 +16,16 @@ object ShelfCopy {
     const val CLOSE = "닫기"
     const val CANCEL = "취소"
 
+    // Card view (LIB-04, LIB-05; boards `LibCards`, `LibCardsWide`)
+    const val HOLO = "홀로"
+    const val RECENTS = "최근 연 파일"
+
+    /**
+     * `ED` (no board draws the way into 설정): a 설정 icon button in the 서재 header. Its label is
+     * the screen's own title (LIB-63).
+     */
+    const val SETTINGS = "설정"
+
     /** `이름 바꾸기` sheet: field label reused from LIB-09 (spec: rename copy not in sources). */
     const val RENAME_TITLE = "이름 바꾸기"
     const val NAME_LABEL = "이름"

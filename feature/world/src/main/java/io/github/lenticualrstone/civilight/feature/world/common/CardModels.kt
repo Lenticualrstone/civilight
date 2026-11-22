@@ -36,8 +36,11 @@ sealed interface CardAccess {
 /** Eyebrow, name and description of a card (`용어` · `오리지늄 등불` · 설명). */
 data class CardHeadUi(val eyebrow: String, val name: String, val description: List<ParagraphUi>)
 
-/** A fixed or derived field row (`첫 공개 | 1-7 씬 3 · #044`); [onEdit] rows open their editor. */
-data class FixedRowUi(val label: String, val value: String, val editable: Boolean)
+/**
+ * A fixed or derived field row (`첫 공개 | 1-7 씬 3 · #044`); editable rows open their editor. [note]
+ * is the small line after the value (`별칭 | 오리지늄 · 빛돌 | 후보 2 새로 찾음`, board `RTLinkAll`).
+ */
+data class FixedRowUi(val label: String, val value: String, val editable: Boolean, val note: String? = null)
 
 /** Item references as cards print them: live names, `숨긴 항목`, `지운 용어 · …`, joined with ` · `. */
 object ItemRefsText {

@@ -30,15 +30,15 @@ import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
 import io.github.lenticualrstone.civilight.feature.canvas.common.canvasEditContext
 import io.github.lenticualrstone.civilight.feature.canvas.edit.CanvasEdits
 import io.github.lenticualrstone.civilight.feature.canvas.edit.LineResult
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphGeometry
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphHit
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphScene
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphSelection
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphSurface
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphSurfaceListener
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphViewport
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Pt
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Sz
+import io.github.lenticualrstone.civilight.ui.graph.GraphGeometry
+import io.github.lenticualrstone.civilight.ui.graph.GraphHit
+import io.github.lenticualrstone.civilight.ui.graph.GraphScene
+import io.github.lenticualrstone.civilight.ui.graph.GraphSelection
+import io.github.lenticualrstone.civilight.ui.graph.GraphSurface
+import io.github.lenticualrstone.civilight.ui.graph.GraphSurfaceListener
+import io.github.lenticualrstone.civilight.ui.graph.GraphViewport
+import io.github.lenticualrstone.civilight.ui.graph.Pt
+import io.github.lenticualrstone.civilight.ui.graph.Sz
 import io.github.lenticualrstone.civilight.feature.canvas.label.LineLabelPopoverBody
 import io.github.lenticualrstone.civilight.feature.canvas.label.LineStartSheet
 import io.github.lenticualrstone.civilight.feature.canvas.label.rememberLineLabelState
@@ -57,6 +57,7 @@ import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 import io.github.lenticualrstone.civilight.ui.lens.LensRules
 import io.github.lenticualrstone.civilight.ui.lens.lensChipLabel
+import io.github.lenticualrstone.civilight.ui.picker.HiddenGate
 import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.project.EditResult
 import io.github.lenticualrstone.civilight.ui.project.ProjectLoad
@@ -85,7 +86,7 @@ fun CanvasBoardScreen(route: CanvasBoard, deps: FeatureDeps) {
         CivilightScreen(title = "", smallLine = CanvasCopy.SMALL_LINE, back = back) { }
         return
     }
-    val canvas = CanvasEdits.resolve(ready.doc, route.canvasKey)
+    val canvas = CanvasEdits.resolveForRoute(ready.doc, route.canvasKey)
     if (canvas == null) {
         NoCanvas(ready.readOnly, back, vm)
         return
@@ -132,6 +133,7 @@ private fun CanvasBoard(
 
     // A dropped node keeps its on-screen position until the document has it (no flicker back).
     LaunchedEffect(canvas) { dropSettled(canvas, moved) }
+    LaunchedEffect(canvas.key) { vm.markOpened(canvas.key) }
 
     val readOnlyToast = { deps.toasts.show(CanvasCopy.READ_ONLY, actionLabel = null) }
     val openNode = { key: Key -> if (cover) sheets.open(NodeEditSheet(projectKey, canvas.key, key)) else popover = true }
@@ -163,6 +165,9 @@ private fun CanvasBoard(
                                 onText = { vm.setText(key.canvasKey, key.nodeKey, it) },
                                 onOpen = { close(); view.openRoute?.let(deps.navigator::push) },
                                 onRemove = { removeNode(vm, key.canvasKey, view, readOnlyToast); close(); clearSelection() },
+                                onRestore = { restoreItem(vm, deps, view, gate, readOnlyToast) { close() } },
+                                onKeep = { keepItem(vm, view, readOnlyToast); close() },
+                                onUnlock = gate.unlock,
                             )
                         }
                     }
@@ -284,7 +289,7 @@ private fun CanvasBoard(
             }
 
             if (!cover && popover && sheets.top == null) {
-                InnerPopover(projectKey, canvas, doc, readOnly, gate.open, scene, sizes, vp, ui.selection, deps, vm, sheets, readOnlyToast, clearSelection)
+                InnerPopover(projectKey, canvas, doc, readOnly, gate, scene, sizes, vp, ui.selection, deps, vm, sheets, readOnlyToast, clearSelection)
             }
         }
     }
@@ -297,7 +302,7 @@ private fun InnerPopover(
     canvas: Canvas,
     doc: ProjectDoc,
     readOnly: Boolean,
-    hiddenOpen: Boolean,
+    gate: HiddenGate,
     scene: GraphScene,
     sizes: Map<String, Sz>,
     viewport: GraphViewport,
@@ -327,7 +332,7 @@ private fun InnerPopover(
     }
     val nodeKey = selection.nodeKey ?: return
     val node = scene.nodesByKey[nodeKey] ?: return
-    val view: NodeEditView = remember(doc, nodeKey, hiddenOpen, readOnly) { NodeEditModel.build(doc, canvas.key, nodeKey, hiddenOpen, readOnly) } ?: return
+    val view: NodeEditView = remember(doc, nodeKey, gate.open, readOnly) { NodeEditModel.build(doc, canvas.key, nodeKey, gate.open, readOnly) } ?: return
     val rect = GraphGeometry.rectOf(node, sizes)
     val anchor = viewport.toScreen(Pt(rect.center.x, rect.bottom)) + Pt(0f, 8f)
     CanvasPopover(anchor, onDismiss = close) {
@@ -339,8 +344,30 @@ private fun InnerPopover(
             onText = { vm.setText(canvas.key, nodeKey, it) },
             onOpen = { close(); view.openRoute?.let(deps.navigator::push) },
             onRemove = { removeNode(vm, canvas.key, view, readOnlyToast); close() },
+            onRestore = { restoreItem(vm, deps, view, gate, readOnlyToast, close) },
+            onKeep = { keepItem(vm, view, readOnlyToast); close() },
+            onUnlock = gate.unlock,
         )
     }
+}
+
+/** `되살리기` of the item behind a deleted node: a hidden item asks for `지문으로 보기` first; the toast can undo it. */
+private fun restoreItem(vm: CanvasBoardViewModel, deps: FeatureDeps, view: NodeEditView, gate: HiddenGate, readOnlyToast: () -> Unit, done: () -> Unit) {
+    val item = view.item ?: return
+    vm.restoreItem(item, gate.open) { r, result ->
+        if (r == EditResult.READ_ONLY) readOnlyToast()
+        if (result.needsAuth) {
+            gate.unlock()
+        } else {
+            done()
+            result.toast?.let { t -> deps.toasts.show(t.message, actionLabel = t.action) { vm.undoLast() } }
+        }
+    }
+}
+
+private fun keepItem(vm: CanvasBoardViewModel, view: NodeEditView, readOnlyToast: () -> Unit) {
+    val item = view.item ?: return
+    vm.keepItem(item) { r -> if (r == EditResult.READ_ONLY) readOnlyToast() }
 }
 
 private fun removeNode(vm: CanvasBoardViewModel, canvasKey: Key, view: NodeEditView, readOnlyToast: () -> Unit) {

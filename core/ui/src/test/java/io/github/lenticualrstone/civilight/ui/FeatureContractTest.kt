@@ -37,6 +37,10 @@ import kotlinx.coroutines.flow.StateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import io.github.lenticualrstone.civilight.navigation.Recording
+import io.github.lenticualrstone.civilight.navigation.RichLinkPickerSheet
+import io.github.lenticualrstone.civilight.navigation.Route
+import io.github.lenticualrstone.civilight.ui.feature.StartupHooks
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -106,5 +110,24 @@ class FeatureContractTest {
 
     private companion object {
         const val PLACEHOLDER = "placeholder"
+    }
+
+    @Test
+    fun `start-up hooks run once per process, failures are skipped and routes come back in order`() {
+        val hooks = StartupHooks()
+        val deps = FakeDeps()
+        var runs = 0
+        hooks.register("recorder.resume") { runs++; Recording(surface = "recovery") }
+        hooks.register("broken") { error("boom") }
+        hooks.register("quiet") { null }
+        val failed = ArrayList<String>()
+        val routes = kotlinx.coroutines.runBlocking { hooks.runPending(deps) { id, _ -> failed += id } }
+        assertEquals(listOf<Route>(Recording(surface = "recovery")), routes)
+        assertEquals(listOf("broken"), failed)
+        // A recreated activity registers again: nothing runs twice.
+        hooks.register("recorder.resume") { runs++; null }
+        assertEquals(emptyList<Route>(), kotlinx.coroutines.runBlocking { hooks.runPending(deps) })
+        assertEquals(1, runs)
+        assertTrue(deps.sheets.isRegistered(RichLinkPickerSheet::class))
     }
 }

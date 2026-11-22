@@ -191,6 +191,20 @@ object VoiceIds {
         }
     }
 
+    /**
+     * Format `직접` (SCR-23): the ID the author typed for a dialogue block in the `속성` tab. A blank
+     * [id] clears it. A fixed ID is never touched (the field is read-only then).
+     */
+    fun setManualId(doc: ProjectDoc, blockKey: Key, id: String?, ctx: EditContext): ProjectDoc {
+        val block = doc.index.block(blockKey)?.takeIf { it.kind.known == BlockKind.DIALOGUE } ?: return doc
+        if (isFixed(block.voice)) return doc
+        val typed = id?.trim()?.takeIf { it.isNotEmpty() }
+        if (block.voice?.manualId == typed) return doc
+        val base = block.voice ?: VoiceState()
+        val voice = base.copy(manualId = typed).takeIf { it != VoiceState() }
+        return doc.replaceBlock(block.copy(voice = voice, updatedAt = ctx.now, updatedBy = ctx.device))
+    }
+
     /** Fixed IDs of live blocks and options (`고정 ID {n}개는 그대로`). */
     fun fixedCount(doc: ProjectDoc): Int = doc.manuscript.liveBlocks.sumOf { b ->
         (if (isFixed(b.voice)) 1 else 0) + b.options.count { isFixed(it.voice) }

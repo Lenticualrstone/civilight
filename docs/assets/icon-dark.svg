@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
+  <rect width="108" height="108" rx="24" fill="#0B0C0E"/>
+  <g transform="translate(21 21) scale(0.6875)">
+    <path fill="#ECECEF" d="M15,22 h66 a3,3 0 0 1 0,6 h-66 a3,3 0 0 1 0,-6 z"/>
+    <path fill="#ECECEF" d="M15,44 h54 a3,3 0 0 1 0,6 h-54 a3,3 0 0 1 0,-6 z"/>
+    <path fill="#ECECEF" d="M15,66 h34 a3,3 0 0 1 0,6 h-34 a3,3 0 0 1 0,-6 z"/>
+    <path fill="#8FB8E6" d="M60,62 a2,2 0 0 1 2,2 v12 a2,2 0 0 1 -4,0 v-12 a2,2 0 0 1 2,-2 z"/>
+  </g>
+</svg>

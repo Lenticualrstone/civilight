@@ -26,16 +26,19 @@ import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
+import io.github.lenticualrstone.civilight.domain.world.term.BulkMode
 import io.github.lenticualrstone.civilight.domain.world.term.RevealTarget
 import io.github.lenticualrstone.civilight.domain.world.term.TermCandidate
 import io.github.lenticualrstone.civilight.domain.world.term.TermChip
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
 import io.github.lenticualrstone.civilight.feature.world.common.CardAccess
-import io.github.lenticualrstone.civilight.feature.world.common.CardArt
+import io.github.lenticualrstone.civilight.feature.world.common.CardImageSlot
+import io.github.lenticualrstone.civilight.feature.world.common.CardImages
+import io.github.lenticualrstone.civilight.feature.world.common.MergePickSheet
+import io.github.lenticualrstone.civilight.feature.world.common.WorldGoneCard
 import io.github.lenticualrstone.civilight.feature.world.common.CardHead
 import io.github.lenticualrstone.civilight.feature.world.common.FieldSection
 import io.github.lenticualrstone.civilight.feature.world.common.FixedRow
-import io.github.lenticualrstone.civilight.feature.world.common.GoneCard
 import io.github.lenticualrstone.civilight.feature.world.common.ItemMenuSheet
 import io.github.lenticualrstone.civilight.feature.world.common.LensBanner
 import io.github.lenticualrstone.civilight.feature.world.common.lensBannerSlot
@@ -51,6 +54,8 @@ import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.recorder.EntrySurface
 import io.github.lenticualrstone.civilight.model.recorder.RecorderTargetKind
 import io.github.lenticualrstone.civilight.navigation.AddFieldSheet
+import io.github.lenticualrstone.civilight.navigation.CheckCenter
+import io.github.lenticualrstone.civilight.domain.story.checks.CheckFilter
 import io.github.lenticualrstone.civilight.navigation.FieldValueEditSheet
 import io.github.lenticualrstone.civilight.navigation.LensSheet
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
@@ -115,7 +120,7 @@ fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
         },
         sheets = sheets,
         localSheets = { key ->
-            termSheet(key, doc, readOnly, gate, ::choose, vm::toggleRelated) ?: itemSheet(key, doc, vm, readOnly, gate)
+            revealSheet(key) ?: bulkSheet(key) ?: termSheet(key, doc, readOnly, gate, vm) ?: itemSheet(key, doc, vm, readOnly, gate)
         },
     ) { padding ->
         CenterColumn {
@@ -123,7 +128,7 @@ fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
                 if (card == null) return@LazyColumn
                 when (val access = card.access) {
                     is CardAccess.Locked -> item(key = "locked") { LockedCard(access.text, gate.unlock) }
-                    is CardAccess.Gone -> item(key = "gone") { GoneCard(access.text, access.dotted) }
+                    is CardAccess.Gone -> item(key = "gone") { WorldGoneCard(access, doc, vm, WorldKind.TERM, route.termKey, readOnly, gate) }
                     CardAccess.Open -> termBody(
                         card = card,
                         readOnly = readOnly,
@@ -151,6 +156,22 @@ fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
                                 if (vm.rejectCandidate(candidate)) deps.toasts.show(WorldCopy.TODO_COPY_WORLD_REJECTED_TOAST) { vm.undoLast() }
                             }
                         },
+                        onWarning = { deps.navigator.push(CheckCenter(route.projectKey, CheckFilter.TERM.name)) },
+                        onIntended = { linkKey ->
+                            scope.launch {
+                                if (vm.markIntended(linkKey)) deps.toasts.show(WorldCopy.TODO_COPY_WORLD_INTENDED_TOAST) { vm.undoLast() }
+                            }
+                        },
+                        onBulk = { mode -> sheets.open(BulkCandidatesSheet(route.termKey, mode)) },
+                        onAliases = { sheets.open(AliasSheet(route.termKey)) },
+                        art = { name ->
+                            doc?.let { d ->
+                                CardImageSlot(d, WorldKind.TERM, route.termKey, name, WorldCopy.IMAGE_LABEL, readOnly) {
+                                    sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.TERM, route.termKey))
+                                }
+                            }
+                        },
+                        onMerge = { sheets.open(MergePickSheet(WorldKind.TERM.name, route.termKey)) },
                     )
                 }
             }
@@ -172,14 +193,30 @@ private fun androidx.compose.foundation.lazy.LazyListScope.termBody(
     onOpen: (UsageRowUi) -> Unit,
     onLink: (TermCandidate) -> Unit,
     onReject: (TermCandidate) -> Unit,
+    onWarning: () -> Unit,
+    onIntended: (io.github.lenticualrstone.civilight.model.Key) -> Unit,
+    onBulk: (BulkMode) -> Unit,
+    onAliases: () -> Unit,
+    art: @Composable (String) -> Unit,
+    onMerge: () -> Unit,
 ) {
     val head = card.head ?: return
-    item(key = "art") { CardArt(head.name, WorldCopy.IMAGE_LABEL) }
-    item(key = "head") { CardHead(head) }
+    item(key = "art") { art(head.name) }
+    item(key = "head") {
+        androidx.compose.foundation.layout.Column {
+            CardHead(head)
+            card.sameName?.let { text ->
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CivilightText(text, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
+                    if (!readOnly) TextAction(WorldCopy.MENU_MERGE, onMerge, color = CivilightTheme.colors.acc, style = CivilightTheme.type.small)
+                }
+            }
+        }
+    }
     item(key = "fixed") {
         androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
             card.reveal?.let { FixedRow(it, onReveal) }
-            card.aliases?.let { FixedRow(it) {} }
+            card.aliases?.let { FixedRow(it, onAliases) }
             card.related?.let { FixedRow(it, onRelated) }
             FieldSection(
                 section = card.fields,
@@ -198,7 +235,17 @@ private fun androidx.compose.foundation.lazy.LazyListScope.termBody(
     card.groups.forEach { group ->
         // With one group the header already reads `쓰인 곳 · N`.
         if (card.groups.size > 1) {
-            item(key = "group:${group.id}") { SectionLabel(group.title, Modifier.padding(top = 14.dp, bottom = 2.dp)) }
+            item(key = "group:${group.id}") {
+                Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SectionLabel(group.title, Modifier.weight(1f))
+                    // WLD-23: `모두 잇기 · 모두 아님` over the 후보 group; each word opens the sheet in its mode.
+                    if (group.id == "candidates" && card.bulkActions.size == 2 && !readOnly) {
+                        TextAction(card.bulkActions[0], { onBulk(BulkMode.LINK_ALL) }, color = CivilightTheme.colors.acc, style = CivilightTheme.type.small)
+                        CivilightText(WorldCopy.SEP, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
+                        TextAction(card.bulkActions[1], { onBulk(BulkMode.REJECT_ALL) }, color = CivilightTheme.colors.acc, style = CivilightTheme.type.small)
+                    }
+                }
+            }
         }
         items(group.rows, key = { it.id }) { row ->
             UsageRowView(
@@ -207,6 +254,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.termBody(
                 readOnly = readOnly,
                 onLink = { row.candidate?.let(onLink) },
                 onReject = { row.candidate?.let(onReject) },
+                onWarning = onWarning,
+                onIntended = { row.linkKey?.let(onIntended) },
             )
         }
     }

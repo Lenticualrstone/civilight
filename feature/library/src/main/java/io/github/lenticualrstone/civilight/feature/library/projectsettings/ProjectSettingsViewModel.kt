@@ -23,6 +23,12 @@ internal class ProjectSettingsViewModel(projectKey: Key, private val services: L
     /** One switch (LIB-25): hiding off asks first; the rating never changes. */
     fun switch(protection: Protection, on: Boolean) {
         val before = doc.value?.project?.protections ?: return
-        viewModelScope.launch { services.protection.switch(projectKey, before, protection, on) }
+        viewModelScope.launch { services.report(services.protection.switch(projectKey, before, protection, on)) }
+    }
+
+    /** `무대 위치` · `보이스 ID` (SCR-24, SCR-25): one undo step named after the row. */
+    fun scriptSwitch(switch: ScriptSwitch, on: Boolean) {
+        val label = if (switch == ScriptSwitch.STAGE_POSITION) ProjectSettingsCopy.STAGE else ProjectSettingsCopy.VOICE_ID
+        edit(label) { ScriptSettingsEdit.set(it, switch, on) }
     }
 }

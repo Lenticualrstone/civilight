@@ -57,4 +57,12 @@ class FieldDiffTest {
         assertEquals(3, FieldDiff.rawOffset(4))
         assertEquals(4, FieldDiff.fieldOffset(3))
     }
+
+    @Test
+    fun `SCR-07 parentheses are plain text in kinds without 괄호 지문`() {
+        val s = FieldDiff.SENTINEL
+        assertEquals(FieldChange.OpenParen(2), FieldDiff.classify("가나", "${s}가나(", 4, parenMode = false))
+        assertEquals(FieldChange.Text(2, 2, "("), FieldDiff.classify("가나", "${s}가나(", 4, parenMode = false, parens = false))
+        assertEquals(FieldChange.Text(2, 2, ")"), FieldDiff.classify("가나", "${s}가나)", 4, parenMode = true, parens = false))
+    }
 }

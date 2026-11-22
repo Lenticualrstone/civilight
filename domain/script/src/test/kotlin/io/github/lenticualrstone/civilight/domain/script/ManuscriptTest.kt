@@ -97,6 +97,20 @@ class ManuscriptTest {
     }
 
     @Test
+    fun `rule 19 address hints never name a locked hidden character`() {
+        val raw = ExampleProject.build()
+        fun hide(key: String) = raw.copy(cast = raw.cast.copy(characters = raw.cast.characters.map { if (it.key == key) it.copy(hidden = true) else it }))
+        val rienHidden = hide(K.RIEN)
+        assertTrue(Manuscript.addressHints(rienHidden, rienHidden.block(K.BLOCK_043), unlocked = false).isEmpty())
+        assertEquals(listOf("리엔을 ‘꼬마’"), Manuscript.addressHints(rienHidden, rienHidden.block(K.BLOCK_043), unlocked = true))
+        val hartHidden = hide(K.HART)
+        assertTrue(Manuscript.addressHints(hartHidden, hartHidden.block(K.BLOCK_043), unlocked = false).isEmpty())
+        val rows = Manuscript.rows(rienHidden, K.EPISODE_1_7, StoryTimes.source(rienHidden), ScriptLayers(addressHint = true), unlocked = false)
+        val hart = rows.filterIsInstance<Manuscript.Row.BlockRow>().single { it.block.key == K.BLOCK_043 }
+        assertTrue(hart.addressHints.isEmpty())
+    }
+
+    @Test
     fun `point lines, orphan card and selection bar`() {
         val deleted = BlockTrash.delete(doc, listOf(b(43)), ctx).doc
         val card = Panels.orphanCard(deleted, deleted.record(F1.R1))!!

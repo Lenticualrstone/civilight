@@ -22,11 +22,14 @@ import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.RecorderEnv
+import io.github.lenticualrstone.civilight.domain.recorder.picker.LinkCandidate
 import io.github.lenticualrstone.civilight.domain.recorder.capture.Recording
 import io.github.lenticualrstone.civilight.domain.recorder.text.Runs
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureHub
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureProtection
 import io.github.lenticualrstone.civilight.feature.recorder.capture.PickerTarget
+import io.github.lenticualrstone.civilight.model.recorder.RecorderLink
 import io.github.lenticualrstone.civilight.ui.picker.PickerCopy
 import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
 
@@ -40,7 +43,6 @@ import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
 fun ColumnScope.LinkPickerContent(hub: CaptureHub, onClose: () -> Unit) {
     val state by hub.state.collectAsState()
     val request = state.picker
-    var field by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
     val links = when (request?.target) {
         PickerTarget.MEMO -> state.memo?.draft?.pendingLinks
         PickerTarget.SESSION -> state.session?.pendingLinks
@@ -51,11 +53,28 @@ fun ColumnScope.LinkPickerContent(hub: CaptureHub, onClose: () -> Unit) {
         PickerTarget.SESSION -> state.session?.let { Recording.transcript(it).text }
         null -> null
     }
-    val sections = remember(field.text, state.env, links, recordText) {
-        LinkPickerRows.sections(state.env, field.text, links, recordText)
+    LinkPickerBody(env = state.env, links = links, recordText = recordText, onPick = hub::pick, onClose = onClose)
+}
+
+/**
+ * The picker's content for any link list: a capture's pending links or a saved record's links
+ * ([links] are drawn checked; [recordText] feeds `글에 나온 이름`). The window takes the protection of
+ * every project the list shows (LIB-26).
+ */
+@Composable
+fun ColumnScope.LinkPickerBody(
+    env: RecorderEnv,
+    links: List<RecorderLink>,
+    recordText: String?,
+    onPick: (LinkCandidate) -> Unit,
+    onClose: () -> Unit,
+) {
+    var field by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
+    val sections = remember(field.text, env, links, recordText) {
+        LinkPickerRows.sections(env, field.text, links, recordText)
     }
     val shownProjects = remember(sections) { sections.flatMap { it.rows }.map { it.candidate.target.projectKey }.toSet() }
-    ProtectWindow(CaptureProtection.of(state.env, shownProjects))
+    ProtectWindow(CaptureProtection.of(env, shownProjects))
     SheetHeader(title = RecorderCopy.TODO_PICKER_TITLE, onClose = onClose)
     SearchField(
         value = field,
@@ -73,7 +92,7 @@ fun ColumnScope.LinkPickerContent(hub: CaptureHub, onClose: () -> Unit) {
                     title = row.title,
                     subtitle = row.sub.takeIf { it.isNotEmpty() },
                     compact = true,
-                    onClick = if (row.linked) null else ({ hub.pick(row.candidate) }),
+                    onClick = if (row.linked) null else ({ onPick(row.candidate) }),
                     trailing = if (row.linked) ({ CivilightIcon(IconId.Check, contentDescription = null, size = 18.dp, tint = CivilightTheme.colors.acc) }) else null,
                 )
             }

@@ -130,7 +130,9 @@ class TimeLabels(val times: SceneTimes, val codes: UnitCodes = UnitCodes(times.d
             io.github.lenticualrstone.civilight.model.story.FlashbackRelation.AFTER -> "후"
             else -> "그날"
         }
-        val event = stored.eventKey?.let { doc.index.event(it)?.title }
+        // Only a `기준 사건` flashback names its event; a `직접` one keeps the key (switching back restores it) but not the words.
+        val event = stored.eventKey?.takeIf { stored.mode.known == io.github.lenticualrstone.civilight.model.story.FlashbackMode.ANCHOR }
+            ?.let { doc.index.event(it)?.title }
         val first = if (event != null) "연도 $year · $event $relation" else "연도 $year"
         val start = doc.project.worldTime.storyStartYear ?: return first to ""
         val diff = start - year

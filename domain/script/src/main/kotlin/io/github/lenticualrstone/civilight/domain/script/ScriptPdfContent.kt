@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.script
 
+import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.script.BlockKind
 import io.github.lenticualrstone.civilight.model.script.ScriptLayers
@@ -24,15 +25,29 @@ object ScriptPdfContent {
         time: SceneTimeSource,
         includeDirectionAndParens: Boolean,
         layers: ScriptLayers = ScriptLayers(),
+    ): List<Line> = linesOf(doc, scope.scenes(doc).map { it.key }, time, includeDirectionAndParens, layers)
+
+    /**
+     * The same lines for the scenes an export plan wrote (`ExportPlan.scenes`, in that order), so the
+     * PDF renderer prints exactly the planned range and hidden-scene choice (DECISIONS §1). Keys of
+     * scenes that are not live are skipped.
+     */
+    fun linesOf(
+        doc: ProjectDoc,
+        sceneKeys: List<Key>,
+        time: SceneTimeSource,
+        includeDirectionAndParens: Boolean,
+        layers: ScriptLayers = ScriptLayers(),
     ): List<Line> {
         val printLayers = ScriptLayers(
             direction = includeDirectionAndParens, paren = includeDirectionAndParens, memo = layers.memo,
             system = true, marks = false, addressHint = false, termCandidates = false,
         )
         val out = mutableListOf<Line>()
-        for (scene in scope.scenes(doc)) {
-            out += Line.Title(SceneText.headText(doc, scene.key, time.timeOf(scene.key)))
-            for (b in doc.manuscript.liveBlocksOf(scene.key)) {
+        for (sceneKey in sceneKeys) {
+            if (!doc.manuscript.isLiveUnit(sceneKey)) continue
+            out += Line.Title(SceneText.headText(doc, sceneKey, time.timeOf(sceneKey)))
+            for (b in doc.manuscript.liveBlocksOf(sceneKey)) {
                 if (!Manuscript.isShown(b.kind.known, printLayers)) continue
                 val label = when (b.kind.known) {
                     BlockKind.DIALOGUE -> b.speakerKey?.let { Labels.speakerName(doc, it) } ?: Manuscript.SpeakerLabel.Missing.TEXT

@@ -62,6 +62,12 @@ Package root `io.github.lenticualrstone.civilight.designsystem` (sub-packages `t
 - **DS-61 recorder glow**: `component/RecorderGlow.kt` (`RecorderGlowBand`, `glowBandScale`, `RecordingMark`). Test `DS-61 glow bands stay between 0_72 and 1_08`.
 - **DS-64 accessibility**: roles (Button / Tab / RadioButton / Checkbox / Switch), selected / toggle state through `pressable`, Korean labels on icon buttons, marker words via `contentDescription`, decorative layers `clearAndSetSemantics`, `Modifier.focusRing` (2 dp `acc`, 2 dp outside), progress semantics, toast live region.
 
+- **Core pass (2026-11-22, for the feature lanes; details in shell.md "Changes for the feature lanes")**:
+  - `BottomGlassBar` and `CivilightSheetLayout` sit above the keyboard via the public `KeyboardLift` insets (consumption-aware); `BottomGlassBar(aboveKeyboard = true)`.
+  - `IconId.Pencil · Shield · Download · Minus`.
+  - `NodeCard(deleted = …)` (dotted `ink3` outline + `◇`, rule 20 / CNV-11) with the pure `nodeCardLook`; `insetOutline(dotted = …)`.
+  - Test: `NodeCardLookTest` (4). `:core:designsystem:testDebugUnitTest` 56 passing.
+
 ## Partial
 
 - **DS-22 glass material**: `glass/GlassStyle.kt` (`GlassMode.resolve`, `glassStyle`, `SCRIM_ALPHA`) and `glass/GlassMaterial.kt` (`GlassSource`, `Modifier.glassSource`, `GlassBackground` with RenderEffect blur and saturation 1.4 on API 31+, DstIn edge masks, OPAQUE borders, `GlassBudget` for BLUR_COSTLY, `OnGlass` so glass never samples through glass). Test `T-DS-34 glass rendering by mode`. Missing: the blur path has never run, because no device or emulator was allowed. Rendering and GPU cost on API 31–33 are unverified.

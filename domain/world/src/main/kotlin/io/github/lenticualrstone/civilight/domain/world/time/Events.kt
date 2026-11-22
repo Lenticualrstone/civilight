@@ -47,17 +47,27 @@ class EventDetails(private val doc: ProjectDoc, times: SceneTimeSource) {
     private val ages = Ages(doc)
     private val codes = StoryCodes(doc)
 
-    fun detail(eventKey: Key): EventDetail? {
+    fun detail(eventKey: Key): EventDetail? = detail(eventKey, hiddenUnlocked = true)
+
+    /**
+     * [detail] for a reader whose hidden items are open or locked (WLD-13, rule 19): while locked,
+     * a hidden place or region reads `숨긴 항목`, hidden characters are left out of `그때 나이`, hidden
+     * related terms read `숨긴 항목`, and `이 사건에서 바뀐 것` rows about hidden items name them
+     * `숨긴 항목` with their values left out.
+     */
+    fun detail(eventKey: Key, hiddenUnlocked: Boolean): EventDetail? {
         val event = doc.index.event(eventKey) ?: return null
         val story = event.kind.known == EventKind.STORY
         val moment = moments.ofEvent(eventKey)
         val rows = ArrayList<Pair<String, String>>()
-        placeName(event.place)?.let { rows += "장소" to it }
+        val place = if (!hiddenUnlocked && EventMasks.placeHidden(doc, event.place)) EventMasks.HIDDEN_ITEM else placeName(event.place)
+        place?.let { rows += "장소" to it }
         val year = moment?.let(moments::yearOf)
         if (year != null) {
             val month = (moment as? Moment.WorldYear)?.month
             val day = (moment as? Moment.WorldYear)?.day
-            val everyone = doc.cast.characters.filter { it.deletedAt == null }.sortedWith(compareBy({ it.order }, { it.key }))
+            val everyone = doc.cast.characters.filter { it.deletedAt == null && (hiddenUnlocked || !it.hidden) }
+                .sortedWith(compareBy({ it.order }, { it.key }))
             val line = everyone.mapNotNull { c -> ages.ageAt(c, year, month, day)?.takeIf { it is Age.Years }?.let { "${c.name} ${it.label()}" } }
             if (line.isNotEmpty()) rows += "그때 나이" to line.joinToString(Copy.SEP)
         }
@@ -69,7 +79,9 @@ class EventDetails(private val doc: ProjectDoc, times: SceneTimeSource) {
                 .joinToString(Copy.SEP).ifEmpty { null }
         }
         manuscript?.let { rows += "원고" to it }
-        val terms = event.relatedTermKeys.mapNotNull { doc.index.term(it)?.takeIf { t -> t.deletedAt == null }?.name }
+        val terms = event.relatedTermKeys.mapNotNull { key ->
+            doc.index.term(key)?.takeIf { t -> t.deletedAt == null }?.let { t -> if (!hiddenUnlocked && t.hidden) EventMasks.HIDDEN_ITEM else t.name }
+        }
         if (terms.isNotEmpty()) rows += "관련 용어" to terms.joinToString(Copy.SEP)
         return EventDetail(
             eventKey = eventKey,
@@ -81,7 +93,7 @@ class EventDetails(private val doc: ProjectDoc, times: SceneTimeSource) {
             },
             description = event.description.docText,
             rows = rows,
-            changes = changes(eventKey),
+            changes = changes(eventKey).map { row -> if (hiddenUnlocked) row else EventMasks.maskChange(doc, row) },
         )
     }
 
@@ -112,6 +124,47 @@ class EventDetails(private val doc: ProjectDoc, times: SceneTimeSource) {
         PlaceRefKind.PLACE -> doc.index.place(ref.key)?.name
         PlaceRefKind.REGION -> doc.index.region(ref.key)?.second?.name
         null -> null
+    }
+}
+
+/** Masking of hidden items on the timeline and the event detail while locked (WLD-13, rule 19). */
+object EventMasks {
+    /** The label a hidden item takes while locked (rule 19 §6). */
+    const val HIDDEN_ITEM = "숨긴 항목"
+
+    /** The label of a hidden scene while locked. */
+    const val HIDDEN_SCENE = "숨긴 씬"
+
+    /** True when [event] is a story event on a scene that is hidden itself or under a hidden unit. */
+    fun sceneHidden(doc: ProjectDoc, event: TimelineEvent): Boolean {
+        val scene = event.sceneKey?.let { doc.index.unit(it) } ?: return false
+        return scene.hidden || doc.index.ancestors(scene).any { it.hidden }
+    }
+
+    /** True when [ref] is a hidden place, or a region linked to a hidden place or faction. */
+    fun placeHidden(doc: ProjectDoc, ref: PlaceRef?): Boolean = when (ref?.kind?.known) {
+        PlaceRefKind.PLACE -> doc.index.place(ref.key)?.hidden == true
+        PlaceRefKind.REGION -> doc.index.region(ref.key)?.second?.let { region ->
+            region.placeKey?.let { doc.index.place(it)?.hidden == true } == true ||
+                region.factionKey?.let { doc.index.faction(it)?.hidden == true } == true
+        } == true
+        null -> false
+    }
+
+    /** True when the item named by a `◆` target is hidden (character, place, term or faction). */
+    fun entityHidden(doc: ProjectDoc, kind: io.github.lenticualrstone.civilight.model.cast.EntityKind?, key: Key): Boolean = when (kind) {
+        io.github.lenticualrstone.civilight.model.cast.EntityKind.CHARACTER -> doc.index.character(key)?.hidden == true
+        io.github.lenticualrstone.civilight.model.cast.EntityKind.PLACE -> doc.index.place(key)?.hidden == true
+        io.github.lenticualrstone.civilight.model.cast.EntityKind.TERM -> doc.index.term(key)?.hidden == true
+        io.github.lenticualrstone.civilight.model.cast.EntityKind.FACTION -> doc.index.faction(key)?.hidden == true
+        null -> false
+    }
+
+    /** A `이 사건에서 바뀐 것` row about a hidden item: `숨긴 항목`, no field and no values. */
+    fun maskChange(doc: ProjectDoc, row: EventChangeRow): EventChangeRow {
+        val target = row.record.target as? ChangeTarget.Field ?: return row
+        if (!entityHidden(doc, target.entityKind.known, target.entityKey)) return row
+        return row.copy(label = HIDDEN_ITEM, value = "")
     }
 }
 

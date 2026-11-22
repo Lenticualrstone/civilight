@@ -59,6 +59,16 @@ class PlaceCardStateTest {
     }
 
     @Test
+    fun `WLD-63 and rule 19 a hidden character's name leaves 이곳의 시간 while locked`() {
+        val base = WorldTestFixture.stateB()
+        val hidden = base.copy(cast = base.cast.copy(characters = base.cast.characters.map { if (it.key == K.RIEN) it.copy(hidden = true) else it }))
+        fun subs(open: Boolean) = PlaceCardState.build(hidden, WorldTestFixture.PROJECT, K.PLACE_LOWER_STREET, hiddenOpen = open, readOnly = false)
+            .timeRows.filterIsInstance<PlaceTimeItemUi.Row>().map { it.sub }
+        assertTrue(subs(false).toString(), subs(false).none { it.contains("리엔") })
+        assertTrue(subs(true).toString(), subs(true).any { it.contains("리엔") })
+    }
+
+    @Test
     fun `WLD-06 and WLD-12 the 상태 field shows its value at the lens with ◆`() {
         val doc = WorldTestFixture.stateB()
         val place = doc.index.place(K.PLACE_LOWER_STREET)!!

@@ -153,7 +153,25 @@ fun ColumnScope.UnitPickerSheet(
     ItemPickerSheet(title, model, query, { query = it }, { onPick(it.key) }, onClose, selectedKey = selectedKey, onUnlockHidden = gate.unlock)
 }
 
-/** `@` 연결 (SCR-55): people, terms and places; [onPick] gets the kind, key and the text to insert. */
+/** 사건 고르기: live events in timeline order; [onPick] gets the event key. */
+@Composable
+fun ColumnScope.EventPickerSheet(
+    doc: ProjectDoc,
+    title: String,
+    onPick: (Key) -> Unit,
+    onClose: () -> Unit,
+    selectedKey: Key? = null,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val labels = remember(doc) { UnitLabels(doc) }
+    val model = remember(doc, query) { PickerModels.events(doc, query, labels) }
+    ItemPickerSheet(title, model, query, { query = it }, { onPick(it.key) }, onClose, selectedKey = selectedKey)
+}
+
+/**
+ * `@` 연결 (SCR-55): people, terms and places ([kinds] adds factions for document text); [onPick] gets
+ * the kind, key and the text to insert.
+ */
 @Composable
 fun ColumnScope.LinkPickerSheet(
     doc: ProjectDoc,
@@ -162,8 +180,9 @@ fun ColumnScope.LinkPickerSheet(
     onPick: (kind: PickKind, key: Key, text: String) -> Unit,
     onClose: () -> Unit,
     initialQuery: String = "",
+    kinds: Set<PickKind> = PickerModels.SCRIPT_LINK_KINDS,
 ) {
     var query by rememberSaveable { mutableStateOf(initialQuery) }
-    val model = remember(doc, query, gate.open) { PickerModels.links(doc, query, gate.open) }
+    val model = remember(doc, query, gate.open, kinds) { PickerModels.links(doc, query, gate.open, kinds) }
     ItemPickerSheet(title, model, query, { query = it }, { onPick(it.kind, it.key, it.insertText) }, onClose, onUnlockHidden = gate.unlock)
 }

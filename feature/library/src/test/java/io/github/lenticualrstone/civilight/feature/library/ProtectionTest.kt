@@ -32,11 +32,23 @@ import org.junit.Test
 class ProtectionTest {
     private val all = Protections(hidden = true, captureBlock = true, nameMask = true, recorderLinkMask = true)
 
-    private class FakePorts(projects: Map<Key, Project>, var authResult: Boolean = true, val readOnly: Set<Key> = emptySet()) : ProtectionPorts {
+    private class FakePorts(
+        projects: Map<Key, Project>,
+        var authResult: Boolean = true,
+        val readOnly: Set<Key> = emptySet(),
+        var secure: Boolean = true,
+    ) : ProtectionPorts {
         val projects = projects.toMutableMap()
         val labels = mutableListOf<String>()
         val forgotten = mutableListOf<Key>()
+        val keptOpen = mutableListOf<Key>()
         var prompts = 0
+
+        override fun deviceSecure(): Boolean = secure
+
+        override fun keepOpen(projectKey: Key) {
+            keptOpen += projectKey
+        }
 
         override suspend fun write(projectKey: Key, label: String, transform: (Project) -> Project): EditResult {
             if (projectKey in readOnly) return EditResult.READ_ONLY
@@ -215,5 +227,33 @@ class ProtectionTest {
         assertTrue(RatingSheetModel.lockedAway(all, hiddenGroupOpen = false))
         assertFalse(RatingSheetModel.lockedAway(all, hiddenGroupOpen = true))
         assertFalse(RatingSheetModel.lockedAway(Protections(), hiddenGroupOpen = false))
+    }
+
+    @Test
+    fun `R19 §2 a project that becomes hidden stays open until the next re-lock`() = runTest {
+        val p = ports()
+        assertEquals(ProtectionOutcome.APPLIED, ProtectionActions(p).hide(ashen.key))
+        assertEquals(listOf(ashen.key), p.keptOpen)
+        assertEquals(listOf(ashen.key), p.forgotten)
+        // Unhiding keeps nothing open.
+        ProtectionActions(p).unhideInOpenGroup(ashen.key)
+        assertEquals(listOf(ashen.key), p.keptOpen)
+    }
+
+    @Test
+    fun `Q19 without a device lock hiding is refused on every path and nothing changes`() = runTest {
+        val p = FakePorts(mapOf(ashen.key to ashen, oath.key to oath), secure = false)
+        val actions = ProtectionActions(p)
+        assertEquals(ProtectionOutcome.NO_DEVICE_LOCK, actions.hide(ashen.key))
+        assertEquals(ProtectionOutcome.NO_DEVICE_LOCK, actions.switch(ashen.key, ashen.protections, Protection.HIDDEN, true))
+        assertEquals(ProtectionOutcome.NO_DEVICE_LOCK, actions.changeRating(ashen.key, sheet(ashen, Rating.R18).apply()))
+        assertEquals(ProtectionOutcome.NO_DEVICE_LOCK, actions.applyDefaultsAll(listOf(Triple(ashen.key, ashen.protections, ashen.protections.copy(hidden = true)))))
+        assertEquals(ashen, p.projects.getValue(ashen.key))
+        assertTrue(p.labels.isEmpty())
+        assertTrue(p.keptOpen.isEmpty())
+        assertEquals(0, p.prompts)
+        // Other switches still work.
+        assertEquals(ProtectionOutcome.APPLIED, actions.switch(ashen.key, ashen.protections, Protection.CAPTURE_BLOCK, true))
+        assertFalse(RatingSheetModel.closesAfter(ProtectionOutcome.NO_DEVICE_LOCK))
     }
 }

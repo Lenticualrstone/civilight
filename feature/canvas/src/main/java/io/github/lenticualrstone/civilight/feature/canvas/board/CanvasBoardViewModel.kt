@@ -1,13 +1,18 @@
 package io.github.lenticualrstone.civilight.feature.canvas.board
 
 import io.github.lenticualrstone.civilight.domain.cast.EditContext
+import androidx.lifecycle.viewModelScope
+import io.github.lenticualrstone.civilight.domain.trash.ItemId
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
+import io.github.lenticualrstone.civilight.feature.canvas.common.RefFixes
+import io.github.lenticualrstone.civilight.feature.canvas.common.RestoreResult
+import kotlinx.coroutines.launch
 import io.github.lenticualrstone.civilight.feature.canvas.common.CanvasViewModel
 import io.github.lenticualrstone.civilight.feature.canvas.edit.CanvasEdits
 import io.github.lenticualrstone.civilight.feature.canvas.edit.LineResult
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphViewport
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Pt
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Sz
+import io.github.lenticualrstone.civilight.ui.graph.GraphViewport
+import io.github.lenticualrstone.civilight.ui.graph.Pt
+import io.github.lenticualrstone.civilight.ui.graph.Sz
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.Viewport
 import io.github.lenticualrstone.civilight.model.canvas.CanvasNodeKind
@@ -74,6 +79,30 @@ class CanvasBoardViewModel(
 
     fun removeNode(canvasKey: Key, nodeKey: Key, then: (EditResult) -> Unit) {
         act(CanvasCopy.UNDO_REMOVE, then = then) { doc, ctx -> CanvasEdits.removeNode(doc, canvasKey, nodeKey, ctx) }
+    }
+
+    /** `되살리기` of a deleted item behind a node (CNV-11); [then] gets the toast or `needsAuth`. */
+    fun restoreItem(item: ItemId, authenticated: Boolean, then: (EditResult, RestoreResult) -> Unit) {
+        var result = RestoreResult(null, null)
+        act(CanvasCopy.BTN_RESTORE, then = { then(it, result) }) { doc, ctx ->
+            result = RefFixes.restore(doc, item, ctx, authenticated)
+            result.doc ?: doc
+        }
+    }
+
+    /** `이대로 두기` on a deleted item behind a node (CNV-11). */
+    fun keepItem(item: ItemId, then: (EditResult) -> Unit) {
+        act(CanvasCopy.BTN_KEEP, then = then) { doc, ctx -> RefFixes.keep(doc, item, ctx) }
+    }
+
+    /** `되돌리기` of the last step (the restore toast). */
+    fun undoLast() {
+        viewModelScope.launch { undo() }
+    }
+
+    /** CNV-02: the canvas the home shortcut opens next (`_app/view.json` `lastCanvasKey`, never exported). */
+    fun markOpened(canvasKey: Key) {
+        actApp { app -> if (app.view.lastCanvasKey == canvasKey) app else app.copy(view = app.view.copy(lastCanvasKey = canvasKey)) }
     }
 
     /** The canvas viewport is app state (`_app/view.json`), never exported (CNV-12 [PROPOSED]). */

@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -71,6 +72,9 @@ import kotlinx.coroutines.launch
  * handle, padding 10 top / [sidePadding] sides / navigation inset bottom; its top never rises above the
  * status bar + 56 dp, and longer content scrolls inside it.
  * [centered] draws the inner-screen centred sheet (max width 560, all corners rounded).
+ * With the keyboard up both kinds sit above it ([KeyboardLift], consumption-aware): the bottom sheet's
+ * bottom edge rides on the keyboard and its maximum height shrinks by the keyboard; the centred sheet
+ * centres in the space above the keyboard.
  */
 @Composable
 fun CivilightSheetLayout(
@@ -153,7 +157,10 @@ private fun SheetSurface(
     var sheetHeight by remember { mutableFloatStateOf(0f) }
     val drag = remember { Animatable(0f) }
     val shape: Shape = if (centered) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = if (centered) Alignment.Center else Alignment.BottomCenter) {
+    BoxWithConstraints(
+        Modifier.fillMaxSize().windowInsetsPadding(KeyboardLift),
+        contentAlignment = if (centered) Alignment.Center else Alignment.BottomCenter,
+    ) {
         val maxSheet = maxHeight - statusTop - LayoutMetrics.sheetMaxTopBelowStatusBar
         Box(
             modifier = Modifier

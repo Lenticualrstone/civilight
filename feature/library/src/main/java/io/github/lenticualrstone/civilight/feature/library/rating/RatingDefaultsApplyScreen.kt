@@ -22,7 +22,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightButto
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.readingMeasure
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
-import io.github.lenticualrstone.civilight.feature.library.protection.ProtectionOutcome
 import io.github.lenticualrstone.civilight.navigation.RatingDefaultsApply
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 import io.github.lenticualrstone.civilight.ui.scaffold.BACK_LABEL
@@ -59,7 +58,7 @@ internal fun RatingDefaultsApplyScreen(route: RatingDefaultsApply, services: Lib
                     working = true
                     vm.apply(checkedRows) { outcome ->
                         working = false
-                        if (outcome != ProtectionOutcome.CANCELLED) deps.navigator.pop()
+                        if (RatingSheetModel.closesAfter(outcome)) deps.navigator.pop()
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

@@ -61,6 +61,17 @@ class AppStateJsonTest {
     }
 
     @Test
+    fun lastCanvasKeyIsOptionalAndRoundTrips() {
+        val plain = CivilightJson.encode(ProjectViewFile.serializer(), ProjectViewFile())
+        assertTrue(plain, "lastCanvasKey" !in plain)
+        assertEquals(null, CivilightJson.decode(ProjectViewFile.serializer(), plain).lastCanvasKey)
+        val view = ProjectViewFile(lastCanvasKey = "CV1")
+        val text = CivilightJson.encode(ProjectViewFile.serializer(), view)
+        assertTrue(text, "\"lastCanvasKey\":\"CV1\"" in text)
+        assertEquals(view, CivilightJson.decode(ProjectViewFile.serializer(), text))
+    }
+
+    @Test
     fun libraryIndex() {
         val index = LibraryIndexFile(listOf(LibraryEntry(key = "P", name = "잿빛 새벽의 등불", rating = Rating.R18.open(), hidden = true)))
         val text = CivilightJson.encode(LibraryIndexFile.serializer(), index)

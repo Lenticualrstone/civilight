@@ -10,6 +10,7 @@ import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.project.Rating
+import io.github.lenticualrstone.civilight.model.project.WorldTimeMode
 import io.github.lenticualrstone.civilight.model.story.StoryUnit
 import io.github.lenticualrstone.civilight.navigation.CanvasBoard
 import io.github.lenticualrstone.civilight.navigation.CastList
@@ -34,7 +35,16 @@ data class HomeResume(val where: String, val quote: String, val blockKey: Key)
  * A row of the current chapter list: `1-7 | 잿빛 새벽의 등불 | 쓰는 중 · 씬 3`. [current] = the
  * episode of the last edit (bold title); [writing] = status `쓰는 중 …` (`acc`).
  */
-data class HomeRow(val key: Key, val code: String, val title: String, val status: String, val current: Boolean, val writing: Boolean)
+data class HomeRow(
+    val key: Key,
+    val code: String,
+    val title: String,
+    val status: String,
+    val current: Boolean,
+    val writing: Boolean,
+    /** An unlocked hidden scene (1-level rows): small `숨김` tag (STO-11). A locked one reads `숨긴 씬`. */
+    val hiddenTag: Boolean = false,
+)
 
 /** The `작업` shortcuts (STO-01): `스토리 · 인물 · 세계 · 연표 · 캔버스 · 설정`; `설정` is drawn `ink3`. */
 enum class HomeShortcut(val label: String, val dim: Boolean = false) {
@@ -91,6 +101,16 @@ data class HomeUi(
  * - 1 level: the scenes themselves, no header.
  */
 object HomeModel {
+    /**
+     * The episode the right pane shows (`TwoHome`, STO-43): the `StoryStructure` right above this home on
+     * the back stack (its focus unit), or null when no structure is beside home.
+     */
+    fun selectedKey(backStack: List<androidx.navigation3.runtime.NavKey>, projectKey: Key): Key? {
+        val top = backStack.lastOrNull() as? StoryStructure ?: return null
+        val below = backStack.getOrNull(backStack.lastIndex - 1) as? io.github.lenticualrstone.civilight.navigation.ProjectHome ?: return null
+        return top.focusUnitKey.takeIf { below.projectKey == projectKey && top.projectKey == projectKey }
+    }
+
     fun build(doc: ProjectDoc, readOnly: Boolean, locked: Boolean, today: LocalDate, zone: ZoneId): HomeUi {
         val view = StoryOverview(doc, locked = locked)
         val levels = doc.project.structure.levels.size
@@ -118,11 +138,15 @@ object HomeModel {
             resume = resume,
             listHeader = header,
             rows = rows,
-            shortcuts = HomeShortcut.entries,
+            shortcuts = shortcuts(doc),
             commandHint = CommandBar.placeholder(CommandScreen.HOME),
             readOnly = readOnly,
         )
     }
+
+    /** The `작업` shortcuts; `연표` is left out in `시간 없이` (WLD-29 `[PROPOSED]`, the 연표 is off there). */
+    fun shortcuts(doc: ProjectDoc): List<HomeShortcut> =
+        if (doc.project.worldTime.mode.known == WorldTimeMode.NONE) HomeShortcut.entries - HomeShortcut.TIMELINE else HomeShortcut.entries
 
     /** `7/10` · `1장 에피소드` (3+ levels); `k/n` · `<episode level name>` (2) or `<scene level name>` (1), `ED`. */
     private fun progressStat(view: StoryOverview, levels: Int): HomeStat? {
@@ -145,7 +169,7 @@ object HomeModel {
         val row = view.sceneRow(scene)
         val code = view.codes.sceneLabel(scene)
         val title = row.label.removePrefix("$code · ").let { if (it == StoryCopy.UNTITLED && scene.title == null) HomeCopy.NO_TITLE else it }
-        return HomeRow(scene.key, code, title, row.status.word, row.current, row.status == SceneStatus.WRITING)
+        return HomeRow(scene.key, code, title, row.status.word, row.current, row.status == SceneStatus.WRITING, hiddenTag = row.hiddenTag)
     }
 
     /** `1,240`. */

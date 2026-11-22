@@ -3,7 +3,7 @@ package io.github.lenticualrstone.civilight.feature.canvas.board
 import io.github.lenticualrstone.civilight.domain.cast.ItemRefs
 import io.github.lenticualrstone.civilight.domain.cast.ResolvedItem
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
-import io.github.lenticualrstone.civilight.feature.canvas.graph.NodeLook
+import io.github.lenticualrstone.civilight.ui.graph.NodeLook
 import io.github.lenticualrstone.civilight.model.canvas.CanvasNode
 import io.github.lenticualrstone.civilight.model.canvas.CanvasNodeKind
 import io.github.lenticualrstone.civilight.model.cast.EntityKind

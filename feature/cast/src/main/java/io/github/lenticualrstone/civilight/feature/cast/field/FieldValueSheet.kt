@@ -18,12 +18,19 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
+import io.github.lenticualrstone.civilight.domain.cast.field.FieldDefinitions
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldText
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.feature.cast.common.castLens
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.FieldPayload
+import io.github.lenticualrstone.civilight.model.cast.FieldType
+import io.github.lenticualrstone.civilight.ui.richtext.RichTextEditor
+import io.github.lenticualrstone.civilight.ui.richtext.rememberRichTextEditorState
 import io.github.lenticualrstone.civilight.navigation.FieldValueEditSheet
+import io.github.lenticualrstone.civilight.domain.cast.entityKind
+import io.github.lenticualrstone.civilight.feature.cast.trash.rememberItemTrash
 import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
@@ -44,6 +51,7 @@ fun SheetScope.FieldValueSheetContent(sheet: FieldValueEditSheet) {
     val doc by store.doc.collectAsState()
     val editor = rememberCastEditor(sheet.projectKey)
     val gate = rememberHiddenGate(sheet.projectKey)
+    val trash = rememberItemTrash(sheet.projectKey)
     val lens = doc.castLens
     val subject = TimedSubject.Field(sheet.kind, sheet.entityKey, sheet.fieldDefKey)
     val def = TimedEditModel.def(doc, subject)
@@ -67,6 +75,8 @@ fun SheetScope.FieldValueSheetContent(sheet: FieldValueEditSheet) {
     }
 
     val editable = !store.readOnly && view.derived == null
+    val longText = def.type.known == FieldType.LONG_TEXT
+    val rich = rememberRichTextEditorState(remember(sheet) { (reading.value?.payload as? FieldPayload.Rich)?.doc.orEmpty() }, key = sheet)
     val check = FieldDrafts.check(def, draft, initial, FieldDrafts.monthCount(doc))
     val notice = FieldText.format(doc, def, reading.value).notice
     SheetHeader(view.title, onClose = ::close, subtitle = view.derived, closeLabel = CastUiCopy.BTN_CLOSE)
@@ -87,11 +97,32 @@ fun SheetScope.FieldValueSheetContent(sheet: FieldValueEditSheet) {
                 longTextEditable = LongTextEdit.editable((reading.value?.payload as? FieldPayload.Rich)?.doc.orEmpty()),
                 hiddenUnlocked = gate.open,
                 modifier = Modifier.padding(top = 14.dp),
+                dottedLinks = linkKind?.entityKind?.let { kind -> LinkFixes.rows(doc, kind, draft.linkKeys, sheet.entityKey, gate.open) }.orEmpty(),
+                onRestoreLink = { key -> linkKind?.entityKind?.let { trash.restore(it, key) } },
+                onKeepLink = { key -> trash.keep(key, sheet.entityKey) },
+                richLongText = {
+                    RichTextEditor(
+                        state = rich,
+                        projectKey = sheet.projectKey,
+                        linkPickerTitle = CastUiCopy.TODO_COPY_CAST_LINK_PICKER_TITLE,
+                        openSheet = host::open,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                },
             )
-            SaveButtons(view.mode, check.canSave) { choice ->
+            if (def.scopeCharacterKey != null) {
+                // CST-22: an `이 인물만` field can become a project field later; this value is kept.
+                TextAction(CastUiCopy.BTN_PROMOTE, {
+                    editor.act(CastUiCopy.BTN_PROMOTE) { d, ctx -> FieldDefinitions.promoteToAll(d, def.key, ctx) }
+                }, Modifier.padding(top = 8.dp), color = CivilightTheme.colors.ink2, style = CivilightTheme.type.label)
+            }
+            val canSave = if (longText) (check.canSave || (rich.changed && !draft.unknown)) else check.canSave
+            SaveButtons(view.mode, canSave) { choice ->
                 val saved = draft
+                val savedRich = rich.result
                 editor.act(choice.label(view.mode)) { d, ctx ->
-                    TimedEditModel.saveField(d, subject, FieldDrafts.toValue(def, saved, reading.value, ctx), choice, lens, ctx)
+                    val value = if (longText) FieldDrafts.richValue(saved, savedRich) else FieldDrafts.toValue(def, saved, reading.value, ctx)
+                    TimedEditModel.saveField(d, subject, value, choice, lens, ctx)
                 }
                 host.close()
             }

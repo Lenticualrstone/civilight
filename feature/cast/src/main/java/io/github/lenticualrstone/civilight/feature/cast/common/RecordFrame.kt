@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.BottomGlassBar
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.component.GlassPill
 import io.github.lenticualrstone.civilight.designsystem.component.GlassRoundButton
 import io.github.lenticualrstone.civilight.designsystem.component.GlassScaffold
@@ -45,7 +46,7 @@ fun recordTopInset(): Dp = WindowInsets.statusBars.asPaddingValues().calculateTo
  * has no glass top bar while the record's head is on screen: a glass round back button and the lens
  * as a glass pill float over the page (DS-28 `FadingHeaderArt`: "no glass bar on top"). Once the
  * name has scrolled away ([collapsed]) the usual glass top bar shows the record number and name, as
- * the `Relations` board draws it. The bottom bar holds the five tabs above the command bar; toasts
+ * the `Relations` board draws it. [add] is the tab's `+` (`게임 텍스트`: a voice line, CST-16) and [menu] the record `⋯` (CST-40); both sit next to the lens in either state. The bottom bar holds the five tabs above the command bar; toasts
  * and sheets work as in `CivilightScreen`.
  *
  * [content] gets the bottom bar's height as padding; its top is [recordTopInset] (fixed, so the
@@ -56,6 +57,8 @@ fun RecordFrame(
     back: IconAction?,
     lens: LensChipLabel,
     onLens: () -> Unit,
+    add: IconAction?,
+    menu: IconAction?,
     collapsed: Boolean,
     collapsedTitle: String,
     collapsedSmallLine: String,
@@ -74,6 +77,8 @@ fun RecordFrame(
                 if (collapsed) {
                     TopGlassBar(collapsedTitle, smallLine = collapsedSmallLine, back = back, wide = wide) {
                         LensChip(lens.text, lens.state, onLens)
+                        if (add != null) CivilightIconButton(IconId.Plus, add.label, add.onClick, tint = CivilightTheme.colors.ink)
+                        if (menu != null) CivilightIconButton(IconId.More, menu.label, menu.onClick, tint = CivilightTheme.colors.ink)
                     }
                 } else {
                     Row(
@@ -87,6 +92,8 @@ fun RecordFrame(
                         Spacer(Modifier.weight(1f))
                         val colors = CivilightTheme.colors
                         GlassPill(lens.text, onLens, textColor = if (lens.state == LensChipState.PAST) colors.acc else colors.ink)
+                        if (add != null) GlassRoundButton(IconId.Plus, add.label, add.onClick, Modifier.padding(start = 8.dp))
+                        if (menu != null) GlassRoundButton(IconId.More, menu.label, menu.onClick, Modifier.padding(start = 8.dp))
                     }
                 }
             },

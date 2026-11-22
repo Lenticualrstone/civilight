@@ -3,6 +3,8 @@ package io.github.lenticualrstone.civilight.feature.story.menu
 import io.github.lenticualrstone.civilight.domain.story.scene.SceneHeads
 import io.github.lenticualrstone.civilight.domain.story.structure.StoryOverview
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
+import io.github.lenticualrstone.civilight.feature.story.common.isDrawnCopy
+import io.github.lenticualrstone.civilight.feature.story.move.MoveModel
 import io.github.lenticualrstone.civilight.feature.story.structure.StructureCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
@@ -21,6 +23,9 @@ enum class MenuAction {
 
     /** Opens the scene in the script; the split happens there below a block (STO-07 Q5 `ED`). */
     SPLIT_HERE,
+
+    /** `옮기기` (STO-08): destination picker, then the `SceneMoveSheet` preview. */
+    MOVE,
 
     /** `씬 지우기` (STO-10, SCR-52): no question, toast with `되돌리기`. */
     DELETE_SCENE,
@@ -52,7 +57,13 @@ enum class MenuAction {
 data class MenuRow(val action: MenuAction, val label: String, val value: String?, val enabled: Boolean = true)
 
 /** A ⋯ sheet: title (`씬 4 · 1-7`) and rows. */
-data class MenuModel(val title: String, val rows: List<MenuRow>)
+data class MenuModel(val title: String, val rows: List<MenuRow>) {
+    /**
+     * Without the rows whose label is not drawn yet (`TODO_COPY_…`, 20-story-time §6 Q34): they come
+     * back by themselves once the copy constant gets its words.
+     */
+    fun drawnOnly(): MenuModel = copy(rows = rows.filter { isDrawnCopy(it.label) })
+}
 
 /** Where a unit ⋯ was opened: the 스토리 list (STO-07) or a scene head in the script (SCR-47). */
 enum class MenuSurface { STORY_LIST, SCENE_HEAD }
@@ -83,27 +94,29 @@ object UnitMenuModel {
     /**
      * Scene ⋯. On a scene head it is `domain:story` `SceneHeads.menu` as is (SCR-47). In the 스토리
      * list (STO-07): `장소와 때 · 전환 문구 · 앞 씬과 합치기` (disabled for an episode's first scene) `·
-     * 여기서 나누기 · 씬 지우기`, then `완료` (copy not drawn).
+     * 여기서 나누기 · 옮기기 · 씬 지우기`, then `완료` (copy not drawn, so left out for now).
      */
     private fun sceneMenu(doc: ProjectDoc, scene: StoryUnit, surface: MenuSurface, readOnly: Boolean): MenuModel? {
         val head = SceneHeads(doc).menu(scene.key, readOnly) ?: return null
         val mapped = head.rows.mapNotNull { row -> headActions[row.label]?.let { MenuRow(it, row.label, row.value, row.enabled) } }
-        if (surface == MenuSurface.SCENE_HEAD) return MenuModel(head.title, mapped)
+        if (surface == MenuSurface.SCENE_HEAD) return MenuModel(head.title, mapped).drawnOnly()
         fun from(action: MenuAction) = mapped.firstOrNull { it.action == action }
         val rows = buildList {
             from(MenuAction.PLACE_TIME)?.let(::add)
             from(MenuAction.TRANSITION)?.let(::add)
             add(from(MenuAction.MERGE_PREVIOUS) ?: MenuRow(MenuAction.MERGE_PREVIOUS, MenuCopy.MERGE_PREVIOUS, null, enabled = false))
             add(mutating(MenuAction.SPLIT_HERE, MenuCopy.SPLIT_HERE, null, readOnly))
+            add(mutating(MenuAction.MOVE, MenuCopy.MOVE, null, readOnly).let { if (MoveModel.movable(doc, scene.key)) it else it.copy(enabled = false) })
             from(MenuAction.DELETE_SCENE)?.let(::add)
             add(doneRow(doc, scene, readOnly))
         }
-        return MenuModel(head.title, rows)
+        return MenuModel(head.title, rows).drawnOnly()
     }
 
     /**
-     * Episode ⋯: `번호 다시 매기기 · 1-7` (the drawn item, STO-07 → SCR-22), then `새 에피소드` and
-     * `완료` (copy not drawn, Q34). The ⋯ of units above the episode level: `새 장` (copy not drawn).
+     * Episode ⋯: `번호 다시 매기기 · 1-7` (the drawn item, STO-07 → SCR-22), `옮기기` (STO-08), then
+     * `새 에피소드` and `완료` (copy not drawn, Q34, left out). Units above the episode level: `옮기기`
+     * and `새 장` (copy not drawn, left out).
      */
     private fun unitMenu(doc: ProjectDoc, unit: StoryUnit, readOnly: Boolean): MenuModel {
         val view = StoryOverview(doc)
@@ -112,10 +125,12 @@ object UnitMenuModel {
         val newLabel = if (isEpisode) StoryCopy.TODO_COPY_STO_NEW_EPISODE else StoryCopy.TODO_COPY_STO_NEW_CHAPTER
         val rows = buildList {
             if (isEpisode) add(mutating(MenuAction.RENUMBER, "${MenuCopy.RENUMBER} · ${view.codes.episodeCode(unit)}", null, readOnly))
+            // `옮기기` (STO-08): the explicit path for reordering episodes and chapters (no drag needed).
+            add(mutating(MenuAction.MOVE, MenuCopy.MOVE, null, readOnly))
             add(mutating(MenuAction.NEW_UNIT_AFTER, newLabel, null, readOnly))
             if (isEpisode) add(doneRow(doc, unit, readOnly))
         }
-        return MenuModel(title, rows)
+        return MenuModel(title, rows).drawnOnly()
     }
 
     /** `완료` toggle; the value line is the current status word (`쓰는 중`, `완료`, `미정`). */
@@ -150,6 +165,6 @@ object StructureMenuModel {
                 levels.size == 2 -> add(UnitMenuModel.mutating(MenuAction.NEW_TOP_UNIT, StoryCopy.TODO_COPY_STO_NEW_EPISODE, null, readOnly))
             }
         }
-        return MenuModel(StructureCopy.TITLE, rows)
+        return MenuModel(StructureCopy.TITLE, rows).drawnOnly()
     }
 }

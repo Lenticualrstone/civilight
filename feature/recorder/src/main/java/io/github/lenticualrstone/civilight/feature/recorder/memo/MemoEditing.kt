@@ -40,23 +40,37 @@ object MemoEditing {
  * (rule 23 §5: the run holds only the name), so the field shows it through an offset mapping:
  * [starts] are the link runs' start offsets in the stored text, ascending; [ends] their ends.
  */
-class AtMarks(private val starts: IntArray, private val ends: IntArray) {
+class AtMarks(
+    private val starts: IntArray,
+    private val ends: IntArray,
+    private val dotted: BooleanArray = BooleanArray(starts.size),
+    private val diamond: BooleanArray = BooleanArray(starts.size),
+) {
     val count: Int get() = starts.size
+
+    /** Link run [index] points at a target in the trash (LRC-23): a dotted `ink3` line, as its chip. */
+    fun isDotted(index: Int): Boolean = dotted.getOrElse(index) { false }
+
+    /** Link run [index] points at a deleted card (인물 · 장소 · 용어 · 세력): `◇` instead of `@`, as its chip. */
+    fun hasDiamond(index: Int): Boolean = diamond.getOrElse(index) { false }
 
     /** True when these marks were made for a text of [length] (the field may be one keystroke ahead). */
     fun fits(length: Int): Boolean = ends.all { it <= length }
 
-    override fun equals(other: Any?): Boolean = other is AtMarks && starts.contentEquals(other.starts) && ends.contentEquals(other.ends)
+    override fun equals(other: Any?): Boolean =
+        other is AtMarks && starts.contentEquals(other.starts) && ends.contentEquals(other.ends) &&
+            dotted.contentEquals(other.dotted) && diamond.contentEquals(other.diamond)
 
-    override fun hashCode(): Int = 31 * starts.contentHashCode() + ends.contentHashCode()
+    override fun hashCode(): Int =
+        31 * (31 * (31 * starts.contentHashCode() + ends.contentHashCode()) + dotted.contentHashCode()) + diamond.contentHashCode()
 
-    /** The text as shown: `@` inserted before every link run. */
+    /** The text as shown: `@` inserted before every link run (`◇` before a run to a deleted card). */
     fun show(text: String): String {
         if (starts.isEmpty()) return text
         val out = StringBuilder(text.length + starts.size)
         var from = 0
-        for (s in starts) {
-            out.append(text, from, s).append('@')
+        for ((i, s) in starts.withIndex()) {
+            out.append(text, from, s).append(if (hasDiamond(i)) DIAMOND else '@')
             from = s
         }
         return out.append(text, from, text.length).toString()
@@ -77,10 +91,24 @@ class AtMarks(private val starts: IntArray, private val ends: IntArray) {
 
     companion object {
         val NONE = AtMarks(IntArray(0), IntArray(0))
+        private const val DIAMOND = '◇'
 
-        fun of(runs: List<TextRun>): AtMarks {
-            val ranges = Runs.linkRanges(runs).map { it.second }
-            return AtMarks(ranges.map { it.first }.toIntArray(), ranges.map { it.last + 1 }.toIntArray())
+        /**
+         * Marks of [runs]; [dotted] says which link runs point at a target in the trash, [diamond]
+         * which at a deleted card (LRC-23, the same flags as their chips).
+         */
+        fun of(
+            runs: List<TextRun>,
+            dotted: (TextRun.Link) -> Boolean = { false },
+            diamond: (TextRun.Link) -> Boolean = { false },
+        ): AtMarks {
+            val links = Runs.linkRanges(runs)
+            return AtMarks(
+                links.map { it.second.first }.toIntArray(),
+                links.map { it.second.last + 1 }.toIntArray(),
+                links.map { dotted(it.first) }.toBooleanArray(),
+                links.map { diamond(it.first) }.toBooleanArray(),
+            )
         }
     }
 }

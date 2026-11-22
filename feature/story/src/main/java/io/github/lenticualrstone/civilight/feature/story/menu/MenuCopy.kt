@@ -12,6 +12,9 @@ object MenuCopy {
     const val DELETE_SCENE = "씬 지우기"
     const val NEW_SCENE_BEFORE = "앞에 새 씬"
 
+    /** Scene ⋯ `옮기기` (STO-08, R12 §3). */
+    const val MOVE = "옮기기"
+
     /** Episode ⋯ `번호 다시 매기기 · 1-7` (STO-07 → SCR-22 `RTRenumber`). */
     const val RENUMBER = "번호 다시 매기기"
     const val CANCEL = "취소"

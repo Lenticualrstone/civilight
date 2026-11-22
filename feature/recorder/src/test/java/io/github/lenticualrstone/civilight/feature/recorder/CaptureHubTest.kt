@@ -270,6 +270,26 @@ class CaptureHubTest {
     }
 
     @Test
+    fun LRC_34_noPutHereWhenTheCaretBlockWasDeletedMeanwhile() = runTest {
+        val f = HubFixture(this)
+        f.startFromScript()
+        f.engine.confirm(Fx.R1_TEXT)
+        wait(3_000)
+        // #044 goes to the trash while the recording runs.
+        val trashed = f.projects.doc.let { doc ->
+            doc.copy(episodes = doc.episodes.mapValues { (_, ep) -> ep.copy(blocks = ep.blocks.map { if (it.key == ExampleKeys.BLOCK_044) it.copy(deletedAt = Fx.NOW) else it }) })
+        }
+        f.projects.doc = trashed
+        f.env.env = Fx.env(trashed)
+        f.hub.stopAndSave()
+        f.hub.refreshEnv()
+        testScheduler.runCurrent()
+        assertNull(CaptureViews.processing(f.hub.state.value)!!.screen.putHere)
+        assertNull(f.hub.putHere())
+        assertTrue(f.projects.labels.isEmpty())
+    }
+
+    @Test
     fun putHereIsNotOfferedInAReadOnlyProjectNorFromAnotherEntry() = runTest {
         val p1 = Fx.p1()
         val readOnlyEnv = RecorderEnv(listOf(ProjectSnapshot(Fx.entry(p1, readOnly = true), p1)), zone = Fx.ZONE)

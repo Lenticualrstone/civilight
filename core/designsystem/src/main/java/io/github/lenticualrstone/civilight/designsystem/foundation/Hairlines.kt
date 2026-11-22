@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
@@ -41,7 +42,8 @@ fun Modifier.bottomHairline(color: Color, width: Dp = 1.dp): Modifier = drawBehi
 
 /**
  * An inside outline (CSS `box-shadow: inset 0 0 0 Npx`): drawn over the content within the bounds,
- * so it never changes layout. [dashed] draws the memo-node / deleted dashed variant.
+ * so it never changes layout. [dashed] draws the memo-node dashed variant (4 / 3 dp); [dotted] the
+ * rule 20 "attached to something deleted" variant (round dots, 1.5 / 3 dp). [dotted] wins when both are set.
  */
 fun Modifier.insetOutline(
     color: Color,
@@ -49,13 +51,14 @@ fun Modifier.insetOutline(
     shape: Shape,
     dashed: Boolean = false,
     overContent: Boolean = true,
+    dotted: Boolean = false,
 ): Modifier = drawWithContent {
-    if (!overContent) drawInset(color, width, shape, dashed)
+    if (!overContent) drawInset(color, width, shape, dashed, dotted)
     drawContent()
-    if (overContent) drawInset(color, width, shape, dashed)
+    if (overContent) drawInset(color, width, shape, dashed, dotted)
 }
 
-private fun DrawScope.drawInset(color: Color, width: Dp, shape: Shape, dashed: Boolean) {
+private fun DrawScope.drawInset(color: Color, width: Dp, shape: Shape, dashed: Boolean, dotted: Boolean = false) {
     val w = width.toPx()
     if (w <= 0f) return
     val inner = Size(size.width - w, size.height - w)
@@ -64,7 +67,11 @@ private fun DrawScope.drawInset(color: Color, width: Dp, shape: Shape, dashed: B
         drawOutline(
             outline,
             color,
-            style = Stroke(w, pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())) else null),
+            style = when {
+                dotted -> Stroke(w, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(0.01f, 3.dp.toPx() + w)))
+                dashed -> Stroke(w, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())))
+                else -> Stroke(w)
+            },
         )
     }
 }

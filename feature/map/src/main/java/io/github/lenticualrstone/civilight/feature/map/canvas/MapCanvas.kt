@@ -20,6 +20,8 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import io.github.lenticualrstone.civilight.model.map.DrawnLineKind
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -87,6 +89,10 @@ fun MapCanvas(
     onTap: (Point, MapHit?) -> Unit = { _, _ -> },
     extraDraw: DrawScope.(MapMarkScope) -> Unit = {},
     marks: @Composable BoxScope.(MapMarkScope) -> Unit = {},
+    /** The base's drawn width in px at the current zoom (the scale bar picks 1 or 2 days from it). */
+    onContentWidth: ((Float) -> Unit)? = null,
+    /** Taps may hit stamps and drawn lines (the detailed-terrain editor only). */
+    hitTerrain: Boolean = false,
 ) {
     val blobs: BlobStore = LocalFeatureDeps.current.stores.blobs
     var size by remember { mutableStateOf(IntSize.Zero) }
@@ -105,6 +111,11 @@ fun MapCanvas(
         if (viewport.zoom <= 0f && interactive) {
             LaunchedEffect(math) { onViewportChange(resolved) }
         }
+        val contentWidth = math.contentW(resolved)
+        if (onContentWidth != null) {
+            val report by rememberUpdatedState(onContentWidth)
+            LaunchedEffect(contentWidth) { report(contentWidth) }
+        }
         val current by rememberUpdatedState(resolved)
         val change by rememberUpdatedState(onViewportChange)
         val tap by rememberUpdatedState(onTap)
@@ -119,7 +130,7 @@ fun MapCanvas(
                 detectTapGestures { o ->
                     val s = ScreenPoint(o.x, o.y)
                     val p = math.toMap(current, s)
-                    if (math.onBase(p)) tap(p, MapHitTest.hit(sceneNow, math, current, s, touchPx))
+                    if (math.onBase(p)) tap(p, MapHitTest.hit(sceneNow, math, current, s, touchPx, terrain = hitTerrain))
                 }
             }
         val markScope = MapMarkScope(math, resolved)
@@ -146,7 +157,22 @@ private fun OverlayCanvas(
     val art = FixedColors.mapArt(if (colors.isDark) ResolvedTheme.DARK else ResolvedTheme.LIGHT)
     val measurer = rememberTextMeasurer()
     val labelStyle = CivilightTheme.type.label.merge(TextStyle(color = colors.ink))
+    val river = FixedColors.terrain.getValue(io.github.lenticualrstone.civilight.designsystem.theme.Terrain.SEA)
     Canvas(modifier) {
+        val roadDash = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx()))
+        for (l in scene.lines) {
+            val selected = l.key == selectedKey
+            val path = polyPath(l.points.map { math.toScreen(viewport, it) }, closed = false)
+            val isRiver = l.kind == DrawnLineKind.RIVER
+            drawPath(
+                path,
+                if (selected) colors.acc else if (isRiver) river else colors.ink2.copy(alpha = 0.7f),
+                style = Stroke(
+                    ((if (isRiver) 1.6 else 1.2) + if (selected) 1.0 else 0.0).dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round,
+                    pathEffect = if (isRiver) null else roadDash,
+                ),
+            )
+        }
         for (r in scene.regions) {
             if (r.shape.size < 3) continue
             val c = regionColor(r.color, art)
@@ -159,12 +185,28 @@ private fun OverlayCanvas(
         for (l in scene.links) {
             val a = math.toScreen(viewport, l.a)
             val b = math.toScreen(viewport, l.b)
-            drawLine(colors.ink3.copy(alpha = if (l.dim) 0.4f else 1f), Offset(a.x, a.y), Offset(b.x, b.y), 1.5.dp.toPx(), StrokeCap.Round)
+            val selected = l.key == selectedKey
+            drawLine(
+                (if (selected) colors.acc else colors.ink3).copy(alpha = if (l.dim) 0.4f else 1f), Offset(a.x, a.y), Offset(b.x, b.y),
+                (if (selected) 2.5 else 1.5).dp.toPx(), StrokeCap.Round,
+            )
         }
         for (r in scene.routes) {
             val selected = r.key == selectedKey
             val path = polyPath(r.points.map { math.toScreen(viewport, it) }, closed = false)
             drawPath(path, colors.acc.copy(alpha = if (r.dim) 0.4f else 1f), style = Stroke((if (selected) 3.5 else 2.0).dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        for (st in scene.stamps) {
+            val c = math.toScreen(viewport, st.at)
+            val r = maxOf(StampGlyphs.radius(st.size) * math.contentW(viewport), (4 + 3 * st.size).dp.toPx())
+            val selected = st.key == selectedKey
+            val color = (if (selected) colors.acc else colors.ink).copy(alpha = if (st.dim) 0.4f else 0.85f)
+            for (stroke in StampGlyphs.strokes(st.kind)) {
+                val pts = StampGlyphs.place(stroke, c.x, c.y, r, st.rotation)
+                val path = Path()
+                pts.forEachIndexed { i, (x, y) -> if (i == 0) path.moveTo(x, y) else path.lineTo(x, y) }
+                drawPath(path, color, style = Stroke((if (selected) 2.0 else 1.4).dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
         }
         for (l in scene.labels) {
             val curve = l.curve ?: continue
@@ -199,6 +241,19 @@ private fun BoxScope.OverlayMarks(scene: MapScene, math: ViewportMath, viewport:
                 if (!onScreen(mid)) continue
                 MapValueChip(r.label, Modifier.mapAt(mid.x, mid.y, ay = 1.2f).alpha(if (r.dim) 0.45f else 1f))
             }
+        }
+        // Connection labels (`계단 · 잠김`, `정문 통과`) at the middle of their line (WLD-50).
+        for (l in scene.links) {
+            val text = l.label ?: continue
+            val a = math.toScreen(viewport, l.a)
+            val b = math.toScreen(viewport, l.b)
+            val mx = (a.x + b.x) / 2f
+            val my = (a.y + b.y) / 2f
+            if (!onScreen(ScreenPoint(mx, my))) continue
+            CivilightText(
+                text, type.small, Modifier.mapAt(mx, my).alpha(if (l.dim) 0.45f else 1f),
+                color = if (l.key == selectedKey) colors.acc else colors.ink2, maxLines = 1,
+            )
         }
         for (n in scene.nodes) {
             val s = math.toScreen(viewport, n.at)

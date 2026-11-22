@@ -76,6 +76,12 @@ data class SceneSplitSheet(override val projectKey: Key, val blockKey: Key) : Pr
     override val owner: FeatureModule get() = FeatureModule.SCRIPT
 }
 
+/** 번호 다시 매기기 (SCR-22) of [episodeKey]'s numbering unit; opened from the structure ⋯ and the script. */
+@Serializable
+data class RenumberSheet(override val projectKey: Key, val episodeKey: Key) : ProjectSheet {
+    override val owner: FeatureModule get() = FeatureModule.SCRIPT
+}
+
 /** 씬 합치기 with the previous scene (SCR-51). */
 @Serializable
 data class SceneMergeSheet(override val projectKey: Key, val sceneKey: Key) : ProjectSheet {
@@ -150,10 +156,27 @@ data class EventCreateSheet(override val projectKey: Key) : ProjectSheet {
     override val owner: FeatureModule get() = FeatureModule.WORLD
 }
 
-/** 선 라벨 (CNV-08; CST S18) of a canvas or relationship-map line. */
+/**
+ * 선 라벨 (CNV-08; CST S18) of a canvas or relationship-map line. A canvas line names its
+ * [canvasKey] and [edgeKey]. A relationship-map line (`canvasKey == null`) names the two
+ * characters in [fromCharacterKey] / [toCharacterKey]; use [forCharacters], which also fills
+ * [edgeKey] with the pair id (`Relation.pairIdOf` order).
+ */
 @Serializable
-data class LineLabelSheet(override val projectKey: Key, val canvasKey: Key?, val edgeKey: Key) : ProjectSheet {
+data class LineLabelSheet(
+    override val projectKey: Key,
+    val canvasKey: Key?,
+    val edgeKey: Key,
+    val fromCharacterKey: Key? = null,
+    val toCharacterKey: Key? = null,
+) : ProjectSheet {
     override val owner: FeatureModule get() = FeatureModule.CANVAS
+
+    companion object {
+        /** The relationship-map line between characters [a] and [b]. */
+        fun forCharacters(projectKey: Key, a: Key, b: Key): LineLabelSheet =
+            LineLabelSheet(projectKey, canvasKey = null, edgeKey = if (a <= b) "$a|$b" else "$b|$a", fromCharacterKey = a, toCharacterKey = b)
+    }
 }
 
 /** 이미지 고르기 (CNV-27) for an owner's image slot. */
@@ -179,8 +202,40 @@ data class RatingChangeSheet(override val projectKey: Key, val to: Rating) : Pro
     override val owner: FeatureModule get() = FeatureModule.LIBRARY
 }
 
-/** 글 메모 (LRC-15), from the command bar `글로` or the inbox; [projectKey] = where it started. */
+/**
+ * 글 메모 (LRC-15), from the command bar `글로` or the inbox; [projectKey] = where it started.
+ * [targetKind] / [targetKey] pre-fill the link to a card or scene (LRC-19), with the same strings as
+ * [Recording.targetKind].
+ */
 @Serializable
-data class TextMemoSheet(val projectKey: Key? = null) : SharedSheet {
+data class TextMemoSheet(
+    val projectKey: Key? = null,
+    val targetKind: String? = null,
+    val targetKey: Key? = null,
+) : SharedSheet {
     override val owner: FeatureModule get() = FeatureModule.RECORDER
+}
+
+/**
+ * The recorder's link picker (LRC-20), stacked over [TextMemoSheet] on another area's screen. What
+ * it edits is held by the recorder's capture hub; [forMemo] = the memo's links (else the record's).
+ */
+@Serializable
+data class RecorderLinkPickerSheet(val forMemo: Boolean = true) : SharedSheet {
+    override val owner: FeatureModule get() = FeatureModule.RECORDER
+}
+
+/**
+ * The `@` link picker of the shared rich text editor (core:ui `RichTextEditor`), drawn by the shell.
+ * The pick goes back through `NavResults` under [requestKey] as a core:ui `LinkPick`. [kinds] are
+ * `LinkTargetKind` names offered (empty = 인물 · 용어 · 장소); [title] is the caller's copy.
+ */
+@Serializable
+data class RichLinkPickerSheet(
+    override val projectKey: Key,
+    val requestKey: String,
+    val title: String,
+    val kinds: List<String> = emptyList(),
+) : ProjectSheet {
+    override val owner: FeatureModule get() = FeatureModule.SHELL
 }

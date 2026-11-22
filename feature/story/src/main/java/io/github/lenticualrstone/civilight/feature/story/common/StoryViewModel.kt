@@ -4,6 +4,8 @@ import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.domain.actions.ActionContext
 import io.github.lenticualrstone.civilight.domain.actions.SceneDeleteResult
 import io.github.lenticualrstone.civilight.domain.story.structure.NewUnitResult
+import io.github.lenticualrstone.civilight.domain.trash.DocChange
+import io.github.lenticualrstone.civilight.domain.trash.Toast
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.project.SceneNotation
@@ -16,6 +18,7 @@ import io.github.lenticualrstone.civilight.ui.project.ProjectViewModel
 import io.github.lenticualrstone.civilight.ui.scaffold.ToastController
 import io.github.lenticualrstone.civilight.ui.security.UnlockState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -53,10 +56,19 @@ abstract class StoryViewModel(projectKey: Key, protected val services: StoryServ
     /** True while the hidden items of this project are locked (R19 §6: `숨긴 씬` masks). */
     fun itemsLocked(state: UnlockState): Boolean = !state.itemsOpen(projectKey)
 
-    /** Runs [transform] as one undo step named [label]. */
-    fun apply(label: String, transform: (ProjectDoc, ActionContext) -> ProjectDoc): Job = viewModelScope.launch {
+    /**
+     * Runs [transform] as one undo step named [label]. The store runs the transform on the caller's
+     * thread, so it is launched on [Dispatchers.Default]: some transforms re-run checks or a term scan.
+     */
+    fun apply(label: String, transform: (ProjectDoc, ActionContext) -> ProjectDoc): Job = viewModelScope.launch(Dispatchers.Default) {
         val ctx = services.actionContext()
         update(label) { doc -> transform(doc, ctx) }
+    }
+
+    /** Like [apply], but consecutive edits with the same [mergeKey] form one undo step (typing in a field). */
+    fun applyMerged(label: String, mergeKey: String, transform: (ProjectDoc, ActionContext) -> ProjectDoc): Job = viewModelScope.launch(Dispatchers.Default) {
+        val ctx = services.actionContext()
+        update(label, mergeKey) { doc -> transform(doc, ctx) }
     }
 
     /**
@@ -90,6 +102,37 @@ abstract class StoryViewModel(projectKey: Key, protected val services: StoryServ
         }
     }
 
+    /**
+     * A `되살리기` (STO-11, R20 §2) as one undo step: [restore] returns what it restored, or null when
+     * nothing was (stale, or the gate wants authentication). Its toast comes with `되돌리기`, which
+     * reverts exactly that restore row by row on the app scope (as the delete toast does).
+     */
+    fun restoreWithToast(label: String, restore: (ProjectDoc, ActionContext) -> RestoreStep?): Job = viewModelScope.launch {
+        val ctx = services.actionContext()
+        var step: RestoreStep? = null
+        val applied = update(label) { doc ->
+            val r = restore(doc, ctx)
+            step = r
+            r?.doc ?: doc
+        }
+        val done = step ?: return@launch
+        if (applied != EditResult.APPLIED) return@launch
+        val toast = done.toast ?: return@launch
+        services.toasts.show(toast.message, toast.action ?: StoryCopy.UNDO) { revertOnAppScope(label, done.change) }
+    }
+
+    private fun revertOnAppScope(label: String, change: DocChange) {
+        val sessions = services.projects
+        services.appScope.launch {
+            val store = sessions.acquire(projectKey)
+            try {
+                if (!store.readOnly) store.update(label) { change.revert(it) }
+            } finally {
+                sessions.release(projectKey)
+            }
+        }
+    }
+
     /** `새 에피소드` after [unitKey] (STO-05). */
     fun newUnitAfter(unitKey: Key, label: String): Job =
         newUnit(label) { doc, ctx -> StoryActions.newUnitAfter(doc, unitKey, ctx) }
@@ -108,6 +151,9 @@ abstract class StoryViewModel(projectKey: Key, protected val services: StoryServ
     fun setNotation(notation: SceneNotation, label: String): Job =
         apply(label) { doc, ctx -> StoryActions.setNotation(doc, notation, ctx) }
 }
+
+/** What a `되살리기` did: the next doc, the row-level change (for `되돌리기`) and the toast. */
+data class RestoreStep(val doc: ProjectDoc, val change: DocChange, val toast: Toast?)
 
 /** The view model of story sheets shown over any project screen (`UnitMenuSheet`, `NewUnitSheet`). */
 class StoryActionsViewModel(projectKey: Key, services: StoryServices) : StoryViewModel(projectKey, services)

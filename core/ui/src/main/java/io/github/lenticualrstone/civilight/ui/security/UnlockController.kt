@@ -14,12 +14,15 @@ import kotlinx.coroutines.flow.update
  * - [hiddenGroupUnlockedAt]: the hidden-projects group is open since then (LIB-32); null = locked.
  * - [itemsUnlockedAt]: hidden items of a project are open since then (LIB-36), by project key.
  * - [recordsUnlockedAt]: hidden recorder records are open since then (LRC-41).
+ * - [keptOpenSince]: projects that became hidden in this session and stay open "지금은 열린 채"
+ *   (R19 §2, LIB-12, LIB-24, LIB-33) until the next re-lock, by project key.
  */
 data class UnlockState(
     val appLocked: Boolean = false,
     val hiddenGroupUnlockedAt: Long? = null,
     val itemsUnlockedAt: Map<Key, Long> = emptyMap(),
     val recordsUnlockedAt: Long? = null,
+    val keptOpenSince: Map<Key, Long> = emptyMap(),
     /** Events since the earliest open unlock; cleared when everything is locked again. */
     val events: Set<RelockEvent> = emptySet(),
 ) {
@@ -29,7 +32,14 @@ data class UnlockState(
 
     val recordsOpen: Boolean get() = recordsUnlockedAt != null
 
-    val anythingOpen: Boolean get() = hiddenGroupUnlockedAt != null || itemsUnlockedAt.isNotEmpty() || recordsUnlockedAt != null
+    /** Projects kept open in this session although hidden ("지금은 열린 채"). */
+    val keptOpen: Set<Key> get() = keptOpenSince.keys
+
+    /** Whether hidden project [projectKey] may show its content: the group is open or it is kept open. */
+    fun projectOpen(projectKey: Key): Boolean = hiddenGroupOpen || projectKey in keptOpenSince
+
+    val anythingOpen: Boolean
+        get() = hiddenGroupUnlockedAt != null || itemsUnlockedAt.isNotEmpty() || recordsUnlockedAt != null || keptOpenSince.isNotEmpty()
 }
 
 /**
@@ -80,8 +90,15 @@ class UnlockController(
 
     fun unlockRecords() = open { it.copy(recordsUnlockedAt = now()) }
 
-    /** Locks the hidden group right away (auth cancelled on the hidden lock, L-05). */
-    fun lockHiddenGroup() = _state.update { tidy(it.copy(hiddenGroupUnlockedAt = null)) }
+    /**
+     * "지금은 열린 채" (R19 §2): [projectKey] was just hidden (or created hidden) in this session and stays
+     * open until the next re-lock under the same policy as the hidden group (`다시 잠그기`, leaving the
+     * app, screen off or 5 minutes, LIB-33). No prompt: the user is already looking at it.
+     */
+    fun keepOpen(projectKey: Key) = open { it.copy(keptOpenSince = it.keptOpenSince + (projectKey to now())) }
+
+    /** Locks the hidden group right away (auth cancelled on the hidden lock, L-05); kept-open projects lock too. */
+    fun lockHiddenGroup() = _state.update { tidy(it.copy(hiddenGroupUnlockedAt = null, keptOpenSince = emptyMap())) }
 
     private fun open(change: (UnlockState) -> UnlockState) = _state.update { s ->
         change(if (s.anythingOpen) s else s.copy(events = emptySet()))
@@ -101,6 +118,7 @@ class UnlockController(
                 hiddenGroupUnlockedAt = s.hiddenGroupUnlockedAt.takeUnless { due(it) },
                 itemsUnlockedAt = s.itemsUnlockedAt.filterValues { !due(it) },
                 recordsUnlockedAt = s.recordsUnlockedAt.takeUnless { due(it) },
+                keptOpenSince = s.keptOpenSince.filterValues { !due(it) },
             ),
         )
     }

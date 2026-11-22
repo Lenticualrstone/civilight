@@ -5,16 +5,19 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.project.Project
 import io.github.lenticualrstone.civilight.store.app.AppStateStore
 import io.github.lenticualrstone.civilight.ui.project.EditResult
+import io.github.lenticualrstone.civilight.ui.security.AuthAvailability
 import io.github.lenticualrstone.civilight.ui.security.AuthCopy
 import io.github.lenticualrstone.civilight.ui.security.AuthRequest
 import io.github.lenticualrstone.civilight.ui.security.AuthResult
 import io.github.lenticualrstone.civilight.ui.security.BiometricGate
+import io.github.lenticualrstone.civilight.ui.security.UnlockController
 
 /** [ProtectionPorts] over the shared stores and the system prompt. */
 internal class AppProtectionPorts(
     private val writer: ProjectWriter,
     private val biometric: BiometricGate,
     private val appState: AppStateStore,
+    private val unlock: UnlockController,
 ) : ProtectionPorts {
     override suspend fun write(projectKey: Key, label: String, transform: (Project) -> Project): EditResult =
         writer.edit(projectKey, label) { doc, stamp ->
@@ -29,4 +32,8 @@ internal class AppProtectionPorts(
         appState.ensureLoaded()
         appState.removeRecentsOf(projectKey)
     }
+
+    override fun deviceSecure(): Boolean = biometric.availability() != AuthAvailability.NONE
+
+    override fun keepOpen(projectKey: Key) = unlock.keepOpen(projectKey)
 }

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="map_sketch" path="map_sketch/" />
+    <cache-path name="map_export" path="map_export/" />
 </paths>

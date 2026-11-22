@@ -44,6 +44,16 @@ import io.github.lenticualrstone.civilight.feature.map.canvas.mapAt
 import io.github.lenticualrstone.civilight.feature.map.common.GlassCard
 import io.github.lenticualrstone.civilight.feature.map.common.TopBarTapGuard
 import io.github.lenticualrstone.civilight.feature.map.common.MapEnv
+import io.github.lenticualrstone.civilight.feature.map.common.MapNav
+import io.github.lenticualrstone.civilight.feature.map.scale.ScaleBars
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.platform.LocalDensity
+import io.github.lenticualrstone.civilight.feature.map.list.NewMapSheet
+import io.github.lenticualrstone.civilight.feature.map.list.rememberNewMapFlow
+import io.github.lenticualrstone.civilight.feature.map.travel.TravelModeContent
+import io.github.lenticualrstone.civilight.feature.map.travel.TravelModeSheet
+import io.github.lenticualrstone.civilight.domain.world.map.MapNesting
+import io.github.lenticualrstone.civilight.model.map.MapParent
 import io.github.lenticualrstone.civilight.feature.map.common.MapScreenViewModel
 import io.github.lenticualrstone.civilight.feature.map.common.mapBack
 import io.github.lenticualrstone.civilight.feature.map.view.MovePinBar
@@ -51,8 +61,22 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Point
 import io.github.lenticualrstone.civilight.navigation.LensSheet
 import io.github.lenticualrstone.civilight.navigation.PlaceCard
-import io.github.lenticualrstone.civilight.navigation.TravelModes
 import io.github.lenticualrstone.civilight.navigation.MapEdit as MapEditRoute
+import io.github.lenticualrstone.civilight.navigation.DetailStamps as DetailStampsRoute
+import io.github.lenticualrstone.civilight.navigation.MapReveal as MapRevealRoute
+import io.github.lenticualrstone.civilight.domain.story.lens.EditChoice
+import io.github.lenticualrstone.civilight.domain.world.map.MapScales
+import io.github.lenticualrstone.civilight.designsystem.component.MapValueChip
+import io.github.lenticualrstone.civilight.feature.map.canvas.StampGlyphs
+import io.github.lenticualrstone.civilight.feature.map.common.rememberMapMenuHost
+import io.github.lenticualrstone.civilight.feature.map.view.MapMenu
+import io.github.lenticualrstone.civilight.feature.map.view.MapMenuScreen
+import io.github.lenticualrstone.civilight.feature.map.view.MapMoreContent
+import io.github.lenticualrstone.civilight.feature.map.view.MapMoreSheet
+import io.github.lenticualrstone.civilight.model.map.DrawnLineKind
+import io.github.lenticualrstone.civilight.model.position.LensPoint
+import io.github.lenticualrstone.civilight.ui.picker.PlacePickerSheet
+import androidx.compose.ui.graphics.PathOperation
 import io.github.lenticualrstone.civilight.navigation.MapScale as MapScaleRoute
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
@@ -69,7 +93,21 @@ import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
  * inner side panel `속성 · 레이어 · 목록` or the cover bottom card; property pickers as sheets.
  */
 @Composable
-fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
+fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) = MapEditorScreen(route.projectKey, route.mapKey, deps, detail = false)
+
+/**
+ * 상세 지형 · 편집 (WLD-60, boards `MapDetail`, `MMapStamp`): the same editor with the tool bar
+ * `이동 · 도장 · 강 · 길 · 라벨 · 영역 · 레이어`, the side panel `도장 · 범례 · 레이어` (inner) or the
+ * bottom card (cover, `[PROPOSED]`), stamp handles and the stamp chip.
+ */
+@Composable
+fun DetailStampsScreen(route: DetailStampsRoute, deps: FeatureDeps) = MapEditorScreen(route.projectKey, route.mapKey, deps, detail = true)
+
+private data class EditorRoute(val projectKey: String, val mapKey: String)
+
+@Composable
+private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDeps, detail: Boolean) {
+    val route = EditorRoute(projectKey, mapKey)
     val vm = entryViewModel { MapEditViewModel(route.projectKey, route.mapKey, MapEnv.of(deps)) }
     val doc by vm.doc.collectAsState()
     val readOnly by vm.readOnly.collectAsState()
@@ -84,10 +122,27 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
     val editor = remember(editorText) { EditorState.decode(editorText) }
     fun set(s: EditorState) { editorText = s.encode() }
     val viewport = Viewport.fromArray(viewportArray)
+    var contentWidth by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val barPx = with(density) { 96.dp.toPx() }
 
     val d = doc
     val ui = remember(d, hiddenOpen, editorText) { d?.let { EditState.build(it, route.mapKey, MapScreenViewModel.lensOf(it), hiddenOpen, editor) } }
     val map = d?.maps?.get(route.mapKey)
+    val newMap = rememberNewMapFlow(route.projectKey, deps, vm, sheets)
+    val menu = rememberMapMenuHost(route.projectKey, route.mapKey, deps, vm, sheets)
+    val settings by deps.settings.collectAsState()
+    val lens = d?.let { MapScreenViewModel.lensOf(it) } ?: LensPoint.Latest
+    val tools = if (detail) EditTool.DETAIL else EditTool.BASE
+    val layerActions = remember(vm, sheets) {
+        object : LayerActions {
+            override fun setVisible(layerKey: Key, visible: Boolean) { vm.setLayerVisible(layerKey, visible) }
+            override fun rename(layerKey: Key) = sheets.open(LayerNameSheet(layerKey))
+            override fun reveal(layerKey: Key) = sheets.open(RevealSheet(layerKey))
+            override fun move(layerKey: Key, up: Boolean) { vm.moveLayer(layerKey, up) }
+            override fun add() = sheets.open(LayerNameSheet(null))
+        }
+    }
 
     val actions = remember(vm, sheets) {
         object : PanelActions {
@@ -112,12 +167,26 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
                 val points = s().routeDraft.points
                 vm.finishRoute(points) { key -> set(Editor.routeFinished(EditorState.decode(editorText), key)) }
             }
-            override fun setRouteMode(routeKey: Key, modeKey: Key?) {
-                if (modeKey == null) deps.navigator.push(TravelModes(route.projectKey)) else vm.updateRoute(routeKey) { it.copy(shownModeKey = modeKey) }
+            override fun setRouteMode(routeKey: Key, index: Int?) {
+                if (index == null) sheets.open(TravelModeSheet(routeKey = routeKey)) else vm.setRouteMode(routeKey, index)
             }
+            override fun openChildMap(mapKey: Key) = MapNav.open(deps.navigator, vm.doc.value, route.projectKey, mapKey)
+            override fun createChildMap(pinKey: Key) = newMap.open(MapParent(route.mapKey, pinKey))
+            override fun pickChildMap(pinKey: Key) = sheets.open(ChildMapSheet(pinKey))
             override fun setScale() = deps.navigator.push(MapScaleRoute(route.projectKey, route.mapKey))
             override fun movePin(pinKey: Key) = set(Editor.startMovePin(s(), pinKey))
             override fun openPlaceCard(placeKey: Key) = deps.navigator.push(PlaceCard(route.projectKey, placeKey))
+            override fun setStampSize(stampKey: Key, size: Int) { vm.updateStamp(stampKey) { it.copy(size = size) } }
+            override fun openStampPlace(stampKey: Key) = sheets.open(StampPlaceSheet(stampKey))
+            override fun moveStamp() = set(Editor.startMoveStamp(s()))
+            override fun undoLinePoint() = set(Editor.undoLinePoint(s()))
+            override fun finishLine() {
+                val st = s()
+                val points = st.line ?: return
+                val kind = if (st.tool == EditTool.ROAD) DrawnLineKind.ROAD else DrawnLineKind.RIVER
+                vm.finishLine(kind, points) { key -> set(Editor.lineFinished(EditorState.decode(editorText), key)) }
+            }
+            override fun toggleCompare(index: Int) = set(Editor.toggleCompare(s(), index))
             override fun setCurve(labelKey: Key, on: Boolean) {
                 val label = vm.doc.value?.maps?.get(route.mapKey)?.labels?.firstOrNull { it.key == labelKey } ?: return
                 vm.setLabelCurve(labelKey, if (on) CurveGeometry.defaultCurve(Point(label.x, label.y)) else null)
@@ -126,12 +195,13 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
     }
 
     CivilightScreen(
-        title = ui?.title.orEmpty(),
-        smallLine = ui?.small,
+        title = if (detail) MapCopy.DETAIL_TITLE else ui?.title.orEmpty(),
+        smallLine = if (detail) map?.name else ui?.small,
         back = mapBack(deps),
         lens = d?.let(::lensChipLabel),
         onLens = { sheets.open(LensSheet(route.projectKey)) },
         actions = {
+            CivilightIconButton(IconId.More, MapCopy.MORE, { sheets.open(MapMoreSheet) })
             CivilightIconButton(IconId.Undo, MapCopy.BTN_UNDO, { vm.undoLast() }, enabled = !readOnly)
             TextAction(MapCopy.BTN_DONE, { deps.navigator.pop() })
         },
@@ -140,7 +210,31 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
         localSheets = { key ->
             val doc0 = doc
             val map0 = doc0?.maps?.get(route.mapKey)
-            if (doc0 == null || map0 == null) null else when (key) {
+            if (doc0 == null || map0 == null) null else menu.content(key, doc0, readOnly) ?: when (key) {
+                MapMoreSheet -> {
+                    {
+                        MapMoreContent(
+                            rows = MapMenu.rows(map0, MapMenuScreen.EDIT),
+                            onRow = { action -> close(); menu.onRow(action, doc0) },
+                            canScale = !MapScales.isNodeMap(map0),
+                            defaultSize = settings.largeMapExport,
+                            exporting = false,
+                            onScale = { close(); deps.navigator.push(MapScaleRoute(route.projectKey, route.mapKey)) },
+                            onReveal = { close(); deps.navigator.push(MapRevealRoute(route.projectKey, route.mapKey)) },
+                            onExport = {},
+                            onClose = ::close,
+                            canExport = false,
+                        )
+                    }
+                }
+                is StampPlaceSheet -> {
+                    {
+                        PlacePickerSheet(doc0, gate, MapCopy.PLACE_LINK, onPick = { ref ->
+                            close()
+                            vm.updateStamp(key.stampKey) { it.copy(placeKey = ref.key) }
+                        }, onClose = ::close, includeRegions = false)
+                    }
+                }
                 is PinPlaceSheet -> {
                     {
                         val model = PinPick.model(doc0, route.mapKey, pinQuery, hiddenOpen)
@@ -226,6 +320,36 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
                         }, onClose = ::close)
                     }
                 }
+                is NewMapSheet -> { { newMap.content(this, key) } }
+                is LayerNameSheet -> {
+                    {
+                        val existing = key.layerKey?.let { k -> map0.layers.firstOrNull { it.key == k } }
+                        LayerNameContent(existing?.name.orEmpty(), existing != null, onDone = { name ->
+                            close()
+                            if (existing != null) vm.renameLayer(existing.key, name) else vm.addLayer(name)
+                        }, onClose = ::close)
+                    }
+                }
+                is ChildMapSheet -> {
+                    {
+                        val maps = MapNesting.candidates(doc0, route.mapKey, key.pinKey).map { it.key to it.name }
+                        ChildMapContent(maps, onPick = { child ->
+                            close()
+                            vm.nestMap(child, key.pinKey)
+                        }, onClose = ::close)
+                    }
+                }
+                is TravelModeSheet -> {
+                    {
+                        val routeKey = key.routeKey
+                        val shown = routeKey?.let { k -> map0.routes.firstOrNull { it.key == k }?.shownModeKey }
+                        TravelModeContent(doc0, shown, readOnly, onPick = null, onSave = { modeKey, name, km, hours ->
+                            vm.saveTravelMode(modeKey, name, km, hours) { saved ->
+                                if (modeKey == null && routeKey != null) vm.setRouteModeKey(routeKey, saved)
+                            }
+                        }, onClose = ::close)
+                    }
+                }
                 else -> null
             }
         },
@@ -238,6 +362,8 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
                 scene = state.scene,
                 viewport = viewport,
                 onViewportChange = { viewportArray = it.toArray() },
+                onContentWidth = { contentWidth = it },
+                hitTerrain = detail,
                 selectedKey = editor.movingPin ?: editor.selected,
                 onTap = { p, hit ->
                     val m = map ?: return@MapCanvas
@@ -249,13 +375,30 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
                         null -> Unit
                     }
                     when (val c = out.commit) {
-                        is EditorCommit.MoveVertex -> vm.moveVertex(c.regionKey, c.index, c.to)
-                        is EditorCommit.MoveCurveHandle -> {
-                            val curve = m.labels.firstOrNull { it.key == c.labelKey }?.curve
-                            if (curve != null && c.index in curve.indices) {
-                                vm.setLabelCurve(c.labelKey, curve.mapIndexed { i, q -> if (i == c.index) c.to else q })
+                        is EditorCommit.MoveVertex -> when {
+                            m.drawnLines.any { it.key == c.regionKey } -> vm.moveLinePoint(c.regionKey, c.index, c.to)
+                            else -> {
+                                // WLD-65: under the lens, or with `◆` history, the author chooses first.
+                                val d0 = vm.doc.value
+                                if (d0 != null && ShapeEdits.choice(d0, route.mapKey, c.regionKey, lens) is EditChoice.TwoButtons) {
+                                    set(Editor.askShapeEdit(out.state, c.regionKey, c.index, c.to))
+                                } else {
+                                    vm.overwriteShape(c.regionKey, lens, c.index, c.to)
+                                }
                             }
                         }
+                        is EditorCommit.MoveCurveHandle -> when {
+                            m.stamps.any { it.key == c.labelKey } ->
+                                if (c.index == StampHandles.ROTATE) vm.rotateStampToward(c.labelKey, c.to) else vm.resizeStampToward(c.labelKey, c.to)
+                            else -> {
+                                val curve = m.labels.firstOrNull { it.key == c.labelKey }?.curve
+                                if (curve != null && c.index in curve.indices) {
+                                    vm.setLabelCurve(c.labelKey, curve.mapIndexed { i, q -> if (i == c.index) c.to else q })
+                                }
+                            }
+                        }
+                        is EditorCommit.PlaceStamp -> vm.placeStamp(c.at, c.kind, c.size) { key -> set(Editor.select(EditorState.decode(editorText), key)) }
+                        is EditorCommit.MoveStamp -> vm.moveStamp(c.stampKey, c.to)
                         null -> Unit
                     }
                 },
@@ -270,6 +413,19 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
                     }
                     line(state.regionDraft, closed = false)
                     line(state.routeDraft, closed = false)
+                    line(state.lineDraft, closed = false)
+                    state.lineDraft.forEach { q -> val s0 = scope.screen(q); drawCircle(acc, 4.dp.toPx(), Offset(s0.x, s0.y)) }
+                    state.compare?.let { (other, current) ->
+                        // WLD-65 `비교`: the other shape dashed; the part of it outside the current shape dotted.
+                        fun path(points: List<Point>) = Path().apply {
+                            points.forEachIndexed { i, q -> val s0 = scope.screen(q); if (i == 0) moveTo(s0.x, s0.y) else lineTo(s0.x, s0.y) }
+                            close()
+                        }
+                        val added = Path().apply { op(path(other), path(current), PathOperation.Difference) }
+                        drawPath(added, acc.copy(alpha = 0.18f))
+                        drawPath(added, acc, style = Stroke(1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx()))))
+                        drawPath(path(other), acc, style = Stroke(1.5.dp.toPx(), pathEffect = dash))
+                    }
                     state.routeDraft.forEach { q -> val s = scope.screen(q); drawCircle(acc, 4.dp.toPx(), Offset(s.x, s.y)) }
                 },
                 marks = { scope ->
@@ -278,6 +434,19 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
                         MapVertex(Modifier.mapAt(s.x, s.y), last = i == state.regionDraft.lastIndex)
                     }
                     val props = state.props
+                    if (props is PropsUi.StampProps && (editor.tool == EditTool.MOVE || editor.tool == EditTool.STAMP)) {
+                        val c = scope.screen(props.data.at)
+                        val r = maxOf(StampGlyphs.radius(props.data.size) * scope.math.contentW(scope.viewport), with(density) { (4 + 3 * props.data.size).dp.toPx() })
+                        MapValueChip(props.data.chip, Modifier.mapAt(c.x, c.y + r + with(density) { 22.dp.toPx() }))
+                        MapVertex(Modifier.mapAt(c.x, c.y - r * 1.6f), last = editor.handle == StampHandles.ROTATE, onClick = { set(Editor.chooseHandle(editor, StampHandles.ROTATE)) })
+                        MapVertex(Modifier.mapAt(c.x + r * 1.1f, c.y + r * 1.1f), last = editor.handle == StampHandles.SIZE, onClick = { set(Editor.chooseHandle(editor, StampHandles.SIZE)) })
+                    }
+                    if (props is PropsUi.LineProps && editor.tool == EditTool.MOVE) {
+                        props.points.forEachIndexed { i, q ->
+                            val s0 = scope.screen(q)
+                            MapVertex(Modifier.mapAt(s0.x, s0.y), last = editor.vertex == i, onClick = { set(Editor.chooseVertex(editor, i)) })
+                        }
+                    }
                     if (editor.tool == EditTool.MOVE || editor.tool == EditTool.LAYER) {
                         if (props is PropsUi.RegionProps) {
                             props.vertices.forEachIndexed { i, q ->
@@ -295,9 +464,24 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
                 },
             )
             TopBarTapGuard(padding.calculateTopPadding())
-            val tools = remember { EditTool.entries.map { MapTool(it.label, it.icon) } }
+            val toolCells = remember(detail) { tools.map { MapTool(it.label, it.icon) } }
             val toolbar: @Composable (Modifier) -> Unit = { mod ->
-                MapToolbar(editor.tool.ordinal, { set(Editor.chooseTool(editor, EditTool.entries[it])) }, mod, tools = tools, label = MapCopy.TOOLBAR)
+                MapToolbar(tools.indexOf(editor.tool).coerceAtLeast(0), { set(Editor.chooseTool(editor, tools[it], detail)) }, mod, tools = toolCells, label = MapCopy.TOOLBAR)
+            }
+            val shapeEdit = editor.shapeEdit
+            val shapeBar: (@Composable (Modifier) -> Unit)? = shapeEdit?.let { pending ->
+                val choice = d?.let { ShapeEdits.choice(it, route.mapKey, pending.regionKey, lens) } as? EditChoice.TwoButtons
+                choice?.let { c ->
+                    { mod ->
+                        ShapeChoiceBar(
+                            c, readOnly,
+                            onOverwrite = { vm.overwriteShape(pending.regionKey, lens, pending.index, pending.to); set(Editor.endShapeEdit(editor)) },
+                            onFromHere = { vm.changeShapeFromHere(pending.regionKey, lens, pending.index, pending.to); set(Editor.endShapeEdit(editor)) },
+                            onCancel = { set(Editor.endShapeEdit(editor)) },
+                            modifier = mod,
+                        )
+                    }
+                }
             }
             val moving = state.moving
             if (inner) {
@@ -305,27 +489,41 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
                     Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    state.scale?.let { ScaleBar(it) }
+                    (map?.let { m -> d?.let { ScaleBars.label(it, m, contentWidth, barPx) } } ?: state.scale)?.let { ScaleBar(it) }
                     if (moving != null) {
                         MovePinBar(moving.first, moving.second != null && !readOnly, { set(Editor.endMovePin(editor)) }, {
                             val to = moving.second ?: return@MovePinBar
                             editor.movingPin?.let { k -> vm.movePin(k, to) { set(Editor.endMovePin(EditorState.decode(editorText))) } }
                         }, Modifier.widthIn(max = 360.dp))
                     }
+                    shapeBar?.invoke(Modifier.widthIn(max = 360.dp))
                     toolbar(Modifier)
                 }
                 SidePanel(
                     onClose = actions::deselect,
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
-                    tabs = listOf(MapCopy.TAB_PROPS, MapCopy.TAB_LAYERS, MapCopy.TAB_LIST),
+                    tabs = if (detail) listOf(MapCopy.TAB_STAMPS, MapCopy.TAB_LEGEND, MapCopy.TAB_LAYERS) else listOf(MapCopy.TAB_PROPS, MapCopy.TAB_LAYERS, MapCopy.TAB_LIST),
                     selectedTab = editor.panelTab,
                     onSelectTab = { set(editor.copy(panelTab = it)) },
                 ) {
                     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        when (editor.panelTab) {
-                            1 -> LayersPanel(state.layers, readOnly) { k, v -> vm.setLayerVisible(k, v) }
-                            2 -> ItemsPanel(state.items) { set(Editor.select(editor, it)) }
-                            else -> state.props?.let { PropsPanel(it, readOnly, actions) }
+                        if (detail) {
+                            when (editor.panelTab) {
+                                1 -> LegendPanel(state.legend)
+                                2 -> LayersPanel(state.layers, readOnly, layerActions)
+                                else -> {
+                                    state.props?.let { PropsPanel(it, readOnly, actions, editor.compare) }
+                                    if (state.props == null || editor.tool == EditTool.STAMP) {
+                                        StampPalette(editor.stampKind, editor.stampSize, { set(Editor.chooseStamp(editor, it)) }, { set(Editor.chooseStampSize(editor, it)) })
+                                    }
+                                }
+                            }
+                        } else {
+                            when (editor.panelTab) {
+                                1 -> LayersPanel(state.layers, readOnly, layerActions)
+                                2 -> ItemsPanel(state.items) { set(Editor.select(editor, it)) }
+                                else -> state.props?.let { PropsPanel(it, readOnly, actions, editor.compare) }
+                            }
                         }
                     }
                 }
@@ -340,11 +538,17 @@ fun MapEditScreen(route: MapEditRoute, deps: FeatureDeps) {
                             val to = moving.second ?: return@MovePinBar
                             editor.movingPin?.let { k -> vm.movePin(k, to) { set(Editor.endMovePin(EditorState.decode(editorText))) } }
                         }, Modifier.fillMaxWidth())
+                        shapeBar != null -> shapeBar(Modifier.fillMaxWidth())
                         editor.tool == EditTool.LAYER -> GlassCard(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
-                            Column(Modifier.verticalScroll(rememberScrollState())) { LayersPanel(state.layers, readOnly) { k, v -> vm.setLayerVisible(k, v) } }
+                            Column(Modifier.verticalScroll(rememberScrollState())) { LayersPanel(state.layers, readOnly, layerActions) }
                         }
                         state.props != null -> GlassCard(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-                            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { PropsPanel(state.props, readOnly, actions) }
+                            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { PropsPanel(state.props, readOnly, actions, editor.compare) }
+                        }
+                        detail && editor.tool == EditTool.STAMP -> GlassCard(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                StampPalette(editor.stampKind, editor.stampSize, { set(Editor.chooseStamp(editor, it)) }, { set(Editor.chooseStampSize(editor, it)) })
+                            }
                         }
                     }
                     toolbar(Modifier)

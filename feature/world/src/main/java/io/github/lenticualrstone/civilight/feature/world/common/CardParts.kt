@@ -109,7 +109,7 @@ fun CardDescription(paragraphs: List<ParagraphUi>, modifier: Modifier = Modifier
 /** A fixed row of the field table (`첫 공개 | 1-7 씬 3 · #044`); editable rows open their editor. */
 @Composable
 fun FixedRow(row: FixedRowUi, onEdit: () -> Unit) {
-    FieldTableRow(label = row.label, value = row.value, onClick = if (row.editable) onEdit else null)
+    FieldTableRow(label = row.label, value = row.value, point = row.note, onClick = if (row.editable) onEdit else null)
 }
 
 /**

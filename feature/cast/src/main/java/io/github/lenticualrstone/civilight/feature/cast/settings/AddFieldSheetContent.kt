@@ -32,6 +32,9 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.designsystem.component.SwitchRow
+import io.github.lenticualrstone.civilight.designsystem.component.RadioRow
+import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
+import androidx.compose.foundation.layout.heightIn
 import io.github.lenticualrstone.civilight.designsystem.component.TypeGridCell
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
@@ -68,6 +71,7 @@ fun SheetScope.AddFieldSheetContent(sheet: AddFieldSheet) {
     val character = sheet.entityKey?.takeIf { kind == EntityKind.CHARACTER }?.let(doc.index::character)
     val fromRecord = sheet.entityKey != null
     var draft by rememberSaveable(sheet, stateSaver = DraftSaver) { mutableStateOf(AddFieldDraft()) }
+    var typesOpen by rememberSaveable(sheet) { mutableStateOf(false) }
     val check = remember(doc, draft, kind) { AddFieldModel.check(doc, draft, kind) }
     val focus = remember { FocusRequester() }
     if (store.readOnly) {
@@ -84,8 +88,19 @@ fun SheetScope.AddFieldSheetContent(sheet: AddFieldSheet) {
         if (!fromRecord) {
             CivilightTextField(draft.exportName, { draft = draft.copy(exportName = it) }, Modifier.fillMaxWidth().padding(top = 10.dp), label = CastUiCopy.EXPORT_NAME)
         }
-        Label(CastUiCopy.TYPE)
-        TypeGrid(draft.type) { draft = AddFieldModel.withType(doc, kind, draft, it) }
+        if (fromRecord) {
+            // `RCProfileAdd`: one row `종류 | 짧은 글 ›` that opens the type list in place.
+            TypeRow(draft.type, typesOpen) { typesOpen = !typesOpen }
+            if (typesOpen) {
+                TypeList(draft.type) {
+                    draft = AddFieldModel.withType(doc, kind, draft, it)
+                    typesOpen = false
+                }
+            }
+        } else {
+            Label(CastUiCopy.TYPE)
+            TypeGrid(draft.type) { draft = AddFieldModel.withType(doc, kind, draft, it) }
+        }
         TypeInputs(draft, kind, AddFieldModel.calcSources(doc, kind).map { it.key to it.name }) { draft = it }
         if (fromRecord && character != null) {
             Label(CastUiCopy.WHERE)
@@ -130,6 +145,33 @@ private fun TypeGrid(selected: FieldType, onSelect: (FieldType) -> Unit) {
                 if (pair.size == 1) Column(Modifier.weight(1f)) {}
             }
         }
+    }
+}
+
+/** `종류 | 짧은 글 ›` (`RCProfileAdd`): the chosen type; tapping shows or hides the list. */
+@Composable
+private fun TypeRow(selected: FieldType, open: Boolean, onToggle: () -> Unit) {
+    val colors = CivilightTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp)
+            .topHairline(colors.line)
+            .pressable(onClick = onToggle, scaleOnPress = false, onClickLabel = CastUiCopy.TYPE)
+            .heightIn(min = 44.dp)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CivilightText(CastUiCopy.TYPE, CivilightTheme.type.itemTitleCompact, Modifier.weight(1f), color = colors.ink)
+        CivilightText(CastUiCopy.chosenType(FieldTypes.label(selected)), CivilightTheme.type.small, color = if (open) colors.acc else colors.ink2)
+    }
+}
+
+/** The nine types as radio rows (table order). */
+@Composable
+private fun TypeList(selected: FieldType, onSelect: (FieldType) -> Unit) {
+    Column {
+        for (t in AddFieldModel.TYPES) RadioRow(FieldTypes.label(t), t == selected, { onSelect(t) })
     }
 }
 

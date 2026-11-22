@@ -41,6 +41,8 @@ fun UsageRowView(
     readOnly: Boolean = true,
     onLink: () -> Unit = {},
     onReject: () -> Unit = {},
+    onWarning: (() -> Unit)? = null,
+    onIntended: () -> Unit = {},
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -66,10 +68,28 @@ fun UsageRowView(
         val indent = Modifier.padding(start = LOCATION_WIDTH + GAP, top = 4.dp)
         row.placeLine?.let { CivilightText(it, type.small, indent, color = colors.ink3) }
         row.markers.forEachIndexed { i, marker ->
-            if (i == 0 && row.candidate != null) {
-                CandidateMarker(marker.text, readOnly, onLink, onReject, Modifier.padding(start = LOCATION_WIDTH + GAP))
-            } else {
-                CivilightText(marker.text, type.small, indent, color = if (marker.warn) colors.warn else colors.ink3)
+            when {
+                i == 0 && row.candidate != null -> CandidateMarker(marker.text, readOnly, onLink, onReject, Modifier.padding(start = LOCATION_WIDTH + GAP))
+                // `▲` opens the check center (WLD-20); `맞음` next to it keeps this use (WLD-24).
+                // Both are text buttons with 44 dp targets.
+                marker.warn && onWarning != null -> Row(
+                    Modifier.padding(start = LOCATION_WIDTH + GAP - 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextAction(marker.text, onWarning, color = colors.warn, style = type.small)
+                    if (row.canMarkIntended && !readOnly) {
+                        CivilightText(WorldCopy.SEP, type.small, color = colors.ink3)
+                        TextAction(WorldCopy.TAG_INTENDED, onIntended, color = colors.acc, style = type.small)
+                    }
+                }
+                marker.dotted -> DecoratedText(
+                    text = AnnotatedString(marker.text),
+                    style = type.small,
+                    modifier = indent,
+                    color = colors.ink3,
+                    decorations = listOf(DecorationRange(0, marker.text.length, InlineDecoration.DELETED_REF)),
+                )
+                else -> CivilightText(marker.text, type.small, indent, color = if (marker.warn) colors.warn else colors.ink3)
             }
         }
         if (row.tags.isNotEmpty()) {

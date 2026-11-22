@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.ui.scaffold
 
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -10,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -89,6 +91,16 @@ fun SheetHostLayout(
     // Keep the last sheet while it animates out.
     var shown by remember { mutableStateOf(host.top) }
     host.top?.let { shown = it }
+    // Only the top sheet is composed. A sheet under another one keeps its saveable state (drafts, an
+    // editor's text, a pending picker request) until it is closed; a closed sheet starts fresh.
+    val holder = rememberSaveableStateHolder()
+    val seen = remember { HashSet<String>() }
+    val open = host.sheets.mapTo(HashSet()) { RouteCodec.encode(it) }
+    SideEffect {
+        val gone = seen - open
+        gone.forEach(holder::removeState)
+        seen.removeAll(gone)
+    }
     CivilightSheetLayout(
         sheetVisible = host.top != null,
         onDismissRequest = { host.close() },
@@ -96,10 +108,14 @@ fun SheetHostLayout(
         centered = isInner,
         sheet = {
             shown?.let { sheet ->
-                key(RouteCodec.encode(sheet)) {
-                    val column = this
-                    val scope = remember(column, host, isInner) { HostSheetScope(column, host, isInner) }
-                    scope.SheetBody(sheet, localSheets, registry)
+                val id = RouteCodec.encode(sheet)
+                if (id in open) seen += id
+                key(id) {
+                    holder.SaveableStateProvider(id) {
+                        val column = this
+                        val scope = remember(column, host, isInner) { HostSheetScope(column, host, isInner) }
+                        scope.SheetBody(sheet, localSheets, registry)
+                    }
                 }
             }
         },

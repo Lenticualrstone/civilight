@@ -19,6 +19,19 @@ import io.github.lenticualrstone.civilight.model.recorder.TextMemoDraft
 import io.github.lenticualrstone.civilight.model.sample.ExampleKeys
 import io.github.lenticualrstone.civilight.model.sample.ExampleProject
 import io.github.lenticualrstone.civilight.model.sample.ExampleRecorder
+import io.github.lenticualrstone.civilight.domain.trash.RecorderTrashState
+import io.github.lenticualrstone.civilight.model.trash.TrashEntry
+import io.github.lenticualrstone.civilight.feature.recorder.audio.AudioTakes
+import io.github.lenticualrstone.civilight.feature.recorder.audio.NoAudioTakes
+import io.github.lenticualrstone.civilight.feature.recorder.audio.Playback
+import io.github.lenticualrstone.civilight.feature.recorder.audio.TakeFile
+import io.github.lenticualrstone.civilight.model.asset.Blob
+import io.github.lenticualrstone.civilight.model.asset.BlobSource
+import io.github.lenticualrstone.civilight.model.open
+import io.github.lenticualrstone.civilight.model.recorder.TranscriptionMode
+import java.io.File
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import java.time.Instant
 import java.time.ZoneId
@@ -51,7 +64,13 @@ object Fx {
     }
 }
 
-class FakeRecorder(var library: RecorderLibrary = RecorderLibrary()) : RecorderPort {
+class FakeRecorder(library: RecorderLibrary = RecorderLibrary(), var trash: List<TrashEntry> = emptyList()) : RecorderPort {
+    private val flow = MutableStateFlow(library)
+    var library: RecorderLibrary
+        get() = flow.value
+        set(value) {
+            flow.value = value
+        }
     var session: RecordingSession? = null
     var draft: TextMemoDraft? = null
     var sessionWrites = 0
@@ -61,6 +80,16 @@ class FakeRecorder(var library: RecorderLibrary = RecorderLibrary()) : RecorderP
     override suspend fun ensureLoaded() = Unit
 
     override suspend fun update(transform: (RecorderLibrary) -> RecorderLibrary): RecorderLibrary = transform(library).also { library = it }
+
+    override fun observe(): Flow<RecorderLibrary> = flow
+
+    override suspend fun updateTrash(transform: (RecorderTrashState) -> RecorderTrashState) {
+        val next = transform(RecorderTrashState(library, trash))
+        library = next.library
+        trash = next.entries
+    }
+
+    override suspend fun readSession(): RecordingSession? = session
 
     override suspend fun saveSession(session: RecordingSession?) {
         this.session = session
@@ -72,6 +101,113 @@ class FakeRecorder(var library: RecorderLibrary = RecorderLibrary()) : RecorderP
     }
 
     override suspend fun readDraft(): TextMemoDraft? = draft
+
+    /** Audio kept in the blob store: hash → path (content-addressed by the path in tests). */
+    val blobs = mutableMapOf<String, String>()
+
+    override suspend fun importAudio(path: String, mime: String, durationMs: Long): Blob? {
+        val hash = "h-" + path.substringAfterLast('/')
+        blobs[hash] = path
+        return Blob(hash = hash, fileExt = "aac", mime = mime, bytes = 1000, durationMs = durationMs, source = BlobSource.RECORDER.open(), importedAt = Fx.NOW)
+    }
+
+    override fun audioFile(hash: String): File? = blobs[hash]?.let(::File)
+}
+
+/**
+ * Microphone takes the test drives: a started segment counts as captured when [finish]ed (unless
+ * [captures] is false); [level] is what [sample] reports. Takes are kept per record by segment count.
+ */
+class FakeTakes(var captures: Boolean = true, var level: Float = 0.5f) : AudioTakes {
+    private var segmentKey: Key? = null
+    val segments = mutableMapOf<Key, Int>()
+    val discarded = mutableListOf<Key>()
+    val recovered = mutableListOf<Key>()
+    var pruneKept: Set<Key>? = null
+    var paused = false
+
+    override val capturing: Boolean get() = segmentKey != null
+
+    override fun start(recordKey: Key): Boolean {
+        if (!captures) return false
+        segmentKey = recordKey
+        paused = false
+        return true
+    }
+
+    override fun pause() {
+        paused = true
+    }
+
+    override fun resume() {
+        paused = false
+    }
+
+    override fun sample(): Float = if (capturing) level else 0f
+
+    override fun finish(recordKey: Key): Boolean {
+        if (segmentKey != recordKey) return false
+        segmentKey = null
+        segments[recordKey] = (segments[recordKey] ?: 0) + 1
+        return true
+    }
+
+    override fun drop(recordKey: Key) {
+        if (segmentKey == recordKey) segmentKey = null
+    }
+
+    override fun take(recordKey: Key): TakeFile? {
+        val n = segments[recordKey] ?: return null
+        return TakeFile("takes/$recordKey.aac", "audio/aac", 1000L * n, ByteArray(64) { 128.toByte() })
+    }
+
+    override fun discard(recordKey: Key) {
+        drop(recordKey)
+        segments.remove(recordKey)
+        discarded += recordKey
+    }
+
+    override fun recoverSegment(recordKey: Key) {
+        recovered += recordKey
+        segments[recordKey] = (segments[recordKey] ?: 0) + 1
+    }
+
+    override fun prune(keep: Set<Key>) {
+        pruneKept = keep
+        segments.keys.retainAll(keep)
+    }
+}
+
+/** Playback the test drives: [finish] ends the file; [at] is the position reported. */
+class FakePlayback(var playable: Boolean = true) : Playback {
+    var path: String? = null
+    var at: Long = 0
+    var starts = 0
+    private var onComplete: (() -> Unit)? = null
+
+    override fun start(path: String, fromMs: Long, onComplete: () -> Unit): Boolean {
+        if (!playable) return false
+        this.path = path
+        at = fromMs
+        starts++
+        this.onComplete = onComplete
+        return true
+    }
+
+    override fun pause(): Long = at
+
+    override fun position(): Long = at
+
+    override fun stop() {
+        path = null
+        onComplete = null
+    }
+
+    fun finish() {
+        val done = onComplete
+        stop()
+        done?.invoke()
+    }
 }
 
 class FakeProjects(var doc: ProjectDoc, var readOnly: Boolean = false) : ProjectPort {
@@ -87,7 +223,13 @@ class FakeProjects(var doc: ProjectDoc, var readOnly: Boolean = false) : Project
 }
 
 class FakeEnv(var env: RecorderEnv) : EnvSource {
+    val forgotten = mutableListOf<Key>()
+
     override suspend fun load(): RecorderEnv = env
+
+    override fun forget(projectKey: Key) {
+        forgotten += projectKey
+    }
 
     override fun quick(): RecorderEnv = env
 }
@@ -136,6 +278,9 @@ class HubFixture(
     val env: FakeEnv = FakeEnv(Fx.env(projects.doc)),
     val engine: FakeEngine = FakeEngine(),
     var settings: AppSettings = AppSettings(),
+    val takes: AudioTakes = NoAudioTakes,
+    var online: Boolean = false,
+    val engines: ((TranscriptionMode) -> SpeechEngine)? = null,
 ) {
     private val keys = Fx.keys()
     var now: Long = Fx.NOW
@@ -149,6 +294,8 @@ class HubFixture(
         context = { ActionContext(now = now, zone = Fx.ZONE, device = Fx.DEVICE, newKey = keys) },
         monotonicMs = { scope.testScheduler.currentTime },
         audioTempPath = { "takes/$it.m4a" },
-        engineFactory = { engine },
+        engineFactory = engines ?: { engine },
+        takes = takes,
+        online = { online },
     )
 }

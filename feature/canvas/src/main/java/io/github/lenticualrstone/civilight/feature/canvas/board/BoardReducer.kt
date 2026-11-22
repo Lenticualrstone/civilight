@@ -1,9 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.canvas.board
 
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphHit
-import io.github.lenticualrstone.civilight.feature.canvas.graph.GraphSelection
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Pt
+import io.github.lenticualrstone.civilight.ui.graph.GraphHit
+import io.github.lenticualrstone.civilight.ui.graph.GraphSelection
+import io.github.lenticualrstone.civilight.ui.graph.Pt
 
 /**
  * The tool bar's tools (CNV-03), in bar order. Exactly one is current, and only the current tool acts

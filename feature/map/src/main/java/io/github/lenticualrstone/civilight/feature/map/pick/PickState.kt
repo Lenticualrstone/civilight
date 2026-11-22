@@ -31,7 +31,7 @@ data class PickUi(
     val picked: PlaceRef?,
     /** The pin or region drawn as chosen. */
     val selectedKey: Key?,
-    /** `씬 1개 → 잿더미 시장` for a scene, or the name alone; null before a pick. */
+    /** `씬 1개 → 잿더미 시장` for a scene (`씬 4개 → …` for a bulk pick), or the name alone; null before a pick. */
     val bar: String?,
 )
 
@@ -85,6 +85,8 @@ object PickState {
         regions: Boolean,
         picked: PlaceRef?,
         sceneKey: Key?,
+        /** Scenes placed at once (`PickOnMap.sceneCount`, bulk `장소 정하기`). */
+        sceneCount: Int = 1,
     ): PickUi? {
         val maps = pickableMaps(doc)
         val map = maps.firstOrNull { it.key == mapKey } ?: return null
@@ -95,7 +97,7 @@ object PickState {
             else -> null
         }
         val bar = picked?.let { ref ->
-            if (sceneKey != null) PlacePicker(doc, hiddenOpen).confirmBar(1, ref) else nameOf(doc, ref)
+            if (sceneKey != null || sceneCount > 1) PlacePicker(doc, hiddenOpen).confirmBar(sceneCount.coerceAtLeast(1), ref) else nameOf(doc, ref)
         }
         return PickUi(
             maps = maps.map { PickMapChip(it.key, it.name, it.key == mapKey) },

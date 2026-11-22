@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.Serializable
 
-/** A card's `⋯` (feature-local). [kind] = `WorldKind.name`. Later batches add `아님으로 둔 것 · 지우기 · 합치기 · 숨기기`. */
+/** A card's `⋯` (feature-local). [kind] = `WorldKind.name`: `이름 바꾸기 · 설명 고치기 · (용어) 아님으로 둔 것 · 숨기기 · 합치기 · 지우기`. */
 @Serializable
 data class ItemMenuSheet(val kind: String, val key: Key) : SheetKey
 
@@ -66,7 +66,10 @@ fun itemSheet(
 ): (@Composable SheetScope.() -> Unit)? {
     if (doc == null) return null
     return when (key) {
-        is ItemMenuSheet -> { { ItemMenuContent(WorldKind.valueOf(key.kind), key.key, doc, readOnly) } }
+        is ItemMenuSheet -> { { ItemMenuContent(WorldKind.valueOf(key.kind), key.key, doc, vm, readOnly) } }
+        is DeleteSheet -> { { DeleteSheetContent(key, vm, readOnly) } }
+        is MergePickSheet -> { { MergePickContent(key, doc, gate) } }
+        is MergeSheet -> { { MergeSheetContent(key, doc, vm, readOnly) } }
         is RenameSheet -> { { RenameContent(WorldKind.valueOf(key.kind), key.key, doc, vm, readOnly) } }
         is DescriptionSheet -> { { DescriptionContent(WorldKind.valueOf(key.kind), key.key, doc, vm, readOnly, gate) } }
         else -> null
@@ -74,9 +77,12 @@ fun itemSheet(
 }
 
 @Composable
-private fun SheetScope.ItemMenuContent(kind: WorldKind, key: Key, doc: ProjectDoc, readOnly: Boolean) {
+private fun SheetScope.ItemMenuContent(kind: WorldKind, key: Key, doc: ProjectDoc, vm: WorldViewModel, readOnly: Boolean) {
     val name = ItemEdits.nameAndText(doc, kind, key)?.first.orEmpty()
     val sheet = this
+    val delete = rememberDeleteAction(vm, kind, key)
+    val hidden = ItemLifecycle.isHidden(doc, kind, key)
+    val roSub = if (readOnly) WorldCopy.READ_ONLY else null
     SheetHeader(title = name, onClose = ::close)
     SheetScrollBody {
         ListRow(
@@ -95,6 +101,32 @@ private fun SheetScope.ItemMenuContent(kind: WorldKind, key: Key, doc: ProjectDo
                 sheet.close()
                 sheet.open(DescriptionSheet(kind.name, key))
             }),
+            compact = true,
+        )
+        if (kind == WorldKind.TERM) {
+            // Read-only projects may still look at the list; `되돌리기` there is disabled.
+            ListRow(
+                title = WorldCopy.MENU_REJECTIONS,
+                onClick = { sheet.close(); sheet.open(io.github.lenticualrstone.civilight.feature.world.term.RejectionsSheet(key)) },
+                compact = true,
+            )
+        }
+        ListRow(
+            title = if (hidden) WorldCopy.MENU_UNHIDE else WorldCopy.MENU_HIDE,
+            subtitle = roSub,
+            onClick = if (readOnly) null else ({ sheet.close(); vm.setHidden(kind, key, !hidden) }),
+            compact = true,
+        )
+        ListRow(
+            title = WorldCopy.MENU_MERGE,
+            subtitle = roSub,
+            onClick = if (readOnly) null else ({ sheet.close(); sheet.open(MergePickSheet(kind.name, key)) }),
+            compact = true,
+        )
+        ListRow(
+            title = WorldCopy.MENU_DELETE,
+            subtitle = roSub,
+            onClick = if (readOnly) null else ({ delete(sheet) }),
             compact = true,
         )
     }

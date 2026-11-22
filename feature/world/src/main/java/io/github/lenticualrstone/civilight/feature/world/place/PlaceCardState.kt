@@ -118,7 +118,7 @@ object PlaceCardState {
     private fun timeRows(doc: ProjectDoc, projectKey: Key, placeKey: Key, hiddenOpen: Boolean): List<PlaceTimeItemUi> {
         val lens = LensRules.effective(doc, doc.app.view.lens.point)
         val engine = StoryEngine(doc)
-        return PlaceTimes(doc, engine, engine).rows(placeKey, lens).mapIndexed { i, row ->
+        return PlaceTimes(doc, engine, engine).rows(placeKey, lens, hiddenUnlocked = hiddenOpen).mapIndexed { i, row ->
             when (row) {
                 is PlaceTimeRow.EventRow -> PlaceTimeItemUi.Row(
                     "event:${row.eventKey}", row.time, row.title, row.sub, row.dimmed, EventDetail(projectKey, row.eventKey),

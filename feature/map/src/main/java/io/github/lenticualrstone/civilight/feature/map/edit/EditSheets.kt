@@ -156,6 +156,37 @@ fun ColumnScope.NameContent(initial: String, onDone: (String) -> Unit, onClose: 
     SheetActions { CivilightButton(MapCopy.BTN_DONE, { onDone(text) }, Modifier.weight(1f)) }
 }
 
+/** A layer's name: rename [layerKey], or a new layer when null (WLD-45). */
+@Serializable
+data class LayerNameSheet(val layerKey: Key? = null) : SheetKey
+
+/** `하위 지도 · 고르기` for [pinKey] (WLD-48). */
+@Serializable
+data class ChildMapSheet(val pinKey: Key) : SheetKey
+
+/** `레이어` name: `완료` renames, `만들기` adds. */
+@Composable
+fun ColumnScope.LayerNameContent(initial: String, editing: Boolean, onDone: (String) -> Unit, onClose: () -> Unit) {
+    var text by rememberSaveable { mutableStateOf(initial) }
+    SheetHeader(MapCopy.LAYER, onClose = onClose)
+    SheetScrollBody { CivilightTextField(text, { text = it }, Modifier.padding(top = 12.dp), label = MapCopy.NAME) }
+    SheetActions {
+        CivilightButton(if (editing) MapCopy.BTN_DONE else MapCopy.BTN_CREATE, { onDone(text) }, Modifier.weight(1f), enabled = text.isNotBlank())
+    }
+}
+
+/** `하위 지도 · 고르기`: maps that may sit under this pin (not this map, not above it). */
+@Composable
+fun ColumnScope.ChildMapContent(maps: List<Pair<Key, String>>, onPick: (Key) -> Unit, onClose: () -> Unit) {
+    SheetHeader(MapCopy.CHILD_MAP, onClose = onClose)
+    SheetScrollBody {
+        if (maps.isEmpty()) io.github.lenticualrstone.civilight.designsystem.component.CivilightText(
+            MapCopy.NONE, io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme.type.small, Modifier.padding(vertical = 12.dp),
+        )
+        maps.forEach { (key, name) -> ListRow(name, onClick = { onPick(key) }) }
+    }
+}
+
 /** Sheet anchor point helper. */
 fun PinPlaceSheet.point(): Point = Point(x, y)
 

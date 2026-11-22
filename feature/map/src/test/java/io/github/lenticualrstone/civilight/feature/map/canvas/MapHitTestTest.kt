@@ -49,4 +49,17 @@ class MapHitTestTest {
         assertEquals(1, MapHitTest.handle(handles, math, zoomed, ScreenPoint(s.x + 30f, s.y), touch))
         assertNull(MapHitTest.handle(handles, math, zoomed, ScreenPoint(s.x + 300f, s.y), touch))
     }
+
+    @Test
+    fun `terrain lines and stamps are hit only in the detailed-terrain editor`() {
+        // The drawn road runs through the region 하층 구역 here.
+        val onRoad = math.toScreen(zoomed, Point(0.335f, 0.415f))
+        assertEquals(MapHit.Region(K.REGION_LOWER_DISTRICT), MapHitTest.hit(scene, math, zoomed, onRoad, touch))
+        assertEquals(MapHit.Line(K.drawnLine(1)), MapHitTest.hit(scene, math, zoomed, onRoad, touch, terrain = true))
+        // The tower stamp sits by the 상층 관문 pin: pins win; without the pin the stamp is hit.
+        val tower = math.toScreen(zoomed, Point(0.42f, 0.28f))
+        assertEquals(MapHit.Pin(K.PIN_UPPER_GATE), MapHitTest.hit(scene, math, zoomed, tower, touch, terrain = true))
+        assertEquals(MapHit.Stamp(K.stamp(4)), MapHitTest.hit(scene.copy(pins = emptyList()), math, zoomed, tower, touch, terrain = true))
+        assertEquals(null, MapHitTest.hit(scene.copy(pins = emptyList(), regions = emptyList()), math, zoomed, tower, touch))
+    }
 }

@@ -18,7 +18,7 @@ internal fun UnlockState.toSession(): UnlockSession = UnlockSession(
 )
 
 /**
- * The shell's unlock state as `domain:library` [HiddenAccess]. The shell keeps no per-project
- * "지금은 열린 채" set, so [HiddenAccess.keptOpen] stays empty (see Requests in the status file).
+ * The shell's unlock state as `domain:library` [HiddenAccess], with the projects kept open in this
+ * session ("지금은 열린 채", `UnlockController.keepOpen`) so every surface reads the same set.
  */
-internal fun UnlockState.toAccess(): HiddenAccess = HiddenAccess(session = toSession())
+internal fun UnlockState.toAccess(): HiddenAccess = HiddenAccess(session = toSession(), keptOpen = keptOpen)

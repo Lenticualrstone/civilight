@@ -9,6 +9,7 @@ import io.github.lenticualrstone.civilight.store.AppClock
 import io.github.lenticualrstone.civilight.store.StoreContainer
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetRegistry
+import io.github.lenticualrstone.civilight.ui.feature.StartupHooks
 import io.github.lenticualrstone.civilight.ui.feature.registerShellSheets
 import io.github.lenticualrstone.civilight.ui.project.ProjectSessions
 import io.github.lenticualrstone.civilight.ui.scaffold.ToastController
@@ -40,4 +41,5 @@ class ShellDeps(
     override val results: NavResults = locator.results
     override val appScope: CoroutineScope = locator.appScope
     override val sheets: SheetRegistry = SheetRegistry().apply { registerShellSheets() }
+    override val startup: StartupHooks = locator.startup
 }

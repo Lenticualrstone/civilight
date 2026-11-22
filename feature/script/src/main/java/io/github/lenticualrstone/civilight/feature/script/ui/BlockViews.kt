@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.script.ui
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -28,6 +29,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.SceneHead
 import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
+import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.text.DecoratedText
@@ -35,6 +37,13 @@ import io.github.lenticualrstone.civilight.designsystem.text.DecorationRange
 import io.github.lenticualrstone.civilight.designsystem.text.InlineDecoration
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
+import io.github.lenticualrstone.civilight.feature.script.links.BlockTap
+import io.github.lenticualrstone.civilight.feature.script.links.LinkFixes
+import io.github.lenticualrstone.civilight.feature.script.terms.TermCopy
+import io.github.lenticualrstone.civilight.domain.world.term.TermCandidate
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import io.github.lenticualrstone.civilight.feature.script.editor.LinkLook
 import io.github.lenticualrstone.civilight.feature.script.editor.RunLayout
 import io.github.lenticualrstone.civilight.feature.script.editor.SpanKind
@@ -43,6 +52,8 @@ import io.github.lenticualrstone.civilight.feature.script.state.EmptySceneRow
 import io.github.lenticualrstone.civilight.feature.script.state.HeadRow
 import io.github.lenticualrstone.civilight.feature.script.state.HiddenSceneRow
 import io.github.lenticualrstone.civilight.feature.script.state.MarkModel
+import io.github.lenticualrstone.civilight.feature.script.state.OptionLine
+import io.github.lenticualrstone.civilight.feature.script.state.SlotModel
 import io.github.lenticualrstone.civilight.feature.script.state.SpeakerLook
 import io.github.lenticualrstone.civilight.feature.script.state.SpeakerModel
 import io.github.lenticualrstone.civilight.model.script.BlockKind
@@ -86,35 +97,65 @@ fun BlockView(
     onTapText: (rawOffset: Int?) -> Unit,
     onSpeaker: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    onTapOption: ((OptionLine) -> Unit)? = null,
+    /** A tap on a link, a candidate or a recorder source (SCR-55, 56, 59); true = handled. */
+    onTapTarget: ((BlockTap) -> Boolean)? = null,
+    /** The candidate whose small window is open in this block (drawn boxed). */
+    openCandidate: TermCandidate? = null,
+    /** The small window anchored under the text (SCR-56). */
+    popover: (@Composable () -> Unit)? = null,
+    /** The margin `▲` (SCR-56): opens the check center's term items. */
+    onMarginWarning: (() -> Unit)? = null,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    BlockFrame(selected, modifier.pressable(PressAction.Click({ onTapText(null) }), role = Role.Button, scaleOnPress = false)) {
+    Box(modifier) {
+    BlockFrame(selected, Modifier.pressable(PressAction.Click({ onTapText(null) }), role = Role.Button, scaleOnPress = false)) {
         AddressHints(row.addressHints)
-        when (row.kind) {
-            BlockKind.DIALOGUE -> row.speaker?.let { speaker ->
+        if (row.kind == BlockKind.DIALOGUE) {
+            row.speaker?.let { speaker ->
                 ScriptSpeakerLine(
                     speaker, selected, row.number.takeIf { selected }, row.speakerMarks,
                     extraLabel = ScriptCopy.INHERITED_SPEAKER.takeIf { inheritedHint },
                     onClick = onSpeaker,
                 )
             }
-            BlockKind.CHOICE -> SlotLine(ScriptCopy.CHOICE_LABEL, ScriptCopy.CHOICE_REJOIN, row.number.takeIf { selected })
-            BlockKind.SYSTEM -> SlotLine(ScriptCopy.SYSTEM_LABEL, ScriptCopy.SYSTEM_SUB, row.number.takeIf { selected })
-            BlockKind.NARRATION -> if (selected) SlotLine(io.github.lenticualrstone.civilight.domain.script.Labels.kindLabel(BlockKind.NARRATION), null, row.number)
-            else -> Unit
+        } else {
+            row.slot(selected)?.let { SlotLine(it) }
         }
         when (row.kind) {
             BlockKind.DIRECTION -> CivilightText(row.text, type.dir, color = colors.ink3)
             BlockKind.CHOICE -> row.options.forEach { option ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                    CivilightText(option.index, type.number.merge(TextStyle(fontSize = 12.sp)), color = colors.ink3)
-                    CivilightText(option.text, type.body.merge(TextStyle(lineHeight = 26.sp)), color = colors.ink)
-                }
+                OptionView(option, selected, onTap = onTapOption?.let { tap -> { tap(option) } })
             }
             null -> CivilightText(row.text, type.body, color = colors.ink2)
-            else -> RunsText(row, showParens, onTapText)
+            else -> Box {
+                RunsText(row, showParens, onTapText, onTapTarget, openCandidate)
+                popover?.invoke()
+            }
         }
+    }
+    if (row.preReveal) MarginWarning(selected, onMarginWarning, Modifier.align(Alignment.TopStart))
+    }
+}
+
+/**
+ * The amber `▲` in the line's margin (SCR-56): a link here is used before its term's first reveal.
+ * Drawn whatever the layers; a tap opens the check center's `용어 공개` items.
+ */
+@Composable
+private fun MarginWarning(selected: Boolean, onClick: (() -> Unit)?, modifier: Modifier) {
+    val tap = onClick?.let { Modifier.pressable(PressAction.Click(it), role = Role.Button, hitTarget = HitTarget.SMALL, scaleOnPress = false) } ?: Modifier
+    Box(
+        modifier
+            .padding(top = if (selected) 12.dp else 0.dp)
+            .width(24.dp)
+            .heightIn(min = 24.dp)
+            .semantics { contentDescription = TermCopy.MARGIN }
+            .then(tap),
+        contentAlignment = Alignment.Center,
+    ) {
+        CivilightText("▲", CivilightTheme.type.small, color = CivilightTheme.colors.warn, maxLines = 1)
     }
 }
 
@@ -132,6 +173,41 @@ fun BlockFrame(selected: Boolean, modifier: Modifier = Modifier, content: @Compo
     )
 }
 
+/** One option line of a choice block (board `Blocks`): mono index (`#045-1` while selected) + serif 16 / 26 text. */
+@Composable
+fun OptionView(option: OptionLine, selected: Boolean, onTap: (() -> Unit)?, text: @Composable (() -> Unit)? = null) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    // Lines keep the board's 16 / 26 rhythm; the touch area grows to 44 dp without moving them (DS-11).
+    val tap = onTap?.let {
+        Modifier.pressable(PressAction.Click(it), role = Role.Button, hitTarget = HitTarget.SMALL, scaleOnPress = false)
+    } ?: Modifier
+    Row(
+        tap.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        CivilightText(if (selected) option.number else option.index, optionIndexStyle(), color = colors.ink3, maxLines = 1)
+        if (text != null) {
+            Box(Modifier.weight(1f)) { text() }
+        } else {
+            CivilightText(option.text, optionTextStyle(), Modifier.weight(1f), color = colors.ink)
+        }
+    }
+}
+
+/** Option index: mono 12. */
+@Composable
+fun optionIndexStyle(): TextStyle = CivilightTheme.type.number.merge(TextStyle(fontSize = 12.sp))
+
+/** Option text: serif 16 / 26. */
+@Composable
+fun optionTextStyle(): TextStyle = CivilightTheme.type.body.merge(TextStyle(lineHeight = 26.sp))
+
+/** A [SlotModel] line. */
+@Composable
+fun SlotLine(slot: SlotModel) = SlotLine(slot.label, slot.sub, slot.number)
+
 /** `선택지 · 다음 블록에서 합류` / `시스템 · 화면 문구` speaker slot (boards `Blocks`). */
 @Composable
 fun SlotLine(label: String, sub: String?, number: String?) {
@@ -144,22 +220,34 @@ fun SlotLine(label: String, sub: String?, number: String?) {
     }
 }
 
+/** `호칭 힌트` (SCR-29): `리엔을 ‘꼬마’` in `small` `ink3` above the speaker line. */
 @Composable
-private fun AddressHints(hints: List<String>) {
+fun AddressHints(hints: List<String>) {
     if (hints.isEmpty()) return
     CivilightText(hints.joinToString(" · "), CivilightTheme.type.small, color = CivilightTheme.colors.ink3, maxLines = 1)
 }
 
 /** Text runs with their decorations, the memo prefix, and the end-of-line marks; taps give a raw offset. */
 @Composable
-private fun RunsText(row: BlockRow, showParens: Boolean, onTapText: (Int?) -> Unit) {
+private fun RunsText(
+    row: BlockRow,
+    showParens: Boolean,
+    onTapText: (Int?) -> Unit,
+    onTapTarget: ((BlockTap) -> Boolean)?,
+    openCandidate: TermCandidate?,
+) {
     val (style, color) = blockTextStyle(row.kind)
     val layout = remember(row, showParens) { row.layout(showParens) }
     val prefix = row.memoPrefix?.let { "$it  " }.orEmpty()
     val suffix = row.textMarks.joinToString("") { " ${it.glyph}" }
     val text = prefix + layout.text + suffix
-    val decorations = remember(layout, prefix) {
-        layout.spans.map { DecorationRange(it.start + prefix.length, it.end + prefix.length, it.kind.decoration()) }
+    val decorations = remember(layout, prefix, row.termCandidates, openCandidate) {
+        layout.spans.map { DecorationRange(it.start + prefix.length, it.end + prefix.length, it.kind.decoration()) } +
+            // SCR-56: candidate spans (raw offsets) drawn dotted; the tapped one boxed.
+            row.termCandidates.map { c ->
+                val kind = if (c.candidate == openCandidate) InlineDecoration.CANDIDATE_SELECTED else InlineDecoration.CANDIDATE
+                DecorationRange(layout.toDisplay(c.start) + prefix.length, layout.toDisplay(c.end) + prefix.length, kind)
+            }
     }
     val dotted = remember(row.textMarks, text) { dottedIndices(text.length - suffix.length, row.textMarks) }
     var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -169,9 +257,20 @@ private fun RunsText(row: BlockRow, showParens: Boolean, onTapText: (Int?) -> Un
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 20.dp)
-            .pointerInput(layout, prefix) {
+            .pointerInput(layout, prefix, row.termCandidates, row.recorderRecordKey, onTapTarget) {
                 detectTapGestures { position ->
-                    val at = textLayout?.getOffsetForPosition(position)
+                    val result = textLayout
+                    val at = result?.getOffsetForPosition(position)
+                    // The character under the finger (links, candidates, the recorder source).
+                    val char = if (result == null || at == null) null else listOf(at, at - 1).firstOrNull { i ->
+                        i in 0 until (text.length - suffix.length) && result.getBoundingBox(i).contains(position)
+                    }
+                    if (char != null && onTapTarget != null) {
+                        val inPrefix = char < prefix.length
+                        val raw = if (inPrefix) null else layout.toRaw(char - prefix.length)
+                        val hit = LinkFixes.tapAt(row, raw, inPrefix)
+                        if (hit != null && onTapTarget(hit)) return@detectTapGestures
+                    }
                     onTapText(at?.let { layout.toRaw((it - prefix.length).coerceAtLeast(0)) })
                 }
             },
@@ -187,16 +286,18 @@ private fun dottedIndices(start: Int, marks: List<MarkModel>): Set<Int> =
     marks.mapIndexedNotNull { i, m -> if (m.dotted) start + i * 2 + 1 else null }.toSet()
 
 /**
- * Scene head (SCR-46, DS-43): tap → `씬 · 장소와 때`; `⋯` → the scene menu (SCR-47) when
- * [onMenu] is given.
+ * Scene head (SCR-46, DS-43): head text and the `전환 문구` line; tap → `씬 · 장소와 때`; `⋯`
+ * (`씬 4 메뉴`) → the scene menu (SCR-47) when [onMenu] is given; `sel` while that menu is open.
  */
 @Composable
-fun HeadView(row: HeadRow, onOpen: () -> Unit, onMenu: (() -> Unit)?) {
+fun HeadView(row: HeadRow, selected: Boolean, onOpen: () -> Unit, onMenu: (() -> Unit)?) {
     SceneHead(
         title = row.title,
         modifier = Modifier.pressable(PressAction.Click(onOpen), role = Role.Button, scaleOnPress = false),
-        subtitle = row.transitionLine,
+        // SCR-58 `[PROPOSED]`: an unlocked hidden scene's head carries a small `숨김` tag.
+        subtitle = HeadLines.subtitle(row),
         menu = onMenu?.let { IconAction(ScriptCopy.sceneMenuLabel(row.ordinal), it) },
+        selected = selected,
     )
 }
 
@@ -229,4 +330,11 @@ fun EmptySceneView(row: EmptySceneRow, speaker: SpeakerModel?, onTap: () -> Unit
         )
         Spacer(Modifier.height(CivilightTheme.type.line.lineHeight.value.dp))
     }
+}
+
+/** The scene head's second line (SCR-46, SCR-58): the transition line and, for a hidden scene, `숨김`. */
+object HeadLines {
+    fun subtitle(row: HeadRow): String? =
+        listOfNotNull(row.transitionLine, io.github.lenticualrstone.civilight.feature.script.scenes.SceneCopy.HIDDEN.takeIf { row.hiddenTag })
+            .joinToString(" · ").ifEmpty { null }
 }

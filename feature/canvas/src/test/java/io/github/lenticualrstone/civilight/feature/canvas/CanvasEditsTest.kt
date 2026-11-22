@@ -3,12 +3,12 @@ package io.github.lenticualrstone.civilight.feature.canvas
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasFx.CANVAS
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasFx.EDGE_RIEN_HART
 import io.github.lenticualrstone.civilight.feature.canvas.board.NodeLabels
-import io.github.lenticualrstone.civilight.feature.canvas.board.eventRows
+import io.github.lenticualrstone.civilight.ui.picker.PickerModels
 import io.github.lenticualrstone.civilight.feature.canvas.edit.CanvasEdits
 import io.github.lenticualrstone.civilight.feature.canvas.edit.LineResult
-import io.github.lenticualrstone.civilight.feature.canvas.graph.NodeLook
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Pt
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Sz
+import io.github.lenticualrstone.civilight.ui.graph.NodeLook
+import io.github.lenticualrstone.civilight.ui.graph.Pt
+import io.github.lenticualrstone.civilight.ui.graph.Sz
 import io.github.lenticualrstone.civilight.feature.canvas.node.NodeEditModel
 import io.github.lenticualrstone.civilight.model.canvas.CanvasNodeKind
 import io.github.lenticualrstone.civilight.navigation.CharacterProfile
@@ -169,8 +169,9 @@ class CanvasEditsTest {
     @Test
     fun `event picker searches titles with 초성`() {
         val doc = CanvasFx.s0()
-        assertTrue(eventRows(doc, "").any { it.key == K.EVENT_BLACKOUT })
-        assertTrue(eventRows(doc, "ㄷㅈㅈ").any { it.key == K.EVENT_BLACKOUT })
-        assertTrue(eventRows(doc, "없는 사건").isEmpty())
+        // The shared event picker (core pass, PickKind.EVENT) replaced the canvas's local list.
+        assertTrue(PickerModels.events(doc, "").items.any { it.key == K.EVENT_BLACKOUT })
+        assertTrue(PickerModels.events(doc, "ㄷㅈㅈ").items.any { it.key == K.EVENT_BLACKOUT })
+        assertTrue(PickerModels.events(doc, "없는 사건").items.isEmpty())
     }
 }

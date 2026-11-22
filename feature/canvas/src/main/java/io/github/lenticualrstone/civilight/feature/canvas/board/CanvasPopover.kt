@@ -19,7 +19,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.tokenShadow
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassMode
 import io.github.lenticualrstone.civilight.designsystem.glass.SCRIM_ALPHA
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
-import io.github.lenticualrstone.civilight.feature.canvas.graph.Pt
+import io.github.lenticualrstone.civilight.ui.graph.Pt
 
 /** Width of the inner popovers (`Canvas`: ≈300 dp). */
 const val POPOVER_WIDTH = 300f

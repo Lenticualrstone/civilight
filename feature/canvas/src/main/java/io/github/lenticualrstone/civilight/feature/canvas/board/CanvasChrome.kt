@@ -31,15 +31,6 @@ import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.PathParser
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
@@ -106,37 +97,8 @@ fun ZoomColumn(percent: String, canIn: Boolean, canOut: Boolean, onIn: () -> Uni
         Column(Modifier.insetOutline(colors.line, 1.dp, shape), horizontalAlignment = Alignment.CenterHorizontally) {
             CivilightIconButton(IconId.Plus, CanvasCopy.ZOOM_IN, onIn, iconSize = 18.dp, enabled = canIn)
             CivilightText(percent, CivilightTheme.type.number.merge(TextStyle(fontSize = 12.sp, lineHeight = 16.sp)), color = colors.ink2, maxLines = 1)
-            MinusButton(CanvasCopy.TODO_COPY_CANVAS_ZOOM_OUT, onOut, enabled = canOut)
+            CivilightIconButton(IconId.Minus, CanvasCopy.TODO_COPY_CANVAS_ZOOM_OUT, onOut, iconSize = 18.dp, enabled = canOut)
         }
-    }
-}
-
-/**
- * DS-12 has no minus glyph; the board draws `M5 12h14` with the DS stroke (1.6, round caps). Same
- * geometry as [CivilightIconButton] (Requests: add `IconId.Minus`).
- */
-private val MinusVector: ImageVector by lazy {
-    ImageVector.Builder("CanvasMinus", 24.dp, 24.dp, 24f, 24f).addPath(
-        pathData = PathParser().parsePathString("M5 12h14").toNodes(),
-        fill = null,
-        stroke = SolidColor(Color.Black),
-        strokeLineWidth = 1.6f,
-        strokeLineCap = StrokeCap.Round,
-        strokeLineJoin = StrokeJoin.Round,
-    ).build()
-}
-
-@Composable
-private fun MinusButton(label: String, onClick: () -> Unit, enabled: Boolean) {
-    Box(
-        Modifier
-            .alpha(if (enabled) 1f else 0.38f)
-            .pressable(onClick = onClick, enabled = enabled, hitTarget = HitTarget.ICON_BUTTON, shape = CircleShape)
-            .size(44.dp)
-            .semantics { contentDescription = label },
-        contentAlignment = Alignment.Center,
-    ) {
-        CivilightIcon(MinusVector, contentDescription = null, size = 18.dp, tint = CivilightTheme.colors.ink2)
     }
 }
 

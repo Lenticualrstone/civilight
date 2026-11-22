@@ -9,11 +9,18 @@ import io.github.lenticualrstone.civilight.domain.cast.field.FieldRow
 import io.github.lenticualrstone.civilight.domain.cast.field.Overview
 import io.github.lenticualrstone.civilight.domain.cast.field.Profile
 import io.github.lenticualrstone.civilight.domain.cast.field.RecordHeader
+import io.github.lenticualrstone.civilight.domain.cast.relation.RelationReader
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationTab
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationViews
 import io.github.lenticualrstone.civilight.domain.cast.timed.TimedValues
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.feature.cast.common.castLens
+import io.github.lenticualrstone.civilight.feature.cast.image.CharacterImages
+import io.github.lenticualrstone.civilight.model.asset.ImageSlot
+import io.github.lenticualrstone.civilight.feature.cast.trash.ItemTrash
+import io.github.lenticualrstone.civilight.domain.trash.Fixes
+import io.github.lenticualrstone.civilight.model.nfc
+import io.github.lenticualrstone.civilight.domain.trash.ItemId
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.FieldType
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
@@ -23,7 +30,7 @@ import io.github.lenticualrstone.civilight.navigation.ProfileTab
 import kotlinx.serialization.builtins.serializer
 
 /** The fixed fields a record edits from its `항목` list (CST-07, CST-11, CST-12). */
-enum class FixedField { NAME, DISPLAY_NAME, ONE_LINER, TAGS }
+enum class FixedField { NAME, DISPLAY_NAME, ONE_LINER, PORTRAIT, BACKGROUND, TAGS }
 
 /** A fixed field's row; same shape as a custom field row, keyed by [field]. */
 data class FixedRow(
@@ -58,6 +65,14 @@ data class ProfileState(
     val emptyLabel: String,
     val relations: RelationTab,
     val readOnly: Boolean,
+    /** Relation of each deleted partner's dotted row (its `이대로 두기` acknowledges that one row). */
+    val deletedPartnerRelations: Map<Key, Key> = emptyMap(),
+    /** Deleted partners whose row was kept (`이대로 두기`): dotted, without fix buttons. */
+    val keptPartners: Set<Key> = emptySet(),
+    /** Hidden (CST-39): the record is open, so the gate is; the head shows the `숨김` tag. */
+    val hidden: Boolean = false,
+    /** `◇ 같은 이름 2 · 노아` while another live character has exactly this name (CST-46), with `합치기`. */
+    val sameName: String? = null,
 )
 
 /** Pure builder of the character record over `domain:cast` [Profile] and [RelationViews]. */
@@ -73,6 +88,10 @@ object ProfileModel {
         val emptyLong = if (!ui.showEmpty) emptyList() else Profile.publicDefs(doc, characterKey)
             .filter { it.type.known == FieldType.LONG_TEXT && it.key !in withSection }
             .map { Profile.row(doc, characterKey, it, lens) }
+        val relations = RelationViews.tab(doc, characterKey, lens, hiddenUnlocked)
+        val deletedRelations = relations.deletedRows.mapNotNull { row ->
+            RelationReader.between(doc, characterKey, row.partnerKey)?.let { row.partnerKey to it.key }
+        }.toMap()
         return ProfileState(
             characterKey = characterKey,
             name = c.name,
@@ -82,14 +101,31 @@ object ProfileModel {
             fixedRows = fixedRows(doc, characterKey, lens, ui.showEmpty),
             emptyLongRows = emptyLong,
             emptyLabel = CastUiCopy.emptyRow(overview.emptyCount),
-            relations = RelationViews.tab(doc, characterKey, lens, hiddenUnlocked),
+            relations = relations,
             readOnly = readOnly,
+            deletedPartnerRelations = deletedRelations,
+            keptPartners = deletedRelations.filter { (partner, relation) -> ItemTrash.isKept(doc, partner, relation) }.keys,
+            hidden = c.hidden,
+            sameName = sameNameNotice(doc, characterKey, hiddenUnlocked),
         )
     }
 
     /**
-     * Fixed rows: `표시 이름` while an override is set or it has history, `태그` when there are tags;
-     * with `보기` all four (`이름`, `표시 이름`, `한 줄 소개`, `태그`) so each can be edited.
+     * `◇ 같은 이름 2 · 노아` (CST-46, `domain:trash` [Fixes.sameNameNotice]). While hidden characters are
+     * locked only visible ones count, so the row never reveals a hidden twin (rule 19 §6).
+     */
+    fun sameNameNotice(doc: ProjectDoc, characterKey: Key, hiddenUnlocked: Boolean): String? {
+        if (hiddenUnlocked) return Fixes.sameNameNotice(doc, ItemId.character(characterKey))
+        val c = doc.index.character(characterKey) ?: return null
+        val name = c.name.nfc()
+        val count = doc.cast.characters.count { it.deletedAt == null && !it.hidden && it.name.nfc() == name }
+        return if (count < 2) null else CastUiCopy.sameName(count, c.name)
+    }
+
+    /**
+     * Fixed rows: `표시 이름` while an override is set or it has history, the image slots that hold an
+     * image, `태그` when there are tags; with `보기` all of them (`이름`, `표시 이름`, `한 줄 소개`,
+     * `인물 초상`, `인물 배경`, `태그`) so each can be edited.
      */
     fun fixedRows(doc: ProjectDoc, characterKey: Key, lens: LensPoint, showEmpty: Boolean): List<FixedRow> {
         val c = doc.index.character(characterKey) ?: return emptyList()
@@ -109,15 +145,20 @@ object ProfileModel {
         )
         val tagNames = c.tagKeys.mapNotNull { doc.index.tag(it)?.name }
         val tags = FixedRow(FixedField.TAGS, CastUiCopy.TAGS, CastCopy.joinAll(tagNames))
+        // CST-13: `인물 초상 · 인물 배경` read `잿빛 새벽` / `내 이미지`, or `이미지 고르기` while empty.
+        val images = CharacterImages.slotRows(doc, characterKey).map { row ->
+            FixedRow(if (row.slot == ImageSlot.CHARACTER_PORTRAIT) FixedField.PORTRAIT else FixedField.BACKGROUND, row.label, row.value) to row.chosen
+        }
         return if (showEmpty) {
             listOf(
                 FixedRow(FixedField.NAME, CastUiCopy.NAME, c.name),
                 display,
                 FixedRow(FixedField.ONE_LINER, CastUiCopy.ONE_LINER, c.oneLiner.orEmpty()),
-                tags,
-            )
+            ) + images.map { it.first } + tags
         } else {
-            listOfNotNull(display.takeIf { reading.isOverridden || hasHistory }, tags.takeIf { tagNames.isNotEmpty() })
+            listOfNotNull(display.takeIf { reading.isOverridden || hasHistory }) +
+                images.filter { it.second }.map { it.first } +
+                listOfNotNull(tags.takeIf { tagNames.isNotEmpty() })
         }
     }
 }

@@ -13,12 +13,10 @@ import io.github.lenticualrstone.civilight.feature.library.common.LibraryDocs
 import io.github.lenticualrstone.civilight.feature.library.common.actionContext
 import io.github.lenticualrstone.civilight.feature.library.common.toAccess
 import io.github.lenticualrstone.civilight.feature.library.common.toSession
+import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
-import io.github.lenticualrstone.civilight.navigation.Library
-import io.github.lenticualrstone.civilight.navigation.ProjectHome
 import io.github.lenticualrstone.civilight.navigation.Route
-import io.github.lenticualrstone.civilight.navigation.WorldCalendar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -74,8 +72,10 @@ internal class NewProjectViewModel(private val services: LibraryServices) : View
                     defaults = deps.settings.value.ratingDefaults,
                     ctx = stores.actionContext(),
                     bundleSource = sourceDoc(form),
+                    notation = deps.settings.value.defaultSceneNotation,
                 )
-                onCreated(listOfNotNull(Library, ProjectHome(result.projectKey), if (result.opensCalendar) WorldCalendar(result.projectKey) else null))
+                if (result.hidingRefused) services.showNoDeviceLock()
+                onCreated(ProjectCreator.stackAfter(result))
             } finally {
                 _creating.value = false
             }
@@ -94,4 +94,8 @@ private class StoreCreatorPorts(private val services: LibraryServices) : Creator
         stores.recorder.ensureLoaded()
         stores.recorder.updateLibrary(transform)
     }
+
+    override fun deviceSecure(): Boolean = services.deviceSecure()
+
+    override fun keepOpen(projectKey: Key) = services.deps.unlock.keepOpen(projectKey)
 }

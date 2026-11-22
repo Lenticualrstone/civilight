@@ -14,6 +14,8 @@ sealed interface MapHit {
     data class Node(override val key: Key) : MapHit
     data class Route(override val key: Key) : MapHit
     data class Region(override val key: Key) : MapHit
+    data class Stamp(override val key: Key) : MapHit
+    data class Line(override val key: Key) : MapHit
 }
 
 /**
@@ -34,6 +36,8 @@ object MapHitTest {
         touchPx: Float,
         pinLiftPx: Float = touchPx * 12f / 44f,
         glyphPx: Float = touchPx * 12f / 44f,
+        /** Stamps and drawn lines are hit only where they are edited (상세 지형 · 편집). */
+        terrain: Boolean = false,
     ): MapHit? {
         val radius = touchPx / 2
         fun dist(p: Point): Float {
@@ -52,11 +56,15 @@ object MapHitTest {
         scene.pins.mapNotNull { p -> pinDist(p)?.let { p to it } }.minByOrNull { it.second }?.let { return MapHit.Pin(it.first.key) }
         scene.nodes.filter { dist(it.at) <= radius }.minByOrNull { dist(it.at) }?.let { return MapHit.Node(it.key) }
         scene.labels.filter { dist(it.at) <= radius }.minByOrNull { dist(it.at) }?.let { return MapHit.Label(it.key) }
+        if (terrain) scene.stamps.filter { dist(it.at) <= radius }.minByOrNull { dist(it.at) }?.let { return MapHit.Stamp(it.key) }
         val mapTap = math.toMap(viewport, tap)
         val lineTol = touchPx / 3 / math.contentW(viewport)
-        scene.routes.map { r ->
-            r to r.points.zipWithNext { a, b -> MapGeometry.segmentDistance(mapTap, a, b) }.minOrNull()!!
+        scene.routes.mapNotNull { r ->
+            r.points.zipWithNext { a, b -> MapGeometry.segmentDistance(mapTap, a, b) }.minOrNull()?.let { r to it }
         }.filter { it.second <= lineTol }.minByOrNull { it.second }?.let { return MapHit.Route(it.first.key) }
+        if (terrain) scene.lines.mapNotNull { l ->
+            l.points.zipWithNext { a, b -> MapGeometry.segmentDistance(mapTap, a, b) }.minOrNull()?.let { l to it }
+        }.filter { it.second <= lineTol }.minByOrNull { it.second }?.let { return MapHit.Line(it.first.key) }
         scene.regions.lastOrNull { MapGeometry.contains(it.shape, mapTap) }?.let { return MapHit.Region(it.key) }
         return null
     }

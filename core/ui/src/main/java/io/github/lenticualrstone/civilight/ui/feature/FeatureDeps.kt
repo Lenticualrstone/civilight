@@ -67,6 +67,13 @@ interface FeatureDeps {
     /** Scope that outlives screens (saving after a screen closed, toasts). Main dispatcher. */
     val appScope: CoroutineScope
 
+    /**
+     * One-time start-up work (LRC-09 recovery): register in your entries function; the shell runs each
+     * hook once per process after the app lock and pushes the route it returns. Process-wide in the
+     * shell; the default (test fakes) keeps nothing.
+     */
+    val startup: StartupHooks get() = StartupHooks.Unused
+
     /** The lens of an open project (STO-13); one value per project, shared by all lens screens. */
     fun lens(store: ProjectStore): LensController = LensController(store, appScope)
 }

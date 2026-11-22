@@ -73,6 +73,21 @@ class VoiceIdsTest {
     }
 
     @Test
+    fun `T-12-23 manual IDs are typed in the 속성 tab, cleared when blank, never over a fixed ID`() {
+        val base = F1.build()
+        val manual = base.copy(project = base.project.copy(script = base.project.script.copy(voiceIdFormat = VoiceIdFormat(VoiceIdFormatMode.MANUAL.open()))))
+        val typed = VoiceIds.setManualId(manual, b(43), " HRT_A_01 ", ctx)
+        assertEquals("HRT_A_01", VoiceIds.currentId(typed, typed.block(b(43))))
+        val both = VoiceIds.setManualId(typed, b(47), "HRT_A_01", ctx)
+        assertEquals("▲ 보이스 ID 겹침 1", ScriptChecks.voiceDuplicates(both).single().title)
+        val cleared = VoiceIds.setManualId(typed, b(43), "  ", ctx)
+        assertNull(cleared.block(b(43)).voice)
+        val fixedDoc = manual.withBlock(b(43)) { it.copy(voice = fixed("HRT_0107_043")) }
+        assertEquals(fixedDoc, VoiceIds.setManualId(fixedDoc, b(43), "X", ctx))
+        assertEquals(typed, VoiceIds.setManualId(typed, b(44), "X", ctx))
+    }
+
+    @Test
     fun `voice IDs off hide the field but keep the data`() {
         val base = F1.build().withBlock(b(43)) { it.copy(voice = fixed("HRT_0107_043")) }
         val off = base.copy(project = base.project.copy(script = base.project.script.copy(voiceIdEnabled = false)))

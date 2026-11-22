@@ -25,6 +25,9 @@ interface EnvSource {
 
     /** Without I/O: only the projects open right now (enough for the entry project at start). */
     fun quick(): RecorderEnv
+
+    /** [projectKey] was written by the recorder: its cached document is dropped, so the next [load] reads it again. */
+    fun forget(projectKey: Key) = Unit
 }
 
 /** Pure assembly of a [RecorderEnv] from the 서재 rows, documents and unlock state. */
@@ -75,6 +78,10 @@ class StoreEnvSource(
             cache.keys.retainAll(entries.map { it.key }.toSet())
         }
         return RecorderEnvs.build(entries, docs, unlock(), zone())
+    }
+
+    override fun forget(projectKey: Key) {
+        cache.remove(projectKey)
     }
 
     override fun quick(): RecorderEnv {

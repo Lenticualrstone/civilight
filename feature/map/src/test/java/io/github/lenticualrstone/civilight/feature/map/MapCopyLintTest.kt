@@ -33,6 +33,25 @@ class MapCopyLintTest {
         MapCopy.step(MapCopy.PIN, "결사의 문"),
         MapCopy.defaultRegionName(3),
         MapCopy.movingPin("결사의 문"),
+        MapCopy.defaultMapName(3),
+        MapCopy.dayTravel("도보", "15"),
+        MapCopy.revealMode("1-5"),
+        MapCopy.pendingTag("상층 관문", "1-7"),
+        MapCopy.crumbs(listOf("하층 구역", "결사 본부")),
+        MapCopy.linking("시장 입구"),
+        MapCopy.seed("0031"),
+        MapCopy.styleSection("상세 지형"),
+        MapCopy.genSmall("상세 지형", "색면"),
+        MapCopy.rerollStep("강"),
+        MapCopy.hexSmall("세계 지도"),
+        MapCopy.coordEvery(3),
+        MapCopy.cells(37),
+        MapCopy.assigned(1, "하층 구역"),
+        MapCopy.defaultProvinceName(3),
+        MapCopy.km("24"),
+        MapCopy.otherCandidates(3),
+        MapCopy.sourceCount(MapCopy.SOURCE_PLACES, 6),
+        MapCopy.sourcePage("하층 구역의 빛"),
     )
 
     @Test
@@ -65,5 +84,17 @@ class MapCopyLintTest {
         assertEquals("지점 3 · 12 km", MapCopy.routeDraftBar(3, "12"))
         assertEquals(listOf("세력 영역", "지역", "기타"), MapCopy.REGION_KINDS)
         assertEquals("종류 · 땅 비율 · 그림 → 후보 3", MapCopy.NEW_GENERATED_SUB)
+        assertEquals("도보 15 km", MapCopy.dayTravel("도보", "15"))
+        assertEquals("1-5 시점 · 보이는 것만", MapCopy.revealMode("1-5"))
+        assertEquals("상층 관문 · 1-7", MapCopy.pendingTag("상층 관문", "1-7"))
+        assertEquals("하층 구역 › 결사 본부", MapCopy.crumbs(listOf("하층 구역", "결사 본부")))
+        assertEquals("시드 0031", MapCopy.seed("0031"))
+        assertEquals("상세 지형 · 색면 · 지형 만들기 2/2", MapCopy.genSmall("상세 지형", "색면"))
+        assertEquals("강 다시 만들기", MapCopy.rerollStep("강"))
+        assertEquals("세계 지도 · 육각", MapCopy.hexSmall("세계 지도"))
+        assertEquals("칸 1 → 하층 구역", MapCopy.assigned(1, "하층 구역"))
+        assertEquals("다른 후보 3", MapCopy.otherCandidates(3))
+        assertEquals("페이지 ‘하층 구역의 빛’", MapCopy.sourcePage("하층 구역의 빛"))
+        assertEquals("장소 6", MapCopy.sourceCount(MapCopy.SOURCE_PLACES, 6))
     }
 }

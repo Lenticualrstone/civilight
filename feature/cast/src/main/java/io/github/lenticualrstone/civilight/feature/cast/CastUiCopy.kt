@@ -23,6 +23,9 @@ object CastUiCopy {
     const val NO_RESULTS = "결과 없음"
     const val HIDDEN_TAG = "숨김"
 
+    /** Search footer while hidden characters are locked (CST-27, rule 19 §6). */
+    const val HIDDEN_EXCLUDED = "숨긴 항목 제외"
+
     // --- 인물 목록 (CST-01, CST-02, CST-05) ---
     const val NEW_CHARACTER = "인물 추가"
 
@@ -54,9 +57,6 @@ object CastUiCopy {
 
     /** Status words of a relation step after the lens, as the `Relations` board writes them (`◆ 지금 시점보다 뒤`). */
     fun stepStatus(label: String): String = "${CastCopy.CHANGE_MARK} $label"
-
-    /** No source gives copy for a long text holding `@` links or paren runs that cannot be edited as plain text yet. */
-    const val TODO_COPY_CAST_LONG_TEXT_RICH = "TODO_COPY_CAST_LONG_TEXT_RICH"
 
     // --- 항목 값 넣기 (CST-09, CST-20) ---
     const val OPTIONS = "보기"
@@ -90,11 +90,17 @@ object CastUiCopy {
     const val SCOPE_ALL_SUB = "인물 항목에 추가 · 다른 인물은 빈 칸"
     const val SCOPE_ONE = "이 인물만"
 
+    /** CST-22: an `이 인물만` field becomes a project field (`모든 인물에 넣기`). */
+    const val BTN_PROMOTE = "모든 인물에 넣기"
+
     /** `인물 · 모든 인물에` (`RCFieldAdd` sub), the same pattern for the other kinds. */
     fun addFieldSub(kind: EntityKind): String = "${kind.label} · 모든 ${kind.label}에"
 
     /** `리엔 · 인물 기록 007` (`RCProfileAdd` sub). */
     fun recordSub(name: String, recordNo: Int): String = "$name · 인물 기록 ${recordNo.toString().padStart(3, '0')}"
+
+    /** `짧은 글 ›`: the chosen type on the record sheet's `종류` row (`RCProfileAdd`). */
+    fun chosenType(label: String): String = "$label ›"
 
     /** `리엔에게만`. */
     fun onlyFor(name: String): String = "${name}에게만"
@@ -102,7 +108,146 @@ object CastUiCopy {
     /** `출생에서` (calc source chip, as the settings rows write it). */
     fun fromSource(name: String): String = "${name}에서"
 
+    // --- 항목 정의 바꾸기 (CST-23) ---
+    /** `숨기기` of a field definition (values kept, CST-23 table). */
+    const val HIDE = "숨기기"
+
+    /**
+     * Applies a previewed change (field type, relation kind switch). No source names this button;
+     * `바꾸기` is the verb of the spec's `관계 종류 · 바꾸기 ›` row [PROPOSED reuse].
+     */
+    const val BTN_CHANGE = "바꾸기"
+
+    /** A definition change as the spec writes it (`키 → 신장`, `짧은 글 → 숫자`). */
+    fun change(from: String, to: String): String = "$from → $to"
+
+    // --- 관계 종류 (CST-32, `RCRelTypes`) ---
+    const val KIND_TITLE = "관계 종류"
+    const val KIND_NEW = "새 종류"
+    const val KIND_BETWEEN = "사이"
+    const val KIND_MIND = "마음"
+    const val KIND_SYMMETRIC = "대칭"
+    const val KIND_PAIR_NAME = "짝 이름"
+
+    /** `쓰임 1`. */
+    fun usage(count: Int): String = "쓰임 $count"
+
+    // --- 전체 관계도 (CST-33, CST-34; `CastMap`, `CastMapC`) ---
+    const val ALL = "전체"
+    const val MAP_SUB = "관계도로 보기"
+    const val SELECTED_RELATION = "고른 관계"
+
+    /** The cover sheet's short `지금 시점보다 뒤` (`CastMapC`: `· 뒤`). */
+    const val AFTER_LENS_SHORT = "뒤"
+
+    /** The line tool (the canvas tool word `선`): tap one character, then another. */
+    const val LINE_TOOL = "선"
+
+    /** Undo label of a node drag (the canvas hint `노드는 끌어서 이동`). */
+    const val UNDO_MOVE = "노드는 끌어서 이동"
+
+    // --- 시작 묶음 (CST-24) ---
+    /** The bundle picker title and its button (`RCFields` row `시작 묶음 · …` / `항목 더하기 ›`). */
+    const val BUNDLE_TITLE = "시작 묶음"
+    const val BUNDLE_ACTION = "항목 더하기"
+
     // --- 프로젝트 설정 › 인물 항목 (CST-19) ---
     const val REORDER = "순서 바꾸기"
     const val ADD_FIELD_ROW = "항목"
+
+    // --- 관계 만들기 · 고치기 (CST-29) ---
+    /** `무엇으로 적을지` (the slot chips; `CanvasCLabel` line-label sheet). */
+    const val WHAT_TO_WRITE = "무엇으로 적을지"
+
+    /** Partner picker title (rule 13 §7 `상대 고르기`). */
+    const val PICK_PARTNER = "상대 고르기"
+    const val DESCRIPTION_OPTIONAL = "설명 (선택)"
+    const val BTN_MAKE_RELATION = "관계로 만들기"
+
+    // --- 지우기 · 되살리기 (CST-40, CST-41, CST-43) ---
+    const val BTN_DELETE = "지우기"
+    const val BTN_RESTORE = "되살리기"
+    const val BTN_KEEP = "이대로 두기"
+
+    // --- 게임 텍스트 · 말투 (CST-15, CST-16, CST-17) ---
+    /** Label of the record's `+` on `게임 텍스트` (a voice line at the end, CST-16) and the new line's sheet title [PROPOSED]. */
+    const val NEW_VOICE_LINE = "보이스 대사 추가"
+    const val ARCHIVE = "아카이브 문서"
+
+    /** The archive document's unlock point (planning `열리는 시점`). */
+    const val UNLOCK = "열리는 시점"
+
+    /** No source names the `@` picker of cast text (voice lines, 말투, 비밀, archive documents). */
+    const val TODO_COPY_CAST_LINK_PICKER_TITLE = "TODO_COPY_CAST_LINK_PICKER_TITLE"
+
+    // --- 항목 필터 · 정렬 (CST-03) ---
+    /** The header button and its sheet (the feature's own name; §6 Q13 default placement). */
+    const val FILTER_TITLE = "항목 필터 · 정렬"
+
+    /** Section of the `<항목>순` orders in that sheet [PROPOSED]. */
+    const val SORT_TITLE = "정렬"
+
+    // --- 이미지 (CST-13) ---
+    const val PORTRAIT = "인물 초상"
+    const val BACKGROUND = "인물 배경"
+    const val PICK_IMAGE = "이미지 고르기"
+    const val OWN_IMAGE = "내 이미지"
+    const val HOLO = "홀로"
+
+    /** The 8 built-in presets (CNV-26), in the order of `CharacterImages` preset ids. */
+    val PRESET_NAMES = listOf("잿빛 새벽", "등불", "심해", "안개 숲", "사막 유적", "성운", "붉은 성채", "설원")
+
+    /** A `숫자` range on its active filter chip: `150 ~ 170`, or one open bound (`150 ~`). */
+    fun range(min: String, max: String): String = "${min.trim()} ~ ${max.trim()}".trim()
+
+    /** `+` beside a section title (`아카이브 문서 · 2`: a new document). */
+    const val ADD_MARK = "+"
+
+    /** The computed fixed fields' header labels (`Profile.header`: `첫 등장`, `보이스`). */
+    const val FIRST_APPEARANCE = "첫 등장"
+    const val VOICE = "보이스"
+
+    /** The record `⋯` label: `리엔 메뉴`. */
+    fun menuLabel(name: String): String = "$name 메뉴"
+
+    /** The separator of joined fragments. */
+    const val SEP = " · "
+
+    // --- 숨기기 (CST-39) ---
+    /** Record `⋯` row (CST-39) and its undo label. */
+    const val BTN_HIDE = "숨기기"
+
+    /** Record `⋯` row of a hidden character (CST-39 `숨김 풀기` [PROPOSED]). */
+    const val BTN_UNHIDE = "숨김 풀기"
+
+    // --- 합치기 (CST-45, CST-46; `RCMerge`) ---
+    const val BTN_MERGE = "합치기"
+    const val BTN_CANCEL = "취소"
+
+    /** The term `첫 공개` comparison row (TC-20-27). */
+    const val FIRST_REVEAL = "첫 공개"
+
+    /** `같은 항목 | 6` (the engine counts equal fields of world items). */
+    const val SAME_FIELDS = "같은 항목"
+
+    /** `◇ 같은 이름 2 · 노아` (CST-46; the `domain:trash` notice, counted over visible characters while locked). */
+    fun sameName(count: Int, name: String): String = "◇ 같은 이름 $count · $name"
+
+    /** `옮길 참조 · 5`. */
+    fun movedTitle(count: Int): String = "옮길 참조 · $count"
+
+    /** `다른 칸 · 3`. */
+    fun differingTitle(count: Int): String = "다른 칸 · $count"
+
+    /** `빛돌 · 합쳐짐` (column head of the merged item). */
+    fun mergedColumn(name: String): String = "$name · 합쳐짐"
+
+    /** `오리지늄 등불 · 남음` (column head of the item that stays). */
+    fun keptColumn(name: String): String = "$name · 남음"
+
+    /** Preview of `@ 한꺼번에 바꾸기` (CST-42), after the speaker one `대사 14 · 노아 → 오웬` [PROPOSED]. */
+    fun linkChange(count: Int, from: String, to: String): String = "@ $count · $from → $to"
+
+    /** `빛돌 · ‘합침 → 오리지늄 등불’로 휴지통`. */
+    fun mergedFootnote(merged: String, target: String): String = "$merged · ‘합침 → $target’로 휴지통"
 }

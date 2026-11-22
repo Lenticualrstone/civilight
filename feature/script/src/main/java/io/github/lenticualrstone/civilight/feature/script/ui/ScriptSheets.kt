@@ -24,6 +24,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.script.Manuscript
 import io.github.lenticualrstone.civilight.domain.script.ScriptCommands
 import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
+import io.github.lenticualrstone.civilight.feature.script.state.ScriptOps
 import io.github.lenticualrstone.civilight.feature.script.state.SpeakerTarget
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
@@ -58,9 +59,13 @@ data class SpeakerSheetKey(
     }
 }
 
-/** `@` link picker at raw [rawOffset] of [blockKey], where the caret was (SCR-16 → SCR-55). */
+/** `@` link picker at raw [rawOffset] of [blockKey] (or of its option line [optionKey]), where the caret was (SCR-16 → SCR-55). */
 @Serializable
-data class LinkSheetKey(val projectKey: Key, val blockKey: Key, val rawOffset: Int) : SheetKey
+data class LinkSheetKey(val projectKey: Key, val blockKey: Key, val rawOffset: Int, val optionKey: Key? = null) : SheetKey
+
+/** `종류 바꾸기` of [blockKey] (SCR-13 `[PROPOSED]`), opened from the `속성` tab's `종류` row. */
+@Serializable
+data class KindSheetKey(val projectKey: Key, val blockKey: Key) : SheetKey
 
 /** Position-label menu: `렌즈를 이 씬으로 맞추기` (SCR-02). */
 @Serializable
@@ -80,7 +85,12 @@ fun SheetScope.BlockAddSheet(
     SheetHeader(title = ScriptCommands.SHEET_TITLE, onClose = ::close, subtitle = subline)
     SheetScrollBody(Modifier.padding(top = 8.dp)) {
         ScriptCommands.ADD_ROWS.forEach { row ->
-            AddRowItem(row, selected = row.kind != null && row.kind == currentKind, readOnly = readOnly) {
+            AddRowItem(
+                row,
+                selected = row.kind != null && row.kind == currentKind,
+                enabled = !readOnly,
+                trailing = if (readOnly) ScriptCommands.READ_ONLY else row.shortcut,
+            ) {
                 this@BlockAddSheet.close()
                 onPick(row)
             }
@@ -88,18 +98,51 @@ fun SheetScope.BlockAddSheet(
     }
 }
 
+/**
+ * `종류 바꾸기` (SCR-13 `[PROPOSED]`): the add sheet's rows without `새 씬`; the current kind is
+ * highlighted, kinds the block cannot become (Q-12: direction and choice only to or from an empty
+ * block) are dimmed. Choosing one converts the block in place.
+ */
 @Composable
-private fun AddRowItem(row: ScriptCommands.AddRow, selected: Boolean, readOnly: Boolean, onClick: () -> Unit) {
+fun SheetScope.KindSheet(subline: String, choices: List<ScriptOps.KindChoice>, readOnly: Boolean, onPick: (BlockKind) -> Unit) {
+    SheetHeader(title = ScriptCopy.KIND_CHANGE_TITLE, onClose = ::close, subtitle = subline)
+    SheetScrollBody(Modifier.padding(top = 8.dp)) {
+        choices.forEach { choice ->
+            val kind = choice.row.kind ?: return@forEach
+            AddRowItem(
+                choice.row,
+                selected = choice.current,
+                enabled = !readOnly && choice.enabled && !choice.current,
+                trailing = if (readOnly) ScriptCommands.READ_ONLY else null,
+                dimWhenDisabled = !choice.current,
+            ) {
+                this@KindSheet.close()
+                onPick(kind)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddRowItem(
+    row: ScriptCommands.AddRow,
+    selected: Boolean,
+    enabled: Boolean,
+    trailing: String?,
+    dimWhenDisabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    val dimmed = !enabled && dimWhenDisabled
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .topHairline(colors.line)
-            .selectedRowBackground(selected && !readOnly, colors.sel, colors.acc)
-            .pressable(PressAction.Click(onClick), enabled = !readOnly, role = Role.Button, scaleOnPress = false)
+            .selectedRowBackground(selected && !dimmed, colors.sel, colors.acc)
+            .pressable(PressAction.Click(onClick), enabled = enabled, role = Role.Button, scaleOnPress = false)
             .heightIn(min = 44.dp)
-            .alpha(if (readOnly) 0.38f else 1f)
+            .alpha(if (dimmed) 0.38f else 1f)
             .padding(vertical = 11.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -108,7 +151,7 @@ private fun AddRowItem(row: ScriptCommands.AddRow, selected: Boolean, readOnly: 
             CivilightText(row.name, type.itemTitle, color = colors.ink, maxLines = 1)
             CivilightText(row.description, type.small, color = colors.ink3, maxLines = 1)
         }
-        CivilightText(if (readOnly) ScriptCommands.READ_ONLY else row.shortcut, type.number, color = colors.ink3, maxLines = 1)
+        if (trailing != null) CivilightText(trailing, type.number, color = colors.ink3, maxLines = 1)
     }
 }
 

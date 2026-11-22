@@ -54,6 +54,7 @@ import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 import io.github.lenticualrstone.civilight.ui.nav.LocalPaneRole
 import io.github.lenticualrstone.civilight.ui.nav.PaneRole
+import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.project.ProjectLoad
 import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
@@ -73,6 +74,7 @@ fun StructureScreen(route: StoryStructure, deps: FeatureDeps) {
     val ui = remember(ready, expanded, locked) { ready?.let { StructureModel.build(it.doc, expanded, locked, it.readOnly) } }
     val sheets = rememberSheetHost()
     val navigator = deps.navigator
+    val gate = rememberHiddenGate(route.projectKey)
     val p = route.projectKey
     CenterColumn {
         CivilightScreen(
@@ -111,7 +113,7 @@ fun StructureScreen(route: StoryStructure, deps: FeatureDeps) {
                     ui = ui,
                     padding = padding,
                     onToggle = { key -> saved = StructureModel.toggle(expanded, key) },
-                    onScene = { key -> navigator.push(Script(p, sceneKey = key)) },
+                    onScene = { item -> if (item.masked) gate.unlock() else navigator.push(Script(p, sceneKey = item.row.key)) },
                     onMenu = { key -> sheets.open(UnitMenuSheet(p, key)) },
                 )
             }
@@ -124,7 +126,7 @@ private fun StructureList(
     ui: StructureUi,
     padding: PaddingValues,
     onToggle: (Key) -> Unit,
-    onScene: (Key) -> Unit,
+    onScene: (SceneItem) -> Unit,
     onMenu: (Key) -> Unit,
 ) {
     val colors = CivilightTheme.colors
@@ -191,9 +193,12 @@ private fun EpisodeLine(item: EpisodeItem, onToggle: (Key) -> Unit, onMenu: (Key
     }
 }
 
-/** `1일째 새벽 | 씬 1 · 새벽 순찰 | 1,820자 | ⋯`; the scene being written has the `sel` fill and `acc` bar. */
+/**
+ * `1일째 새벽 | 씬 1 · 새벽 순찰 | 1,820자 | ⋯`; the scene being written has the `sel` fill and `acc` bar.
+ * An unlocked hidden scene carries a small `숨김` tag; a locked one reads `씬 4 · 숨긴 씬` (STO-11).
+ */
 @Composable
-private fun SceneLine(item: SceneItem, onScene: (Key) -> Unit, onMenu: (Key) -> Unit) {
+private fun SceneLine(item: SceneItem, onScene: (SceneItem) -> Unit, onMenu: (Key) -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val row = item.row
@@ -201,14 +206,21 @@ private fun SceneLine(item: SceneItem, onScene: (Key) -> Unit, onMenu: (Key) -> 
         modifier = Modifier
             .fillMaxWidth()
             .selectedRowBackground(row.current, colors.sel, colors.acc)
-            .pressable(onClick = { onScene(row.key) }, scaleOnPress = false)
+            .pressable(onClick = { onScene(item) }, scaleOnPress = false)
             .heightIn(min = 44.dp)
             .padding(start = if (item.indented) 46.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         CivilightText(row.time, type.numberHeader, Modifier.widthIn(min = 64.dp), color = colors.ink3, maxLines = 1)
-        CivilightText(row.label, type.itemTitleCompact.merge(TextStyle(fontWeight = FontWeight.Normal)), Modifier.weight(1f), color = colors.ink, maxLines = 1)
+        CivilightText(
+            row.label,
+            type.itemTitleCompact.merge(TextStyle(fontWeight = FontWeight.Normal)),
+            Modifier.weight(1f, fill = !row.hiddenTag),
+            color = if (item.masked) colors.ink3 else colors.ink,
+            maxLines = 1,
+        )
+        if (row.hiddenTag) CivilightText(StoryCopy.HIDDEN_TAG, type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
         CivilightText(row.meta, type.small, color = if (row.current) colors.acc else colors.ink3, maxLines = 1)
         CivilightIconButton(IconId.More, StructureCopy.MENU, { onMenu(row.key) })
     }

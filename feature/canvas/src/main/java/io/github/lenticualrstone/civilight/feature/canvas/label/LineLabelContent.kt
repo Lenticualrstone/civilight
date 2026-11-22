@@ -24,6 +24,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
@@ -79,6 +80,8 @@ class LineLabelState(
     fun keep(then: (EditResult) -> Unit) = editor.keep(canvasKey, edgeKey, draft, then)
 
     fun make(then: (EditResult) -> Unit) = editor.make(canvasKey, edgeKey, draft, then)
+
+    fun remove(then: (EditResult) -> Unit) = editor.remove(canvasKey, edgeKey, then)
 }
 
 /** The state of the `선 라벨` surface for a canvas line, or null while loading or when the line is gone. */
@@ -167,6 +170,13 @@ fun ColumnScope.LineLabelRows(
             )
         }
     }
+    // Take the line off the canvas (the relation, if any, stays; Q-CV-13). Copy missing.
+    TextAction(
+        CanvasCopy.TODO_COPY_CANVAS_REMOVE_LINE,
+        { state.remove(after) },
+        Modifier.align(Alignment.End).padding(top = 4.dp),
+        color = if (view.readOnly) colors.ink3 else colors.ink2,
+    )
 }
 
 /**
@@ -177,7 +187,8 @@ fun ColumnScope.LineLabelRows(
 fun SheetScope.LineLabelSheetContent(sheet: LineLabelSheet) {
     val canvasKey = sheet.canvasKey
     if (canvasKey == null) {
-        // A relationship-map line has no canvas edge to label yet; the key contract is under Requests.
+        // `LineLabelSheet.forCharacters` (relationship-map line, core pass): no lane opens it yet, and a
+        // pair without a canvas edge needs a cast write path that is not `CanvasRelations` (see status file).
         SheetHeader(title = CanvasCopy.LINE_LABEL_TITLE, onClose = ::close, closeLabel = CanvasCopy.BTN_CLOSE)
         return
     }

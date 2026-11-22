@@ -29,7 +29,6 @@ import io.github.lenticualrstone.civilight.domain.library.newproject.ProjectMenu
 import io.github.lenticualrstone.civilight.domain.library.newproject.ProjectMenuAction
 import io.github.lenticualrstone.civilight.domain.library.newproject.ProjectMenus
 import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
-import io.github.lenticualrstone.civilight.feature.library.common.LibraryIcons
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.navigation.SheetKey
@@ -48,11 +47,11 @@ data class RenameSheet(val projectKey: Key) : SheetKey
 
 internal fun iconOf(action: ProjectMenuAction): ImageVector = when (action) {
     ProjectMenuAction.OPEN -> IconId.Book.vector
-    ProjectMenuAction.RENAME -> LibraryIcons.Pencil
-    ProjectMenuAction.RATING -> LibraryIcons.Shield
+    ProjectMenuAction.RENAME -> IconId.Pencil.vector
+    ProjectMenuAction.RATING -> IconId.Shield.vector
     ProjectMenuAction.HIDE -> IconId.EyeOff.vector
     ProjectMenuAction.UNHIDE -> IconId.Unlock.vector
-    ProjectMenuAction.BACKUP_EXPORT -> LibraryIcons.Download
+    ProjectMenuAction.BACKUP_EXPORT -> IconId.Download.vector
     ProjectMenuAction.DELETE -> IconId.Trash.vector
 }
 

@@ -2,7 +2,7 @@
 
 Packages: `io.github.lenticualrstone.civilight.navigation` (core:navigation), `io.github.lenticualrstone.civilight.ui.*` (core:ui), `io.github.lenticualrstone.civilight` + `.shell` (app).
 
-**Build and tests.** `tools/gw :core:navigation:testDebugUnitTest :core:ui:testDebugUnitTest` exits 0: 12 tests in core:navigation (`NavigatorTest` 6, `RouteSerializationTest` 6) and 42 in core:ui (`FeatureContractTest` 3, `KoreanSearchTest` 3, `LabelsAndLensTest` 7, `LockRulesTest` 8, `PickerModelsTest` 9, `ProjectViewModelTest` 2, `SessionsAndToastsTest` 3, `ShellRulesTest` 7), all passing. `tools/gw :app:processDebugResources :app:compileDebugKotlin` exits 0, so the app's code, manifest, themes and resources build.
+**Build and tests.** `tools/gw :core:navigation:testDebugUnitTest :core:ui:testDebugUnitTest` exits 0: 13 tests in core:navigation (`NavigatorTest` 6, `RouteSerializationTest` 7) and 72 in core:ui (`FeatureContractTest` 4, `GraphEngineTest` 7, `KoreanSearchTest` 3, `LabelsAndLensTest` 7, `LockRulesTest` 13, `PickerModelsTest` 11, `ProjectViewModelTest` 2, `RichTextEditTest` 15, `SessionsAndToastsTest` 3, `ShellRulesTest` 7), all passing (core pass, 2026-11-22). `tools/gw :app:processDebugResources :app:compileDebugKotlin` exits 0, so the app's code, manifest, themes and resources build.
 
 **No APK was built.** The user asked to hold release and APK builds, so `:app:assembleDebug`, `bundle*`, `install*` and every release task were not run. Any APK under `app/build/outputs` is from an earlier run, not from this code. Nothing was run on a device or emulator.
 
@@ -67,12 +67,13 @@ You receive it as the entries function's parameter. In composition it is also `L
 | `clock: AppClock` | the injected clock for all date logic |
 | `windowLayout: State<WindowLayout>` | also `LocalWindowLayout.current`: `widthDp`, `widthClass` (`COMPACT · MEDIUM · EXPANDED`), `isInner`, `twoPanes`, `centerColumn`, `posture` (always `UNKNOWN` for now) |
 | `projects: ProjectSessions` | shared open project stores: `acquire`/`release`, `peek`, `peekDoc`. Normally use `ProjectViewModel` or `currentProjectStore` instead |
-| `unlock: UnlockController` | `state: StateFlow<UnlockState>` (`appLocked`, `hiddenGroupOpen`, `itemsOpen(projectKey)`, `recordsOpen`); `unlockHiddenGroup()`, `unlockItems(projectKey)`, `unlockRecords()`, `relockNow()` (`다시 잠그기`), `lockHiddenGroup()`, `appLockDisabled()` |
+| `unlock: UnlockController` | `state: StateFlow<UnlockState>` (`appLocked`, `hiddenGroupOpen`, `itemsOpen(projectKey)`, `recordsOpen`, `keptOpen`, `projectOpen(projectKey)`); `unlockHiddenGroup()`, `unlockItems(projectKey)`, `unlockRecords()`, `keepOpen(projectKey)` ("지금은 열린 채"), `relockNow()` (`다시 잠그기`), `lockHiddenGroup()`, `appLockDisabled()` |
 | `capture: CaptureGuard` | window protection requests. Prefer the `ProtectWindow(WindowProtection)` composable |
 | `toasts: ToastController` | `show(text, actionLabel = "되돌리기", onAction)`; one at a time; 6 s (LIB-40) |
 | `results: NavResults` | `send(requestKey, value)` / `consume(requestKey)` / `results(requestKey)` between screens (e.g. `PickOnMap`) |
 | `sheets: SheetRegistry` | `register<S : SheetKey> { sheet -> … }`; content of shared sheets |
 | `appScope: CoroutineScope` | main-thread scope that outlives screens |
+| `startup: StartupHooks` | `register(id) { deps -> Route? }`: one-time start-up work (LRC-09 recovery), run once per process after the app lock; the returned route is pushed |
 | `lens(store): LensController` | the project's lens: `state`/`point` flows, `current()`, `set`, `backToLatest`, `setLensToScene(sceneKey)`, `enterScript`/`leaveScript` (the shell calls the last two) |
 
 ### 3. Routes (core:navigation)
@@ -82,13 +83,13 @@ You receive it as the entries function's parameter. In composition it is also `L
 | Module | Routes |
 | --- | --- |
 | library | `Library` · `Onboarding(page)` · `Walkthrough(page)` · `ExampleTour(projectKey)` · `NewProject(step)` · `Settings` · `SettingsTextSize` · `SettingsLayout` · `SettingsMotion` · `SettingsMore` · `SettingsHiding` · `SettingsRating` · `RatingDefaultsApply(rating)` · `SettingsBackup` · `RecoveryPassword` · `HelpReplay` · `Licenses` · `Trash(filter)` · `RestoreBackup` · `Restoring` · `OpenFile(uri)` · `ProjectSettings(p)` · `StructureLevels(p)` |
-| story | `ProjectHome(p)` · `StoryStructure(p, focusUnitKey)` · `CheckCenter(p, filter)` · `ProjectSearch(p, query)` · `LibrarySearch(query)` · `BulkPlaceTime(p)` · `SceneNotationSettings(p)` · `DayBandSettings(p)` |
+| story | `ProjectHome(p)` · `StoryStructure(p, focusUnitKey)` · `CheckCenter(p, filter)` (filter = `CheckCenterFilter` / `CheckFilter` name) · `ProjectSearch(p, query)` · `LibrarySearch(query)` · `BulkPlaceTime(p)` · `SceneNotationSettings(p)` · `DayBandSettings(p)` |
 | script | `Script(p, sceneKey, blockKey, caretAtEnd)` · `ScriptAssets(p)` · `ScriptFieldSettings(p)` · `TransitionTextSettings(p)` |
 | cast | `CastList(p)` · `CharacterProfile(p, characterKey, tab)` · `RelationMap(p, focusKey)` · `FieldSettings(p, kind)` · `FieldDefEdit(p, fieldDefKey)` · `RelationKindSettings(p)` · `TagSettings(p)` · `ArchiveDocEdit(p, characterKey, docKey)` |
-| world | `World(p, tab)` · `TermCard(p, termKey)` · `PlaceCard(p, placeKey, tab)` · `FactionCard(p, factionKey)` · `Timeline(p)` · `EventDetail(p, eventKey)` · `TimelineMap(p)` · `WorldCalendar(p)` · `TravelModes(p)` |
-| map | `MapList(p)` · `MapView(p, mapKey, focusPinKey)` · `MapEdit` · `MapScale` · `MapReveal` · `NodeMap` · `MapFormatPicker(p)` · `MapGenerate(p, format)` · `HexPaint` · `PolygonRegions` · `DetailStamps` · `TextMap(p, mapKey?)` · `CharacterTrack(p, characterKey?, mapKey?)` · `PickOnMap(p, requestKey, sceneKey?)` |
+| world | `World(p, tab, createTerm)` · `TermCard(p, termKey)` · `PlaceCard(p, placeKey, tab)` · `FactionCard(p, factionKey)` · `Timeline(p)` · `EventDetail(p, eventKey)` · `TimelineMap(p)` · `WorldCalendar(p)` · `TravelModes(p)` |
+| map | `MapList(p)` · `MapView(p, mapKey, focusPinKey)` · `MapEdit` · `MapScale` · `MapReveal` · `NodeMap` · `MapFormatPicker(p, parentMapKey?, parentPinKey?)` · `MapGenerate(p, format)` · `HexPaint` · `PolygonRegions` · `DetailStamps` · `TextMap(p, mapKey?)` · `CharacterTrack(p, characterKey?, mapKey?)` · `PickOnMap(p, requestKey, sceneKey?, sceneCount)` · `SketchStraighten(p, photoHash, parentMapKey?, parentPinKey?)` |
 | canvas | `CanvasBoard(p, canvasKey?)` · `PageList(p)` · `PageDoc(p, pageKey)` · `ImageCrop(p, ownerKind, ownerKey, slot, blobHash)` · `ImageSpecs` · `PresetImages` · `HoloExperiment` |
-| recorder | `RecorderInbox(filter)` · `RecorderRecordDetail(recordKey)` · `Recording(surface, projectKey, targetKind, targetKey, caretBlockKey, startTyped)` · `RecorderSettings` |
+| recorder | `RecorderInbox(filter, projectKey?, targetKind?, targetKey?)` · `RecorderRecordDetail(recordKey)` · `Recording(surface, projectKey, targetKind, targetKey, caretBlockKey, startTyped)` · `RecorderSettings` |
 | shell | `AppLock` · `HiddenProjectLock(p)`. These are overlay keys. They are never pushed. |
 
 Route arguments are keys, strings, booleans, ints and plain enums only, never model objects, so they save through `SavedState`. If you need a new route, list it under Requests here. Do not declare a `Route` in your module: the sealed hierarchy lives in core:navigation.
@@ -113,14 +114,14 @@ Route arguments are keys, strings, booleans, ints and plain enums only, never mo
 Sheets are not back-stack entries. They are saveable state of the screen that shows them, so an open sheet survives process death (CNV-35).
 
 1. Declare the sheet key as a `@Serializable` class implementing `SheetKey`. Feature-local keys may live in your module. Sheets other areas open over their own screens are the `SharedSheet`s in core:navigation `Sheets.kt`, each naming its `owner`:
-   - SHELL: `LensSheet`
+   - SHELL: `LensSheet`, `RichLinkPickerSheet` (the shared editor's `@` picker)
    - STORY: `UnitMenuSheet`, `NewUnitSheet`, `SceneMoveSheet`, `SceneWhereSheet`
-   - SCRIPT: `SceneSplitSheet`, `SceneMergeSheet`
+   - SCRIPT: `SceneSplitSheet`, `SceneMergeSheet`, `RenumberSheet`
    - CAST: `FieldHistorySheet`, `FieldValueEditSheet`, `AddFieldSheet`, `RelationEditSheet`, `DeleteImpactSheet`, `MergeItemsSheet`
    - WORLD: `LinkCandidatesSheet`, `EventCreateSheet`
-   - CANVAS: `LineLabelSheet`, `ImagePickSheet`
+   - CANVAS: `LineLabelSheet` (`LineLabelSheet.forCharacters(p, a, b)` for relationship-map lines), `ImagePickSheet`
    - LIBRARY: `ExportSheet`, `RatingChangeSheet`
-   - RECORDER: `TextMemoSheet`
+   - RECORDER: `TextMemoSheet(projectKey?, targetKind?, targetKey?)`, `RecorderLinkPickerSheet`
 2. In the screen: `val sheets = rememberSheetHost()`, then pass it to `CivilightScreen(…, sheets = sheets, localSheets = { key -> when (key) { is MySheet -> { { MySheetContent(key, this) } } else -> null } })`, or wrap content in `SheetHostLayout(sheets, localSheets = …) { … }`.
 3. Open with `sheets.open(key)`. Inside the sheet, `SheetScope` gives `close()`, `open(another)` (stacked: closing returns to the one below) and `inner`.
 4. The owner of a shared sheet registers its content in its entries function: `deps.sheets.register<SceneWhereSheet> { sheet -> SceneWhereContent(sheet, this) }`. The content's receiver is a `SheetScope`, which is also the sheet's `ColumnScope`, so `ColumnScope` content such as pickers, `SheetScrollBody` and `SheetActions` can be called directly. Start it with the DS `SheetHeader(title, onClose = ::close)`. Use `SheetScrollBody` for long bodies and `SheetActions` for buttons. An unregistered shared sheet shows a placeholder sheet.
@@ -153,6 +154,10 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
 - **Security** (`ui.security`):
   - `ProtectWindow(WindowProtection.forProject(protections))` for any content of a protected project outside its own routes (hidden-group rows, search results, 기록함 rows, recents cards, the export sheet)
   - `AppLockScreen`, `HiddenProjectLockScreen`, `LockRules`, `UnlockController`, `AuthCopy.HIDDEN_PROJECTS` (`숨긴 프로젝트 보기`)
+- **Graph engine** (`ui.graph`, CNV-01): `GraphSurface`, `GraphScene` / `GraphNode` / `GraphLine`, `GraphGeometry`, `GraphViewport`, `graphGestures`; project-type-free, shared by the canvas and the cast 전체 관계도.
+- **Rich text** (`ui.richtext`): `RichTextEditor` + `rememberRichTextEditorState` for any `RichDoc` (`@` links through the shell's `RichLinkPickerSheet`, `( )` paren mode, `⌁` memo paragraphs); pure `RichDocEdit`.
+- **Lens edit banner** (`ui.lens`): `LensEditBanners.of(doc, readOnly)`, `LensEditCopy`, `ProjectLensEditBanner(doc, readOnly, onLatest)`.
+- **Event picker**: `EventPickerSheet` / `PickerModels.events` (`PickKind.EVENT`); `LinkPickerSheet(kinds = …)` adds 세력 for document text.
 - **Theme:** `ThemeBridge` maps model `ThemeMode` / `Rating` / text step / animation preference to the design system's types. Use `ThemeBridge.rating(project.rating)` for `RatingBadge`.
 
 ---
@@ -268,3 +273,94 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
 - **Feature agents**: new routes or shared sheets go in core:navigation. Ask here, do not declare them in your module.
 - **DS-62 repo-wide copy lint** (designsystem request): left for CI. A core:ui test that scans every module's `strings.xml` would tie this module's build to other agents' work in progress.
 - **FEATURES.md**: update the rows listed under Done and Partial (CNV-32 … CNV-36, CNV-38, CNV-46 effects, LIB-08, LIB-17 seed, LIB-26, LIB-29, LIB-32 … LIB-35, LIB-37, LIB-40, STO-13, STO-16, SCR-19 / SCR-55 picker parts). This module may not edit that file.
+
+---
+
+## Changes for the feature lanes (core pass)
+
+Core pass 2026-11-22, after the lanes' first batch. Every change is additive: new parameters have defaults and sit last (before a trailing content lambda), new routes and sheets are new classes. `tools/gw :app:compileDebugKotlin` (all eight feature modules) exits 0, and so do the tests of every changed module: `:core:model:test` 124, `:core:navigation:testDebugUnitTest` 13, `:core:designsystem:testDebugUnitTest` 56, `:core:ui:testDebugUnitTest` 72, `:domain:actions:test` 41, all passing. Nothing was run on a device, so everything visual below (IME, editor, dotted node) is unverified on screen.
+
+### Handled
+
+1. **IME: bars, wizard buttons and sheets sit above the keyboard** (script; the library `새 프로젝트` `이전 · 다음` row seen hidden on the emulator).
+   - DS `BottomGlassBar` now lifts itself by `KeyboardLift` (= `WindowInsets.ime.exclude(navigationBars)`) with the consumption-aware `Modifier.windowInsetsPadding`. That covers every user of the bar: `CivilightScreen`'s command bar, the 새 프로젝트 wizard and cast `RecordFrame` (both use `GlassScaffold` + `BottomGlassBar` directly). New parameter `aboveKeyboard: Boolean = true`; pass `false` for a bar that should stay at the window bottom.
+   - The script already wraps its reading bar in the same padding. Because the padding is consumed, the bar inside adds nothing, so the script is not lifted twice. The keyboard toolbar keeps its own spacer.
+   - DS `CivilightSheetLayout`: the sheet area is padded by `KeyboardLift` (consumption-aware), so the bottom sheet rides on the keyboard and its maximum height shrinks by the keyboard. The centred sheet centres in the space above it. The recorder memo's own `windowInsetsPadding` row inside a sheet becomes a no-op (consumed).
+   - The script's workaround (hide the keyboard before opening a sheet) can now go. That is the script lane's call.
+   - `CivilightScreen`: the content's bottom padding is at least the keyboard height, so a field near the end can be scrolled into view. The toast follows.
+   - `KeyboardLift` is public in `designsystem.component` for screens that draw their own bottom parts.
+   - **Not covered: the 새 프로젝트 inner layout** (`NewProjectScreen` `NewWide` frame, ~line 194). It is a `Box` with `navigationBarsPadding()` and the step buttons at the bottom of a full-height column, with no `BottomGlassBar`. Library lane: pad that `Box` with `windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))` (or add `windowInsetsPadding(KeyboardLift)`), so `이전 · 다음` rides on the keyboard on inner screens too.
+2. **`UnlockController.keepOpen(projectKey)`** ("지금은 열린 채", library; R19 §2, LIB-12, LIB-24, LIB-33).
+   - `UnlockState.keptOpenSince: Map<Key, Long>`, with `keptOpen` and `projectOpen(projectKey)` (= group open or kept open).
+   - Kept-open projects follow the same re-lock policy as the hidden group: `다시 잠그기`, leaving (ON_LEAVE), screen off, 5 minutes from `keepOpen`. `lockHiddenGroup()` clears them too. They count in `anythingOpen`, so the re-lock events are recorded even when the group itself was never opened.
+   - `ProjectEntryFrame` shows a kept-open hidden project without the lock.
+   - Use: call `deps.unlock.keepOpen(p)` right after the project becomes hidden (`ProtectionActions` off → on, `ProjectCreator` for a project created hidden). Feed `UnlockState.keptOpen` into `domain:library` `HiddenAccess.keptOpen` in `LibraryContext`, so the 서재 rows read the same set.
+   - Tests: `LockRulesTest` (5 new: ON_LEAVE, SCREEN_OFF_ONLY, FIVE_MINUTES, relock and cancel, group open).
+3. **Route and sheet arguments** (all in core:navigation; `RouteSamples` updated; a test checks that routes saved before this pass still decode).
+   - `TextMemoSheet(projectKey?, targetKind?, targetKey?)` (recorder, LRC-19): the same strings as `Recording.targetKind`.
+   - `RecorderInbox(filter?, projectKey?, targetKind?, targetKey?)` (cast, story; LRC-27 presets).
+     - Nothing set = `InboxOpening.FromLibrary`.
+     - `projectKey` only = `FromProject` (this project + `정리 안 됨`; LIB-13 checklist, empty-cast `라이프 레코더에서`).
+     - All three = `FromTarget` (CST-49, scene memo cards).
+     - Still not a `ProjectRoute` (the inbox spans projects; no project frame or hidden lock).
+     - The recorder lane maps these to `InboxOpening`. Cast and story push them.
+   - `MapFormatPicker(p, parentMapKey?, parentPinKey?)` (map, WLD-48 `상위` line).
+   - `SketchStraighten(p, photoHash, parentMapKey?, parentPinKey?)` (map, optional request): a new `MapRoute`. It shows the placeholder until feature:map registers it.
+   - `PickOnMap(…, sceneCount = 1)` (map → story, bulk `장소 정하기`).
+   - `LineLabelSheet(p, canvasKey, edgeKey, fromCharacterKey?, toCharacterKey?)` (canvas): for a relationship-map line use `LineLabelSheet.forCharacters(p, a, b)`. It sets `canvasKey = null`, the two keys and `edgeKey` = the pair id (`a|b` sorted, as `Relation.pairIdOf`).
+   - `World(p, tab, createTerm = false)` (story, LIB-13 `세계 용어 하나 적기`): feature:world opens the new-term form on arrival and consumes the flag once with an entry-scoped `rememberSaveable` "handled" flag. Do not replace the route: another route value is another entry, which resets the screen's view model, saved state and sheets.
+   - **`RenumberSheet(projectKey, episodeKey)`**: a `ProjectSheet` owned by **SCRIPT** (story, SCR-22). The script lane registers the content (it can move feature:story's local `RenumberContent` logic). Then feature:story switches `MenuAction.RENUMBER` to it and drops its local key.
+   - **`RecorderLinkPickerSheet(forMemo = true)`**: a `SharedSheet` owned by **RECORDER**. The recorder lane replaces its feature-local class of the same simple name with this one (change the import, delete `RecorderSheets.kt`'s class) and keeps its `register<…>`.
+   - **`CheckCenter.filter` values**: the string is the *name* of `domain:story` `CheckFilter` (`TERM`, `SPEAKER`, `TRAVEL`, `VOICE`, `CHANGE`, `DELETED`, `ACKNOWLEDGED`, `ALL`), also as constants `CheckCenterFilter.TERM` …. feature:story maps it with `CheckFilter.valueOf` (null or unknown = `전체`). World already pushes `CheckCenter(p, CheckFilter.TERM.name)`; that is the contract now.
+4. **`SceneActions.create(doc, parentKey: Key?, …)`** (story, 1-level structures). `parentKey = null` creates a top-level scene after `afterSceneKey` (null = first), only in a 1-level structure (it throws otherwise). No other scene's 때 changes. The call stays source-compatible. The prefills (`prefillAfter` / `prefillBefore`) work by scene key. `move` still needs a parent. Test: `SceneActionsTest.new scene in a 1-level structure …`.
+5. **Shared graph engine** (canvas → cast): `core:ui` package `ui.graph` (`GraphModel`, `GraphGeometry`, `GraphViewport`, `GraphGestures`, `GraphSurface`).
+   - It is a copy of feature:canvas `graph`, project-type-free. `graphGestures` is now public.
+   - One change: a `NodeLook.DOTTED` node draws the new DS `NodeCard(deleted = true)` (dotted + `◇`), not the memo dashes.
+   - feature:cast's 전체 관계도 can use it now. feature:canvas switches its imports to `io.github.lenticualrstone.civilight.ui.graph` and deletes its own copy (canvas lane).
+   - Tests: `GraphEngineTest` (7, the graph half of canvas `GraphAndToolsTest`).
+6. **Shared rich text editor** (cast, world, script; `ui.richtext`): `긴 글` values, 말투 / 비밀 prose, archive docs, world text and pages.
+   - `RichDocEdit` (pure): `textOf`, `apply(doc, newText, newKey, parenMode)`, `insertLink`, `trimmed`, `paragraphAt`, `layout`, `normalize`. Editing a plain-text view keeps:
+     - every untouched run, so link keys survive;
+     - paragraph `key`, `kind`, `recorderSource` and `ext`;
+     - unknown runs.
+     - Typing inside a link or `괄호 지문` edits that run. A new line splits a paragraph, and the new half keeps the kind (a `⌁` memo stays a memo, without the source).
+   - `RichTextEditorState` / `rememberRichTextEditorState(initial, key)`: the field is the source of truth (never re-seeded from the doc, so Hangul composition is safe). It also holds `parenMode`, `result` (to save) and `changed`, and it is saveable.
+   - `RichTextEditor(state, projectKey, linkPickerTitle, openSheet, …)`:
+     - a DS-35 multi-line field: links underlined, parens drawn as `( )` in `ink3`, memo paragraphs with a `⌁ ` mark in `ink3`;
+     - under it, two visible tool buttons: `( )` (toggle) and `@`.
+     - `@` opens the new SHELL sheet `RichLinkPickerSheet(projectKey, requestKey, title, kinds)` through `openSheet`. Pass the screen's `sheets::open`, or the sheet scope's `open` when the editor is inside a sheet. The pick returns through `deps.results` as a `LinkPick` and is inserted at the caret where `@` was pressed. Kinds default to 인물 · 용어 · 장소 · 세력.
+     - The picker title is the caller's copy (lanes still have `TODO_COPY_*_LINK_PICKER_TITLE` open).
+     - `linkLook` styles hidden or deleted targets.
+   - Callers whose text links to items hidden while locked should gate the editor behind `지문으로 보기`, as world does.
+   - **Sheets under a sheet keep their state** (needed for `@` inside `FieldValueEditSheet`): `SheetHostLayout` now gives every sheet in the stack its own `SaveableStateProvider`. A sheet with another one stacked on top keeps its `rememberSaveable` state (an editor draft, the picker request key) until it is closed. A closed sheet starts fresh. Only the top sheet is composed, so state held only in `remember` (not saveable) is still lost while covered.
+   - Tests: `RichTextEditTest` (15).
+7. **DS icons and the deleted node.**
+   - `IconId.Pencil`, `IconId.Shield`, `IconId.Download` (library `LibMenu`; same paths as `LibraryIcons.kt`, so the library can switch).
+   - `IconId.Minus` (`M5 12h14`, canvas zoom column).
+   - `NodeCard(…, deleted = false)`: true = transparent, dotted `ink3` outline, `◇` before the title in `ink3`, title `ink2`. Pass the wide label (`지운 인물 · 노아`) as the title. Selection keeps the dots.
+   - `Modifier.insetOutline(…, dotted = false)`.
+   - Pure `nodeCardLook(…)`. Test: `NodeCardLookTest` (4).
+8. **core:model `ProjectViewFile.lastCanvasKey: Key?`** (canvas, CNV-02). In `_app/view.json`, never exported, not written when null. Set it through `ProjectViewModel.updateApp { }` when a canvas opens; read it to pick the canvas. Test: `AppStateJsonTest.lastCanvasKeyIsOptionalAndRoundTrips`.
+9. **Start-up hook (recorder, LRC-09).**
+   - `FeatureDeps.startup: StartupHooks` (default body, so fakes compile; process-wide in the shell).
+   - Register in your entries function: `deps.startup.register("recorder.resume") { d -> /* read session.json */ Recording(...) or null }`.
+   - The shell runs each pending hook once per process, after the start routes are on the stack and the app lock is passed, and pushes the route it returns.
+   - A hook that throws is logged and skipped. A hook cancelled half-way (activity gone) runs again in the next activity.
+   - Test: `FeatureContractTest.start-up hooks run once per process …`.
+10. **`PickKind.EVENT` and the event picker** (canvas): `PickerModels.events(doc, query)` lists live events in timeline order. A story event's sub line is its scene (`1-3 씬 2`). Composable: `EventPickerSheet(doc, title, onPick, onClose, selectedKey)`. Also:
+    - `PickerModels.links(doc, query, hiddenOpen, kinds)` with `SCRIPT_LINK_KINDS` / `DOCUMENT_LINK_KINDS`;
+    - `LinkPickerSheet(…, kinds = SCRIPT_LINK_KINDS)` adds 세력 for document text.
+    - Existing `when (kind)` blocks over `PickKind` all have `else`, so nothing broke.
+11. **`CivilightScreen(…, topBar = null, bottomBar = null)` and a public `ToastOverlay(bottom)`** (script). A screen that needs its own header or keyboard toolbar can keep the shell frame, or draw `ToastOverlay` in its own frame instead of re-creating the toast host.
+12. **Shared lens edit banner** (world, optional): `ui.lens.LensEditBanners.of(doc, readOnly)`, `LensEditCopy` (`<code> 시점 값 고치는 중`, `고치면 <code>부터 적용`, `최신으로`), `ProjectLensEditBanner(doc, readOnly, onLatest)`. Cast and world can drop their copies.
+
+### Declined or left open (with the reason)
+
+- **Build files** (shell.md, core-model.md, core-store.md requests: `testImplementation(libs.junit)` for app, `api(...)` for serialization / coroutines / datastore): this pass may not edit build files. core:ui already declares `androidx.window` and `material3.adaptive`, so posture work can start, but `FoldPosture` is still `UNKNOWN` (not part of this pass).
+- **`ChangeTarget` kind for fixed world fields** (world): it changes the exported file format and is a spec-owner decision (00-domain-model §2.4). Those values stay base values.
+- **Real fields for `TrashEntry.ext["refSites"]` and `MergeRecord.ext["summary"]`** (domain:trash): format change, spec-owner call. They round-trip as `ext` today.
+- **Merged place names as aliases** (domain:actions → domain:trash): a design call, not a code gap.
+- **`PurgeActions.runDue` at start-up** (domain-actions.md): no feature lane needs it this round. It writes every project outside the open sessions and their undo stacks, and the existing `StoreContainer.runMaintenance` already purges whole projects, recorder records and blobs. Row purges inside a project stay with the trash screens until a maintenance batch wires it through `ProjectSessions`.
+- **Map `MapSketchFileProvider` merged-manifest check** (map): needs an APK build, which is on hold.
+- **Copy (`TODO_COPY_*`)**: these are for the spec owner, not core. The editor and picker take titles from the caller and invent none. `TODO_COPY_SHELL_PROJECT_OPEN_FAILED` is still open.
+- **Requests between lanes** (library `ProjectSettings` rows, script day baselines, world ↔ cast sheet registration, recorder `Recording` pushes): not core. They stay in the lanes' files.

@@ -36,6 +36,8 @@ import io.github.lenticualrstone.civilight.feature.story.menu.storyActions
 import io.github.lenticualrstone.civilight.model.project.TransitionMode
 import io.github.lenticualrstone.civilight.model.story.PlaceRef
 import io.github.lenticualrstone.civilight.model.story.PlaceRefKind
+import io.github.lenticualrstone.civilight.model.project.Band
+import io.github.lenticualrstone.civilight.domain.story.time.word
 import io.github.lenticualrstone.civilight.navigation.NewUnitSheet
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
@@ -68,6 +70,8 @@ fun SheetScope.NewUnitContent(sheet: NewUnitSheet, deps: FeatureDeps) {
     var placeKind by rememberSaveable { mutableStateOf<String?>(null) }
     var placeKey by rememberSaveable { mutableStateOf<String?>(null) }
     var timeCleared by rememberSaveable { mutableStateOf(false) }
+    var dayChip by rememberSaveable { mutableStateOf<Int?>(null) }
+    var band by rememberSaveable { mutableStateOf<String?>(null) }
     var mode by rememberSaveable { mutableStateOf<String?>(null) }
     var directText by rememberSaveable { mutableStateOf("") }
     var picking by rememberSaveable { mutableStateOf(false) }
@@ -84,6 +88,8 @@ fun SheetScope.NewUnitContent(sheet: NewUnitSheet, deps: FeatureDeps) {
             else -> PlaceChoice.Prefilled
         },
         timeCleared = timeCleared,
+        dayChip = dayChip,
+        band = band,
         transition = mode?.let { m -> TransitionMode.entries.firstOrNull { it.name == m } },
         directText = directText,
     )
@@ -105,7 +111,7 @@ fun SheetScope.NewUnitContent(sheet: NewUnitSheet, deps: FeatureDeps) {
         return
     }
 
-    SheetHeader(title = setup?.title ?: NewUnitCopy.TITLE_AFTER, onClose = ::close, subtitle = setup?.subtitle)
+    SheetHeader(title = setup?.title ?: NewUnitCopy.TITLE_AFTER, onClose = ::close, subtitle = setup?.subtitle?.ifEmpty { null })
     if (setup == null) return
     val lines = NewSceneForms.lines(doc, setup, form)
     val readOnly = store.readOnly
@@ -122,6 +128,24 @@ fun SheetScope.NewUnitContent(sheet: NewUnitSheet, deps: FeatureDeps) {
         }
         FieldRow(NewUnitCopy.FIELD_TIME, lines.time) {
             if (lines.timeClearable) TextAction(NewUnitCopy.CLEAR, { timeCleared = true }, style = actionStyle())
+        }
+        if (NewSceneForms.baseKey(doc, setup) != null) {
+            val selectedDay = NewSceneForms.dayChipOf(doc, setup, form)
+            val selectedBand = NewSceneForms.bandOf(doc, setup, form)
+            ChipFlow(Modifier.padding(bottom = 10.dp)) {
+                listOf(0 to NewUnitCopy.SAME_DAY, 1 to NewUnitCopy.PLUS_ONE, 2 to NewUnitCopy.PLUS_TWO).forEach { (n, word) ->
+                    FilterChip(word, !timeCleared && selectedDay == n, {
+                        timeCleared = false
+                        dayChip = n
+                    })
+                }
+                Band.entries.forEach { b ->
+                    FilterChip(b.word, !timeCleared && selectedBand == b, {
+                        timeCleared = false
+                        band = b.name
+                    })
+                }
+            }
         }
         TransitionRow(lines.transition, lines.autoEnabled) { mode = it.name }
         if (lines.transition == TransitionMode.DIRECT) {

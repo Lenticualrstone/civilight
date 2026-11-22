@@ -18,13 +18,20 @@ import io.github.lenticualrstone.civilight.domain.recorder.put.PositionSheets
 import io.github.lenticualrstone.civilight.domain.recorder.text.Runs
 import io.github.lenticualrstone.civilight.feature.recorder.env.EnvSource
 import io.github.lenticualrstone.civilight.feature.recorder.memo.MemoEditing
+import io.github.lenticualrstone.civilight.feature.recorder.outside.AudioFocusGate
+import io.github.lenticualrstone.civilight.feature.recorder.audio.AudioTakes
+import io.github.lenticualrstone.civilight.feature.recorder.audio.NoAudioTakes
+import io.github.lenticualrstone.civilight.feature.recorder.speech.ChosenEngine
+import io.github.lenticualrstone.civilight.feature.recorder.speech.EngineChoice
 import io.github.lenticualrstone.civilight.feature.recorder.speech.SpeechEngine
+import io.github.lenticualrstone.civilight.model.recorder.RecorderAudio
 import io.github.lenticualrstone.civilight.feature.recorder.speech.SpeechListener
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.AppSettings
 import io.github.lenticualrstone.civilight.model.recorder.EntryContext
+import io.github.lenticualrstone.civilight.model.recorder.EntrySurface
+import io.github.lenticualrstone.civilight.model.recorder.RecorderTargetKind
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
-import io.github.lenticualrstone.civilight.model.recorder.RecorderTranscription
 import io.github.lenticualrstone.civilight.model.recorder.RecordingPhase
 import io.github.lenticualrstone.civilight.model.recorder.RecordingSession
 import io.github.lenticualrstone.civilight.model.recorder.TranscriptionMode
@@ -57,9 +64,14 @@ class CaptureHub(
     private val context: () -> ActionContext,
     private val monotonicMs: () -> Long,
     private val audioTempPath: (Key) -> String,
-    engineFactory: () -> SpeechEngine,
+    private val engineFactory: (TranscriptionMode) -> SpeechEngine,
+    private var focus: AudioFocusGate = AudioFocusGate.None,
+    private val takes: AudioTakes = NoAudioTakes,
+    private var online: () -> Boolean = { false },
 ) {
-    private val engine: SpeechEngine by lazy(engineFactory)
+    /** The engine of the current take (LRC-11, LRC-12), chosen when a take starts. */
+    private var chosen: ChosenEngine? = null
+    private val engine: SpeechEngine get() = (chosen ?: chooseEngine()).engine
     private val _state = MutableStateFlow(CaptureState())
     private val _level = MutableStateFlow(0f)
 
@@ -84,6 +96,35 @@ class CaptureHub(
 
     private val s: CaptureState get() = _state.value
 
+    /** The platform audio focus, installed once by the first capture screen (it needs a context). */
+    fun usePlatformFocus(gate: AudioFocusGate) {
+        if (focus === AudioFocusGate.None) focus = gate
+    }
+
+    /** The platform network check (LRC-12), installed by the first capture screen (it needs a context). */
+    fun useNetwork(network: () -> Boolean) {
+        online = network
+    }
+
+    /** Start-up: takes nobody brought back (a `취소` never undone) are deleted, except [keep]'s. */
+    fun pruneTakes(keep: Key?) = takes.prune(setOfNotNull(keep))
+
+    /** Picks the engine for a new take from the setting and the network (LRC-12). */
+    private fun chooseEngine(): ChosenEngine =
+        EngineChoice.choose(settings().recorder.transcription, online(), engineFactory).also { chosen = it }
+
+    /**
+     * The take's audio kept in the blob store (LRC-14) when `원본 음성 보관` is on, with its envelope;
+     * null when it is off or nothing was captured.
+     */
+    private suspend fun keptAudio(recordKey: Key, durationMs: Long): RecorderAudio? {
+        if (!settings().recorder.keepAudio) return null
+        val take = takes.take(recordKey) ?: return null
+        val blob = recorder.importAudio(take.path, take.mime, durationMs) ?: return null
+        val envelope = take.envelope.takeIf { it.isNotEmpty() }?.let(RecorderAudio::encodeEnvelope)
+        return RecorderAudio(hash = blob.hash, mime = blob.mime, bytes = blob.bytes, durationMs = durationMs, envelope = envelope)
+    }
+
     /** Runs [block] in the hub's own scope, so writes finish even after the screen left. */
     fun launch(block: suspend CaptureHub.() -> Unit): Job = scope.launch { block() }
 
@@ -105,7 +146,9 @@ class CaptureHub(
                 MicAction.SHOW_MIC_ERROR -> _state.update {
                     it.copy(stage = if (micDenied) CaptureStage.MIC_OFF else CaptureStage.MIC_REASON, entry = entry, memo = null, voiceFromMemo = false)
                 }
-                else -> start(entry)
+                // `잠금 화면에서 녹음` off: the device unlock comes first (LRC-05); the screen asks for it.
+                MicAction.REQUEST_UNLOCK -> _state.value = CaptureState(entry = entry, unlock = UnlockRequest.Start(entry), env = s.env)
+                MicAction.START_RECORDING, MicAction.OPEN_RUNNING -> start(entry)
             }
         }
     }
@@ -122,6 +165,20 @@ class CaptureHub(
         when {
             now.voiceFromMemo -> memoToVoice(true)
             now.entry != null -> start(now.entry)
+        }
+    }
+
+    /**
+     * The device unlock asked for by [CaptureState.unlock] answered (LRC-05). Unlocked: the start
+     * goes on, or the link picker opens; the capture now counts as off the lock screen for links.
+     * Cancelled: the recording screen stays as it was; a start that never began closes.
+     */
+    fun unlockResult(granted: Boolean) {
+        val request = s.unlock ?: return
+        _state.update { it.copy(unlock = null, deviceUnlocked = it.deviceUnlocked || granted) }
+        when (request) {
+            is UnlockRequest.Start -> if (granted) start(request.entry.copy(onLockScreen = false)) else close()
+            is UnlockRequest.Picker -> if (granted) openPicker(request.picker)
         }
     }
 
@@ -149,10 +206,50 @@ class CaptureHub(
         val fullEntry = withExample(entry, env)
         val key = ctx.newKey()
         val session = Recording.start(key, fullEntry, settings().recorder, env, audioTempPath(key), ctx.recorder)
-        _state.value = CaptureState(stage = CaptureStage.RECORDING, entry = fullEntry, session = session, env = env, engineUnavailable = !engine.available)
+        val engineNow = chooseEngine().engine
+        _state.value = CaptureState(stage = CaptureStage.RECORDING, entry = fullEntry, session = session, env = env, engineUnavailable = !engineNow.available)
+        takes.start(key)
         startListening()
         refreshEnv()
     }
+
+    /**
+     * Start-up recovery (LRC-09, `[PROPOSED]`): the recording that was running when the process
+     * ended. A take still recording or paused is saved with what was captured and opens in
+     * `정리 중`; a `정리 중` comes back with its unsaved link and hide edits. A take with nothing in it
+     * (no time, no text, no record yet) is dropped. Returns the entry to show, or null.
+     */
+    suspend fun recover(saved: RecordingSession): EntryContext? {
+        if (s.active) return null
+        recorder.ensureLoaded()
+        val env = envSource.load()
+        val existing = recorder.current().record(saved.recordKey)
+        val empty = saved.elapsedMs <= 0 && Runs.text(saved.confirmedRuns).isBlank() && saved.partialText.isBlank()
+        if (existing == null && (saved.phase == RecordingPhase.PROCESSING || empty)) {
+            recorder.saveSession(null)
+            return null
+        }
+        var session = saved
+        if (saved.phase != RecordingPhase.PROCESSING) {
+            val ctx = context()
+            takes.recoverSegment(saved.recordKey)
+            val audio = keptAudio(saved.recordKey, saved.elapsedMs)
+            recorder.update { lib ->
+                val (next, library) = Recording.stopAndSave(saved.copy(phase = RecordingPhase.PAUSED), lib, ctx.recorder, audio = audio, transcribedBy = transcription())
+                session = next
+                library
+            }
+        }
+        _state.value = CaptureState(
+            stage = CaptureStage.PROCESSING, entry = session.entry, session = session.copy(hideSwitch = RecordHiding.hideSwitch(session.hideSwitch, session.pendingLinks, env)),
+            env = env, audioKept = recorder.current().record(session.recordKey)?.audio != null,
+        )
+        recorder.saveSession(_state.value.session)
+        return session.entry
+    }
+
+    /** The engine that transcribed this take (the record's `transcribedBy`); on-device when none ran. */
+    private fun transcription(): TranscriptionMode = chosen?.mode ?: TranscriptionMode.ON_DEVICE
 
     fun togglePause() {
         val session = s.session ?: return
@@ -161,11 +258,15 @@ class CaptureHub(
                 stopTicker()
                 setSession(Recording.pause(s.session!!))
                 engine.pause()
+                takes.pause()
+                focus.abandon()
                 _level.value = 0f
             }
             RecordingPhase.PAUSED -> {
                 setSession(Recording.resume(session))
+                focus.request(::focusLost)
                 engine.resume()
+                takes.resume()
                 startTicker()
             }
             RecordingPhase.PROCESSING -> Unit
@@ -189,15 +290,15 @@ class CaptureHub(
         finalBase = Runs.normalize(session.confirmedRuns)
         _state.update { it.copy(stage = CaptureStage.PROCESSING, finalising = true) }
         _level.value = 0f
+        focus.abandon()
         engine.stop()
+        takes.finish(session.recordKey)
         val ctx = context()
-        val mode = when (settings().recorder.transcription) {
-            RecorderTranscription.CLOUD -> TranscriptionMode.CLOUD
-            RecorderTranscription.ON_DEVICE -> TranscriptionMode.ON_DEVICE
-        }
+        val mode = transcription()
+        val audio = keptAudio(session.recordKey, (s.session ?: session).elapsedMs)
         var next: RecordingSession = session
         recorder.update { lib ->
-            val (saved, library) = Recording.stopAndSave(s.session ?: session, lib, ctx.recorder, transcribedBy = mode)
+            val (saved, library) = Recording.stopAndSave(s.session ?: session, lib, ctx.recorder, audio = audio, transcribedBy = mode)
             next = saved
             library
         }
@@ -213,6 +314,7 @@ class CaptureHub(
         finalBase = null
         setSession(Recording.continueSpeaking(session, recorder.current()))
         _state.update { it.copy(stage = CaptureStage.RECORDING, finalising = false) }
+        takes.start(session.recordKey)
         startListening()
     }
 
@@ -224,6 +326,7 @@ class CaptureHub(
         close()
         recorder.update { Recording.keepInInbox(session, it, ctx.recorder) }
         recorder.saveSession(null)
+        takes.discard(session.recordKey)
     }
 
     /** `취소` (LRC-07, `ED` §6 Q8). */
@@ -233,8 +336,11 @@ class CaptureHub(
         val session = s.session ?: return CancelOutcome.Nothing
         engineToken++
         engine.stop()
+        focus.abandon()
         _level.value = 0f
         val (back, cancelled) = Recording.cancel(session, recorder.current())
+        // A continued take drops only its new segment; a first take keeps its file for the toast's undo (pruned at start-up otherwise).
+        if (back != null) takes.drop(session.recordKey) else takes.finish(session.recordKey)
         return if (back != null) {
             setSession(back)
             _state.update { it.copy(stage = CaptureStage.PROCESSING, finalising = false) }
@@ -257,8 +363,10 @@ class CaptureHub(
             next = session
             library
         }
+        val audio = keptAudio(cancelled.session.recordKey, cancelled.session.elapsedMs)
+        if (audio != null) recorder.update { CaptureRules.withAudio(it, cancelled.session.recordKey, audio) }
         val env = envSource.quick()
-        _state.value = CaptureState(stage = CaptureStage.PROCESSING, entry = cancelled.session.entry, session = next, env = env)
+        _state.value = CaptureState(stage = CaptureStage.PROCESSING, entry = cancelled.session.entry, session = next, env = env, audioKept = audio != null)
         recorder.saveSession(next)
         refreshEnv()
     }
@@ -294,8 +402,10 @@ class CaptureHub(
             }
             ) ?: return null
         close()
+        envSource.forget(projectKey)
         recorder.update { insertion.library }
         recorder.saveSession(null)
+        takes.discard(session.recordKey)
         return PutHereOutcome(projectKey, insertion)
     }
 
@@ -307,12 +417,19 @@ class CaptureHub(
             library = l
             d to Unit
         } ?: return
+        envSource.forget(outcome.projectKey)
         library?.let { l -> recorder.update { l } }
     }
 
     // ---- links (LRC-18 … LRC-20) ----
 
+    /** `+ 연결` or a chip tap. On the lock screen the device unlock comes first (LRC-05, `[PROPOSED]` §6 Q7). */
     fun openPicker(request: PickerRequest) {
+        val session = s.session
+        if (request.target == PickerTarget.SESSION && session != null && Recording.linkPickerNeedsUnlock(session) && !s.deviceUnlocked) {
+            _state.update { it.copy(unlock = UnlockRequest.Picker(request)) }
+            return
+        }
         _state.update { it.copy(picker = request) }
         refreshEnv()
     }
@@ -405,8 +522,11 @@ class CaptureHub(
         if (s.session == null || s.stage != CaptureStage.RECORDING) return
         stopTicker()
         val session = s.session ?: return
+        if (session.entry.onLockScreen) return
         engineToken++
         engine.stop()
+        takes.finish(session.recordKey)
+        focus.abandon()
         _level.value = 0f
         val memo = Recording.switchToText(session, s.env, context().now)
         _state.update {
@@ -450,6 +570,11 @@ class CaptureHub(
         close()
         recorder.update { TextMemo.save(memo, it, ctx).first }
         recorder.saveDraft(null)
+        // LRC-16: the audio of a recording switched to text stays attached to the voice record.
+        memo.carriedVoice?.let { voice ->
+            keptAudio(voice.recordKey, voice.durationMs)?.let { audio -> recorder.update { CaptureRules.withAudio(it, voice.recordKey, audio) } }
+            takes.discard(voice.recordKey)
+        }
         return true
     }
 
@@ -459,6 +584,8 @@ class CaptureHub(
         if (s.stage != CaptureStage.TYPING) return
         close()
         recorder.saveDraft(TextMemo.close(memo))
+        // The kept draft holds text and links only; the switched recording's audio has nothing left to attach to.
+        memo.carriedVoice?.let { takes.discard(it.recordKey) }
     }
 
     /** `말로 기록으로 바꾸기` (LRC-16): recording starts with the typed text as the start of the transcript. */
@@ -473,13 +600,15 @@ class CaptureHub(
         val carried = memo.carriedVoice
         val key = carried?.recordKey ?: context().newKey()
         val session = TextMemo.toVoice(memo, key, audioTempPath(key)).let { if (carried != null) it.copy(elapsedMs = carried.durationMs) else it }
+        val engineNow = chooseEngine().engine
         _state.update {
             it.copy(
                 stage = CaptureStage.RECORDING, entry = memo.draft.entry, session = session, memo = null, voiceFromMemo = false,
-                picker = null, finalising = false, audioKept = false, engineUnavailable = !engine.available,
+                picker = null, finalising = false, audioKept = false, engineUnavailable = !engineNow.available,
             )
         }
         recorder.saveDraft(null)
+        takes.start(key)
         startListening()
     }
 
@@ -531,12 +660,28 @@ class CaptureHub(
 
     // ---- internals ----
 
-    /** The entry marked as inside the onboarding example (its chip reads `예시 · 끝나면 연결 없어짐`, LRC-19). */
-    private fun withExample(entry: EntryContext, env: RecorderEnv): EntryContext =
-        entry.copy(isExample = entry.projectKey?.let { env.project(it)?.isExample } == true)
+    /**
+     * The entry completed from the documents: marked as inside the onboarding example (its chip reads
+     * `예시 · 끝나면 연결 없어짐`, LRC-19), and a script entry that names only its caret block gets that
+     * block's scene as the pre-filled target (rule 23 §2: script → that scene).
+     */
+    private fun withExample(entry: EntryContext, env: RecorderEnv): EntryContext {
+        val project = entry.projectKey?.let(env::project)
+        val caretScene = if (entry.surface == EntrySurface.SCRIPT && entry.targetKey == null) {
+            entry.caretBlockKey?.let { project?.doc?.index?.block(it)?.sceneKey }
+        } else {
+            null
+        }
+        return entry.copy(
+            isExample = project?.isExample == true,
+            targetKind = if (caretScene != null) RecorderTargetKind.UNIT else entry.targetKind,
+            targetKey = caretScene ?: entry.targetKey,
+        )
+    }
 
     private fun close() {
         memoDetached = false
+        focus.abandon()
         stopTicker()
         finalBase = null
         _level.value = 0f
@@ -552,6 +697,7 @@ class CaptureHub(
 
     private fun startListening() {
         val token = ++engineToken
+        focus.request(::focusLost)
         engine.start(listenerFor(token))
         startTicker()
         persistSoon()
@@ -610,6 +756,9 @@ class CaptureHub(
         lastTick = now
         val session = s.session ?: return
         if (session.phase != RecordingPhase.RECORDING || delta <= 0) return
+        // The microphone's own level drives the glow (LRC-10) and the waveform envelope (LRC-14).
+        val level = takes.sample()
+        if (takes.capturing) _level.value = level
         setSession(Recording.elapse(session, delta))
         sincePersist += delta
         if (sincePersist >= PERSIST_EVERY_MS) {
@@ -660,5 +809,10 @@ object CaptureRules {
     /** [recordKey]'s text replaced by [runs] without a revision step (the engine refining its own transcript). */
     fun withRuns(library: RecorderLibrary, recordKey: Key, runs: List<TextRun>): RecorderLibrary = library.copy(
         records = library.records.map { if (it.key == recordKey) it.copy(runs = Runs.normalize(runs)) else it },
+    )
+
+    /** [recordKey]'s kept audio set (LRC-14: after `되돌리기` of `취소`, and for a recording switched to text). */
+    fun withAudio(library: RecorderLibrary, recordKey: Key, audio: RecorderAudio): RecorderLibrary = library.copy(
+        records = library.records.map { if (it.key == recordKey) it.copy(audio = audio) else it },
     )
 }

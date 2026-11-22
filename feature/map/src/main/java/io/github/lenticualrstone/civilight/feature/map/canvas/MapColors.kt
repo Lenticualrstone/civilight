@@ -29,6 +29,9 @@ object MapColors {
         return t.substring(1).toLongOrNull(16)?.let { 0xFF000000L or it }
     }
 
+    /** A region or province colour token as ARGB over [art] (`map-art-1 … 5` of the theme). */
+    fun tokenArgb(token: String, art: List<Int>): Int = parseHex(token)?.toInt() ?: art[artIndex(token) ?: 0]
+
     fun dsTerrain(t: Terrain): DsTerrain = when (t) {
         Terrain.DEEP -> DsTerrain.DEEP
         Terrain.SEA -> DsTerrain.SEA

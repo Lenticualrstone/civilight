@@ -162,6 +162,19 @@ class NewSceneFormTest {
         val deleted = io.github.lenticualrstone.civilight.domain.actions.SceneActions.delete(doc, s9, Fx.ctx()).doc
         assertNull(NewSceneForms.create(deleted, sheet, NewSceneForm(), Fx.ctx()))
         val oneLevel = Fx.mini(listOf("씬"), node("S1"))
-        assertNull(NewSceneForms.setup(oneLevel, NewUnitSheet(oneLevel.project.key, parentKey = null)))
+        assertNull("a 1-level sheet names no parent", NewSceneForms.setup(oneLevel, NewUnitSheet(oneLevel.project.key, parentKey = "S1")))
+    }
+
+    @Test
+    fun oneLevelStructureCreatesATopLevelScene() {
+        val oneLevel = Fx.mini(listOf("씬"), node("S1"), node("S2"))
+        val sheet = NewUnitSheet(oneLevel.project.key, parentKey = null, afterKey = "S1")
+        val setup = NewSceneForms.setup(oneLevel, sheet)!!
+        assertNull(setup.parentKey)
+        assertEquals("S1", setup.afterSceneKey)
+        assertEquals("씬 1 뒤", setup.subtitle)
+        val (created, key) = NewSceneForms.create(oneLevel, sheet, NewSceneForm(title = "새 장면"), Fx.ctx())!!
+        val top = created.index.children(null).filter { created.liveness.isUnitLive(it.key) }.map { it.key }
+        assertEquals(listOf("S1", key, "S2"), top)
     }
 }

@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.story.home
 
 import io.github.lenticualrstone.civilight.domain.library.newproject.ChecklistItem
 import io.github.lenticualrstone.civilight.domain.library.newproject.StartBlock
+import io.github.lenticualrstone.civilight.feature.story.common.TODO_COPY_PREFIX
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.ProjectAppState
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
@@ -49,13 +50,13 @@ object HomeStartModel {
             items = block.items.map { item ->
                 val route = when (item.id) {
                     ChecklistItem.Id.PROTAGONIST -> CastList(p)
-                    // `ED`: the 기록함 has no project filter id yet (Requests); it opens unfiltered.
-                    ChecklistItem.Id.LINKED_RECORDS -> RecorderInbox()
-                    // `ED`: no route opens a new term directly (Requests); the 용어 tab of 세계.
-                    ChecklistItem.Id.TERM -> World(p, WorldTab.TERMS)
+                    // `FromProject` preset (core pass): this project's records + `정리 안 됨`.
+                    ChecklistItem.Id.LINKED_RECORDS -> RecorderInbox(projectKey = p)
+                    // feature:world opens the new-term form on arrival (core pass `createTerm`).
+                    ChecklistItem.Id.TERM -> World(p, WorldTab.TERMS, createTerm = true)
                     ChecklistItem.Id.FIRST_LINE -> write
                 }
-                HomeStartItem(item.id, item.title, item.sub, item.done, route)
+                HomeStartItem(item.id, item.title, shownSub(item.sub), item.done, route)
             },
         )
     }
@@ -71,6 +72,12 @@ object HomeStartModel {
         }
         return last
     }
+
+    /**
+     * A sub line as shown: copy the spec does not draw yet (`TODO_COPY_…` from `domain:library`, e.g.
+     * `주인공 만들기` while no character exists) is left empty, never put on screen.
+     */
+    fun shownSub(sub: String): String = if (sub.startsWith(TODO_COPY_PREFIX)) "" else sub
 
     /** `목록 닫기`: dismissed for good. */
     fun dismiss(app: ProjectAppState): ProjectAppState =

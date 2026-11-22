@@ -79,6 +79,18 @@ enum class IconId(val pathData: String) {
     StepLock("M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3"),
     StepOpen("M6 11h12v9H6zM8 11V8a4 4 0 0 1 7.5-2"),
     Exclaim("M12 5v9M12 18h.01"),
+
+    /** `이름 바꾸기` (서재 ⋯ menu, LIB-02). */
+    Pencil("M4 20h4l10-10-4-4L4 16z"),
+
+    /** `수위 등급` (서재 ⋯ menu, LIB-02). */
+    Shield("M12 3l8 4v5c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V7z"),
+
+    /** `백업 · 내보내기`: download tray (서재 ⋯ menu, LIB-02). */
+    Download("M12 4v11M7 10l5 5 5-5M5 20h14"),
+
+    /** Zoom out `−` (canvas zoom column, CNV-01); the pair of [Plus]. */
+    Minus("M5 12h14"),
 }
 
 /** [ImageVector]s for [IconId]; built once and cached. */

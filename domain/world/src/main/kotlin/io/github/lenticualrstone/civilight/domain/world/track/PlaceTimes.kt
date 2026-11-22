@@ -46,7 +46,13 @@ class PlaceTimes(
 
     private data class Item(val absolute: Long, val tier: Int, val manuscript: Int, val after: Boolean, val row: PlaceTimeRow)
 
-    fun rows(placeKey: Key, lens: LensPoint = LensPoint.Latest): List<PlaceTimeRow> {
+    fun rows(placeKey: Key, lens: LensPoint = LensPoint.Latest): List<PlaceTimeRow> = rows(placeKey, lens, hiddenUnlocked = true)
+
+    /**
+     * [rows] with the hidden-item lock (rule 19): while locked ([hiddenUnlocked] false) hidden
+     * characters are left out of the scene sub lines. Hidden scenes are masked by the caller.
+     */
+    fun rows(placeKey: Key, lens: LensPoint, hiddenUnlocked: Boolean): List<PlaceTimeRow> {
         if (doc.index.place(placeKey) == null) return emptyList()
         val regions = PlaceRefs.regionsHolding(doc, placeKey).map { it.second.key }.toSet()
         val lensRank = doc.manuscript.rankOf(lens)
@@ -66,7 +72,9 @@ class PlaceTimes(
             val after = start > lensRank
             val planned = writing != null && start > writing
             val moment = moments.ofScene(scene.key)
-            val names = cast.castOf(scene.key).mapNotNull { doc.index.character(it)?.takeIf { c -> c.deletedAt == null }?.name }
+            val names = cast.castOf(scene.key).mapNotNull {
+                doc.index.character(it)?.takeIf { c -> c.deletedAt == null && (hiddenUnlocked || !c.hidden) }?.name
+            }
             val timePart = when (val w = timesSource.timeOf(scene.key)) {
                 is SceneWhen.Story -> w.episodeLabel
                 is SceneWhen.Flashback -> w.label

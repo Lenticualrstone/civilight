@@ -35,6 +35,18 @@ class CastCopyLintTest {
         add(CastUiCopy.fromSource("출생"))
         add(CastUiCopy.since("1-3"))
         add(CastUiCopy.monthNumber(3))
+        add(CastUiCopy.menuLabel("리엔"))
+        add(CastUiCopy.range("150", "170"))
+        add(CastUiCopy.range("150", ""))
+        add(CastUiCopy.chosenType("짧은 글"))
+        add(CastUiCopy.change("짧은 글", "숫자"))
+        add(CastUiCopy.usage(1))
+        add(CastUiCopy.movedTitle(5))
+        add(CastUiCopy.differingTitle(3))
+        add(CastUiCopy.mergedColumn("시장 꼬마"))
+        add(CastUiCopy.keptColumn("노아"))
+        add(CastUiCopy.mergedFootnote("시장 꼬마", "노아"))
+        add(CastUiCopy.linkChange(3, "노아", "오웬"))
     }
 
     @Test

@@ -14,9 +14,30 @@ data class ProjectHome(override val projectKey: Key) : StoryRoute, ProjectRoute,
 @Serializable
 data class StoryStructure(override val projectKey: Key, val focusUnitKey: Key? = null) : StoryRoute, ProjectRoute, DetailPaneRoute
 
-/** 점검 센터 (STO-39 … STO-42, CNV-17); no lens chip. [filter] = selected chip id. */
+/**
+ * 점검 센터 (STO-39 … STO-42, CNV-17); no lens chip. [filter] = the chip to select: the *name* of
+ * `domain:story` `CheckFilter` (`TERM`, `SPEAKER`, `TRAVEL`, `VOICE`, `CHANGE`, `DELETED`,
+ * `ACKNOWLEDGED`, `ALL`), also as [CheckCenterFilter] constants; null or an unknown value = `전체`.
+ */
 @Serializable
 data class CheckCenter(override val projectKey: Key, val filter: String? = null) : StoryRoute, ProjectRoute, ListPaneRoute
+
+/**
+ * [CheckCenter.filter] values: the names of `domain:story` `CheckFilter` (core:navigation cannot
+ * see that enum, so the contract is the string). feature:story maps them with `CheckFilter.valueOf`.
+ */
+object CheckCenterFilter {
+    const val ALL = "ALL"
+    const val TERM = "TERM"
+    const val SPEAKER = "SPEAKER"
+    const val TRAVEL = "TRAVEL"
+    const val VOICE = "VOICE"
+    const val CHANGE = "CHANGE"
+    const val DELETED = "DELETED"
+    const val ACKNOWLEDGED = "ACKNOWLEDGED"
+
+    val all: List<String> = listOf(ALL, TERM, SPEAKER, TRAVEL, VOICE, CHANGE, DELETED, ACKNOWLEDGED)
+}
 
 /** 검색 · 명령 in a project (STO-36 … STO-38), glass over the blurred screen. */
 @Serializable

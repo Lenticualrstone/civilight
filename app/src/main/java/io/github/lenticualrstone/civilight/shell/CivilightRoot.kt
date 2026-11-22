@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.shell
 
 import android.app.Activity
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
@@ -113,6 +114,13 @@ fun CivilightRoot(
                 if (pendingRoute != null && !unlock.appLocked) {
                     navigator.push(pendingRoute)
                     onPendingRouteHandled()
+                }
+            }
+            // Features' start-up hooks (LRC-09 recovery) run once per process after the app lock.
+            LaunchedEffect(deps, unlock.appLocked) {
+                if (!unlock.appLocked) {
+                    deps.startup.runPending(deps) { id, e -> Log.w("Civilight", "start-up hook $id failed", e) }
+                        .forEach { navigator.push(it) }
                 }
             }
             // `연 지 5분 뒤` is checked on the clock while in the foreground (LIB-33).

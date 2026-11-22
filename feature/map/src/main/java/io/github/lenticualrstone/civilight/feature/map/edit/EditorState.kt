@@ -9,11 +9,16 @@ import io.github.lenticualrstone.civilight.feature.map.canvas.MapHit
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Point
 import io.github.lenticualrstone.civilight.model.map.RoutePoint
+import io.github.lenticualrstone.civilight.model.map.StampKind
 import io.github.lenticualrstone.civilight.model.map.WorldMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** The base tool set `이동 · 핀 · 영역 · 경로 · 라벨 · 레이어` (WLD-40, DS-55). Only the chosen tool acts on taps. */
+/**
+ * The editor's tools. The base set `이동 · 핀 · 영역 · 경로 · 라벨 · 레이어` (WLD-40, DS-55) and the
+ * detailed-terrain set `이동 · 도장 · 강 · 길 · 라벨 · 영역 · 레이어` (WLD-60, board `MapDetail`).
+ * Only the chosen tool acts on taps.
+ */
 enum class EditTool(val label: String, val icon: IconId) {
     MOVE(MapCopy.TOOL_MOVE, IconId.Move),
     PIN(MapCopy.TOOL_PIN, IconId.Pin),
@@ -21,7 +26,22 @@ enum class EditTool(val label: String, val icon: IconId) {
     ROUTE(MapCopy.TOOL_ROUTE, IconId.Route),
     LABEL(MapCopy.TOOL_LABEL, IconId.Label),
     LAYER(MapCopy.TOOL_LAYER, IconId.Layers),
+    STAMP(MapCopy.TOOL_STAMP, IconId.Stamp),
+    RIVER(MapCopy.TOOL_RIVER, IconId.Wave),
+    ROAD(MapCopy.TOOL_ROAD, IconId.Line);
+
+    companion object {
+        val BASE: List<EditTool> = listOf(MOVE, PIN, REGION, ROUTE, LABEL, LAYER)
+        val DETAIL: List<EditTool> = listOf(MOVE, STAMP, RIVER, ROAD, LABEL, REGION, LAYER)
+    }
 }
+
+/**
+ * `여기서부터 바뀜` or `이 값 고치기` waiting for the author (WLD-65): a vertex of [regionKey] moved to
+ * [to] while the lens or the shape's `◆` history asks which one.
+ */
+@Serializable
+data class ShapeEditState(val regionKey: Key, val index: Int, val to: Point)
 
 /** `새 영역 · 그리는 중`: the vertices so far and the properties chosen while drawing (WLD-42). */
 @Serializable
@@ -64,6 +84,12 @@ data class TapOutcome(val state: EditorState, val effect: EditorEffect? = null, 
 sealed interface EditorCommit {
     data class MoveVertex(val regionKey: Key, val index: Int, val to: Point) : EditorCommit
     data class MoveCurveHandle(val labelKey: Key, val index: Int, val to: Point) : EditorCommit
+
+    /** `도장 · 탭 → 놓기` (WLD-60) with the palette's kind and size. */
+    data class PlaceStamp(val at: Point, val kind: StampKind, val size: Int) : EditorCommit
+
+    /** `이동` of a selected stamp: the next tap places it. */
+    data class MoveStamp(val stampKey: Key, val to: Point) : EditorCommit
 }
 
 /**
@@ -90,8 +116,19 @@ data class EditorState(
     val vertex: Int? = null,
     /** The chosen curve handle of the selected label, placed by the next tap. */
     val handle: Int? = null,
-    /** Inner side panel tab: 0 `속성`, 1 `레이어`, 2 `목록`. */
+    /** Inner side panel tab: 0 `속성`, 1 `레이어`, 2 `목록` (detailed terrain: 0 `도장`, 1 `범례`, 2 `레이어`). */
     val panelTab: Int = 0,
+    /** `도장` palette: the kind and size the next stamp gets (WLD-60). */
+    val stampKind: StampKind = StampKind.CASTLE,
+    val stampSize: Int = 2,
+    /** The `강 · 길` line being drawn (0–1 points). */
+    val line: List<Point>? = null,
+    /** `이동` of the selected stamp: the next tap places it. */
+    val movingStamp: Boolean = false,
+    /** WLD-65: a vertex move waiting for `이 값 고치기 · 여기서부터 바뀜`. */
+    val shapeEdit: ShapeEditState? = null,
+    /** WLD-65 `비교`: the index of the region shape history entry drawn over the current shape. */
+    val compare: Int? = null,
 ) {
     val routeDraft: RouteDraft get() = RouteDraft(route.orEmpty().map { it.toModel() })
 
@@ -106,17 +143,27 @@ data class EditorState(
 
 /** The reducer. Pure; the screen applies the outcome and hands commits to the view model. */
 object Editor {
-    /** Choosing a tool ends pending picks and moves; drafts stay until closed or finished. */
-    fun chooseTool(s: EditorState, tool: EditTool): EditorState = s.copy(
-        tool = tool,
-        pendingPin = null,
-        pendingLabel = null,
-        movingPin = null,
-        movingTo = null,
-        vertex = null,
-        handle = null,
-        panelTab = if (tool == EditTool.LAYER) 1 else if (s.panelTab == 1) 0 else s.panelTab,
-    )
+    /**
+     * Choosing a tool ends pending picks and moves; region and route drafts stay until closed or
+     * finished, a `강 · 길` draft stays only on its own tool. [detail] selects the detailed-terrain
+     * panel (`도장 · 범례 · 레이어`, the layer tab is 2).
+     */
+    fun chooseTool(s: EditorState, tool: EditTool, detail: Boolean = false): EditorState {
+        val layerTab = if (detail) 2 else 1
+        return s.copy(
+            tool = tool,
+            pendingPin = null,
+            pendingLabel = null,
+            movingPin = null,
+            movingTo = null,
+            vertex = null,
+            handle = null,
+            movingStamp = false,
+            shapeEdit = null,
+            line = if (tool == s.tool) s.line else null,
+            panelTab = if (tool == EditTool.LAYER) layerTab else if (s.panelTab == layerTab) 0 else s.panelTab,
+        )
+    }
 
     /**
      * A tap on the base at [p] that hit [hit]; [handleIndex] is the handle under the tap when the
@@ -137,11 +184,20 @@ object Editor {
                 TapOutcome(s.copy(route = next.points.map(RoutePointState::of), selected = null, panelTab = 0))
             }
             EditTool.LABEL -> if (hit is MapHit.Label) TapOutcome(s.copy(selected = hit.key, panelTab = 0)) else TapOutcome(s.copy(pendingLabel = p), EditorEffect.LABEL_TEXT)
+            EditTool.STAMP -> when {
+                hit is MapHit.Stamp -> TapOutcome(s.copy(selected = hit.key, vertex = null, handle = null, panelTab = 0))
+                s.selected != null && s.handle != null -> TapOutcome(s.copy(handle = null), commit = EditorCommit.MoveCurveHandle(s.selected, s.handle, p))
+                else -> TapOutcome(s, commit = EditorCommit.PlaceStamp(p, s.stampKind, s.stampSize))
+            }
+            EditTool.RIVER, EditTool.ROAD -> TapOutcome(s.copy(line = s.line.orEmpty() + p, selected = null, panelTab = 0))
         }
     }
 
     private fun moveTap(s: EditorState, p: Point, hit: MapHit?, handleIndex: Int?, curveHandle: Boolean): TapOutcome {
         val selected = s.selected
+        if (selected != null && s.movingStamp) {
+            return TapOutcome(s.copy(movingStamp = false), commit = EditorCommit.MoveStamp(selected, p))
+        }
         if (selected != null && s.vertex != null) {
             return TapOutcome(s.copy(vertex = null), commit = EditorCommit.MoveVertex(selected, s.vertex, p))
         }
@@ -187,7 +243,30 @@ object Editor {
 
     fun labelPlaced(s: EditorState, labelKey: Key?): EditorState = s.copy(pendingLabel = null, selected = labelKey ?: s.selected)
 
-    fun select(s: EditorState, key: Key?): EditorState = s.copy(selected = key, vertex = null, handle = null, panelTab = 0)
+    fun select(s: EditorState, key: Key?): EditorState = s.copy(selected = key, vertex = null, handle = null, panelTab = 0, movingStamp = false, compare = null)
+
+    // --- WLD-60 detailed terrain ---
+
+    /** A stamp kind of the palette; the next tap with `도장` places it. */
+    fun chooseStamp(s: EditorState, kind: StampKind): EditorState = s.copy(stampKind = kind, tool = EditTool.STAMP)
+
+    fun chooseStampSize(s: EditorState, size: Int): EditorState = s.copy(stampSize = size.coerceIn(1, 3))
+
+    /** `이동` of the selected stamp. */
+    fun startMoveStamp(s: EditorState): EditorState = if (s.selected == null) s else s.copy(movingStamp = true, vertex = null, handle = null)
+
+    fun undoLinePoint(s: EditorState): EditorState = s.copy(line = s.line?.dropLast(1)?.takeIf { it.isNotEmpty() })
+
+    fun lineFinished(s: EditorState, lineKey: Key?): EditorState = s.copy(line = null, selected = lineKey, tool = if (lineKey != null) EditTool.MOVE else s.tool)
+
+    // --- WLD-65 region shape at the lens ---
+
+    /** A vertex move that needs `이 값 고치기 · 여기서부터 바뀜` first. */
+    fun askShapeEdit(s: EditorState, regionKey: Key, index: Int, to: Point): EditorState = s.copy(shapeEdit = ShapeEditState(regionKey, index, to))
+
+    fun endShapeEdit(s: EditorState): EditorState = s.copy(shapeEdit = null)
+
+    fun toggleCompare(s: EditorState, index: Int): EditorState = s.copy(compare = if (s.compare == index) null else index)
 
     /** The vertex bar `꼭짓점 N · 되돌리기 · 닫기`. */
     fun vertexCount(s: EditorState): Int = s.region?.vertices?.size ?: 0

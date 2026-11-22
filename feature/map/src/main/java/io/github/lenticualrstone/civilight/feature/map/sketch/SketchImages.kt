@@ -40,6 +40,21 @@ object SketchImages {
         return file to FileProvider.getUriForFile(context, authority(context), file)
     }
 
+    /**
+     * The stored photo [hash] as a [Blob] row (the `SketchStraighten` route carries only the hash).
+     * Re-importing a stored file finds the same content hash, so nothing is copied twice.
+     */
+    suspend fun blobOf(blobs: BlobStore, hash: String): Blob? {
+        val file = blobs.fileOf(hash) ?: return null
+        val mime = when (file.extension.lowercase()) {
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            "heic", "heif" -> "image/heif"
+            else -> "image/jpeg"
+        }
+        return blobs.import(file, mime, BlobSource.SKETCH)
+    }
+
     /** Imports the captured photo and deletes the cache file. */
     suspend fun importCapture(blobs: BlobStore, file: File): Blob? = try {
         if (file.length() > 0) blobs.import(file, "image/jpeg", BlobSource.SKETCH) else null

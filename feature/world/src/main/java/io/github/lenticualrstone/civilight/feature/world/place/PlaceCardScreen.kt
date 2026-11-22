@@ -39,12 +39,15 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
 import io.github.lenticualrstone.civilight.feature.world.common.CardAccess
-import io.github.lenticualrstone.civilight.feature.world.common.CardArt
+import io.github.lenticualrstone.civilight.feature.world.common.CardImageSlot
+import io.github.lenticualrstone.civilight.feature.world.common.CardImages
+import io.github.lenticualrstone.civilight.feature.world.common.MergePickSheet
+import io.github.lenticualrstone.civilight.feature.world.common.SameNameLine
+import io.github.lenticualrstone.civilight.feature.world.common.WorldGoneCard
 import io.github.lenticualrstone.civilight.feature.world.common.CardDescription
 import io.github.lenticualrstone.civilight.feature.world.common.CardHead
 import io.github.lenticualrstone.civilight.feature.world.common.FieldSection
 import io.github.lenticualrstone.civilight.feature.world.common.FixedRow
-import io.github.lenticualrstone.civilight.feature.world.common.GoneCard
 import io.github.lenticualrstone.civilight.feature.world.common.ItemMenuSheet
 import io.github.lenticualrstone.civilight.feature.world.common.LensBanner
 import io.github.lenticualrstone.civilight.feature.world.common.lensBannerSlot
@@ -134,7 +137,7 @@ fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
                 if (card == null) return@LazyColumn
                 when (val access = card.access) {
                     is CardAccess.Locked -> item(key = "locked") { LockedCard(access.text, gate.unlock) }
-                    is CardAccess.Gone -> item(key = "gone") { GoneCard(access.text, access.dotted) }
+                    is CardAccess.Gone -> item(key = "gone") { WorldGoneCard(access, doc, vm, WorldKind.PLACE, route.placeKey, readOnly, gate) }
                     CardAccess.Open -> placeBody(
                         card = card,
                         tab = tab,
@@ -146,6 +149,14 @@ fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
                         onField = { def -> sheets.open(FieldValueEditSheet(route.projectKey, EntityKind.PLACE, route.placeKey, def)) },
                         onAddField = { sheets.open(AddFieldSheet(route.projectKey, EntityKind.PLACE, route.placeKey)) },
                         onOpen = { deps.navigator.openFromWorld(it) },
+                        art = { name ->
+                            doc?.let { d ->
+                                CardImageSlot(d, WorldKind.PLACE, route.placeKey, name, label = null, readOnly = readOnly) {
+                                    sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.PLACE, route.placeKey))
+                                }
+                            }
+                        },
+                        sameName = { SameNameLine(doc, WorldKind.PLACE, route.placeKey, readOnly) { sheets.open(MergePickSheet(WorldKind.PLACE.name, route.placeKey)) } },
                     )
                 }
             }
@@ -164,12 +175,15 @@ private fun LazyListScope.placeBody(
     onField: (Key) -> Unit,
     onAddField: () -> Unit,
     onOpen: (io.github.lenticualrstone.civilight.navigation.Route) -> Unit,
+    art: @Composable (String) -> Unit,
+    sameName: @Composable () -> Unit,
 ) {
     val head = card.head ?: return
-    item(key = "art") { CardArt(head.name, label = null) }
+    item(key = "art") { art(head.name) }
     item(key = "head") {
         Column {
             CardHead(head.copy(description = emptyList()))
+            sameName()
             CivilightTabs(tabs = card.tabs, selectedIndex = tab, onSelect = onTab, modifier = Modifier.padding(top = 12.dp))
         }
     }

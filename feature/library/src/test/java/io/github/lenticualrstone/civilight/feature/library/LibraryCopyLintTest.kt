@@ -1,13 +1,27 @@
 package io.github.lenticualrstone.civilight.feature.library
 
 import io.github.lenticualrstone.civilight.designsystem.text.CopyLint
+import io.github.lenticualrstone.civilight.domain.library.onboarding.ModuleTours
+import io.github.lenticualrstone.civilight.domain.library.onboarding.TourModule
+import io.github.lenticualrstone.civilight.feature.library.backup.BackupCopy
+import io.github.lenticualrstone.civilight.feature.library.backup.RecoveryCopy
+import io.github.lenticualrstone.civilight.feature.library.backup.RestoreCopy
+import io.github.lenticualrstone.civilight.feature.library.export.ExportCopy
+import io.github.lenticualrstone.civilight.feature.library.help.HelpCopy
+import io.github.lenticualrstone.civilight.feature.library.onboarding.OnboardingCopy
 import io.github.lenticualrstone.civilight.feature.library.newproject.NewProjectCopy
 import io.github.lenticualrstone.civilight.feature.library.newproject.NewProjectRules
+import io.github.lenticualrstone.civilight.feature.library.openfile.OpenFileCopy
 import io.github.lenticualrstone.civilight.feature.library.projectsettings.ProjectSettingsCopy
 import io.github.lenticualrstone.civilight.feature.library.protection.ProtectionCopy
 import io.github.lenticualrstone.civilight.feature.library.rating.RatingCopy
 import io.github.lenticualrstone.civilight.feature.library.rating.RatingSettingsState
+import io.github.lenticualrstone.civilight.feature.library.settings.LayoutSettingsCopy
+import io.github.lenticualrstone.civilight.feature.library.settings.MoreSettingsCopy
+import io.github.lenticualrstone.civilight.feature.library.settings.MotionSettingsCopy
+import io.github.lenticualrstone.civilight.feature.library.settings.SettingsCopy
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCopy
+import io.github.lenticualrstone.civilight.feature.library.trash.TrashScreenCopy
 import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.navigation.NewProjectStep
 import org.junit.Assert.assertEquals
@@ -17,7 +31,7 @@ import java.lang.reflect.Modifier
 
 /** DECISIONS §3: every value of this module's copy objects passes the design-system copy lint. */
 class LibraryCopyLintTest {
-    private val objects: List<Any> = listOf(ShelfCopy, NewProjectCopy, RatingCopy, ProtectionCopy, ProjectSettingsCopy)
+    private val objects: List<Any> = listOf(ShelfCopy, NewProjectCopy, RatingCopy, ProtectionCopy, ProjectSettingsCopy, TrashScreenCopy, ExportCopy, SettingsCopy, OpenFileCopy, OnboardingCopy, HelpCopy, BackupCopy, RecoveryCopy, RestoreCopy, LayoutSettingsCopy, MotionSettingsCopy, MoreSettingsCopy)
 
     /** `Object.FIELD` → string value, for every constant of every copy object. */
     private fun values(): Map<String, String> = objects.flatMap { obj ->
@@ -36,6 +50,29 @@ class LibraryCopyLintTest {
             add(NewProjectRules.title(it))
         }
         Rating.entries.forEach { add(RatingSettingsState.applyTitle(it, 2)) }
+        add(TrashScreenCopy.restored("유리 정원"))
+        (1..3).forEach { add(OnboardingCopy.setupLine(it)) }
+        add(OnboardingCopy.exploreLine(OnboardingCopy.EXPLORE_SCRIPT, "1-7 씬 3"))
+        add(HelpCopy.stepsLine(3, seen = true))
+        add(HelpCopy.stepsLine(4, seen = false))
+        // LIB-19 tour copy drawn on the boards (domain:library), and the card words.
+        TourModule.entries.forEach { m ->
+            m.label?.takeUnless { it.startsWith("TODO_COPY_") }?.let(::add)
+            add(m.rowTitle)
+            ModuleTours.steps(m).filter { it.hasCopy }.forEach { add(it.title); add(it.sub) }
+        }
+        addAll(listOf(ModuleTours.SKIP, ModuleTours.PREVIOUS, ModuleTours.NEXT, ModuleTours.FINISH))
+        // Batch 5: 복구 암호 strength line and the 되살리는 중 lines.
+        add(io.github.lenticualrstone.civilight.feature.library.backup.RecoveryPasswordState.strength("등불지기의새벽1잿빛하층구역".toCharArray())!!.line)
+        add("${RestoreCopy.DRIVE} · 11월 20일 ${RestoreCopy.BACKUP}")
+        add("${RestoreCopy.ABOUT} 40${RestoreCopy.SECONDS}")
+        // Batch 6: the LIB-62 storage line and the LIB-61 banner (domain:library `BackupFailureBanner`).
+        add(io.github.lenticualrstone.civilight.feature.library.backup.StorageFacts(1_288_490_188L, 356_515_840L).line)
+        io.github.lenticualrstone.civilight.domain.library.backup.BackupFailureBanner.of(
+            io.github.lenticualrstone.civilight.model.app.BackupState(lastSuccessAt = LibFx.NOW - 4 * 86_400_000L, failureStreakStartedAt = LibFx.NOW - 2 * 86_400_000L, lastFailureReason = "loginExpired"),
+            LibFx.NOW,
+            LibFx.ZONE,
+        )!!.let { addAll(listOf(it.title, it.sub, it.driveRow!!) + it.buttons) }
     }
 
     @Test
@@ -54,6 +91,11 @@ class LibraryCopyLintTest {
         val buttons = listOf(
             NewProjectCopy.CANCEL, NewProjectCopy.NEXT, NewProjectCopy.PREVIOUS, NewProjectCopy.CREATE,
             ShelfCopy.RENAME_CONFIRM, ShelfCopy.CANCEL, ShelfCopy.RELOCK, RatingCopy.CANCEL, RatingCopy.APPLY_TOGETHER,
+            TrashScreenCopy.RESTORE, TrashScreenCopy.PURGE, TrashScreenCopy.EMPTY_TRASH, TrashScreenCopy.CANCEL,
+            OnboardingCopy.START, OnboardingCopy.RESTORE_FROM_BACKUP, OnboardingCopy.NEXT, OnboardingCopy.LATER, OnboardingCopy.PREVIOUS,
+            OnboardingCopy.CONNECT, OnboardingCopy.SEE_EXAMPLE, OnboardingCopy.FINISH_REPLAY, OnboardingCopy.FINISH_ONBOARDING,
+            HelpCopy.REPLAY, HelpCopy.RESET_ALL,
+            RecoveryCopy.SET, RestoreCopy.CONNECT, RestoreCopy.CANCEL, RestoreCopy.OPEN, ExportCopy.CANCEL,
         )
         val failures = buttons.filter { CopyLint.lint(it, isButton = true).isNotEmpty() }
         assertEquals(emptyList<String>(), failures)
@@ -71,5 +113,7 @@ class LibraryCopyLintTest {
         assertEquals("새 프로젝트 · 4/4", NewProjectRules.smallLine(NewProjectStep.START))
         assertEquals("시작 재료", NewProjectRules.title(NewProjectStep.START))
         assertEquals("이미 있는 R-18 프로젝트 2", RatingSettingsState.applyTitle(Rating.R18, 2))
+        assertEquals("처음 설정 · 2/4", OnboardingCopy.setupLine(2))
+        assertEquals("3단계 · 아직 안 봄", HelpCopy.stepsLine(3, seen = false))
     }
 }

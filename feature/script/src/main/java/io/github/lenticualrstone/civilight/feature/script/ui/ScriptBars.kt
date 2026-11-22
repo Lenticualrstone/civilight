@@ -62,11 +62,16 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
 import io.github.lenticualrstone.civilight.designsystem.glass.OnGlass
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.text.MarkerGlyph
+import io.github.lenticualrstone.civilight.designsystem.text.MarkerKind
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.LayoutMetrics
 import io.github.lenticualrstone.civilight.domain.script.ScriptCommands
 import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
+import io.github.lenticualrstone.civilight.feature.script.panel.PanelTab
+import io.github.lenticualrstone.civilight.feature.script.state.CommandRow
 
 /**
  * Script header while reading (SCR-01, board `Main`): 118 dp glass, the mono position line, the
@@ -110,37 +115,70 @@ fun EditingTopBar(line: String, onDone: () -> Unit) {
 
 private val EDIT_BAR: Dp = 76.dp
 
-/** The layers button (`연출 · 메모 표시`); disabled until the `표시` sheet (SCR-26) is wired. */
+/** The layers button (`연출 · 메모 표시`, SCR-26). */
 @Composable
 private fun LayersButton(onLayers: (() -> Unit)?) {
     CivilightIconButton(IconId.Layers, ScriptCopy.LAYERS_LABEL, onLayers ?: {}, enabled = onLayers != null)
 }
 
 /**
- * Bottom glass bar while reading (SCR-01): with a writing position, the row of the speaker pill, the
- * layers button and the `줄바꿈` pill; then the command field with the Life Recorder mic.
+ * Bottom glass bar while reading (SCR-01): the command row ([row], see [CommandRow]): the speaker
+ * pill, the layers button, the selected block's panel buttons `◆ 시간 · 참고 · 속성` (SCR-30 tap path)
+ * and the `줄바꿈` pill; then the command field with the Life Recorder mic.
  */
 @Composable
 fun ScriptBottomBar(
-    showRow: Boolean,
+    row: CommandRow,
     speakerName: String?,
     onSpeaker: () -> Unit,
     onLayers: (() -> Unit)?,
     onLineBreak: () -> Unit,
     lineBreakEnabled: Boolean,
+    timeHasChange: Boolean = false,
+    onPanelTab: (PanelTab) -> Unit = {},
     command: @Composable () -> Unit,
 ) {
     BottomGlassBar(
-        extraRow = if (showRow) {
+        extraRow = if (row.visible) {
             {
-                SpeakerPill(name = speakerName ?: ScriptCopy.NO_SPEAKER, label = speakerName ?: ScriptCopy.NO_SPEAKER, onClick = onSpeaker)
-                LayersButton(onLayers)
+                if (row.speaker) {
+                    SpeakerPill(name = speakerName ?: ScriptCopy.NO_SPEAKER, label = speakerName ?: ScriptCopy.NO_SPEAKER, onClick = onSpeaker)
+                }
+                if (row.layers) LayersButton(onLayers)
+                if (row.panelTabs) PanelTabButtons(timeHasChange, onPanelTab)
                 Spacer(Modifier.weight(1f))
-                Pill(ScriptCopy.LINE_BREAK, onLineBreak, Modifier.alpha(if (lineBreakEnabled) 1f else 0.38f), primary = true)
+                if (row.lineBreak) Pill(ScriptCopy.LINE_BREAK, onLineBreak, Modifier.alpha(if (lineBreakEnabled) 1f else 0.38f), primary = true)
             }
         } else null,
         commandBar = command,
     )
+}
+
+/**
+ * The swipe row's three buttons drawn in the command row (SCR-30, Q-02 `ED`): `◆ 시간` (`◆` and label
+ * `acc` when the block carries a `◆`), `참고`, `속성`, compact, each with a 44 dp touch area.
+ */
+@Composable
+private fun PanelTabButtons(timeHasChange: Boolean, onTab: (PanelTab) -> Unit) {
+    val colors = CivilightTheme.colors
+    val style = CivilightTheme.type.chip
+    PanelTab.SWIPE.forEach { tab ->
+        Row(
+            Modifier
+                .pressable(PressAction.Click({ onTab(tab) }), role = Role.Button, hitTarget = HitTarget.SMALL, scaleOnPress = false)
+                .padding(horizontal = 5.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            when (tab) {
+                PanelTab.TIME -> if (timeHasChange) MarkerGlyph(MarkerKind.CHANGE, size = 11.dp)
+                PanelTab.REF -> CivilightIcon(IconId.Paper, null, size = 16.dp, tint = colors.ink2)
+                else -> CivilightIcon(IconId.Props, null, size = 16.dp, tint = colors.ink2)
+            }
+            val color = if (tab == PanelTab.TIME && timeHasChange) colors.acc else colors.ink
+            CivilightText(tab.label, style, color = color, maxLines = 1)
+        }
+    }
 }
 
 /**
@@ -158,9 +196,11 @@ fun ScriptCommandField(
     onClose: () -> Unit,
     onMic: () -> Unit,
     focusRequester: FocusRequester,
+    /** The field's hint: the script's (SCR-68) or another script screen's (`에셋`, SCR-61). */
+    hint: String = ScriptCommands.HINT,
 ) {
     if (!typing) {
-        CommandBar(hint = ScriptCommands.HINT, onClick = onStart, onMic = onMic, micLabel = ScriptCopy.MIC_LABEL)
+        CommandBar(hint = hint, onClick = onStart, onMic = onMic, micLabel = ScriptCopy.MIC_LABEL)
         return
     }
     val colors = CivilightTheme.colors
@@ -179,7 +219,7 @@ fun ScriptCommandField(
     ) {
         CivilightText("/", type.number.merge(TextStyle(fontSize = 13.sp)), color = colors.ink2, maxLines = 1)
         Box(Modifier.weight(1f)) {
-            if (text.isEmpty()) CivilightText(ScriptCommands.HINT, type.command, color = colors.ink3, maxLines = 1)
+            if (text.isEmpty()) CivilightText(hint, type.command, color = colors.ink3, maxLines = 1)
             BasicTextField(
                 value = text,
                 onValueChange = onText,
@@ -191,7 +231,7 @@ fun ScriptCommandField(
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester)
-                    .semantics { contentDescription = ScriptCommands.HINT },
+                    .semantics { contentDescription = hint },
             )
         }
         TextAction(ScriptCopy.CLOSE, onClose)
@@ -212,11 +252,14 @@ fun KeyboardToolbar(
     showSpeaker: Boolean,
     onKind: () -> Unit,
     onSpeaker: () -> Unit,
-    onParen: () -> Unit,
+    /** Null hides `( )` (kinds without `괄호 지문`, SCR-07). */
+    onParen: (() -> Unit)?,
     parenOn: Boolean,
     onLink: () -> Unit,
     onUndo: () -> Unit,
     canUndo: Boolean,
+    /** `◆` (SCR-41): the change sheet for the block being typed; null while the caret has no block yet. */
+    onChange: (() -> Unit)? = null,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -236,10 +279,12 @@ fun KeyboardToolbar(
                 ) {
                     KindTool(kindLabel + ScriptCopy.KIND_CHEVRON, onKind)
                     if (showSpeaker) SpeakerTool(speakerName ?: ScriptCopy.NO_SPEAKER, onSpeaker)
-                    KeyboardTool(onClick = onParen, text = ScriptCopy.PAREN_TOOL, on = parenOn, contentDescription = ScriptCopy.PAREN_LABEL)
+                    if (onParen != null) {
+                        KeyboardTool(onClick = onParen, text = ScriptCopy.PAREN_TOOL, on = parenOn, contentDescription = ScriptCopy.PAREN_LABEL)
+                    }
                     KeyboardTool(onClick = onLink, text = ScriptCopy.LINK_TOOL)
-                    Box(Modifier.alpha(0.38f)) {
-                        KeyboardTool(onClick = {}, text = ScriptCopy.CHANGE_TOOL, contentDescription = ScriptCopy.CHANGE_LABEL)
+                    Box(Modifier.alpha(if (onChange != null) 1f else 0.38f)) {
+                        KeyboardTool(onClick = { onChange?.invoke() }, text = ScriptCopy.CHANGE_TOOL, contentDescription = ScriptCopy.CHANGE_LABEL)
                     }
                     CivilightIconButton(IconId.Undo, ScriptCopy.UNDO_LABEL, onUndo, enabled = canUndo)
                 }

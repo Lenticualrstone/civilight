@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.feature.canvas.label
 import io.github.lenticualrstone.civilight.domain.cast.EditContext
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
 import io.github.lenticualrstone.civilight.feature.canvas.common.CanvasViewModel
+import io.github.lenticualrstone.civilight.feature.canvas.edit.CanvasEdits
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.ui.project.EditResult
 import io.github.lenticualrstone.civilight.ui.project.ProjectSessions
@@ -42,6 +43,16 @@ class LineLabelEditor(
     fun make(canvasKey: Key, edgeKey: Key, draft: LineLabelDraft, then: (EditResult) -> Unit) {
         act(CanvasCopy.BTN_MAKE_RELATION, then = { r -> if (r == EditResult.APPLIED) discard(edgeKey); then(r) }) { doc, ctx ->
             LineLabelModel.make(doc, canvasKey, edgeKey, draft, ctx)
+        }
+    }
+
+    /**
+     * Takes the line off the canvas (Q-CV-13 default: a converted line's relation stays). One undo step
+     * named by the button (copy missing: `TODO_COPY_CANVAS_REMOVE_LINE`).
+     */
+    fun remove(canvasKey: Key, edgeKey: Key, then: (EditResult) -> Unit) {
+        act(CanvasCopy.TODO_COPY_CANVAS_REMOVE_LINE, then = { r -> if (r == EditResult.APPLIED) discard(edgeKey); then(r) }) { doc, ctx ->
+            CanvasEdits.removeLine(doc, canvasKey, edgeKey, ctx)
         }
     }
 

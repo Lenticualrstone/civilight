@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.recorder.speech
 
+import io.github.lenticualrstone.civilight.model.recorder.RecorderTranscription
+import io.github.lenticualrstone.civilight.model.recorder.TranscriptionMode
+
 /** What a running [SpeechEngine] reports. All callbacks arrive on the main thread. */
 interface SpeechListener {
     /** The unconfirmed tail changed (drawn `ink3`). */
@@ -59,8 +62,41 @@ class UnavailableSpeechEngine : SpeechEngine {
     }
 }
 
-/** The engine the app uses. A later batch (or a test) swaps [factory]. */
+/**
+ * **needsExternal stub** (LRC-12; the cloud provider is undecided, spec §6 Q1). `클라우드` in
+ * `설정 · 라이프 레코더 › 받아쓰기` would send the audio to the provider; none is bound, so this engine
+ * reports itself unavailable and [EngineChoice] falls back to the on-device engine for the take.
+ */
+class CloudSpeechEngine : SpeechEngine by UnavailableSpeechEngine()
+
+/** The engines the app uses, per transcription mode. A later batch (or a test) swaps [factory]. */
 object SpeechEngines {
     @Volatile
-    var factory: () -> SpeechEngine = { UnavailableSpeechEngine() }
+    var factory: (TranscriptionMode) -> SpeechEngine = { mode ->
+        when (mode) {
+            TranscriptionMode.CLOUD -> CloudSpeechEngine()
+            TranscriptionMode.ON_DEVICE -> UnavailableSpeechEngine()
+        }
+    }
+}
+
+/** The engine one take runs and the mode it stands for (stored as the record's `transcribedBy`). */
+class ChosenEngine(val mode: TranscriptionMode, val engine: SpeechEngine)
+
+/**
+ * Which engine a take uses (LRC-11, LRC-12): `클라우드` only when it is chosen in the settings, the
+ * device is online and a cloud engine is there; otherwise on-device for that take (no network at
+ * recording time → on-device, and nothing is uploaded later, `[PROPOSED]`).
+ */
+object EngineChoice {
+    fun mode(setting: RecorderTranscription, online: Boolean): TranscriptionMode =
+        if (setting == RecorderTranscription.CLOUD && online) TranscriptionMode.CLOUD else TranscriptionMode.ON_DEVICE
+
+    fun choose(setting: RecorderTranscription, online: Boolean, factory: (TranscriptionMode) -> SpeechEngine): ChosenEngine {
+        if (mode(setting, online) == TranscriptionMode.CLOUD) {
+            val cloud = factory(TranscriptionMode.CLOUD)
+            if (cloud.available) return ChosenEngine(TranscriptionMode.CLOUD, cloud)
+        }
+        return ChosenEngine(TranscriptionMode.ON_DEVICE, factory(TranscriptionMode.ON_DEVICE))
+    }
 }

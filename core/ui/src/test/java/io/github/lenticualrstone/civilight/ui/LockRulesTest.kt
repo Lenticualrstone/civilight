@@ -111,4 +111,63 @@ class LockRulesTest {
         assertFalse(c.state.value.anythingOpen)
         assertTrue(c.state.value.events.isEmpty())
     }
+
+    // R19 §2 "지금은 열린 채": a project hidden in this session stays open until the next re-lock.
+
+    @Test
+    fun `kept open project opens without the group and locks on ON_LEAVE background`() {
+        val now = at("09:00")
+        val c = UnlockController(now = { now }, policy = { RelockPolicy.ON_LEAVE }, appLockEnabled = { false })
+        c.keepOpen("P1")
+        assertTrue(c.state.value.projectOpen("P1"))
+        assertFalse(c.state.value.projectOpen("P2"))
+        assertFalse(c.state.value.hiddenGroupOpen)
+        c.onBackground()
+        c.onForeground()
+        assertFalse(c.state.value.projectOpen("P1"))
+        assertFalse(c.state.value.anythingOpen)
+    }
+
+    @Test
+    fun `kept open project survives leaving under SCREEN_OFF_ONLY and locks on screen off`() {
+        val c = UnlockController(now = { at("09:00") }, policy = { RelockPolicy.SCREEN_OFF_ONLY }, appLockEnabled = { false })
+        c.keepOpen("P1")
+        c.onBackground()
+        c.onForeground()
+        assertTrue(c.state.value.projectOpen("P1"))
+        c.onScreenOff()
+        assertFalse(c.state.value.projectOpen("P1"))
+    }
+
+    @Test
+    fun `kept open project locks five minutes after it was kept open`() {
+        var now = at("09:00")
+        val c = UnlockController(now = { now }, policy = { RelockPolicy.FIVE_MINUTES }, appLockEnabled = { false })
+        c.keepOpen("P1")
+        now = at("09:04")
+        c.tick()
+        assertTrue(c.state.value.projectOpen("P1"))
+        now = at("09:05")
+        c.tick()
+        assertFalse(c.state.value.projectOpen("P1"))
+    }
+
+    @Test
+    fun `relock now and a cancelled hidden prompt both clear the kept open set`() {
+        val c = UnlockController(now = { at("09:00") }, policy = { RelockPolicy.SCREEN_OFF_ONLY }, appLockEnabled = { false })
+        c.keepOpen("P1")
+        c.relockNow()
+        assertTrue(c.state.value.keptOpen.isEmpty())
+        c.keepOpen("P2")
+        c.lockHiddenGroup()
+        assertTrue(c.state.value.keptOpen.isEmpty())
+        assertTrue(c.state.value.events.isEmpty())
+    }
+
+    @Test
+    fun `an open group opens every hidden project, kept open or not`() {
+        val c = UnlockController(now = { at("09:00") }, policy = { RelockPolicy.SCREEN_OFF_ONLY }, appLockEnabled = { false })
+        c.unlockHiddenGroup()
+        assertTrue(c.state.value.projectOpen("any"))
+    }
 }

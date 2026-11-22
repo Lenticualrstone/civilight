@@ -15,6 +15,8 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Point
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.map.MapBaseKind
+import io.github.lenticualrstone.civilight.model.map.MapFormat
+import io.github.lenticualrstone.civilight.model.map.MapStyle
 import io.github.lenticualrstone.civilight.model.map.WorldMap
 import io.github.lenticualrstone.civilight.model.position.LensPoint
 
@@ -57,6 +59,8 @@ data class MapViewUi(
     val place: PlacePanelUi?,
     /** The pin being moved and its new spot (`핀 옮기기 · <name>`), drawn there before `완료`. */
     val moving: MovingPinUi?,
+    /** `그림 · 색면` chip of a generated detailed-terrain or polygon map (WLD-57), the style's name. */
+    val styleChip: String? = null,
 )
 
 data class MovingPinUi(val pinKey: Key, val title: String, val to: Point?)
@@ -95,7 +99,16 @@ object MapViewState {
             canReplaceBase = map.baseKind.known == MapBaseKind.IMAGE || map.baseKind.known == MapBaseKind.SKETCH,
             place = selectedPin?.let { placePanel(doc, map, scene, it, lens, hiddenOpen) },
             moving = movingPin,
+            styleChip = styleChip(map),
         )
+    }
+
+    /** The style chip is offered where styles apply: generated detailed-terrain and polygon maps (WLD-57). */
+    fun styleChip(map: WorldMap): String? {
+        if (map.baseKind.known != MapBaseKind.GENERATED) return null
+        val format = map.format?.known
+        if (format != MapFormat.DETAIL && format != MapFormat.POLY) return null
+        return MapCopy.STYLE_NAMES[(map.style?.known ?: MapStyle.SOFT).ordinal]
     }
 
     /** The panel of a drawn pin, or null when the pin is not drawn (hidden, not yet revealed, filtered). */

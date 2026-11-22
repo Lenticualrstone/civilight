@@ -28,6 +28,8 @@ Additive fix in another module (with tests there):
 
 Also: `domain/library/src/test/resources/format/1.0/잿빛 새벽의 등불.civilight` regenerated (2026-11-22) with the LIB-56 writer call after the fixture's two `generation.result` values became real `gen-1` output; only `manifest.json` and the two `maps/*.json` units changed.
 
+- **Core pass (2026-11-22)**: `SceneActions.create(doc, parentKey: Key?, …)`; null = a top-level scene in a 1-level structure (built here with `OrderKeys`, since `NewScene.create` needs a parent). Test `SceneActionsTest.new scene in a 1-level structure …`; `:domain:actions:test` 41 passing.
+
 ## Defaults used
 
 - Scene delete stores the scene's reference sites (`TrashOps.REF_SITES`) as read **before** the 때 rebase, so the restore report counts the rebased `기준` links as re-linked (`relinked[BASE_SCENE]`), not as `그대로 둔 것`.

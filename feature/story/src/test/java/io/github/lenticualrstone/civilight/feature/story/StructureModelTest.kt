@@ -105,12 +105,12 @@ class StructureModelTest {
     }
 
     @Test
-    fun oneLevelListsScenesAtTheTopAndHasNoNewSceneTarget() {
+    fun oneLevelListsScenesAtTheTopAndCreatesThere() {
         val d = Fx.mini(listOf("씬"), node("S1", "첫 장", "글"), node("S2"))
         val ui = build(d, emptyList())
         assertEquals(listOf("씬 1 · 첫 장", "씬 2 · 미정"), ui.items.filterIsInstance<SceneItem>().map { it.row.label })
         assertTrue(ui.items.filterIsInstance<SceneItem>().none { it.indented })
-        assertNull(ui.newScene)
+        assertEquals(io.github.lenticualrstone.civilight.feature.story.structure.NewSceneTarget(null, "S2"), ui.newScene)
     }
 
     @Test

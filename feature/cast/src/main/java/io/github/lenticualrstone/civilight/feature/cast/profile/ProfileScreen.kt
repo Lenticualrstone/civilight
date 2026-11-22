@@ -42,12 +42,33 @@ import io.github.lenticualrstone.civilight.feature.cast.field.DisplayNameEditShe
 import io.github.lenticualrstone.civilight.feature.cast.field.DisplayNameHistoryContent
 import io.github.lenticualrstone.civilight.feature.cast.field.DisplayNameHistorySheet
 import io.github.lenticualrstone.civilight.feature.cast.field.DisplayNameSheetContent
+import io.github.lenticualrstone.civilight.feature.cast.trash.rememberItemTrash
+import io.github.lenticualrstone.civilight.feature.cast.relation.RelationSlotContent
+import io.github.lenticualrstone.civilight.feature.cast.relation.RelationSlotSheet
+import io.github.lenticualrstone.civilight.domain.cast.relation.SheetSlot
+import io.github.lenticualrstone.civilight.feature.cast.gametext.VoiceLineContent
+import io.github.lenticualrstone.civilight.feature.cast.gametext.VoiceLineSheet
+import io.github.lenticualrstone.civilight.navigation.ArchiveDocEdit
+import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
+import io.github.lenticualrstone.civilight.feature.cast.image.CharacterImages
+import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
+import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.recorder.RecorderTargetKind
 import io.github.lenticualrstone.civilight.model.text.docText
 import io.github.lenticualrstone.civilight.navigation.AddFieldSheet
+import io.github.lenticualrstone.civilight.navigation.DeleteImpactSheet
+import io.github.lenticualrstone.civilight.navigation.MergeItemsSheet
+import io.github.lenticualrstone.civilight.navigation.RecorderInbox
+import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
+import io.github.lenticualrstone.civilight.feature.cast.common.CastWrites
+import io.github.lenticualrstone.civilight.feature.cast.common.HiddenMark
+import io.github.lenticualrstone.civilight.feature.cast.common.Step
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import io.github.lenticualrstone.civilight.navigation.CharacterProfile
 import io.github.lenticualrstone.civilight.navigation.FieldHistorySheet
 import io.github.lenticualrstone.civilight.navigation.FieldValueEditSheet
@@ -91,7 +112,8 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     var tab by rememberSaveable { mutableIntStateOf(route.tab.ordinal) }
     var showEmpty by rememberSaveable { mutableStateOf(false) }
     var headerExpanded by rememberSaveable { mutableStateOf(false) }
-    val cover = !LocalWindowLayout.current.isInner
+    val wide = LocalWindowLayout.current.isInner
+    val cover = !wide
     val ui = ProfileUi(ProfileTab.entries[tab], showEmpty, headerExpanded)
     val state = remember(doc, ui, cover, gate.open, ready.readOnly) { ProfileModel.build(doc, c, ui, cover, gate.open, ready.readOnly) }
     if (state == null) {
@@ -104,6 +126,9 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     val collapsed by remember { derivedStateOf { list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 160 } }
     val inDetailPane = LocalPaneRole.current == PaneRole.DETAIL
     val editable = !state.readOnly
+    val trash = rememberItemTrash(p)
+    val writes = remember(deps, p) { CastWrites(deps, p) }
+    val recorderLink = rememberRecorderLink(p, c, doc)
     val actions = RecordActions(
         editable = editable,
         onField = { sheets.open(FieldValueEditSheet(p, EntityKind.CHARACTER, c, it)) },
@@ -115,6 +140,9 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                     FixedField.DISPLAY_NAME -> DisplayNameEditSheet(p, c)
                     FixedField.ONE_LINER -> OneLinerEditSheet(p, c)
                     FixedField.TAGS -> TagsEditSheet(p, c)
+                    // CST-13: picking, presets, crops and holo are the image area's sheet.
+                    FixedField.PORTRAIT -> ImagePickSheet(p, ImageOwnerKind.CHARACTER, c, ImageSlot.CHARACTER_PORTRAIT)
+                    FixedField.BACKGROUND -> ImagePickSheet(p, ImageOwnerKind.CHARACTER, c, ImageSlot.CHARACTER_BACKGROUND)
                 },
             )
         },
@@ -123,12 +151,27 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
         onAddField = { sheets.open(AddFieldSheet(p, EntityKind.CHARACTER, c)) },
         onMap = { deps.navigator.push(RelationMap(p, c)) },
         onAddRelation = { sheets.open(RelationEditSheet(p, endAKey = c)) },
+        onRelation = { partner -> sheets.open(RelationEditSheet(p, endAKey = c, endBKey = partner)) },
+        onRestorePartner = { partner -> trash.restore(EntityKind.CHARACTER, partner) },
+        onKeepPartner = { partner, relationKey -> trash.keep(partner, relationKey) },
+        onEditSpeech = { sheets.open(BodyEditSheet(p, c, BodyPart.SPEECH)) },
+        onAddress = { partner -> sheets.open(RelationSlotSheet(p, c, partner, SheetSlot.ADDRESS)) },
+        onAddAddress = { sheets.open(RelationSlotSheet(p, c, null, SheetSlot.ADDRESS)) },
+        onEditSecret = { sheets.open(BodyEditSheet(p, c, BodyPart.SECRET)) },
+        onVoiceLine = { line -> sheets.open(VoiceLineSheet(p, c, line)) },
+        onToggleVoice = { line, label -> vm.act(label) { d, ctx -> VoiceLines.toggleStatus(d, line, ctx) } },
+        onArchive = { key -> deps.navigator.push(ArchiveDocEdit(p, c, key)) },
+        onDeletedPartner = { partner -> sheets.open(DeleteImpactSheet(p, EntityKind.CHARACTER, partner)) },
+        onRecorder = { deps.navigator.push(RecorderInbox(projectKey = p, targetKind = RecorderLinkModel.TARGET_KIND, targetKey = c)) },
+        onSameNameMerge = { sheets.open(MergeItemsSheet(p, EntityKind.CHARACTER, c, c)) },
     )
     CenterColumn {
         RecordFrame(
             back = if (inDetailPane) null else IconAction(CastUiCopy.BACK) { deps.navigator.pop() },
             lens = lensChipLabel(doc),
             onLens = { sheets.open(LensSheet(p)) },
+            add = if (editable && ui.tab == ProfileTab.GAME_TEXT) IconAction(CastUiCopy.NEW_VOICE_LINE) { sheets.open(VoiceLineSheet(p, c)) } else null,
+            menu = if (editable) IconAction(CastUiCopy.menuLabel(state.name)) { sheets.open(RecordMenuSheet(p, c)) } else null,
             collapsed = collapsed,
             collapsedTitle = state.name,
             collapsedSmallLine = state.header.title.substringBefore(CastCopy.SEP),
@@ -149,18 +192,39 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                     is TagsEditSheet -> { { TagsSheetContent(key) } }
                     is DisplayNameEditSheet -> { { DisplayNameSheetContent(key) } }
                     is DisplayNameHistorySheet -> { { DisplayNameHistoryContent(key) } }
+                    is VoiceLineSheet -> { { VoiceLineContent(key) } }
+                    is BodyEditSheet -> { { BodyEditContent(key) } }
+                    is RelationSlotSheet -> { { RelationSlotContent(key) } }
+                    is RecordMenuSheet -> {
+                        {
+                            RecordMenuContent(
+                                state.name,
+                                hidden = state.hidden,
+                                // CST-39: hiding closes the record while hidden items are locked; the list then shows the lock row.
+                                onHide = {
+                                    close()
+                                    val hide = !state.hidden
+                                    writes.launch(if (hide) CastUiCopy.BTN_HIDE else CastUiCopy.BTN_UNHIDE, { d, ctx -> Step(CharacterEdits.setHidden(d, c, hide, ctx.edit), Unit) })
+                                },
+                                onDelete = { close(); trash.requestDelete(EntityKind.CHARACTER, c, sheets::open) },
+                                onMerge = { close(); sheets.open(MergeItemsSheet(p, EntityKind.CHARACTER, c, c)) },
+                            )
+                        }
+                    }
                     else -> null
                 }
             },
         ) { padding ->
+            val art = remember(doc, c, wide) { CharacterImages.background(doc, c, inner = wide) }
             LazyColumn(
                 state = list,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = recordTopInset(), bottom = padding.calculateBottomPadding() + 24.dp),
+                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = if (art == null) recordTopInset() else 0.dp, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
+                art?.let { image -> item(key = "art") { RecordArt(image, inner = wide, sidePadding = 24.dp) } }
                 item(key = "head") { RecordHead(state, editable, actions) }
                 item(key = "table") { HeaderTable(doc, state, actions) { headerExpanded = true } }
-                item(key = "tab-${ui.tab}") { TabBody(doc, c, state, ui, gate.open, actions) }
+                item(key = "tab-${ui.tab}") { TabBody(doc, c, state, ui, gate.open, actions, recorderLink) }
             }
         }
     }
@@ -172,7 +236,10 @@ private fun RecordHead(state: ProfileState, editable: Boolean, actions: RecordAc
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(Modifier.fillMaxWidth()) {
-        SectionLabel(state.header.title)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionLabel(state.header.title, Modifier.weight(1f, fill = false))
+            if (state.hidden) HiddenMark()
+        }
         CivilightText(
             state.name,
             type.display,
@@ -206,21 +273,21 @@ private fun HeaderTable(doc: ProjectDoc, state: ProfileState, actions: RecordAct
 }
 
 @Composable
-private fun TabBody(doc: ProjectDoc, characterKey: Key, state: ProfileState, ui: ProfileUi, hiddenUnlocked: Boolean, actions: RecordActions) {
+private fun TabBody(doc: ProjectDoc, characterKey: Key, state: ProfileState, ui: ProfileUi, hiddenUnlocked: Boolean, actions: RecordActions, recorderLink: String?) {
     when (ui.tab) {
-        ProfileTab.OVERVIEW -> OverviewTab(doc, state, ui.showEmpty, actions)
+        ProfileTab.OVERVIEW -> OverviewTab(doc, state, ui.showEmpty, actions, recorderLink)
         ProfileTab.RELATIONS -> RelationsTab(state, actions)
         ProfileTab.SPEECH -> {
             val c = doc.index.character(characterKey) ?: return
             val lens = doc.castLens
-            val chips = remember(doc, hiddenUnlocked) { RelationViews.addressChips(doc, characterKey, lens, hiddenUnlocked).map { it.label } }
+            val chips = remember(doc, hiddenUnlocked) { RelationViews.addressChips(doc, characterKey, lens, hiddenUnlocked) }
             val hidden = RelationViews.hiddenPartnerCount(doc, characterKey, hiddenUnlocked).takeIf { it > 0 }?.let(RelationViews::hiddenRow)
-            SpeechTab(c.speechBody.docText, chips, hidden)
+            SpeechTab(c.speechBody.docText, chips, hidden, actions)
         }
         ProfileTab.GAME_TEXT -> {
             val progress = VoiceLines.progress(doc, characterKey)
-            val archive = ArchiveDocs.rows(doc, characterKey).map { it.title to it.sub }
-            GameTextTab(progress.sectionTitle, progress.fraction, VoiceLines.ORDER_LABEL, VoiceLines.rows(doc, characterKey), ArchiveDocs.sectionTitle(doc, characterKey), archive)
+            val archive = ArchiveDocs.rows(doc, characterKey)
+            GameTextTab(progress.sectionTitle, progress.fraction, VoiceLines.ORDER_LABEL, VoiceLines.rows(doc, characterKey), ArchiveDocs.sectionTitle(doc, characterKey), archive, actions)
         }
         ProfileTab.SECRET -> {
             val secret = remember(doc) { Profile.secretTab(doc, characterKey, doc.castLens) }

@@ -33,6 +33,21 @@ class WorldCopyLintTest {
         add(WorldCopy.emptyFields(3))
         add(WorldCopy.lensEditTitle("1-5"))
         add(WorldCopy.lensEditSub("1-5"))
+        add(WorldCopy.anchorChip("기준 사건", "결사 합류"))
+        add(WorldCopy.calendarLine(listOf("가달", "나달")))
+        add(WorldCopy.countLine(WorldCopy.MERGE_REFS, 5))
+        add(WorldCopy.withWord("노아(시장)", WorldCopy.MERGE_MERGED))
+        add(WorldCopy.mergedToTrash("노아(시장)", "노아"))
+        add(WorldCopy.removeAlias("빛돌"))
+        add(WorldCopy.newlyFound(2))
+        io.github.lenticualrstone.civilight.domain.world.term.BulkMode.entries.forEach { add(WorldCopy.bulkMode(it)) }
+        add(WorldCopy.changeTitle("리엔", "소속"))
+        listOf(
+            io.github.lenticualrstone.civilight.ui.picker.PickKind.PLACE,
+            io.github.lenticualrstone.civilight.ui.picker.PickKind.TERM,
+            io.github.lenticualrstone.civilight.ui.picker.PickKind.FACTION,
+        ).forEach { add(WorldCopy.pickLabel(it)) }
+        add(WorldCopy.removeLabel("가달"))
     }
 
     @Test
@@ -64,5 +79,12 @@ class WorldCopyLintTest {
         assertEquals("1-5 시점 값 고치는 중", WorldCopy.lensEditTitle("1-5"))
         assertEquals("고치면 1-5부터 적용", WorldCopy.lensEditSub("1-5"))
         assertEquals("◇ 첫 공개 1-2", WorldCopy.revealSet("1-2"))
+        assertEquals("기준 사건 · 결사 합류", WorldCopy.anchorChip("기준 사건", "결사 합류"))
+        assertEquals("달력: 가달 · 나달", WorldCopy.calendarLine(listOf("가달", "나달")))
+        assertEquals("옮길 참조 · 5", WorldCopy.countLine(WorldCopy.MERGE_REFS, 5))
+        assertEquals("노아(시장) · ‘합침 → 노아’로 휴지통", WorldCopy.mergedToTrash("노아(시장)", "노아"))
+        assertEquals("후보 2 새로 찾음", WorldCopy.newlyFound(2))
+        assertEquals("리엔 · 소속", WorldCopy.changeTitle("리엔", "소속"))
+        assertEquals("모두 아님", WorldCopy.bulkMode(io.github.lenticualrstone.civilight.domain.world.term.BulkMode.REJECT_ALL))
     }
 }

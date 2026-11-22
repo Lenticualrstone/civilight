@@ -104,6 +104,10 @@ object CanvasCopy {
     const val BTN_OPEN_TERM = "용어 카드"
     const val BTN_OPEN_FACTION = "세력 카드"
     const val BTN_OPEN_EVENT = "사건 상세"
+    /** Deleted and hidden references (rule 20 §2, rule 19 §6). */
+    const val BTN_RESTORE = "되살리기"
+    const val BTN_KEEP = "이대로 두기"
+    const val BTN_UNLOCK = "지문으로 보기"
     const val TODO_COPY_CANVAS_REMOVE_NODE = "TODO_COPY_CANVAS_REMOVE_NODE"
     const val TODO_COPY_CANVAS_REMOVE_LINE = "TODO_COPY_CANVAS_REMOVE_LINE"
 

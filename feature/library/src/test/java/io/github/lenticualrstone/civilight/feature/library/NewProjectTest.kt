@@ -1,6 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.library
 
 import io.github.lenticualrstone.civilight.domain.library.newproject.StartBlock
+import androidx.navigation3.runtime.NavKey
+import io.github.lenticualrstone.civilight.feature.library.newproject.CreateResult
 import io.github.lenticualrstone.civilight.feature.library.newproject.CreatorPorts
 import io.github.lenticualrstone.civilight.feature.library.newproject.NewProjectDraftHolder
 import io.github.lenticualrstone.civilight.feature.library.newproject.NewProjectForm
@@ -16,7 +18,12 @@ import io.github.lenticualrstone.civilight.model.project.WorldTimeMode
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.model.sample.ExampleRecorder
 import io.github.lenticualrstone.civilight.model.text.plainText
+import io.github.lenticualrstone.civilight.navigation.BackStackNavigator
+import io.github.lenticualrstone.civilight.navigation.Library
+import io.github.lenticualrstone.civilight.navigation.NewProject
 import io.github.lenticualrstone.civilight.navigation.NewProjectStep
+import io.github.lenticualrstone.civilight.navigation.ProjectHome
+import io.github.lenticualrstone.civilight.navigation.WorldCalendar
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -151,8 +158,15 @@ class NewProjectTest {
         assertTrue(game.project.fieldDefs.size > basic.project.fieldDefs.size)
     }
 
-    private class FakePorts(var recorder: RecorderLibrary) : CreatorPorts {
+    private class FakePorts(var recorder: RecorderLibrary, val secure: Boolean = true) : CreatorPorts {
         val added = mutableListOf<ProjectDoc>()
+        val keptOpen = mutableListOf<String>()
+
+        override fun deviceSecure(): Boolean = secure
+
+        override fun keepOpen(projectKey: String) {
+            keptOpen += projectKey
+        }
 
         override suspend fun addProject(doc: ProjectDoc) {
             added += doc
@@ -186,5 +200,31 @@ class NewProjectTest {
         assertTrue(result.hidden)
         assertTrue(result.opensCalendar)
         assertEquals(RecorderLibrary(), ports.recorder)
+        assertEquals("a project created hidden stays open until the next re-lock (R19 §2)", listOf(result.projectKey), ports.keptOpen)
+    }
+
+    @Test
+    fun `Q19 a device without a lock creates the project visible and says so`() = runTest {
+        val ports = FakePorts(RecorderLibrary(), secure = false)
+        val result = ProjectCreator.create(ports, NewProjectForm(name = "검은 서약", rating = Rating.R18), defaults, LibFx.ctx(), null)
+        assertFalse(result.hidden)
+        assertTrue(result.hidingRefused)
+        assertFalse(ports.added.single().project.protections.hidden)
+        assertTrue(ports.keptOpen.isEmpty())
+    }
+
+    @Test
+    fun `after 만들기 back from the new project's home goes to 서재 - no step stays below`() {
+        val start = listOf(Library, NewProject(NewProjectStep.NAME), NewProject(NewProjectStep.STRUCTURE), NewProject(NewProjectStep.TIME), NewProject(NewProjectStep.START))
+        val stack = start.toMutableList<NavKey>()
+        val navigator = BackStackNavigator(stack)
+        navigator.resetTo(ProjectCreator.stackAfter(CreateResult("01KTESTPROJECT00000000000001", hidden = false, opensCalendar = false)))
+        assertEquals(listOf(Library, ProjectHome("01KTESTPROJECT00000000000001")), stack)
+        assertTrue(navigator.pop())
+        assertEquals(listOf<NavKey>(Library), stack)
+
+        val withCalendar = start.toMutableList<NavKey>()
+        BackStackNavigator(withCalendar).resetTo(ProjectCreator.stackAfter(CreateResult("01KTESTPROJECT00000000000002", hidden = true, opensCalendar = true)))
+        assertEquals(listOf(Library, ProjectHome("01KTESTPROJECT00000000000002"), WorldCalendar("01KTESTPROJECT00000000000002")), withCalendar)
     }
 }

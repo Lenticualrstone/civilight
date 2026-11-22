@@ -23,9 +23,11 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.feature.story.common.StoryActionsViewModel
 import io.github.lenticualrstone.civilight.feature.story.common.storyServices
+import io.github.lenticualrstone.civilight.feature.story.move.MoveTargetSheet
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.navigation.BulkPlaceTime
 import io.github.lenticualrstone.civilight.navigation.NewUnitSheet
+import io.github.lenticualrstone.civilight.navigation.RenumberSheet
 import io.github.lenticualrstone.civilight.navigation.SceneMergeSheet
 import io.github.lenticualrstone.civilight.navigation.SceneWhereSheet
 import io.github.lenticualrstone.civilight.navigation.Script
@@ -80,6 +82,7 @@ fun SheetScope.UnitMenuContent(sheet: UnitMenuSheet, deps: FeatureDeps) {
                         host.close()
                         deps.navigator.push(Script(p, sceneKey = key))
                     }
+                    MenuAction.MOVE -> host.replaceWith(MoveTargetSheet(p, key))
                     MenuAction.DELETE_SCENE -> {
                         actions.deleteScene(key)
                         host.close()

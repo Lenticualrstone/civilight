@@ -2,6 +2,8 @@ package io.github.lenticualrstone.civilight.domain.library.newproject
 
 import io.github.lenticualrstone.civilight.domain.library.common.UnitCodes
 import io.github.lenticualrstone.civilight.domain.library.rating.NewProjectProtections
+import io.github.lenticualrstone.civilight.model.app.RatingDefaults
+import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.project.ProjectFormat
 import io.github.lenticualrstone.civilight.model.project.WorldTimeMode
@@ -75,6 +77,19 @@ data class StartBlock(
                 )
             }
             return StartBlock(summary, quickWriteLine(doc), items)
+        }
+
+        /**
+         * The block for a project home that has only the document (LIB-13, R19 §2): whether the
+         * author turned the hide default off is derived from the project's rating and the current
+         * 설정 · 수위 등급 [defaults]. The rating hides by default and the project is not hidden →
+         * the summary ends with `숨김 · 끔` (also when hiding was refused for want of a device lock,
+         * which leaves the project visible all the same).
+         */
+        fun ofProject(doc: ProjectDoc, recorder: RecorderLibrary, defaults: RatingDefaults): StartBlock {
+            val rating = doc.project.rating.known ?: Rating.R18
+            val protections = NewProjectProtections.of(rating, defaults, step4Hide = doc.project.protections.hidden)
+            return of(doc, recorder, protections)
         }
 
         /**

@@ -12,4 +12,10 @@ object ProtectionCopy {
     const val CAPTURE_BLOCK = "화면 캡처 가리기"
     const val NAME_MASK = "이름 가리기"
     const val RECORDER_LINK_MASK = "라이프 레코더 연결 가리기"
+
+    /**
+     * Toast when hiding is refused on a device without a secure lock screen (§6 Q19 `ED`: hiding
+     * needs a device credential; copy not in sources).
+     */
+    const val TODO_COPY_LIB31_NO_DEVICE_LOCK = "TODO_COPY_LIB31_NO_DEVICE_LOCK"
 }

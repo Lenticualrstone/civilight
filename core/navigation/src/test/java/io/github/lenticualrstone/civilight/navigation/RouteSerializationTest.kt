@@ -67,6 +67,23 @@ class RouteSerializationTest {
     }
 
     @Test
+    fun `routes saved before the core pass still decode with the new arguments at their defaults`() {
+        val old = RouteCodec.encode(World("P", WorldTab.PLACES)).replace(",\"createTerm\":false", "")
+        assertEquals(World("P", WorldTab.PLACES), RouteCodec.decode(old))
+        val inbox = RouteCodec.decode(RouteCodec.encode(RecorderInbox("unsorted")))
+        assertEquals(RecorderInbox("unsorted"), inbox)
+        assertNull((inbox as RecorderInbox).projectKey)
+        val line = LineLabelSheet.forCharacters("P", "B", "A")
+        assertEquals("A|B", line.edgeKey)
+        assertEquals("B", line.fromCharacterKey)
+        assertEquals(null, line.canvasKey)
+        assertEquals(FeatureModule.SCRIPT, RenumberSheet("P", "E").owner)
+        assertEquals(FeatureModule.RECORDER, RecorderLinkPickerSheet().owner)
+        assertEquals(FeatureModule.SHELL, RichLinkPickerSheet("P", "r", "t").owner)
+        assertEquals(8, CheckCenterFilter.all.size)
+    }
+
+    @Test
     fun `nav results wait until consumed`() {
         val results = NavResults()
         results.send("pick", "place-1")

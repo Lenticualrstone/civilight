@@ -123,4 +123,25 @@ class SceneActionsTest {
         val move = SceneActions.move(doc, K.SCENE_1_7_4, K.EPISODE_1_7, null, Fx.ctx())
         assertEquals(K.SCENE_1_7_4, move.result.index.children(K.EPISODE_1_7).first().key)
     }
+
+    @Test
+    fun `new scene in a 1-level structure has no parent and keeps every other scene's 때`() {
+        // A one-level project: only scenes, all at the top.
+        val flat = doc.copy(
+            project = doc.project.copy(structure = doc.project.structure.copy(levels = listOf("씬"))),
+            story = doc.story.copy(units = listOf()),
+        )
+        val ctx = Fx.ctx()
+        val (one, first) = SceneActions.create(flat, null, null, ctx, title = "하나")
+        val (two, second) = SceneActions.create(one, null, first, Fx.ctx(seed = 8), title = "둘")
+        val (three, zeroth) = SceneActions.create(two, null, null, Fx.ctx(seed = 9), title = "영")
+        assertEquals(listOf(zeroth, first, second), three.index.children(null).map { it.key })
+        val scene = three.index.unit(second)!!
+        assertEquals(null, scene.parentKey)
+        assertEquals(0, scene.level)
+        assertEquals(ctx.now, scene.updatedAt)
+        assertEquals(two.story.units.filter { it.key != zeroth }.map { it.key to it.time }, three.story.units.filter { it.key != zeroth }.map { it.key to it.time })
+        // Without a parent only in a 1-level structure.
+        assertTrue(runCatching { SceneActions.create(doc, null, null, Fx.ctx()) }.isFailure)
+    }
 }

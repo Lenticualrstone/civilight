@@ -11,8 +11,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -91,12 +97,15 @@ internal fun NewProjectScreen(route: NewProject, services: LibraryServices) {
         }
     }
 
+    // Step 1's R-18 block says whether a 복구 암호 exists (batch 5: the backup book, loaded here).
+    val backupBook by services.backups.book.state.collectAsState()
+    LaunchedEffect(Unit) { services.backups.book.ensureLoaded() }
     val enabled = NewProjectRules.canProceed(form, step) && !creating
     val leftLabel = if (step == NewProjectStep.NAME) NewProjectCopy.CANCEL else NewProjectCopy.PREVIOUS
     val rightLabel = if (step == NewProjectStep.START) NewProjectCopy.CREATE else NewProjectCopy.NEXT
     val body: @Composable ColumnScope.() -> Unit = {
         when (step) {
-            NewProjectStep.NAME -> NameStep(form, settings.ratingDefaults, services.facts.recoverySet(), ::update)
+            NewProjectStep.NAME -> NameStep(form, settings.ratingDefaults, backupBook.recovery != null, ::update)
             NewProjectStep.STRUCTURE -> StructureStep(form, wide = inner, showPreview = !inner, update = ::update)
             NewProjectStep.TIME -> TimeStep(form, ::update)
             NewProjectStep.START -> StartStep(
@@ -191,41 +200,45 @@ private fun WideFrame(
     body: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = CivilightTheme.colors
-    Box(Modifier.fillMaxSize().background(colors.bg).statusBarsPadding().navigationBarsPadding()) {
-        Row(
-            Modifier.align(Alignment.TopCenter).fillMaxHeight().padding(horizontal = 32.dp, vertical = 28.dp),
-            horizontalArrangement = Arrangement.spacedBy(40.dp),
-        ) {
-            Column(Modifier.width(380.dp).fillMaxHeight()) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StepBars(NewProjectRules.STEPS, NewProjectRules.index(step), Modifier.weight(1f))
-                    TextAction(NewProjectCopy.CANCEL, onCancel)
-                }
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 18.dp)) {
-                    StepHeading(step)
-                    Column(Modifier.padding(top = 18.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = body)
-                }
-                StepButtons(enabled, leftLabel, rightLabel, onLeft, onRight, Modifier.padding(top = 12.dp))
+    // Board `NewWide` (800 wide): the progress row spans both columns with `취소` at its end; the
+    // 380 form column sits at the start and the 300 `미리 보기` aside at the end, stretching down to
+    // the buttons; `이전 · 다음` (380 wide) sit at the bottom end. Wider windows centre the 800 frame.
+    // The buttons ride on the keyboard (or the navigation bar), consumption-aware.
+    Box(
+        Modifier.fillMaxSize().background(colors.bg).statusBarsPadding().windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Column(Modifier.widthIn(max = 800.dp).fillMaxWidth().fillMaxHeight().padding(start = 40.dp, end = 40.dp, top = 28.dp, bottom = 26.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                StepBars(NewProjectRules.STEPS, NewProjectRules.index(step), Modifier.weight(1f))
+                TextAction(NewProjectCopy.CANCEL, onCancel)
             }
-            PreviewAside(form, Modifier.width(300.dp).padding(top = 44.dp))
+            Row(Modifier.weight(1f).fillMaxWidth().padding(top = 26.dp, bottom = 22.dp)) {
+                Column(Modifier.width(380.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                    StepHeading(step)
+                    Column(Modifier.padding(top = 22.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = body)
+                }
+                Spacer(Modifier.weight(1f).widthIn(min = 24.dp))
+                PreviewAside(form, Modifier.width(300.dp).fillMaxHeight())
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                StepButtons(enabled, leftLabel, rightLabel, onLeft, onRight, Modifier.width(380.dp))
+            }
         }
     }
 }
 
-/** `NewWide` aside: `미리 보기`, the name, the format, the live tree, `실시간 미리 보기`. */
+/** `NewWide` aside (padding 22, radius 22, `raise`): `미리 보기`, the name, the format, the live tree, `실시간 미리 보기`. */
 @Composable
 private fun PreviewAside(form: NewProjectForm, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val shape = RoundedCornerShape(22.dp)
-    Column(
-        modifier.clip(shape).background(colors.raise).insetOutline(colors.line, 1.dp, shape).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
+    Column(modifier.clip(shape).background(colors.raise).insetOutline(colors.line, 1.dp, shape).verticalScroll(rememberScrollState()).padding(22.dp)) {
         CivilightText(NewProjectCopy.PREVIEW, type.sec, color = colors.ink3)
-        if (form.name.isNotBlank()) CivilightText(form.name.trim(), type.emptyTitle, color = colors.ink)
-        CivilightText(formatLabel(form.format), type.small, color = colors.ink3)
-        PreviewTree(NewProjectRules.preview(form), Modifier.padding(top = 8.dp))
-        CivilightText(NewProjectCopy.PREVIEW_LIVE, type.small, Modifier.padding(top = 6.dp), color = colors.ink3)
+        if (form.name.isNotBlank()) CivilightText(form.name.trim(), type.emptyTitle, Modifier.padding(top = 10.dp), color = colors.ink)
+        CivilightText(formatLabel(form.format), type.small, Modifier.padding(top = 4.dp), color = colors.ink3)
+        PreviewTree(NewProjectRules.preview(form), Modifier.padding(top = 16.dp))
+        CivilightText(NewProjectCopy.PREVIEW_LIVE, type.small, Modifier.padding(top = 14.dp), color = colors.ink3)
     }
 }

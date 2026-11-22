@@ -33,7 +33,6 @@ import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
 import io.github.lenticualrstone.civilight.domain.library.rating.RatingSheetExtra
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.feature.library.common.rememberProjectDoc
-import io.github.lenticualrstone.civilight.feature.library.protection.ProtectionOutcome
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.navigation.RatingChangeSheet
@@ -101,10 +100,16 @@ internal fun SheetScope.RatingChangeContent(sheet: RatingChangeSheet, services: 
     val recorder by deps.stores.recorder.state.collectAsState()
     val unlock by deps.unlock.state.collectAsState()
     LaunchedEffect(Unit) { deps.stores.recorder.ensureLoaded() }
+    // The 복구 암호 and Drive facts come from the backup book (batch 5): read it before building.
+    var bookLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        services.backups.book.ensureLoaded()
+        bookLoaded = true
+    }
     val closer = remember { RatingSheetModel.CloseOnce(scope::close) }
     var working by remember { mutableStateOf(false) }
     val current = doc
-    val ready = current != null && recorder.loaded
+    val ready = current != null && recorder.loaded && bookLoaded
     // Built once, when the project and the recorder library are first read.
     val built = remember(ready) {
         current?.takeIf { ready }?.let { RatingSheetModel.Built(RatingSheetModel.build(it, sheet.to, settings.ratingDefaults, services.facts, recorder.library)) }
@@ -150,10 +155,12 @@ internal fun SheetScope.RatingChangeContent(sheet: RatingChangeSheet, services: 
                     CivilightText(extra.title, type.command, color = colors.ink)
                     CivilightText(extra.sub, type.small, color = colors.ink3)
                 }
-                // `지우기 ›` of old unencrypted Drive versions arrives with LIB-57 (later batch); until
-                // then no such version exists, so that row is never built (ProtectionFacts).
-                if (extra.kind == RatingSheetExtra.NO_RECOVERY_PASSWORD) {
-                    TextAction(extra.action, onClick = { deps.navigator.push(RecoveryPassword) }, style = type.small)
+                when (extra.kind) {
+                    RatingSheetExtra.NO_RECOVERY_PASSWORD ->
+                        TextAction(extra.action, onClick = { deps.navigator.push(RecoveryPassword) }, style = type.small)
+                    // LIB-57 (batch 5): the old unencrypted Drive versions of this project go.
+                    RatingSheetExtra.UNENCRYPTED_BACKUPS ->
+                        TextAction(extra.action, onClick = { deps.appScope.launch { services.backups.deleteUnencrypted(sheet.projectKey) } }, style = type.small)
                 }
             }
         }
@@ -167,6 +174,7 @@ internal fun SheetScope.RatingChangeContent(sheet: RatingChangeSheet, services: 
                 working = true
                 deps.appScope.launch {
                     val outcome = services.protection.changeRating(sheet.projectKey, model.apply(checked))
+                    services.report(outcome)
                     working = false
                     if (RatingSheetModel.closesAfter(outcome)) closer.close()
                 }

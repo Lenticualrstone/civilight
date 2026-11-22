@@ -20,6 +20,7 @@ import io.github.lenticualrstone.civilight.feature.world.common.FieldRows
 import io.github.lenticualrstone.civilight.feature.world.common.FieldSectionUi
 import io.github.lenticualrstone.civilight.feature.world.common.FixedRowUi
 import io.github.lenticualrstone.civilight.feature.world.common.ItemRefsText
+import io.github.lenticualrstone.civilight.feature.world.common.ItemLifecycle
 import io.github.lenticualrstone.civilight.feature.world.common.WorldTargets
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
@@ -27,8 +28,18 @@ import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.ui.lens.LensRules
 
-/** A marker line under a usage row: `▲ 공개(1-7) 전 사용` ([warn]), `◇ 첫 공개`, `◇ 후보 · 끊김 · 잇기 · 아님`. */
-data class MarkerUi(val text: String, val warn: Boolean)
+/**
+ * A marker line under a usage row: `▲ 공개(1-7) 전 사용` ([warn]; tapping it opens the check center,
+ * WLD-20), `◇ 첫 공개`, `◇ 근거 지워짐` ([dotted], rule 12: the reveal's block was deleted),
+ * `◇ 후보 · 끊김 · 잇기 · 아님`.
+ */
+data class MarkerUi(val text: String, val warn: Boolean, val dotted: Boolean = false) {
+    companion object {
+        const val ORPHANED = "◇ 근거 지워짐"
+
+        fun of(text: String) = MarkerUi(text, warn = text.startsWith("▲"), dotted = text == ORPHANED)
+    }
+}
 
 /**
  * A `쓰인 곳` row (WLD-19): the location (mono small, [location]) and the whole sentence with the
@@ -50,6 +61,10 @@ data class UsageRowUi(
     val target: Route?,
     val placeLine: String? = null,
     val candidate: TermCandidate? = null,
+    /** The link of a `쓰인 곳` row (null for candidates). */
+    val linkKey: Key? = null,
+    /** A `▲ 공개 전 사용` row not yet marked: `맞음` is offered next to the marker (WLD-24). */
+    val canMarkIntended: Boolean = false,
 ) {
     val boxed: Boolean get() = boxEnd > boxStart
 }
@@ -82,6 +97,10 @@ data class TermCardUi(
     val groups: List<UsageGroupUi>,
     /** Text of the description holds links to hidden items while locked (its editor needs `지문으로 보기`). */
     val descriptionLocked: Boolean,
+    /** `◇ 같은 이름 2 · 오리지늄 등불` (WLD-15 entry), null when the name is unique. */
+    val sameName: String? = null,
+    /** `모두 잇기 · 모두 아님` over the `후보` group (WLD-23), as two buttons; empty without candidates. */
+    val bulkActions: List<String> = emptyList(),
 ) {
     val title: String
         get() = when (access) {
@@ -93,7 +112,19 @@ data class TermCardUi(
 
 /** Builds the term card at the lens from the domain's rule-21 readings. */
 object TermCardState {
-    fun build(doc: ProjectDoc, projectKey: Key, termKey: Key, index: CandidateIndex, hiddenOpen: Boolean, readOnly: Boolean): TermCardUi {
+    /**
+     * [aliasFound] = the count of `후보 N 새로 찾음` after the last alias change on this card (WLD-16),
+     * shown next to `별칭`.
+     */
+    fun build(
+        doc: ProjectDoc,
+        projectKey: Key,
+        termKey: Key,
+        index: CandidateIndex,
+        hiddenOpen: Boolean,
+        readOnly: Boolean,
+        aliasFound: Int? = null,
+    ): TermCardUi {
         val access = CardAccess.of(doc, WorldKind.TERM, termKey, hiddenOpen)
         val term = doc.index.term(termKey)
         if (access != CardAccess.Open || term == null) return closed(termKey, access)
@@ -115,7 +146,13 @@ object TermCardState {
             access = access,
             head = CardHeadUi(WorldCopy.EYEBROW_TERM, card.name, CardText.paragraphs(doc, term.description, hiddenOpen)),
             reveal = FixedRowUi(WorldCopy.ROW_REVEAL, card.revealValue, editable),
-            aliases = card.aliasValue.takeIf { it.isNotEmpty() }?.let { FixedRowUi(WorldCopy.ROW_ALIASES, it, editable = false) },
+            // WLD-16: editable projects always show the row (`—` when empty), so aliases can be added.
+            aliases = if (card.aliasValue.isEmpty() && !editable) null else FixedRowUi(
+                WorldCopy.ROW_ALIASES,
+                card.aliasValue.ifEmpty { WorldCopy.EMPTY_VALUE },
+                editable,
+                note = aliasFound?.takeIf { it > 0 }?.let(WorldCopy::newlyFound),
+            ),
             related = FixedRowUi(
                 WorldCopy.ROW_RELATED,
                 ItemRefsText.of(doc, term.related, hiddenOpen).ifEmpty { WorldCopy.EMPTY_VALUE },
@@ -129,6 +166,8 @@ object TermCardState {
             candidatesPending = card.candidatesPending,
             groups = groups,
             descriptionLocked = CardText.hasLockedLinks(doc, term.description, hiddenOpen),
+            sameName = ItemLifecycle.sameName(doc, WorldKind.TERM, termKey),
+            bulkActions = if (card.candidates.rows.isEmpty() || !index.complete) emptyList() else card.candidates.action.split(WorldCopy.SEP),
         )
     }
 
@@ -151,10 +190,13 @@ object TermCardState {
             text = text,
             boxStart = start,
             boxEnd = end,
-            markers = row.markers.map { MarkerUi(it, warn = it.startsWith("▲")) },
+            // A `맞음` row keeps its `▲` line in `ink3` with the `맞음` tag (Q-07); it leaves every count.
+            markers = row.markers.map { if (row.intended && it.startsWith("▲")) MarkerUi(it, warn = false) else MarkerUi.of(it) },
             tags = row.tags,
             dimmed = row.dimmed,
             target = if (locked) null else WorldTargets.of(projectKey, spot),
+            linkKey = row.link.linkKey,
+            canMarkIntended = row.preReveal && !row.intended && !locked,
         )
     }
 
@@ -163,7 +205,7 @@ object TermCardState {
         val (text, start, end) = shown(doc, c.spot, row.snippet, hiddenOpen)
         val locked = WorldTargets.isLocked(doc, c.spot, hiddenOpen)
         return UsageRowUi(
-            id = "cand:${c.spot}:${c.start}:${c.matchedText}",
+            id = LinkCandidatesState.idOf(c),
             location = row.location,
             text = text,
             boxStart = start,

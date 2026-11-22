@@ -11,6 +11,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.items
+import io.github.lenticualrstone.civilight.designsystem.component.ViewToggle
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -68,6 +79,19 @@ fun WorldScreen(route: World, deps: FeatureDeps) {
     val selected = if (LocalPaneRole.current == PaneRole.LIST) selectedCardKey(deps) else null
     val tab = ui?.tab ?: route.tab
     val kind = WorldTabs.kindOf(tab)
+    val settings by deps.settings.collectAsState()
+    val showCards = WorldCardRows.showCards(settings.viewByScreen, tab)
+    val scope = rememberCoroutineScope()
+    val cardRows = remember(doc, ui) { val d = doc; val u = ui; if (d != null && u != null) WorldCardRows.build(d, u.items) else emptyList() }
+    // LIB-13 `세계 용어 하나 적기`: open the new-term form once on arrival (shell.md core pass, item 3).
+    var createHandled by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(route.createTerm) {
+        if (route.createTerm && !createHandled) {
+            createHandled = true
+            vm.selectTab(io.github.lenticualrstone.civilight.navigation.WorldTab.TERMS)
+            sheets.open(CreateItemSheet(io.github.lenticualrstone.civilight.navigation.WorldTab.TERMS))
+        }
+    }
 
     CivilightScreen(
         title = WorldCopy.WORLD_TITLE,
@@ -109,6 +133,12 @@ fun WorldScreen(route: World, deps: FeatureDeps) {
                 padding = padding,
                 selectedKey = selected,
                 readOnly = readOnly,
+                showCards = showCards,
+                cardRows = cardRows,
+                onView = { cards ->
+                    scope.launch { deps.stores.settings.update { it.copy(viewByScreen = WorldCardRows.withView(it.viewByScreen, tab, cards)) } }
+                },
+                onCard = { card -> deps.navigator.openDetail(WorldTargets.card(route.projectKey, card.kind, card.key)) },
                 onSegment = { segment ->
                     val t = segment.tab
                     if (t == null) deps.navigator.push(MapList(route.projectKey)) else vm.selectTab(t)
@@ -129,6 +159,10 @@ private fun WorldList(
     padding: PaddingValues,
     selectedKey: String?,
     readOnly: Boolean,
+    showCards: Boolean,
+    cardRows: List<WorldCardRowUi>,
+    onView: (Boolean) -> Unit,
+    onCard: (WorldCardUi) -> Unit,
     onSegment: (WorldSegment) -> Unit,
     onHint: () -> Unit,
     onRow: (WorldListItem.Row) -> Unit,
@@ -137,6 +171,19 @@ private fun WorldList(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    val reduced = CivilightTheme.reducedMotion
+    // WLD-68: cards grow in place only right after `목록 → 카드` on the same tab, for one motion.
+    val previousView = remember { mutableStateOf(tab to showCards) }
+    var switched by remember { mutableStateOf(false) }
+    LaunchedEffect(tab, showCards) {
+        val (lastTab, lastCards) = previousView.value
+        switched = lastTab == tab && !lastCards && showCards
+        previousView.value = tab to showCards
+        if (switched) {
+            kotlinx.coroutines.delay((ListCardMotion.ENTER_MS + ListCardMotion.EXIT_MS).toLong())
+            switched = false
+        }
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -154,19 +201,38 @@ private fun WorldList(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        if (tab == io.github.lenticualrstone.civilight.navigation.WorldTab.TERMS) {
-            item(key = "hint") {
-                TextAction(
-                    text = WorldCopy.TERM_HINT,
-                    onClick = onHint,
-                    modifier = Modifier.padding(top = 4.dp),
-                    color = colors.ink3,
-                    style = type.small,
+        item(key = "hint") {
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (tab == io.github.lenticualrstone.civilight.navigation.WorldTab.TERMS) {
+                    TextAction(
+                        text = WorldCopy.TERM_HINT,
+                        onClick = onHint,
+                        modifier = Modifier.weight(1f),
+                        color = colors.ink3,
+                        style = type.small,
+                    )
+                } else {
+                    Box(Modifier.weight(1f))
+                }
+                ViewToggle(
+                    showCards = showCards,
+                    onChange = onView,
+                    groupLabel = WorldCopy.VIEW_GROUP,
+                    listLabel = WorldCopy.VIEW_LIST,
+                    cardLabel = WorldCopy.VIEW_CARDS,
                 )
             }
         }
-        val items = ui?.items.orEmpty()
+        val items = ui?.items.orEmpty().let { all -> if (showCards) all.filter { it is WorldListItem.Lock || it is WorldListItem.Empty } else all }
+        if (showCards) {
+            items(cardRows, key = { it.id }) { row ->
+                Box(Modifier.animateItem(fadeInSpec = ListCardMotion.cardIn(reduced), placementSpec = null, fadeOutSpec = ListCardMotion.out(reduced))) {
+                    GrowIn(reduced, switched) { WorldCardRow(row, selectedKey, onCard) }
+                }
+            }
+        }
         itemsIndexed(items, key = { i, item -> if (item is WorldListItem.Row) item.id else "${item.id}@$i" }) { _, item ->
+            Box(Modifier.animateItem(fadeInSpec = ListCardMotion.listIn(reduced), placementSpec = null, fadeOutSpec = ListCardMotion.out(reduced))) {
             when (item) {
                 is WorldListItem.Section -> SectionLabel(item.title, Modifier.padding(top = 18.dp, bottom = 6.dp))
                 is WorldListItem.Lock -> LockRow(
@@ -188,6 +254,7 @@ private fun WorldList(
                     selected = item.key == selectedKey,
                     trailing = { RightColumn(item, pending = ui?.candidatesPending == true) },
                 )
+            }
             }
         }
     }

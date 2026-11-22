@@ -3,9 +3,18 @@ package io.github.lenticualrstone.civilight.navigation
 import io.github.lenticualrstone.civilight.model.Key
 import kotlinx.serialization.Serializable
 
-/** 세계: 용어 · 장소 · 세력 lists (WLD-01 … WLD-05) on [tab]. */
+/**
+ * 세계: 용어 · 장소 · 세력 lists (WLD-01 … WLD-05) on [tab]. [createTerm] = open the new-term form
+ * on arrival (LIB-13 `세계 용어 하나 적기`). The world screen consumes it once with an entry-scoped
+ * `rememberSaveable` "handled" flag (do not replace the route: another route value is another entry,
+ * which would reset the screen's view model, saved state and sheets).
+ */
 @Serializable
-data class World(override val projectKey: Key, val tab: WorldTab = WorldTab.TERMS) : WorldRoute, ProjectRoute, LensScreen, ListPaneRoute
+data class World(
+    override val projectKey: Key,
+    val tab: WorldTab = WorldTab.TERMS,
+    val createTerm: Boolean = false,
+) : WorldRoute, ProjectRoute, LensScreen, ListPaneRoute
 
 @Serializable
 enum class WorldTab { TERMS, PLACES, FACTIONS }

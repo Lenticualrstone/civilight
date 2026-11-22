@@ -27,13 +27,17 @@ data class EpisodeItem(val row: EpisodeRow, val current: Boolean) : StructureIte
     override val id: String get() = "episode:${row.key}"
 }
 
-/** `1일째 새벽 | 씬 1 · 새벽 순찰 | 1,820자`, indented under its episode (not in a 1-level structure). */
-data class SceneItem(val row: SceneRow, val indented: Boolean) : StructureItem {
+/**
+ * `1일째 새벽 | 씬 1 · 새벽 순찰 | 1,820자`, indented under its episode (not in a 1-level structure).
+ * [masked]: a hidden scene while locked (`씬 4 · 숨긴 씬`, STO-11); its tap asks to unlock first.
+ */
+data class SceneItem(val row: SceneRow, val indented: Boolean, val masked: Boolean = false) : StructureItem {
     override val id: String get() = "scene:${row.key}"
 }
 
 /** Where `새 씬` creates its scene: under [parentKey] right after [afterKey] (null = first, an empty episode). */
-data class NewSceneTarget(val parentKey: Key, val afterKey: Key?)
+/** Where `새 씬` creates: under [parentKey] (null = top level of a 1-level structure) after [afterKey]. */
+data class NewSceneTarget(val parentKey: Key?, val afterKey: Key?)
 
 /** Everything 스토리 draws (STO-04, board `Story`). */
 data class StructureUi(
@@ -66,7 +70,7 @@ object StructureModel {
             for (unit in doc.index.children(parentKey)) {
                 if (!doc.liveness.isUnitLive(unit.key)) continue
                 when (unit.level) {
-                    structure.sceneLevel -> items += SceneItem(view.sceneRow(unit), indented = episodeLevel != null)
+                    structure.sceneLevel -> items += SceneItem(view.sceneRow(unit), indented = episodeLevel != null, masked = locked && unit.hidden)
                     episodeLevel -> {
                         val isOpen = unit.key in open
                         items += EpisodeItem(view.episodeRow(unit, isOpen), current = unit.key == currentEpisode)
@@ -117,16 +121,24 @@ object StructureModel {
     /**
      * `새 씬` (STO-05, `ED` insertion point): in the most recently expanded episode, else the episode
      * of the last edit; after the scene being written when it is in that episode, else after its last
-     * scene. Null in a 1-level structure (`SceneActions.create` needs a parent, see Requests).
+     * scene. In a 1-level structure the scene goes at the top level (`SceneActions.create(parentKey =
+     * null)`, core pass): after the scene being written, else after the last scene.
      */
     fun newSceneTarget(view: StoryOverview, expanded: List<Key>): NewSceneTarget? {
         val doc = view.doc
-        val episodeLevel = doc.project.structure.episodeLevel ?: return null
+        val episodeLevel = doc.project.structure.episodeLevel ?: return topLevelTarget(view)
         val episode = expanded.asReversed().firstNotNullOfOrNull { key ->
             doc.index.unit(key)?.takeIf { it.level == episodeLevel && doc.liveness.isUnitLive(it.key) }
         } ?: view.currentSceneKey?.let { view.codes.episodeOf(it) } ?: return null
         val scenes = view.scenesOf(episode)
         val after = view.currentSceneKey?.takeIf { k -> scenes.any { it.key == k } } ?: scenes.lastOrNull()?.key
         return NewSceneTarget(episode.key, after)
+    }
+
+    private fun topLevelTarget(view: StoryOverview): NewSceneTarget {
+        val doc = view.doc
+        val scenes = doc.index.children(null).filter { it.level == doc.project.structure.sceneLevel && doc.liveness.isUnitLive(it.key) }
+        val after = view.currentSceneKey?.takeIf { k -> scenes.any { it.key == k } } ?: scenes.lastOrNull()?.key
+        return NewSceneTarget(null, after)
     }
 }

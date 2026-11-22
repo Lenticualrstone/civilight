@@ -26,7 +26,7 @@ class MenuModelTest {
         val menu = UnitMenuModel.build(doc, K.SCENE_1_7_4, MenuSurface.STORY_LIST, readOnly = false)!!
         assertEquals("씬 4 · 1-7", menu.title)
         assertEquals(
-            listOf(MenuAction.PLACE_TIME, MenuAction.TRANSITION, MenuAction.MERGE_PREVIOUS, MenuAction.SPLIT_HERE, MenuAction.DELETE_SCENE, MenuAction.MARK_DONE),
+            listOf(MenuAction.PLACE_TIME, MenuAction.TRANSITION, MenuAction.MERGE_PREVIOUS, MenuAction.SPLIT_HERE, MenuAction.MOVE, MenuAction.DELETE_SCENE),
             menu.rows.map { it.action },
         )
         val byAction = menu.rows.associateBy { it.action }
@@ -36,7 +36,7 @@ class MenuModelTest {
         assertEquals("여기서 나누기", byAction.getValue(MenuAction.SPLIT_HERE).label)
         assertNull(byAction.getValue(MenuAction.SPLIT_HERE).value)
         assertEquals("씬 지우기" to "휴지통 · 30일", byAction.getValue(MenuAction.DELETE_SCENE).let { it.label to it.value })
-        assertEquals("미정", byAction.getValue(MenuAction.MARK_DONE).value)
+        assertEquals("옮기기", byAction.getValue(MenuAction.MOVE).label)
         assertTrue(menu.rows.all { it.enabled })
     }
 
@@ -73,19 +73,16 @@ class MenuModelTest {
         val episode = UnitMenuModel.build(doc, K.EPISODE_1_7, MenuSurface.STORY_LIST, readOnly = true)!!
         assertTrue(episode.rows.none { it.enabled })
         val structure = StructureMenuModel.build(doc, readOnly = true)
-        assertEquals(listOf(true, true, false), structure.rows.map { it.enabled })
+        assertEquals(listOf(true, true), structure.rows.map { it.enabled })
     }
 
     @Test
     fun episodeMenu() {
         val menu = UnitMenuModel.build(doc, K.EPISODE_1_7, MenuSurface.STORY_LIST, readOnly = false)!!
         assertEquals("1-7 · 잿빛 새벽의 등불", menu.title)
-        assertEquals(listOf(MenuAction.RENUMBER, MenuAction.NEW_UNIT_AFTER, MenuAction.MARK_DONE), menu.rows.map { it.action })
+        // `새 에피소드` and `완료` have no drawn copy (Q34), so only the drawn row shows.
+        assertEquals(listOf(MenuAction.RENUMBER, MenuAction.MOVE), menu.rows.map { it.action })
         assertEquals("번호 다시 매기기 · 1-7", menu.rows[0].label)
-        assertEquals("TODO_COPY_STO_NEW_EPISODE", menu.rows[1].label)
-        assertEquals("쓰는 중 · 씬 3", menu.rows[2].value)
-        val done = UnitMenuModel.build(doc, K.EPISODE_1_5, MenuSurface.STORY_LIST, readOnly = false)!!
-        assertEquals(MenuAction.UNMARK_DONE to "완료", done.rows[2].let { it.action to it.value })
         assertEquals("1-8 · 미정", UnitMenuModel.build(doc, K.EPISODE_1_8, MenuSurface.STORY_LIST, readOnly = false)!!.title)
     }
 
@@ -93,8 +90,7 @@ class MenuModelTest {
     fun chapterMenuAndGoneUnits() {
         val menu = UnitMenuModel.build(doc, K.CHAPTER_1, MenuSurface.STORY_LIST, readOnly = false)!!
         assertEquals("Ⅰ 1장 · 등불지기", menu.title)
-        assertEquals(listOf(MenuAction.NEW_UNIT_AFTER), menu.rows.map { it.action })
-        assertEquals("TODO_COPY_STO_NEW_CHAPTER", menu.rows[0].label)
+        assertEquals(listOf(MenuAction.MOVE), menu.rows.map { it.action })
         assertNull(UnitMenuModel.build(doc, "unknown", MenuSurface.STORY_LIST, readOnly = false))
     }
 
@@ -102,14 +98,23 @@ class MenuModelTest {
     fun structureMenuFollowsTheLevelCount() {
         val three = StructureMenuModel.build(doc, readOnly = false)
         assertEquals("스토리", three.title)
-        assertEquals(listOf(MenuAction.BULK, MenuAction.LEVEL_NAMES, MenuAction.NEW_TOP_UNIT), three.rows.map { it.action })
+        assertEquals(listOf(MenuAction.BULK, MenuAction.LEVEL_NAMES), three.rows.map { it.action })
         assertEquals("장소 · 때 한꺼번에", three.rows[0].label)
         assertEquals("단계 이름" to "장 › 에피소드 › 씬", three.rows[1].let { it.label to it.value })
-        assertEquals("TODO_COPY_STO_NEW_CHAPTER", three.rows[2].label)
         val two = StructureMenuModel.build(Fx.mini(listOf("막", "장면"), node("A1")), readOnly = false)
-        assertEquals("TODO_COPY_STO_NEW_EPISODE", two.rows.last().label)
+        assertEquals(listOf(MenuAction.BULK, MenuAction.LEVEL_NAMES), two.rows.map { it.action })
         val one = StructureMenuModel.build(Fx.mini(listOf("씬"), node("S1")), readOnly = false)
         assertEquals(listOf(MenuAction.BULK, MenuAction.LEVEL_NAMES), one.rows.map { it.action })
+    }
+
+    @Test
+    fun noMenuShowsUndrawnCopy() {
+        val keys = listOf(K.SCENE_1_7_1, K.SCENE_1_7_4, K.EPISODE_1_5, K.EPISODE_1_7, K.CHAPTER_1, K.CHAPTER_2)
+        val menus = keys.flatMap { k -> MenuSurface.entries.flatMap { s -> listOf(true, false).mapNotNull { ro -> UnitMenuModel.build(doc, k, s, ro) } } } +
+            listOf(true, false).map { StructureMenuModel.build(doc, it) }
+        val shown = menus.flatMap { m -> listOf(m.title) + m.rows.flatMap { listOfNotNull(it.label, it.value) } }
+        assertTrue(shown.isNotEmpty())
+        assertEquals(emptyList<String>(), shown.filter { it.startsWith("TODO_COPY_") })
     }
 
     @Test

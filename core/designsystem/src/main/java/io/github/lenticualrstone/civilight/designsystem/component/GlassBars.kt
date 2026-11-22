@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -87,17 +90,29 @@ fun TopGlassBar(
  * [barHeight] (130; 150 with [extraRow]; 120 on onboarding) above the navigation inset, glass with the 70 %
  * edge mask. Contents: a column 8 dp apart, 12 dp sides, 18 dp above the navigation inset: the optional
  * row (speaker pill · `Layers` · spacer · `줄바꿈`), then [commandBar].
+ *
+ * The bar rides above the keyboard: it is lifted by the IME inset minus the navigation inset (its own
+ * padding already covers the navigation bar), with the consumption-aware `windowInsetsPadding`, so a
+ * caller that already lifts it the same way (the script) is not lifted twice. [aboveKeyboard] = false
+ * keeps it at the window bottom (a screen that hides the bar while typing).
  */
 @Composable
 fun BottomGlassBar(
     modifier: Modifier = Modifier,
     barHeight: Dp? = null,
     extraRow: (@Composable RowScope.() -> Unit)? = null,
+    aboveKeyboard: Boolean = true,
     commandBar: @Composable () -> Unit,
 ) {
     val inset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val height = barHeight ?: if (extraRow != null) LayoutMetrics.bottomBarWithRow else LayoutMetrics.bottomBar
-    Box(modifier.fillMaxWidth().heightIn(min = height + inset), contentAlignment = Alignment.BottomCenter) {
+    Box(
+        modifier
+            .then(if (aboveKeyboard) Modifier.windowInsetsPadding(KeyboardLift) else Modifier)
+            .fillMaxWidth()
+            .heightIn(min = height + inset),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
         GlassBackground(GlassSurface.BOTTOM_BAR, Modifier.matchParentSize())
         OnGlass {
             Column(
@@ -163,3 +178,11 @@ fun GlassScaffold(
 }
 
 private enum class Slot { Top, Bottom, Content, Overlay }
+
+/**
+ * The keyboard height above the navigation bar: what a bar or sheet that already pads for the
+ * navigation bar must add to sit on the keyboard. Apply it with `Modifier.windowInsetsPadding`, which
+ * consumes it, so nested users (a bar inside a lifted box) add nothing.
+ */
+val KeyboardLift: WindowInsets
+    @Composable get() = WindowInsets.ime.exclude(WindowInsets.navigationBars)

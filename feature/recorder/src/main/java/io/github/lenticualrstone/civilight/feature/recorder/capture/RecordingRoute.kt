@@ -19,23 +19,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import io.github.lenticualrstone.civilight.feature.recorder.outside.AndroidNetworkStatus
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightSheetLayout
-import io.github.lenticualrstone.civilight.designsystem.component.GlowMode
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
 import io.github.lenticualrstone.civilight.feature.recorder.link.LinkPickerContent
 import io.github.lenticualrstone.civilight.feature.recorder.memo.MemoActions
 import io.github.lenticualrstone.civilight.feature.recorder.memo.TextMemoSheetContent
-import io.github.lenticualrstone.civilight.model.recorder.RecordingPhase
+import io.github.lenticualrstone.civilight.feature.recorder.outside.AndroidAudioFocus
+import io.github.lenticualrstone.civilight.feature.recorder.outside.DeviceUnlock
+import io.github.lenticualrstone.civilight.feature.recorder.outside.KeepAlive
 import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
 import kotlinx.coroutines.flow.first
+
+/** The activity behind [this] context (the device-unlock request needs it). */
+tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 /** Whether the app may record audio now. */
 fun micGranted(context: Context): Boolean =
@@ -62,6 +71,20 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hub.launch { permissionResult(granted) }
+    }
+
+    // Platform parts that need a context: audio focus (LRC-09) and the background keep-alive service.
+    LaunchedEffect(hub) {
+        hub.usePlatformFocus(AndroidAudioFocus(context))
+        hub.useNetwork(AndroidNetworkStatus(context))
+        KeepAlive.attach(context, hub, deps.appScope)
+    }
+
+    // Lock-screen capture (LRC-05): the device unlock before recording or before the link picker.
+    LaunchedEffect(state.unlock) {
+        if (state.unlock == null) return@LaunchedEffect
+        val activity = context.findActivity()
+        if (activity == null) hub.unlockResult(false) else DeviceUnlock.request(activity, hub::unlockResult)
     }
 
     LaunchedEffect(Unit) {
@@ -111,12 +134,7 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
                 }
             },
         ) {
-            val glow = when {
-                !glowOn -> null
-                state.stage == CaptureStage.RECORDING -> if (reduced || state.session?.phase != RecordingPhase.RECORDING) GlowMode.STILL else GlowMode.RECORDING
-                state.stage == CaptureStage.PROCESSING && state.finalising -> if (reduced) GlowMode.STILL else GlowMode.PROCESSING
-                else -> null
-            }
+            val glow = GlowModes.of(state, glowOn, reduced)
             val glass = state.stage == CaptureStage.RECORDING || state.stage == CaptureStage.PROCESSING || state.stage == CaptureStage.MIC_OFF
             CaptureFrame(glow = glow, level = { hub.level.value }, glass = glass) {
                 when (state.stage) {

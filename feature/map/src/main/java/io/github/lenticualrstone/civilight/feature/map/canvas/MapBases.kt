@@ -6,6 +6,10 @@ import io.github.lenticualrstone.civilight.domain.world.map.MapScales
 import io.github.lenticualrstone.civilight.model.map.HexGrid
 import io.github.lenticualrstone.civilight.model.map.HexOrientation
 import io.github.lenticualrstone.civilight.model.map.MapBaseKind
+import io.github.lenticualrstone.civilight.model.map.MapFormat
+import io.github.lenticualrstone.civilight.model.map.DrawnLineKind
+import io.github.lenticualrstone.civilight.model.map.MapStyle
+import io.github.lenticualrstone.civilight.model.map.PolyMap
 import io.github.lenticualrstone.civilight.model.map.WorldMap
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -24,8 +28,23 @@ sealed interface MapBase {
         override val aspect: Float get() = if (width != null && height != null && width > 0 && height > 0) width.toFloat() / height else DEFAULT_ASPECT
     }
 
-    /** A generated map drawn from its stored result (land, rivers, roads) and hex cells, if any. */
-    data class Generated(val world: GeneratedWorld?, val hex: HexGrid?) : MapBase {
+    /**
+     * A generated map drawn from its stored result and format data: hex cells (WLD-58), polygon
+     * cells (WLD-59) or the world picture in [style] (WLD-57) with `등고선` when [contours]. A
+     * detailed-terrain map keeps its rivers and roads as drawn lines in the scene ([worldLines]
+     * false), so the author can edit them (WLD-60).
+     */
+    data class Generated(
+        val world: GeneratedWorld?,
+        val hex: HexGrid?,
+        val poly: PolyMap? = null,
+        val style: MapStyle = MapStyle.SOFT,
+        val contours: Boolean = false,
+        val worldLines: Boolean = true,
+        /** A detailed-terrain map without a drawn river (or road) shows the stored world's (no empty map). */
+        val worldRivers: Boolean = worldLines,
+        val worldRoads: Boolean = worldLines,
+    ) : MapBase {
         override val aspect: Float
             get() = when {
                 world != null -> world.w.toFloat() / world.h
@@ -55,7 +74,16 @@ object MapBases {
         return when {
             MapScales.isNodeMap(map) -> MapBase.Node
             hash != null -> MapBase.Image(hash, map.baseSize?.w, map.baseSize?.h)
-            map.baseKind.known == MapBaseKind.GENERATED -> MapBase.Generated(runCatching { MapGenerator.storedWorld(map) }.getOrNull(), map.hex)
+            map.baseKind.known == MapBaseKind.GENERATED -> MapBase.Generated(
+                world = runCatching { MapGenerator.storedWorld(map) }.getOrNull(),
+                hex = map.hex,
+                poly = map.poly?.takeIf { it.cells.isNotEmpty() },
+                style = map.style?.known ?: MapStyle.SOFT,
+                contours = map.contours,
+                worldLines = map.format?.known != MapFormat.DETAIL,
+                worldRivers = map.format?.known != MapFormat.DETAIL || map.drawnLines.none { it.kind.known == DrawnLineKind.RIVER },
+                worldRoads = map.format?.known != MapFormat.DETAIL || map.drawnLines.none { it.kind.known == DrawnLineKind.ROAD },
+            )
             map.baseKind.known == MapBaseKind.SKETCH -> map.sketch?.photoHash?.let { MapBase.Image(it, null, null) } ?: MapBase.Blank
             else -> MapBase.Blank
         }

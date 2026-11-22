@@ -9,17 +9,37 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.domain.actions.ActionContext
 import io.github.lenticualrstone.civilight.domain.actions.CharacterActions
+import io.github.lenticualrstone.civilight.domain.script.BlockOps
 import io.github.lenticualrstone.civilight.domain.script.EditContext
+import io.github.lenticualrstone.civilight.domain.script.VoiceIds
 import io.github.lenticualrstone.civilight.domain.trash.RestoreOutcome
 import io.github.lenticualrstone.civilight.domain.script.Manuscript
 import io.github.lenticualrstone.civilight.domain.script.Runs
 import io.github.lenticualrstone.civilight.domain.script.SceneText
+import io.github.lenticualrstone.civilight.domain.script.SceneMemo
 import io.github.lenticualrstone.civilight.domain.script.SceneTimeSource
 import io.github.lenticualrstone.civilight.domain.script.StoryTimes
 import io.github.lenticualrstone.civilight.feature.script.editor.FieldChange
 import io.github.lenticualrstone.civilight.feature.script.editor.FieldDiff
 import io.github.lenticualrstone.civilight.feature.script.editor.RunEdit
+import io.github.lenticualrstone.civilight.feature.script.layers.LayerRow
+import io.github.lenticualrstone.civilight.feature.script.layers.LayersModel
+import io.github.lenticualrstone.civilight.feature.script.panel.PanelBuild
+import io.github.lenticualrstone.civilight.feature.script.panel.PanelContent
+import io.github.lenticualrstone.civilight.feature.script.panel.PanelRequest
+import io.github.lenticualrstone.civilight.feature.script.panel.PanelTab
+import io.github.lenticualrstone.civilight.feature.script.panel.SpeakerKeep
+import io.github.lenticualrstone.civilight.feature.script.select.ScriptClipboard
+import io.github.lenticualrstone.civilight.feature.script.select.SelectRules
+import io.github.lenticualrstone.civilight.feature.script.terms.TermMarksModel
+import io.github.lenticualrstone.civilight.feature.script.links.LinkFixes
+import io.github.lenticualrstone.civilight.feature.script.ui.LinkSheetKey
+import io.github.lenticualrstone.civilight.domain.world.term.CandidateIndex
+import io.github.lenticualrstone.civilight.domain.world.term.TermAccess
+import kotlinx.coroutines.flow.mapLatest
+import io.github.lenticualrstone.civilight.feature.script.select.SelectState
 import io.github.lenticualrstone.civilight.feature.script.state.EditorRules
+import io.github.lenticualrstone.civilight.feature.script.state.ScriptRowKeys
 import io.github.lenticualrstone.civilight.feature.script.state.EditorState
 import io.github.lenticualrstone.civilight.feature.script.state.InsertAt
 import io.github.lenticualrstone.civilight.feature.script.state.OpenTarget
@@ -28,11 +48,18 @@ import io.github.lenticualrstone.civilight.feature.script.state.ScriptRow
 import io.github.lenticualrstone.civilight.feature.script.state.ScriptRows
 import io.github.lenticualrstone.civilight.feature.script.state.ScriptTarget
 import io.github.lenticualrstone.civilight.feature.script.state.SpeakerTarget
+import io.github.lenticualrstone.civilight.feature.script.ui.DirectionSheetKey
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.domain.recorder.hooks.TargetLines
+import io.github.lenticualrstone.civilight.domain.recorder.link.TargetRef
+import io.github.lenticualrstone.civilight.model.recorder.RecorderTargetKind
 import io.github.lenticualrstone.civilight.model.Keys
 import io.github.lenticualrstone.civilight.model.app.ProjectAppState
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.script.BlockKind
+import io.github.lenticualrstone.civilight.model.script.CueKind
+import io.github.lenticualrstone.civilight.model.script.ScriptPreview
+import io.github.lenticualrstone.civilight.model.script.StagePosition
 import io.github.lenticualrstone.civilight.model.text.LinkTarget
 import io.github.lenticualrstone.civilight.model.text.LinkTargetKind
 import io.github.lenticualrstone.civilight.model.text.TextRun
@@ -78,6 +105,8 @@ data class ScriptContent(
     val rows: List<ScriptRow>,
     val time: SceneTimeSource,
     val readOnly: Boolean,
+    /** Term marks of this build (SCR-56): candidate popovers read it. */
+    val terms: TermMarksModel.Source? = null,
 )
 
 /**
@@ -99,6 +128,9 @@ class ScriptViewModel(
 ) : ProjectViewModel(route.projectKey, deps.projects) {
 
     private val _editor = MutableStateFlow(EditorState())
+
+    /** The fold restore point was looked at for this view model (SCR-66): it applies once, to a fresh one. */
+    internal var foldRestoreChecked = false
     val editor: StateFlow<EditorState> = _editor.asStateFlow()
 
     private val _target = MutableStateFlow<OpenTarget?>(null)
@@ -108,18 +140,37 @@ class ScriptViewModel(
 
     private val unlocked = deps.unlock.state.map { it.itemsOpen(route.projectKey) }.distinctUntilChanged()
 
+    /**
+     * The `용어 후보` index (SCR-56): built 0.5 s after the text stops changing, only while the layer
+     * is on; otherwise pending (the margin `▲` never waits for it).
+     */
+    private val candidateIndex: StateFlow<CandidateIndex> = combine(state.filterIsInstance<ProjectLoad.Ready>(), unlocked) { r, open -> r.doc to open }
+        .mapLatest { (doc, open) ->
+            if (!doc.app.view.script.layers.termCandidates) {
+                // One shared instance: the state flow drops it as unchanged, so rows are not rebuilt twice.
+                NO_CANDIDATES
+            } else {
+                delay(RESCAN_DELAY_MS)
+                CandidateIndex.build(doc, TermAccess(open))
+            }
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, NO_CANDIDATES)
+
     val content: StateFlow<ScriptContent?> = combine(
         state.filterIsInstance<ProjectLoad.Ready>(),
         _target.filterNotNull(),
         unlocked,
-    ) { ready, target, open ->
+        candidateIndex,
+    ) { ready, target, open, index ->
         val doc = ready.doc
         val time = StoryTimes.source(doc)
         val view = doc.app.view.script
+        val terms = TermMarksModel.Source(doc, index, open, candidatesOn = view.layers.termCandidates)
         ScriptContent(
             doc, target.unitKey,
-            ScriptRows.build(doc, target.unitKey, time, view.layers, view.preview, open, ready.readOnly, deps.clock.zone),
-            time, ready.readOnly,
+            ScriptRows.build(doc, target.unitKey, time, view.layers, LayersModel.effective(view.preview), open, ready.readOnly, deps.clock.zone, terms),
+            time, ready.readOnly, terms,
         )
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -131,7 +182,10 @@ class ScriptViewModel(
     var editRuns by mutableStateOf<List<TextRun>>(emptyList())
         private set
 
-    private data class PendingText(val blockKey: Key, val runs: List<TextRun>)
+    /** Typed runs not yet written: a block's text, or one option line's ([optionKey], SCR-09). */
+    private data class PendingText(val blockKey: Key, val optionKey: Key?, val runs: List<TextRun>) {
+        val mergeKey: String get() = if (optionKey == null) "type:$blockKey" else "type:$blockKey:$optionKey"
+    }
 
     private var pending: PendingText? = null
     private var committedRuns: List<TextRun>? = null
@@ -166,6 +220,37 @@ class ScriptViewModel(
     /** Row keys to bring into view (new blocks, caret moves after an operation). */
     val scrollTo: SharedFlow<String> = _scrollTo.asSharedFlow()
 
+    private val _sheetRequests = MutableSharedFlow<SheetKey>(extraBufferCapacity = 4)
+
+    /** Sheets an operation asks the screen to open (the cue sheet of a new direction block, SCR-08). */
+    val sheetRequests: SharedFlow<SheetKey> = _sheetRequests.asSharedFlow()
+
+    private val _panelTab = MutableStateFlow(PanelTab.TIME)
+
+    /** The panel's tab (SCR-31), remembered per project in `_app/view.json` (`[PROPOSED]`). */
+    val panelTab: StateFlow<PanelTab> = _panelTab.asStateFlow()
+
+    private val _panelRequest = MutableStateFlow(PanelRequest(PanelTab.TIME, null, visible = false))
+
+    /** The shown panel tab's content for the selected block, built off the main thread (SCR-31 … SCR-34). */
+    val panel: StateFlow<PanelContent?> = combine(
+        content.filterNotNull(),
+        _editor.map { it.selected }.distinctUntilChanged(),
+        _panelRequest,
+        unlocked,
+        deps.stores.recorder.state.map { it.library }.distinctUntilChanged(),
+    ) { c, selected, request, open, recorder ->
+        if (!request.visible) return@combine null
+        val recordsOpen = deps.unlock.state.value.recordsOpen
+        PanelBuild.of(
+            c.doc, request.tab, selected, request.headerScene, c.time, c.doc.app.view.script.layers, open, c.readOnly, deps.clock.zone,
+            today = deps.clock.today(),
+            recorderLine = { scene ->
+                TargetLines.line(recorder, c.doc, TargetRef(route.projectKey, RecorderTargetKind.UNIT, scene), recordsOpen)
+            },
+        )
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     private val ops = Channel<suspend () -> Unit>(Channel.UNLIMITED)
     private var busy = false
 
@@ -191,12 +276,25 @@ class ScriptViewModel(
                 if (!busy) reconcile(d)
             }
         }
+        viewModelScope.launch { content.filterNotNull().collect(::dropHiddenPosition) }
+
+    }
+
+    /**
+     * A layer or `대사만` can take the selected block (or the empty scene's line) out of the drawn
+     * rows: the caret leaves it and the selection goes, so no field edits a row that is not there.
+     * Rows lag the store, so only a block the rows' own document holds counts.
+     */
+    private fun dropHiddenPosition(c: ScriptContent) {
+        val next = EditorRules.dropHidden(_editor.value, c.doc, c.rows.mapTo(HashSet()) { it.key }) ?: return
+        flushPending()
+        _editor.value = next
     }
 
     // --- Reading ---
 
     /** The newest document (the store's, ahead of [doc] right after an update). */
-    private val latestDoc: ProjectDoc? get() = projectStore?.doc?.value ?: doc.value
+    internal val latestDoc: ProjectDoc? get() = projectStore?.doc?.value ?: doc.value
 
     val readOnly: Boolean get() = isReadOnly
 
@@ -206,21 +304,76 @@ class ScriptViewModel(
     /** Whose speaker the pill, the toolbar and the picker show and change. */
     fun speakerTarget(): SpeakerTarget? = latestDoc?.let { ScriptOps.speakerTarget(it, _editor.value) }
 
-    /** The `새 씬` sheet for the current position (SCR-49 routing). */
+    /**
+     * The `새 씬` sheet for the current position (SCR-49 routing): checked blocks in select mode, the
+     * caret's offset while typing. Typed text is written first. The screen follows an open
+     * `NewUnitSheet` ([followNewScene]). Null in read-only projects (the row is dimmed).
+     */
     fun newSceneSheet(headerScene: Key?): SheetKey? {
+        if (isReadOnly) return null
         val d = latestDoc ?: return null
         val unit = _target.value?.unitKey ?: return null
-        return ScriptOps.newSceneSheet(d, route.projectKey, _editor.value.selected, headerScene ?: _editor.value.virtualScene, unit)
+        val e = _editor.value
+        val select = selectFlow.value
+        val checked = if (select.active) content.value?.rows?.let { SelectRules.ordered(select, it) }.orEmpty() else emptyList()
+        val offset = if (e.caretBlock != null && e.caretOption == null) rawCaret else null
+        flushNow()
+        return ScriptOps.newSceneSheet(d, route.projectKey, e.selected, headerScene ?: e.virtualScene, unit, checked, offset)
     }
 
-    private fun actionCtx(): ActionContext = ActionContext(
+    /** The pending follow of a scene made by `다음 씬 만들기` / `앞에 새 씬` (SCR-49, [followNewScene]). */
+    internal var newSceneJob: Job? = null
+
+    internal fun actionCtx(): ActionContext = ActionContext(
         now = deps.clock.now(),
         zone = deps.clock.zone,
         device = deps.stores.deviceId.value,
         newKey = Keys::newKey,
     )
 
-    private fun ctx(): EditContext = EditContext(
+    /** For the per-feature op files (`ScriptRecordOps`, `ScriptSelectOps`, …): the editor state, scrolling, the deps. */
+    internal val editorFlow: MutableStateFlow<EditorState> get() = _editor
+    internal val featureDeps: FeatureDeps get() = deps
+    internal val unitKey: Key? get() = _target.value?.unitKey
+
+    internal fun requestScroll(rowKey: String) {
+        _scrollTo.tryEmit(rowKey)
+    }
+
+    /**
+     * The `변화 기록` sheet's draft (SCR-41). Its pickers stack over the sheet (only the top sheet is
+     * composed), so the draft lives here; it goes when the record is written or another block's sheet opens.
+     */
+    /** `블록 고르기` (SCR-36): active and the checked blocks (drawn blocks only). */
+    internal val selectFlow = MutableStateFlow(SelectState())
+    val select: StateFlow<SelectState> = selectFlow.asStateFlow()
+
+    /** The block clipboard of this project (SCR-40). */
+    val clipboard: StateFlow<ScriptClipboard.Entry?> =
+        ScriptClipboard.entry
+            .map { it?.takeIf { e -> e.projectKey == route.projectKey } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    init {
+        // Checked blocks that are gone or no longer drawn drop out after every rebuild (SCR-36).
+        viewModelScope.launch {
+            content.filterNotNull().collect { c ->
+                selectFlow.update { SelectRules.reconcile(it, SelectRules.drawnKeys(c.rows)) }
+            }
+        }
+    }
+
+    /** The pending `씬 메모` write (SCR-35, [editSceneMemo]). */
+    internal var memoJob: Job? = null
+    internal var pendingMemo: PendingMemo? = null
+
+    internal val changeDraft = MutableStateFlow<io.github.lenticualrstone.civilight.feature.script.change.ChangeDraft?>(null)
+
+    internal fun requestSheet(key: SheetKey) {
+        _sheetRequests.tryEmit(key)
+    }
+
+    internal fun ctx(): EditContext = EditContext(
         now = deps.clock.now(),
         zone = deps.clock.zone,
         device = deps.stores.deviceId.value,
@@ -230,10 +383,18 @@ class ScriptViewModel(
     // --- Opening and following the document ---
 
     private fun open(d: ProjectDoc) {
+        _panelTab.value = PanelTab.fromStored(d.app.view.script.panel.tab)
         val t = ScriptTarget.resolve(d, route.sceneKey, route.blockKey, route.caretAtEnd)
         _target.value = t
+        val empty = t.emptyScene
+        val writing = LayersModel.isEditable(d.app.view.script.preview)
+        if (empty != null) {
+            // SCR-01: an empty scene opens with the caret in its first line (the keyboard follows).
+            if (!isReadOnly && writing) enterVirtual(empty)
+            return
+        }
         val block = t.blockKey ?: return
-        if (t.caretOffset != null && !isReadOnly && t.caretOffset >= 0) {
+        if (t.caretOffset != null && !isReadOnly && writing && t.caretOffset >= 0) {
             startEditingIn(d, block, t.caretOffset, hint = null)
         } else {
             _editor.value = EditorRules.select(_editor.value, block)
@@ -247,20 +408,22 @@ class ScriptViewModel(
         if (after != before) _editor.value = after
         val key = after.caretBlock ?: return
         val block = d.index.block(key) ?: return
-        if (pending == null && block.runs != committedRuns) {
+        val option = after.caretOption
+        val runs = if (option != null) block.options.firstOrNull { it.key == option }?.runs ?: return else block.runs
+        if (pending == null && runs != committedRuns) {
             // Changed elsewhere (undo, another screen): the field follows the document.
-            editRuns = block.runs
-            committedRuns = block.runs
-            seedField(block.runs, rawCaret)
+            editRuns = runs
+            committedRuns = runs
+            seedField(runs, rawCaret)
         }
     }
 
-    private fun enqueue(op: suspend () -> Unit) {
+    internal fun enqueue(op: suspend () -> Unit) {
         ops.trySend(op)
     }
 
     /** Runs [op] inside one store update; null when nothing applies or the project is read-only. */
-    private suspend fun runOp(label: String, op: (ProjectDoc) -> ScriptOps.Outcome?): ScriptOps.Outcome? {
+    internal suspend fun runOp(label: String, op: (ProjectDoc) -> ScriptOps.Outcome?): ScriptOps.Outcome? {
         var outcome: ScriptOps.Outcome? = null
         val result = update(label) { d -> op(d)?.also { outcome = it }?.doc ?: d }
         return if (result == EditResult.APPLIED) outcome else null
@@ -270,6 +433,10 @@ class ScriptViewModel(
 
     /** A tap on a block: the caret goes there for a text block (SCR-14), else the block is selected. */
     fun tapBlock(blockKey: Key, isText: Boolean, rawOffset: Int?) {
+        if (!writing()) {
+            leavePreviewAt(blockKey)
+            return
+        }
         if (isReadOnly || !isText) {
             flushPending()
             _editor.update { EditorRules.select(it, blockKey) }
@@ -283,10 +450,34 @@ class ScriptViewModel(
         }
     }
 
+    /** A tap on an option line of a choice block (SCR-09): the caret goes to its end. */
+    fun tapOption(blockKey: Key, optionKey: Key) {
+        if (!writing()) {
+            leavePreviewAt(blockKey)
+            return
+        }
+        if (isReadOnly) {
+            flushPending()
+            _editor.update { EditorRules.select(it, blockKey) }
+            return
+        }
+        flushPending()
+        enqueue {
+            val d = latestDoc ?: return@enqueue
+            val block = d.index.block(blockKey)?.takeIf { d.manuscript.isLiveBlock(it.key) } ?: return@enqueue
+            val option = block.options.firstOrNull { it.key == optionKey } ?: return@enqueue
+            startEditingIn(d, blockKey, Runs.length(option.runs), hint = null, optionKey = optionKey)
+        }
+    }
+
     /** A tap on the virtual first line of an empty scene. */
     fun tapEmptyScene(sceneKey: Key) {
-        if (isReadOnly) return
+        if (isReadOnly || !writing()) return
         flushPending()
+        enterVirtual(sceneKey)
+    }
+
+    internal fun enterVirtual(sceneKey: Key) {
         editRuns = emptyList()
         committedRuns = null
         seedField(emptyList(), 0)
@@ -307,8 +498,10 @@ class ScriptViewModel(
      * lost focus because the caret already moved to another row (Enter, split, merge, the first
      * line of an empty scene) is ignored, so the new row keeps the caret.
      */
-    fun onFieldFocusLost(rowKey: String) {
-        if (_editor.value.caretRowKey == rowKey) done()
+    fun onFieldFocusLost(rowKey: String, optionKey: Key? = null) {
+        // Moving between option lines of one choice block swaps the field: not a focus loss.
+        val state = _editor.value
+        if (state.caretRowKey == rowKey && state.caretOption == optionKey) done()
     }
 
     /** A jump from the command field (SCR-68 `#043`): the block is selected, no caret. */
@@ -317,12 +510,25 @@ class ScriptViewModel(
         _editor.update { EditorRules.select(it, blockKey) }
     }
 
-    private fun startEditingIn(d: ProjectDoc, blockKey: Key, rawOffset: Int, hint: Key?) {
+    /** A row of the panel's `이 씬 안` (SCR-32 `[PROPOSED]`): the block is selected and scrolled to. */
+    fun selectAndShow(blockKey: Key) {
+        selectBlock(blockKey)
+        _scrollTo.tryEmit(ScriptRowKeys.block(blockKey))
+    }
+
+    /** The picker target of a dialogue block (the panel's `화자 · 바꾸기`). */
+    fun speakerTargetOf(blockKey: Key): SpeakerTarget? {
+        val block = latestDoc?.index?.block(blockKey) ?: return null
+        return SpeakerTarget(blockKey, block.speakerKey, block.sceneKey)
+    }
+
+    private fun startEditingIn(d: ProjectDoc, blockKey: Key, rawOffset: Int, hint: Key?, optionKey: Key? = null) {
         val block = d.index.block(blockKey) ?: return
-        editRuns = block.runs
-        committedRuns = block.runs
-        seedField(block.runs, rawOffset)
-        _editor.update { EditorRules.edit(it, blockKey).copy(inheritedHint = hint) }
+        val runs = if (optionKey != null) block.options.firstOrNull { it.key == optionKey }?.runs ?: return else block.runs
+        editRuns = runs
+        committedRuns = runs
+        seedField(runs, rawOffset)
+        _editor.update { EditorRules.edit(it, blockKey, optionKey).copy(inheritedHint = hint) }
     }
 
     private fun seedField(runs: List<TextRun>, rawCaret: Int) {
@@ -337,13 +543,22 @@ class ScriptViewModel(
         val state = _editor.value
         if (!state.editing || isReadOnly) return
         val oldRaw = editRuns.plainText
-        when (val change = FieldDiff.classify(oldRaw, value.text, value.selection.end, state.parenMode)) {
+        when (val change = FieldDiff.classify(oldRaw, value.text, value.selection.end, state.parenMode, parens = caretTakesParens())) {
             FieldChange.None -> {
                 val moved = FieldDiff.rawOffset(value.selection.end) != rawCaret
                 fieldValue = value.withCaretAfterSentinel()
                 if (moved && state.parenMode) _editor.update { it.copy(parenMode = false) }
             }
-            is FieldChange.Text -> applyText(change, value, state)
+            is FieldChange.Text -> {
+                val block = state.caretBlock
+                if (block != null && LinkFixes.opensPicker(change.inserted, change.start, change.end)) {
+                    // SCR-55: a typed `@` opens the link picker at the caret instead of being written.
+                    fieldValue = fieldValue
+                    _sheetRequests.tryEmit(LinkSheetKey(route.projectKey, block, change.start, state.caretOption))
+                } else {
+                    applyText(change, value, state)
+                }
+            }
             is FieldChange.Enter -> {
                 fieldValue = fieldValue
                 enter(change.at)
@@ -392,7 +607,7 @@ class ScriptViewModel(
             return
         }
         val key = state.selected ?: return
-        pending = PendingText(key, editRuns)
+        pending = PendingText(key, state.caretOption, editRuns)
         hasPending.value = true
         commitJob?.cancel()
         commitJob = viewModelScope.launch {
@@ -402,18 +617,25 @@ class ScriptViewModel(
     }
 
     /** Writes typed runs to the store (one undo step per block and pause). */
-    private suspend fun commitNow(label: String = ScriptCopy.UNDO_TYPING, merge: Boolean = true) {
+    internal suspend fun commitNow(label: String = ScriptCopy.UNDO_TYPING, merge: Boolean = true) {
         commitJob?.cancel()
         val p = pending ?: return
         pending = null
         hasPending.value = false
-        update(label, if (merge) "type:${p.blockKey}" else null) { d -> ScriptOps.setRuns(d, p.blockKey, p.runs, ctx()) }
-        if (_editor.value.selected == p.blockKey) committedRuns = p.runs
-        saveLastPosition(p.blockKey, if (_editor.value.selected == p.blockKey) rawCaret else Runs.length(p.runs))
+        val open = featureDeps.unlock.state.value.itemsOpen(route.projectKey)
+        update(label, if (merge) p.mergeKey else null) { d ->
+            val written = if (p.optionKey != null) ScriptOps.setOptionRuns(d, p.blockKey, p.optionKey, p.runs, ctx())
+            else ScriptOps.setRuns(d, p.blockKey, p.runs, ctx())
+            // WLD-22 (world lane's request): a `아님` the edit made stale goes in the same undo step.
+            TermMarksModel.releaseStale(written, p.blockKey, p.optionKey, open)
+        }
+        val here = _editor.value.let { it.selected == p.blockKey && it.caretOption == p.optionKey }
+        if (here) committedRuns = p.runs
+        saveLastPosition(p.blockKey, if (here && p.optionKey == null) rawCaret else Runs.length(p.runs))
     }
 
     /** Queues the typed text of the block being left. */
-    private fun flushPending() {
+    internal fun flushPending() {
         if (pending != null) enqueue { commitNow() }
     }
 
@@ -433,7 +655,7 @@ class ScriptViewModel(
         committedRuns = runs
         _editor.update { it.copy(selected = key, virtualScene = null, editing = true, pendingSpeaker = null, inheritedHint = null) }
         if (editRuns != runs) {
-            pending = PendingText(key, editRuns)
+            pending = PendingText(key, null, editRuns)
             hasPending.value = true
             enqueue { commitNow() }
         }
@@ -444,6 +666,11 @@ class ScriptViewModel(
         enqueue {
             commitNow()
             val key = _editor.value.caretBlock ?: return@enqueue
+            val option = _editor.value.caretOption
+            if (option != null) {
+                apply(runOp(ScriptCopy.UNDO_ADD_OPTION) { d -> ScriptOps.enterOption(d, key, option, at, ctx()) })
+                return@enqueue
+            }
             val atEnd = at >= Runs.length(editRuns)
             val label = if (atEnd) ScriptCopy.UNDO_ADD_BLOCK else ScriptCopy.UNDO_SPLIT
             apply(runOp(label) { d -> ScriptOps.enter(d, key, at, ctx()) })
@@ -454,6 +681,11 @@ class ScriptViewModel(
         enqueue {
             commitNow()
             val key = _editor.value.caretBlock ?: return@enqueue
+            val option = _editor.value.caretOption
+            if (option != null) {
+                apply(runOp(ScriptCopy.UNDO_DELETE) { d -> ScriptOps.backspaceOption(d, key, option, ctx()) })
+                return@enqueue
+            }
             val empty = editRuns.isEmpty()
             val label = if (empty) ScriptCopy.UNDO_DELETE else ScriptCopy.UNDO_MERGE
             apply(runOp(label) { d -> ScriptOps.backspaceAtStart(d, key, ctx()) })
@@ -461,14 +693,14 @@ class ScriptViewModel(
     }
 
     /** Moves the caret or selection after an operation and shows its toast. */
-    private fun apply(outcome: ScriptOps.Outcome?) {
+    internal fun apply(outcome: ScriptOps.Outcome?) {
         outcome ?: return
         outcome.created?.let { _entered.value = it }
         val caret = outcome.caret
         val select = outcome.select
         when {
-            caret != null -> {
-                startEditingIn(outcome.doc, caret.blockKey, caret.offset, hint = caret.blockKey.takeIf { outcome.inherited })
+            caret != null && !isReadOnly -> {
+                startEditingIn(outcome.doc, caret.blockKey, caret.offset, hint = caret.blockKey.takeIf { outcome.inherited }, optionKey = caret.optionKey)
                 _scrollTo.tryEmit("block:${caret.blockKey}")
             }
             select != null -> {
@@ -491,10 +723,56 @@ class ScriptViewModel(
             val d = latestDoc ?: return@enqueue
             val at = state.virtualScene?.let { InsertAt.SceneStart(it) } ?: ScriptOps.insertTarget(d, state.selected, headerScene) ?: return@enqueue
             val speaker = state.pendingSpeaker.takeIf { kind == BlockKind.DIALOGUE }
+            // SCR-26 `[PROPOSED]`: a block of a hidden kind turns its layer on; a new block is written in `쓰기`.
+            // Done before the insert, so no row snapshot holds the new block with its layer still off
+            // (that would make `dropHiddenPosition` take the selection off it).
+            updateApp { app ->
+                val script = app.view.script
+                app.copy(view = app.view.copy(script = script.copy(layers = Manuscript.layersAfterInsert(script.layers, kind), preview = ScriptPreview.WRITE)))
+            }
             val outcome = runOp(ScriptCopy.UNDO_ADD_BLOCK) { doc -> ScriptOps.insert(doc, at, kind, speaker, ctx()) } ?: return@enqueue
             if (speaker != null) _editor.update { it.copy(pendingSpeaker = null) }
-            updateApp { app -> app.withLayers(Manuscript.layersAfterInsert(app.view.script.layers, kind)) }
             apply(outcome)
+            // SCR-08: a new direction block has nothing to show until it has a cue.
+            if (kind == BlockKind.DIRECTION) outcome.select?.let { _sheetRequests.tryEmit(DirectionSheetKey(route.projectKey, it)) }
+        }
+    }
+
+    // --- Delete (SCR-38), kind (SCR-13), cues (SCR-08) ---
+
+    /** Deletes blocks without asking; the toast reports where records went (SCR-38). */
+    fun deleteBlocks(blockKeys: Collection<Key>) {
+        if (isReadOnly || blockKeys.isEmpty()) return
+        enqueue {
+            commitNow()
+            apply(runOp(ScriptCopy.UNDO_DELETE) { d -> ScriptOps.deleteBlocks(d, blockKeys, ctx()) })
+        }
+    }
+
+    /** `종류 바꾸기` (SCR-13): converts the block in place; it stays selected. */
+    fun changeKind(blockKey: Key, kind: BlockKind) {
+        if (isReadOnly) return
+        enqueue {
+            commitNow()
+            apply(runOp(ScriptCopy.UNDO_KIND) { d -> ScriptOps.changeKind(d, blockKey, kind, ctx()) })
+        }
+    }
+
+    /** `+ 연출` (SCR-08): a cue of [kind] with an asset, or a screen effect. */
+    fun addCue(blockKey: Key, kind: CueKind, assetKey: Key?, effect: String?) = cueOp { d -> ScriptOps.addCue(d, blockKey, kind, assetKey, effect, ctx()) }
+
+    /** `바꾸기` of one cue (SCR-08). */
+    fun replaceCue(blockKey: Key, cueKey: Key, assetKey: Key?, effect: String?) =
+        cueOp { d -> ScriptOps.replaceCue(d, blockKey, cueKey, assetKey, effect, ctx()) }
+
+    /** `빼기` of one cue (SCR-08); the last one takes the empty block with it. */
+    fun removeCue(blockKey: Key, cueKey: Key) = cueOp { d -> ScriptOps.removeCue(d, blockKey, cueKey, ctx()) }
+
+    private fun cueOp(op: (ProjectDoc) -> ScriptOps.Outcome?) {
+        if (isReadOnly) return
+        enqueue {
+            commitNow()
+            apply(runOp(ScriptCopy.UNDO_CUE, op))
         }
     }
 
@@ -525,21 +803,30 @@ class ScriptViewModel(
         editRuns = runs
         seedField(runs, at + 1)
         commitJob?.cancel()
-        pending = PendingText(key, runs)
+        pending = PendingText(key, _editor.value.caretOption, runs)
         hasPending.value = true
         enqueue { commitNow(ScriptCopy.UNDO_LINE_BREAK, merge = false) }
     }
 
     /** Toolbar `( )` (SCR-16): typed text goes into a paren run at the caret. */
     fun openParen() {
-        if (_editor.value.editing) _editor.update { it.copy(parenMode = true) }
+        if (_editor.value.editing && caretTakesParens()) _editor.update { it.copy(parenMode = true) }
+    }
+
+    /**
+     * `괄호 지문` are written inside dialogue lines (SCR-07), and inside choice options, which can be
+     * spoken (SCR-09). Other kinds keep `(` and `)` as plain text (`ED`).
+     */
+    fun caretTakesParens(): Boolean {
+        val d = latestDoc ?: return false
+        return ScriptOps.takesParens(ScriptOps.currentKind(d, _editor.value))
     }
 
     /**
      * `@` picker result (SCR-16 → SCR-55): a link run holding the picked text at raw [rawOffset] of
      * [blockKey] (where the caret was when `@` was tapped); the caret goes after it.
      */
-    fun insertLink(blockKey: Key, rawOffset: Int, kind: PickKind, key: Key, text: String) {
+    fun insertLink(blockKey: Key, rawOffset: Int, kind: PickKind, key: Key, text: String, optionKey: Key? = null) {
         if (isReadOnly || text.isEmpty()) return
         val target = when (kind) {
             PickKind.CHARACTER -> LinkTargetKind.CHARACTER
@@ -548,7 +835,7 @@ class ScriptViewModel(
             else -> return
         }
         val link = TextRun.Link(Keys.newKey(), LinkTarget(target, key), text)
-        if (_editor.value.caretBlock == blockKey) {
+        if (_editor.value.caretBlock == blockKey && _editor.value.caretOption == optionKey) {
             insertRunAt(blockKey, rawOffset, link)
             return
         }
@@ -556,7 +843,8 @@ class ScriptViewModel(
             commitNow()
             val d = latestDoc ?: return@enqueue
             val block = d.index.block(blockKey)?.takeIf { d.manuscript.isLiveBlock(it.key) } ?: return@enqueue
-            startEditingIn(d, blockKey, rawOffset.coerceIn(0, Runs.length(block.runs)), hint = null)
+            val runs = if (optionKey != null) block.options.firstOrNull { it.key == optionKey }?.runs ?: return@enqueue else block.runs
+            startEditingIn(d, blockKey, rawOffset.coerceIn(0, Runs.length(runs)), hint = null, optionKey = optionKey)
             insertRunAt(blockKey, rawOffset, link)
         }
     }
@@ -630,10 +918,100 @@ class ScriptViewModel(
         deps.toasts.show(SceneText.lensToast(d, sceneKey), actionLabel = null)
     }
 
-    /** Writes pending text now (screen stops). */
-    fun flushNow() = flushPending()
+    // --- 표시 sheet (SCR-26 … SCR-28) ---
 
-    private fun showUndoToast(text: String) {
+    private fun writing(): Boolean = LayersModel.isEditable(latestDoc?.app?.view?.script?.preview ?: ScriptPreview.WRITE)
+
+    /** A layer switch of the `표시` sheet: view state only (no undo step, also in read-only projects). */
+    fun setLayer(row: LayerRow, on: Boolean) {
+        viewModelScope.launch {
+            updateApp { app -> app.copy(view = app.view.copy(script = app.view.script.copy(layers = LayersModel.set(app.view.script.layers, row, on)))) }
+        }
+    }
+
+    /** `쓰기 · 대사만` (SCR-27). Leaving `쓰기` ends typing; the block stays selected. */
+    fun setPreview(preview: ScriptPreview) {
+        if (preview == ScriptPreview.READ_ALOUD) return
+        if (!LayersModel.isEditable(preview)) {
+            flushPending()
+            _editor.update(EditorRules::stopEditing)
+        }
+        viewModelScope.launch {
+            updateApp { app -> app.copy(view = app.view.copy(script = app.view.script.copy(preview = preview))) }
+        }
+    }
+
+    /** A tap on a line in `대사만` (SCR-27 `[PROPOSED]`): back to `쓰기` with that block selected. */
+    fun leavePreviewAt(blockKey: Key) {
+        flushPending()
+        _editor.update { EditorRules.select(it, blockKey) }
+        viewModelScope.launch {
+            updateApp { app -> app.copy(view = app.view.copy(script = app.view.script.copy(preview = ScriptPreview.WRITE))) }
+            _scrollTo.tryEmit(ScriptRowKeys.block(blockKey))
+        }
+    }
+
+    // --- Panel (SCR-30 … SCR-34) ---
+
+    /** The screen's panel state: which tab is shown, the scene under the header, whether a panel is on screen. */
+    fun setPanelRequest(headerScene: Key?, visible: Boolean) {
+        _panelRequest.value = PanelRequest(_panelTab.value, headerScene, visible)
+    }
+
+    /** Switches the panel tab and remembers it for the project (SCR-31 `[PROPOSED]`). */
+    fun setPanelTab(tab: PanelTab) {
+        if (tab !in PanelTab.BUILT) return
+        _panelTab.value = tab
+        _panelRequest.update { it.copy(tab = tab) }
+        viewModelScope.launch {
+            updateApp { app ->
+                val script = app.view.script
+                app.copy(view = app.view.copy(script = script.copy(panel = script.panel.copy(tab = tab.stored))))
+            }
+        }
+    }
+
+    /** A swipe button (SCR-30): the block is selected (no caret) and the panel shows [tab]. */
+    fun openPanelAt(blockKey: Key, tab: PanelTab) {
+        selectBlock(blockKey)
+        setPanelTab(tab)
+        _scrollTo.tryEmit(ScriptRowKeys.block(blockKey))
+    }
+
+    /** `무대 위치` (SCR-25): one undo step. */
+    fun setStage(blockKey: Key, stage: StagePosition) {
+        if (isReadOnly) return
+        enqueue {
+            commitNow()
+            update(ScriptCopy.STAGE_FIELD) { d -> BlockOps.setStage(d, blockKey, stage, ctx()) }
+        }
+    }
+
+    /** `이대로 두기` on a deleted speaker's line (SCR-34, rule 20): one undo step, no toast. */
+    fun keepSpeaker(characterKey: Key, blockKey: Key) {
+        if (isReadOnly) return
+        enqueue {
+            commitNow()
+            update(ScriptCopy.UNDO_KEEP) { d -> SpeakerKeep.keep(d, characterKey, blockKey, actionCtx().trash) }
+        }
+    }
+
+    /** `보이스 ID` typed with the format `직접` (SCR-23): one undo step. */
+    fun setManualVoice(blockKey: Key, id: String) {
+        if (isReadOnly) return
+        enqueue {
+            commitNow()
+            update(ScriptCopy.VOICE_FIELD) { d -> VoiceIds.setManualId(d, blockKey, id, ctx()) }
+        }
+    }
+
+    /** Writes pending text and a typed `씬 메모` now (screen stops). */
+    fun flushNow() {
+        flushPending()
+        flushMemo()
+    }
+
+    internal fun showUndoToast(text: String) {
         val count = projectStore?.undoState?.value?.undoCount ?: return
         deps.toasts.show(text) {
             enqueue {
@@ -656,20 +1034,35 @@ class ScriptViewModel(
     override fun onCleared() {
         val p = pending
         val store = projectStore
+        val memo = pendingMemo
+        if (memo != null && store != null && !store.readOnly) {
+            val context = ctx()
+            deps.appScope.launch {
+                runCatching { store.update(ScriptCopy.MOD_MEMO, memo.mergeKey) { d -> SceneMemo.set(d, memo.sceneKey, memo.text, context) } }
+            }
+        }
         if (p != null && store != null && !store.readOnly) {
             val context = ctx()
             deps.appScope.launch {
-                runCatching { store.update(ScriptCopy.UNDO_TYPING, "type:${p.blockKey}") { d -> ScriptOps.setRuns(d, p.blockKey, p.runs, context) } }
+                runCatching {
+                    store.update(ScriptCopy.UNDO_TYPING, p.mergeKey) { d ->
+                        if (p.optionKey != null) ScriptOps.setOptionRuns(d, p.blockKey, p.optionKey, p.runs, context)
+                        else ScriptOps.setRuns(d, p.blockKey, p.runs, context)
+                    }
+                }
             }
         }
         super.onCleared()
     }
 
-    private fun ProjectAppState.withLayers(layers: io.github.lenticualrstone.civilight.model.script.ScriptLayers): ProjectAppState =
-        copy(view = view.copy(script = view.script.copy(layers = layers)))
-
     companion object {
         /** Pause after which typing is written (SCR-17 `[PROPOSED]` coalescing). */
         const val COMMIT_DELAY_MS = 500L
+
+        /** Candidate re-scan after the text stops changing (rule 21 §2, ~0.5 s). */
+        const val RESCAN_DELAY_MS = 500L
+
+        /** The index while the `용어 후보` layer is off. */
+        private val NO_CANDIDATES: CandidateIndex = CandidateIndex.pending()
     }
 }

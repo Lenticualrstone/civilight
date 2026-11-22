@@ -41,9 +41,10 @@ object FieldDiff {
     /**
      * Classifies a new field value. [oldRaw] is the raw text before; [newField] the field text after;
      * [newCaretField] the caret (selection end) after, in field offsets. The diff is anchored on the
-     * caret, so repeated letters (`아아` → `아아아`) are placed where they were typed.
+     * caret, so repeated letters (`아아` → `아아아`) are placed where they were typed. Without
+     * [parens] (blocks that hold no `괄호 지문`, SCR-07) `(` and `)` are plain text.
      */
-    fun classify(oldRaw: String, newField: String, newCaretField: Int, parenMode: Boolean): FieldChange {
+    fun classify(oldRaw: String, newField: String, newCaretField: Int, parenMode: Boolean, parens: Boolean = true): FieldChange {
         val sentinelKept = newField.startsWith(SENTINEL)
         val newRaw = newField.replace(SENTINEL.toString(), "")
         if (!sentinelKept && newRaw == oldRaw) return FieldChange.BackspaceAtStart
@@ -61,8 +62,8 @@ object FieldDiff {
         if (start == end) {
             when (inserted) {
                 "\n" -> return FieldChange.Enter(start)
-                "(" -> if (!parenMode) return FieldChange.OpenParen(start)
-                ")" -> if (parenMode) return FieldChange.CloseParen(start)
+                "(" -> if (parens && !parenMode) return FieldChange.OpenParen(start)
+                ")" -> if (parens && parenMode) return FieldChange.CloseParen(start)
             }
         }
         return FieldChange.Text(start, end, inserted)

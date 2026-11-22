@@ -6,6 +6,7 @@ import io.github.lenticualrstone.civilight.navigation.NavResults
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.shell.Startup
 import io.github.lenticualrstone.civilight.store.StoreContainer
+import io.github.lenticualrstone.civilight.ui.feature.StartupHooks
 import io.github.lenticualrstone.civilight.ui.project.ProjectSessions
 import io.github.lenticualrstone.civilight.ui.scaffold.ToastController
 import io.github.lenticualrstone.civilight.ui.security.UnlockController
@@ -43,6 +44,9 @@ class ServiceLocator(context: Context) {
     val toasts = ToastController(appScope)
 
     val results = NavResults()
+
+    /** Features' one-time start-up hooks (LRC-09); run once per process by the shell. */
+    val startup = StartupHooks()
 
     private val _start = MutableStateFlow<List<Route>?>(null)
 

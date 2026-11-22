@@ -38,6 +38,8 @@ data class ProjectViewFile(
     val mapViewports: Map<Key, Viewport> = emptyMap(),
     /** Remembered world tab. */
     val worldTab: String? = null,
+    /** The canvas opened most recently (CNV-02 opens it); null = none yet or it is gone. Not written when null. */
+    val lastCanvasKey: Key? = null,
 )
 
 @Serializable

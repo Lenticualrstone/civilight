@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 홈 화면 위젯 (LRC-02) and the same widget on a launcher cover screen (LRC-04): static, no project names. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/recorder_widget"
+    android:minWidth="180dp"
+    android:minHeight="64dp"
+    android:resizeMode="horizontal"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen|keyguard" />

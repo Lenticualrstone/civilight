@@ -26,7 +26,8 @@ data class NodeEditSheet(val projectKey: Key, val canvasKey: Key, val nodeKey: K
 
 /**
  * Rows of node edit, shared by the cover sheet and the inner popover: the memo text or 묶음 title
- * field, then the buttons — open the referenced item (ghost) and take the node off this canvas.
+ * field, then the buttons: `지문으로 보기` (hidden item while locked), `되살리기` · `이대로 두기` (deleted
+ * item, CNV-11), open the referenced item, and take the node off this canvas.
  */
 @Composable
 fun ColumnScope.NodeEditRows(
@@ -35,6 +36,9 @@ fun ColumnScope.NodeEditRows(
     onText: (String) -> Unit,
     onOpen: () -> Unit,
     onRemove: () -> Unit,
+    onRestore: () -> Unit = {},
+    onKeep: () -> Unit = {},
+    onUnlock: () -> Unit = {},
 ) {
     val colors = CivilightTheme.colors
     if (view.text != null) {
@@ -53,7 +57,13 @@ fun ColumnScope.NodeEditRows(
         )
     }
     if (view.readOnly) CivilightText(CanvasCopy.READ_ONLY, CivilightTheme.type.small, Modifier.padding(top = 10.dp), color = colors.ink3)
+    val variant = if (compact) ButtonVariant.COMPACT_GHOST else ButtonVariant.GHOST
     SheetActions {
+        view.unlockLabel?.let { CivilightButton(text = it, onClick = onUnlock, modifier = Modifier.weight(1f), variant = variant) }
+        if (!view.readOnly) {
+            view.restoreLabel?.let { CivilightButton(text = it, onClick = onRestore, modifier = Modifier.weight(1f), variant = variant) }
+            view.keepLabel?.let { CivilightButton(text = it, onClick = onKeep, modifier = Modifier.weight(1f), variant = variant) }
+        }
         view.openLabel?.let { label ->
             CivilightButton(
                 text = label,

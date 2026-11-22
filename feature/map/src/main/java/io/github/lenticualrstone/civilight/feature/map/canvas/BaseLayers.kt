@@ -24,13 +24,21 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.sp
+import io.github.lenticualrstone.civilight.designsystem.theme.ResolvedTheme
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.FixedColors
 import io.github.lenticualrstone.civilight.domain.world.gen.GenPoint
-import io.github.lenticualrstone.civilight.domain.world.gen.GeneratedWorld
 import io.github.lenticualrstone.civilight.domain.world.map.HexMaps
 import io.github.lenticualrstone.civilight.model.map.HexGrid
 import io.github.lenticualrstone.civilight.model.map.HexOrientation
@@ -164,50 +172,78 @@ private class TileCache(private val max: Int = 48) {
     }
 }
 
-// --- Generated bases (WLD-53 results; styles are WLD-57's) ---
+// --- Generated bases (WLD-53 results, WLD-57 styles, WLD-58 hex, WLD-59 polygons) ---
+
+/** The theme colours of a generated base. */
+@Composable
+fun rememberBasePalette(): BasePalette {
+    val c = CivilightTheme.colors
+    return remember(c) {
+        BasePalette(
+            dark = c.isDark,
+            art = FixedColors.mapArt(if (c.isDark) ResolvedTheme.DARK else ResolvedTheme.LIGHT).map { it.toArgb() },
+            bg = c.bg.toArgb(), tint = c.tint.toArgb(), ink = c.ink.toArgb(), ink2 = c.ink2.toArgb(), ink3 = c.ink3.toArgb(),
+        )
+    }
+}
+
+/** The picture under a generated base (null for hex grids, which are drawn cell by cell). */
+fun baseRaster(base: MapBase.Generated, palette: BasePalette): Raster? {
+    val world = base.world
+    val poly = base.poly
+    val hex = base.hex
+    return when {
+        hex != null && hex.cells.isNotEmpty() -> null
+        poly != null -> GenRaster.poly(poly, world, base.style, palette)
+        world != null -> GenRaster.world(world, base.style, palette)
+        else -> null
+    }
+}
+
+/** Lines over a generated base (coast, ridges, rivers, roads, `등고선`). */
+fun baseLines(base: MapBase.Generated, palette: BasePalette): List<BaseLine> {
+    val world = base.world ?: return emptyList()
+    val hex = base.hex != null && base.hex.cells.isNotEmpty()
+    val worldLines = base.poly == null
+    return GenRaster.lines(world, base.style, palette, base.contours, base.worldLines && worldLines, hex, base.worldRivers && worldLines, base.worldRoads && worldLines)
+}
 
 @Composable
 private fun GeneratedBase(base: MapBase.Generated, math: ViewportMath, viewport: Viewport, modifier: Modifier) {
-    val raster = remember(base.world) { base.world?.let(::terrainRaster) }
+    val palette = rememberBasePalette()
+    val raster by produceState<ImageBitmap?>(null, base, palette) {
+        value = withContext(Dispatchers.Default) {
+            baseRaster(base, palette)?.let { Bitmap.createBitmap(it.pixels, it.w, it.h, Bitmap.Config.ARGB_8888).asImageBitmap() }
+        }
+    }
+    val lines = remember(base, palette) { baseLines(base, palette) }
     val colors = CivilightTheme.colors
-    val river = FixedColors.terrain.getValue(io.github.lenticualrstone.civilight.designsystem.theme.Terrain.SEA)
+    val measurer = rememberTextMeasurer()
+    val coordStyle = CivilightTheme.type.number.merge(TextStyle(fontSize = 9.sp, color = colors.ink.copy(alpha = 0.7f)))
     Canvas(modifier) {
         val tl = math.toScreen(viewport, 0f, 0f)
         val w = math.contentW(viewport)
         val h = math.contentH(viewport)
         val hex = base.hex
+        val bmp = raster
         when {
-            hex != null && hex.cells.isNotEmpty() -> drawHexCells(hex, math, viewport)
-            raster != null -> drawImage(
-                raster,
+            hex != null && hex.cells.isNotEmpty() -> drawHexCells(hex, math, viewport, measurer, coordStyle)
+            bmp != null -> drawImage(
+                bmp,
                 dstOffset = IntOffset(tl.x.roundToInt(), tl.y.roundToInt()),
                 dstSize = IntSize(w.roundToInt().coerceAtLeast(1), h.roundToInt().coerceAtLeast(1)),
                 filterQuality = FilterQuality.Medium,
             )
             else -> drawRect(colors.tint, Offset(tl.x, tl.y), Size(w, h))
         }
-        val world = base.world ?: return@Canvas
-        if (hex == null || hex.cells.isEmpty()) {
-            world.coastline.forEach { drawGenLine(it, math, viewport, colors.ink3.copy(alpha = 0.6f), 1.dp.toPx(), closed = true) }
+        val dash = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx()))
+        for (l in lines) {
+            drawGenLine(l.points, math, viewport, Color(l.color), l.widthDp.dp.toPx(), l.closed, if (l.dashed) dash else null)
         }
-        world.rivers.forEach { drawGenLine(it, math, viewport, river, 1.5.dp.toPx(), closed = false) }
-        world.roads.forEach { drawGenLine(it, math, viewport, colors.ink2.copy(alpha = 0.55f), 1.dp.toPx(), closed = false) }
     }
 }
 
-/** One pixel per generator cell, coloured by terrain (`ter-*`); drawn scaled and smoothed. */
-private fun terrainRaster(world: GeneratedWorld): ImageBitmap {
-    val pixels = IntArray(world.w * world.h) { i ->
-        val c = FixedColors.terrain.getValue(MapColors.dsTerrain(world.terrain(i)))
-        argb(c)
-    }
-    return Bitmap.createBitmap(pixels, world.w, world.h, Bitmap.Config.ARGB_8888).asImageBitmap()
-}
-
-private fun argb(c: Color): Int =
-    ((c.alpha * 255).roundToInt() shl 24) or ((c.red * 255).roundToInt() shl 16) or ((c.green * 255).roundToInt() shl 8) or (c.blue * 255).roundToInt()
-
-private fun DrawScope.drawGenLine(points: List<GenPoint>, math: ViewportMath, viewport: Viewport, color: Color, width: Float, closed: Boolean) {
+private fun DrawScope.drawGenLine(points: List<GenPoint>, math: ViewportMath, viewport: Viewport, color: Color, width: Float, closed: Boolean, effect: PathEffect? = null) {
     if (points.size < 2) return
     val path = Path()
     points.forEachIndexed { i, p ->
@@ -215,14 +251,21 @@ private fun DrawScope.drawGenLine(points: List<GenPoint>, math: ViewportMath, vi
         if (i == 0) path.moveTo(s.x, s.y) else path.lineTo(s.x, s.y)
     }
     if (closed) path.close()
-    drawPath(path, color, style = Stroke(width, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    drawPath(path, color, style = Stroke(width, cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = effect))
 }
 
-private fun DrawScope.drawHexCells(grid: HexGrid, math: ViewportMath, viewport: Viewport) {
+/**
+ * Hex cells in the fixed `ter-*` colours, the automatic marks (`표식(산 · 숲)은 지형 따라 자동`:
+ * a peak for 산 · 봉우리, a hump for 언덕, a dot cluster for 숲) and the coordinates every
+ * `좌표 표시` cells (WLD-58).
+ */
+private fun DrawScope.drawHexCells(grid: HexGrid, math: ViewportMath, viewport: Viewport, measurer: TextMeasurer, coordStyle: TextStyle) {
     val (rx, ry) = MapBases.hexRadius(grid)
     val flat = grid.orientation.known == HexOrientation.FLAT
     val start = if (flat) 0.0 else Math.PI / 6
     val edge = Color.Black.copy(alpha = 0.18f)
+    val mark = Color.Black.copy(alpha = 0.35f)
+    val cellPx = math.contentW(viewport) * rx
     for (i in 0 until grid.rows * grid.cols) {
         val cell = HexMaps.cellOf(grid, i)
         val terrain = HexMaps.terrainAt(grid, i) ?: continue
@@ -236,5 +279,20 @@ private fun DrawScope.drawHexCells(grid: HexGrid, math: ViewportMath, viewport: 
         path.close()
         drawPath(path, FixedColors.terrain.getValue(MapColors.dsTerrain(terrain)))
         drawPath(path, edge, style = Stroke(0.75.dp.toPx()))
+        val sc = math.toScreen(viewport, c)
+        if (cellPx >= 10.dp.toPx()) {
+            HexMarks.of(terrain)?.let { glyph ->
+                val r = cellPx * 0.45f
+                glyph.forEach { stroke ->
+                    val p = Path()
+                    stroke.forEachIndexed { j, q -> val x = sc.x + q.x * r; val y = sc.y + q.y * r; if (j == 0) p.moveTo(x, y) else p.lineTo(x, y) }
+                    drawPath(p, mark, style = Stroke(1.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                }
+            }
+        }
+        if (HexMaps.showsLabel(grid, cell) && cellPx >= 14.dp.toPx()) {
+            val layout = measurer.measure(HexMaps.label(cell), coordStyle)
+            drawText(layout, topLeft = Offset(sc.x - layout.size.width / 2f, sc.y + cellPx * 0.35f - layout.size.height / 2f))
+        }
     }
 }

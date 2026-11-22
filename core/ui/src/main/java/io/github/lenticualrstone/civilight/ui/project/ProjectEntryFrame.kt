@@ -52,7 +52,8 @@ private sealed interface FrameLoad {
  * - keeps the window protected while its content is on screen (LIB-26, LIB-29) — set before the
  *   content is first drawn, since nothing is drawn until the store is open;
  * - shows the hidden-project lock (LIB-34 `RHLockMark`) instead of the content while the hidden
- *   group is locked; a cancelled authentication goes to 서재 with the group locked (L-05);
+ *   group is locked, unless the project is kept open (`UnlockController.keepOpen`, "지금은 열린 채");
+ *   a cancelled authentication goes to 서재 with the group locked (L-05);
  * - shows an error with `서재로` when the project cannot be opened (a restored stack may name a
  *   project that is gone).
  */
@@ -95,7 +96,7 @@ private fun ReadyFrame(store: ProjectStore, deps: FeatureDeps, content: @Composa
     val unlock by deps.unlock.state.collectAsState()
     val protections = doc.project.protections
     ProtectWindow(WindowProtection.forProject(protections))
-    if (protections.hidden && !unlock.hiddenGroupOpen) {
+    if (protections.hidden && !unlock.projectOpen(store.key)) {
         val scope = rememberCoroutineScope()
         fun ask(credentialOnly: Boolean) {
             scope.launch {

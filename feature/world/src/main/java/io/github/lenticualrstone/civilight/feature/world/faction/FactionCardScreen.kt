@@ -22,10 +22,13 @@ import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
 import io.github.lenticualrstone.civilight.feature.world.common.CardAccess
-import io.github.lenticualrstone.civilight.feature.world.common.CardArt
+import io.github.lenticualrstone.civilight.feature.world.common.CardImageSlot
+import io.github.lenticualrstone.civilight.feature.world.common.CardImages
+import io.github.lenticualrstone.civilight.feature.world.common.MergePickSheet
+import io.github.lenticualrstone.civilight.feature.world.common.SameNameLine
+import io.github.lenticualrstone.civilight.feature.world.common.WorldGoneCard
 import io.github.lenticualrstone.civilight.feature.world.common.CardHead
 import io.github.lenticualrstone.civilight.feature.world.common.FieldSection
-import io.github.lenticualrstone.civilight.feature.world.common.GoneCard
 import io.github.lenticualrstone.civilight.feature.world.common.ItemMenuSheet
 import io.github.lenticualrstone.civilight.feature.world.common.LensBanner
 import io.github.lenticualrstone.civilight.feature.world.common.lensBannerSlot
@@ -115,11 +118,22 @@ fun FactionCardScreen(route: FactionCardRoute, deps: FeatureDeps) {
                 if (card == null) return@LazyColumn
                 when (val access = card.access) {
                     is CardAccess.Locked -> item(key = "locked") { LockedCard(access.text, gate.unlock) }
-                    is CardAccess.Gone -> item(key = "gone") { GoneCard(access.text, access.dotted) }
+                    is CardAccess.Gone -> item(key = "gone") { WorldGoneCard(access, doc, vm, WorldKind.FACTION, route.factionKey, readOnly, gate) }
                     CardAccess.Open -> {
                         val head = card.head ?: return@LazyColumn
-                        item(key = "art") { CardArt(head.name, label = null) }
-                        item(key = "head") { CardHead(head) }
+                        item(key = "art") {
+                            doc?.let { d ->
+                                CardImageSlot(d, WorldKind.FACTION, route.factionKey, head.name, label = null, readOnly = readOnly) {
+                                    sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.FACTION, route.factionKey))
+                                }
+                            }
+                        }
+                        item(key = "head") {
+                            Column {
+                                CardHead(head)
+                                SameNameLine(doc, WorldKind.FACTION, route.factionKey, readOnly) { sheets.open(MergePickSheet(WorldKind.FACTION.name, route.factionKey)) }
+                            }
+                        }
                         item(key = "fields") {
                             Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
                                 FieldSection(

@@ -39,6 +39,8 @@ import io.github.lenticualrstone.civilight.feature.script.editor.LinkLook
 import io.github.lenticualrstone.civilight.feature.script.editor.RunLayout
 import io.github.lenticualrstone.civilight.feature.script.editor.SpanKind
 import io.github.lenticualrstone.civilight.feature.script.state.MarkModel
+import io.github.lenticualrstone.civilight.feature.script.state.OptionLine
+import io.github.lenticualrstone.civilight.feature.script.state.SlotModel
 import io.github.lenticualrstone.civilight.feature.script.state.SpeakerModel
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.script.BlockKind
@@ -46,13 +48,16 @@ import io.github.lenticualrstone.civilight.model.text.TextRun
 
 /**
  * Draws the raw field text (sentinel + raw) with parentheses around paren runs, the pending `()` of
- * paren mode, and link styling, mapping offsets through [layout]. Falls back to no transformation
- * when the field and the runs disagree for a frame.
+ * paren mode, and link styling, mapping offsets through [layout]. A [prefix] (the memo's `⌁ 작가
+ * 메모  `, SCR-11) is drawn before the text and cannot hold the caret, so the memo line reads the
+ * same while typing as while reading. Falls back to no transformation when the field and the runs
+ * disagree for a frame.
  */
 class RunsTransformation(
     private val layout: RunLayout,
     private val colors: CivilightColors,
     private val type: CivilightType,
+    private val prefix: String = "",
 ) : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val field = text.text
@@ -60,9 +65,14 @@ class RunsTransformation(
             return TransformedText(text, OffsetMapping.Identity)
         }
         val shown = buildAnnotated(layout)
+        val p = prefix.length
         val mapping = object : OffsetMapping {
-            override fun originalToTransformed(offset: Int): Int = if (offset <= 0) 0 else layout.toDisplay(offset - 1) + 1
-            override fun transformedToOriginal(offset: Int): Int = if (offset <= 0) 0 else layout.toRaw(offset - 1) + 1
+            override fun originalToTransformed(offset: Int): Int = if (offset <= 0) 0 else layout.toDisplay(offset - 1) + 1 + p
+            override fun transformedToOriginal(offset: Int): Int = when {
+                offset <= 0 -> 0
+                offset <= 1 + p -> 1
+                else -> layout.toRaw(offset - 1 - p) + 1
+            }
         }
         return TransformedText(shown, mapping)
     }
@@ -70,9 +80,11 @@ class RunsTransformation(
     private fun buildAnnotated(layout: RunLayout): AnnotatedString {
         val b = AnnotatedString.Builder()
         b.append(FieldDiff.SENTINEL)
+        b.append(prefix)
         b.append(layout.text)
+        val p = prefix.length
         layout.spans.forEach { span ->
-            b.addStyle(styleOf(span.kind), span.start + 1, span.end + 1)
+            b.addStyle(styleOf(span.kind), span.start + 1 + p, span.end + 1 + p)
         }
         return b.toAnnotatedString()
     }
@@ -87,8 +99,10 @@ class RunsTransformation(
 
 /**
  * The block with the caret (SCR-14): the selection look, the speaker line with `입력 중` (or `직전
- * 화자` until the first character), and the text field. The field is the source of truth while
- * typing; [onCaret] reports the caret line in root coordinates for the fixed writing line.
+ * 화자` until the first character) or the kind's [slot] line with the number (SCR-21), and the text
+ * field. A choice block draws its option lines with the field in the [caretOption] line (SCR-09);
+ * tapping another line moves the caret there. The field is the source of truth while typing;
+ * [onCaret] reports the caret line in root coordinates for the fixed writing line.
  */
 @Composable
 fun EditableBlock(
@@ -104,14 +118,25 @@ fun EditableBlock(
     inheritedHint: Boolean,
     focusRequester: FocusRequester,
     onValueChange: (TextFieldValue) -> Unit,
-    onFocusLost: () -> Unit,
+    /** The field lost focus; it passes the option line it was drawn in (null for block text). */
+    onFocusLost: (optionKey: Key?) -> Unit,
     onSpeaker: (() -> Unit)?,
     onCaret: (top: Float, bottom: Float, event: CaretEvent) -> Unit,
     modifier: Modifier = Modifier,
+    slot: SlotModel? = null,
+    options: List<OptionLine> = emptyList(),
+    caretOption: Key? = null,
+    onTapOption: (OptionLine) -> Unit = {},
+    /** `호칭 힌트` lines (SCR-29), drawn as in reading so the text does not move when typing starts. */
+    addressHints: List<String> = emptyList(),
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val (style, color) = blockTextStyle(kind)
+    val (blockStyle, blockColor) = blockTextStyle(kind)
+    val inOption = options.isNotEmpty()
+    val style = if (inOption) optionTextStyle() else blockStyle
+    val color = if (inOption) colors.ink else blockColor
+    val prefix = memoPrefix?.let { "$it  " }.orEmpty()
     val rawCaret = FieldDiff.rawOffset(value.selection.end)
     val layout = remember(runs, parenMode, rawCaret, linkLooks) {
         val touchesParen = parenMode && parenEndsOrContains(runs, rawCaret)
@@ -123,7 +148,7 @@ fun EditableBlock(
             linkLook = { linkLooks[it.linkKey] ?: LinkLook(SpanKind.LINK) },
         )
     }
-    val transformation = remember(layout, colors, type) { RunsTransformation(layout, colors, type) }
+    val transformation = remember(layout, colors, type, prefix) { RunsTransformation(layout, colors, type, prefix) }
     var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
     var hadFocus by remember { mutableStateOf(false) }
@@ -138,17 +163,7 @@ fun EditableBlock(
         onCaret(origin + rect.top, origin + rect.bottom, event)
     }
 
-    BlockFrame(selected = true, modifier = modifier) {
-        if (kind == BlockKind.DIALOGUE && speaker != null) {
-            ScriptSpeakerLine(
-                speaker, selected = true, number = number, marks = speakerMarks, typing = true,
-                extraLabel = if (inheritedHint) ScriptCopy.INHERITED_SPEAKER else ScriptCopy.TYPING,
-                onClick = onSpeaker,
-            )
-        } else if (kind == BlockKind.SYSTEM) {
-            SlotLine(ScriptCopy.SYSTEM_LABEL, ScriptCopy.SYSTEM_SUB, number)
-        }
-        if (memoPrefix != null) CivilightText(memoPrefix, type.dir, color = colors.ink3)
+    val field: @Composable () -> Unit = {
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -159,7 +174,7 @@ fun EditableBlock(
                     if (state.isFocused) hadFocus = true
                     else if (hadFocus) {
                         hadFocus = false
-                        onFocusLost()
+                        onFocusLost(caretOption.takeIf { inOption })
                     }
                 }
                 .onGloballyPositioned {
@@ -175,6 +190,30 @@ fun EditableBlock(
                 reportCaret(CaretEvent.EDIT)
             },
         )
+    }
+
+    BlockFrame(selected = true, modifier = modifier) {
+        AddressHints(addressHints)
+        if (kind == BlockKind.DIALOGUE && speaker != null) {
+            ScriptSpeakerLine(
+                speaker, selected = true, number = number, marks = speakerMarks, typing = true,
+                extraLabel = if (inheritedHint) ScriptCopy.INHERITED_SPEAKER else ScriptCopy.TYPING,
+                onClick = onSpeaker,
+            )
+        } else if (slot != null) {
+            SlotLine(slot)
+        }
+        if (inOption) {
+            options.forEach { option ->
+                if (option.optionKey == caretOption) {
+                    OptionView(option, selected = true, onTap = null, text = field)
+                } else {
+                    OptionView(option, selected = true, onTap = { onTapOption(option) })
+                }
+            }
+        } else {
+            field()
+        }
     }
     LaunchedEffect(value.selection, value.text) { reportCaret(CaretEvent.EDIT) }
 }

@@ -56,11 +56,11 @@ object ScriptAssets {
     /** Assets no direction cue references. */
     fun unused(doc: ProjectDoc): List<ScriptAsset> = usage(doc).filter { it.unused }.map { it.asset }
 
-    /** `2분 41초`, `0.8초`, `12초`. */
+    /** `2분 41초`, `3분 05초` (seconds in two digits after minutes, board `Assets`), `0.8초`, `12초`. */
     fun duration(ms: Long): String {
         val totalSeconds = ms / 1000
         return when {
-            ms >= 60_000 -> "${totalSeconds / 60}분 ${totalSeconds % 60}초"
+            ms >= 60_000 -> "${totalSeconds / 60}분 ${(totalSeconds % 60).toString().padStart(2, '0')}초"
             ms % 1000 == 0L -> "${totalSeconds}초"
             else -> "%.1f초".format(java.util.Locale.US, ms / 1000.0)
         }

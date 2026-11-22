@@ -49,7 +49,10 @@ object EntryRoutes {
         else -> null
     }
 
-    /** The entry context of [route]. Never on the lock screen: the in-app route has no keyguard. */
+    /**
+     * The entry context of [route]. Only the lock-screen surface (`lock`, LRC-05) is on the lock
+     * screen; it never pre-fills a link (rule 23 §2 table).
+     */
     fun entryOf(route: Recording): EntryContext {
         val kind = targetKind(route.targetKind)
         val key = route.targetKey?.takeIf { kind != null }
@@ -57,6 +60,7 @@ object EntryRoutes {
         val named = surfaceNamed(route.surface)
         val surface = named ?: infer(projectKey, kind, route.caretBlockKey)
         return when {
+            surface == EntrySurface.LOCK_SCREEN -> EntryContext(surface = surface, onLockScreen = true)
             // No project: nothing to pre-fill, whatever the surface says.
             projectKey == null -> EntryContext(surface = if (surface.needsProject) EntrySurface.LIBRARY else surface)
             else -> EntryContext(

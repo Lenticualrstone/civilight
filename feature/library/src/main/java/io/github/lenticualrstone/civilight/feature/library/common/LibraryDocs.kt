@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.library.common
 
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Timestamp
+import io.github.lenticualrstone.civilight.model.app.LibraryEntry
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.store.library.LibraryState
 import io.github.lenticualrstone.civilight.store.library.LibraryStore
@@ -21,7 +22,12 @@ import kotlinx.coroutines.launch
  * open, else from disk), never opening a store, and read again only when the index row's
  * `updatedAt` moves. A document that cannot be read maps to null.
  */
-internal class LibraryDocs(private val library: LibraryStore, scope: CoroutineScope) {
+internal class LibraryDocs(
+    private val library: LibraryStore,
+    scope: CoroutineScope,
+    /** Which index rows to read: the live projects, or (휴지통) the trashed ones. */
+    private val select: (LibraryState) -> List<LibraryEntry> = { it.live },
+) {
     private data class Cached(val updatedAt: Timestamp, val doc: ProjectDoc?)
 
     private val cache = MutableStateFlow<Map<Key, Cached>>(emptyMap())
@@ -38,10 +44,12 @@ internal class LibraryDocs(private val library: LibraryStore, scope: CoroutineSc
 
     private suspend fun refresh(state: LibraryState) {
         if (!state.loaded) return
-        val live = state.live
-        val liveKeys = live.mapTo(HashSet()) { it.key }
-        cache.update { current -> current.filterKeys { it in liveKeys } }
-        for (entry in live) {
+        val rows = select(state)
+        val keys = rows.mapTo(HashSet()) { it.key }
+        cache.update { current -> current.filterKeys { it in keys } }
+        for (entry in rows) {
+            // A row that moves between live and trashed keeps its `updatedAt`; its key leaving the
+            // selection drops it above, so it is read again when it comes back.
             if (cache.value[entry.key]?.updatedAt == entry.updatedAt) continue
             val doc = try {
                 library.readDoc(entry.key)

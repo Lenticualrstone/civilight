@@ -115,4 +115,28 @@ class PickerModelsTest {
         val open = PickerModels.units(hiddenDoc, hiddenOpen = true).items.single { it.key == scene4 }
         assertEquals("1-7 씬 4 · 비밀", open.title)
     }
+
+    @Test
+    fun `event picker lists live events in timeline order with the scene of a story event`() {
+        val events = PickerModels.events(doc)
+        val keys = events.items.map { it.key }
+        assertTrue(ExampleKeys.EVENT_BLACKOUT in keys)
+        assertTrue(ExampleKeys.EVENT_JOINS_SOCIETY in keys)
+        assertTrue(events.items.all { it.kind == PickKind.EVENT })
+        assertEquals("1-3 씬 2", events.items.first { it.key == ExampleKeys.EVENT_JOINS_SOCIETY }.subtitle)
+        assertNull(events.items.first { it.key == ExampleKeys.EVENT_BLACKOUT }.subtitle)
+        val trashed = doc.copy(world = doc.world.copy(events = doc.world.events.map { if (it.key == ExampleKeys.EVENT_BLACKOUT) it.copy(deletedAt = 1L) else it }))
+        assertFalse(PickerModels.events(trashed).items.any { it.key == ExampleKeys.EVENT_BLACKOUT })
+        assertEquals(listOf(ExampleKeys.EVENT_BLACKOUT), PickerModels.events(doc, "대정").items.map { it.key })
+    }
+
+    @Test
+    fun `document link picker adds factions and equals the script picker for the script kinds`() {
+        assertEquals(PickerModels.links(doc, "", false), PickerModels.links(doc, "", false, PickerModels.SCRIPT_LINK_KINDS))
+        val document = PickerModels.links(doc, "", false, PickerModels.DOCUMENT_LINK_KINDS)
+        assertEquals(PickerCopy.KIND_FACTION, document.sections.last().title)
+        assertTrue(document.items.any { it.kind == PickKind.FACTION })
+        val onlyFactions = PickerModels.links(doc, "", false, setOf(PickKind.FACTION))
+        assertTrue(onlyFactions.items.all { it.kind == PickKind.FACTION })
+    }
 }

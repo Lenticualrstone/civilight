@@ -44,8 +44,24 @@ import io.github.lenticualrstone.civilight.feature.map.common.CardRow
 import io.github.lenticualrstone.civilight.feature.map.common.GlassCard
 import io.github.lenticualrstone.civilight.feature.map.common.TopBarTapGuard
 import io.github.lenticualrstone.civilight.feature.map.common.MapEnv
+import io.github.lenticualrstone.civilight.feature.map.common.MapNav
+import io.github.lenticualrstone.civilight.feature.map.export.rememberMapExporter
+import io.github.lenticualrstone.civilight.feature.map.scale.ScaleBars
+import io.github.lenticualrstone.civilight.domain.world.map.MapScales
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.FixedColors
+import io.github.lenticualrstone.civilight.designsystem.theme.ResolvedTheme
+import io.github.lenticualrstone.civilight.model.app.LargeMapExport
+import io.github.lenticualrstone.civilight.navigation.MapScale as MapScaleRoute
+import io.github.lenticualrstone.civilight.navigation.MapReveal as MapRevealRoute
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.platform.LocalDensity
 import io.github.lenticualrstone.civilight.feature.map.common.MapScreenViewModel
 import io.github.lenticualrstone.civilight.feature.map.common.mapBack
+import io.github.lenticualrstone.civilight.feature.map.common.MapStyleSheet
+import io.github.lenticualrstone.civilight.feature.map.common.rememberMapMenuHost
+import io.github.lenticualrstone.civilight.designsystem.component.LayerFlagChip
 import io.github.lenticualrstone.civilight.model.Point
 import io.github.lenticualrstone.civilight.navigation.LensSheet
 import io.github.lenticualrstone.civilight.navigation.PlaceCard
@@ -83,6 +99,12 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
     var movingTo by rememberSaveable(route.mapKey) { mutableStateOf<FloatArray?>(null) }
     var focused by rememberSaveable(route.mapKey) { mutableStateOf(route.focusPinKey == null) }
     val viewport = Viewport.fromArray(viewportArray)
+    var contentWidth by remember { mutableFloatStateOf(0f) }
+    val exporter = rememberMapExporter(deps)
+    val barPx = with(LocalDensity.current) { 96.dp.toPx() }
+    val colors = CivilightTheme.colors
+    val settings by deps.settings.collectAsState()
+    val menu = rememberMapMenuHost(route.projectKey, route.mapKey, deps, vm, sheets)
 
     val d = doc
     val ui = remember(d, hiddenOpen, layerFilter, selectedPin, movingPin, movingTo?.toList()) {
@@ -104,13 +126,38 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
         if (uri != null) scope.launch { vm.replaceBase(context.contentResolver, uri) }
     }
 
+    fun export(size: LargeMapExport) {
+        val state = ui ?: return
+        val map = d?.maps?.get(route.mapKey) ?: return
+        exporter.export(state.base, state.scene, map.name, size)
+    }
+
     CivilightScreen(
         title = ui?.title.orEmpty(),
         smallLine = ui?.small,
         back = mapBack(deps),
         lens = d?.let(::lensChipLabel),
         onLens = { sheets.open(LensSheet(route.projectKey)) },
+        actions = { CivilightIconButton(IconId.More, MapCopy.MORE, { sheets.open(MapMoreSheet) }) },
         sheets = sheets,
+        localSheets = { key ->
+            menu.content(key, d, readOnly) ?: if (key != MapMoreSheet) null else {
+                {
+                    val map = d?.maps?.get(route.mapKey)
+                    MapMoreContent(
+                        rows = map?.let { MapMenu.rows(it, MapMenuScreen.VIEW) }.orEmpty(),
+                        onRow = { action -> close(); menu.onRow(action, d) },
+                        canScale = map != null && !MapScales.isNodeMap(map),
+                        defaultSize = settings.largeMapExport,
+                        exporting = exporter.exporting,
+                        onScale = { close(); deps.navigator.push(MapScaleRoute(route.projectKey, route.mapKey)) },
+                        onReveal = { close(); deps.navigator.push(MapRevealRoute(route.projectKey, route.mapKey)) },
+                        onExport = { size -> close(); export(size) },
+                        onClose = ::close,
+                    )
+                }
+            }
+        },
     ) { padding ->
         val state = ui ?: return@CivilightScreen
         Box(Modifier.fillMaxSize()) {
@@ -119,6 +166,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                 scene = state.scene,
                 viewport = viewport,
                 onViewportChange = { viewportArray = it.toArray() },
+                onContentWidth = { contentWidth = it },
                 selectedKey = state.moving?.pinKey ?: state.place?.pinKey,
                 onTap = { p, hit ->
                     when {
@@ -135,7 +183,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
             ) {
                 if (state.crumbs.isNotEmpty()) {
                     Breadcrumb(state.crumbs.map { it.text }, onSegment = { i ->
-                        state.crumbs[i].mapKey?.let { deps.navigator.push(MapViewRoute(route.projectKey, it)) }
+                        state.crumbs[i].mapKey?.takeIf { it != route.mapKey }?.let { MapNav.crumb(deps.navigator, d, route.projectKey, it) }
                     })
                 }
                 Spacer(Modifier.weight(1f))
@@ -159,14 +207,16 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                     onClose = { selectedPin = null },
                     onMove = { movingPin = place.pinKey; movingTo = null },
                     onOpenCard = { deps.navigator.push(PlaceCard(route.projectKey, place.placeKey)) },
-                    onChildMap = { deps.navigator.push(MapViewRoute(route.projectKey, it)) },
+                    onChildMap = { MapNav.open(deps.navigator, d, route.projectKey, it) },
                     modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth(),
                 )
                 else -> BottomTools(
                     state = state, readOnly = readOnly,
+                    scale = d?.maps?.get(route.mapKey)?.let { ScaleBars.label(d, it, contentWidth, barPx) } ?: state.scale,
                     onChip = { layerFilter = it },
                     onReplaceBase = { replaceBase.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     onEdit = { deps.navigator.push(MapEditRoute(route.projectKey, route.mapKey)) },
+                    onStyle = { sheets.open(MapStyleSheet) },
                     modifier = Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp),
                 )
             }
@@ -176,7 +226,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                     onClose = { selectedPin = null },
                     onMove = { movingPin = place.pinKey; movingTo = null },
                     onOpenCard = { deps.navigator.push(PlaceCard(route.projectKey, place.placeKey)) },
-                    onChildMap = { deps.navigator.push(MapViewRoute(route.projectKey, it)) },
+                    onChildMap = { MapNav.open(deps.navigator, d, route.projectKey, it) },
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 40.dp, end = 16.dp).width(270.dp),
                 )
             }
@@ -189,15 +239,18 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
 private fun BottomTools(
     state: MapViewUi,
     readOnly: Boolean,
+    scale: String?,
     onChip: (String?) -> Unit,
     onReplaceBase: () -> Unit,
     onEdit: () -> Unit,
+    onStyle: () -> Unit,
     modifier: Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        state.scale?.let { ScaleBar(it) }
+        scale?.let { ScaleBar(it) }
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             state.chips.forEach { chip -> FilterChip(chip.label, chip.selected, { onChip(chip.layerKey) }) }
+            state.styleChip?.let { LayerFlagChip(MapCopy.STYLE, it, onStyle) }
             if (state.canReplaceBase) FilterChip(MapCopy.BTN_REPLACE_BASE, false, onReplaceBase, enabled = !readOnly)
             FilterChip(MapCopy.BTN_EDIT, false, onEdit, enabled = !readOnly)
         }

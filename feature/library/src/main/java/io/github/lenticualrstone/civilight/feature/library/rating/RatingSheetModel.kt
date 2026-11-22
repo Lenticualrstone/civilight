@@ -37,8 +37,11 @@ object RatingSheetModel {
     /** A project the hidden group hides while it is locked: its sheet may not stay on screen. */
     fun lockedAway(protections: Protections, hiddenGroupOpen: Boolean): Boolean = protections.hidden && !hiddenGroupOpen
 
-    /** After `바꾸기`: applied or refused as read-only closes; a cancelled prompt keeps it open (LIB-24). */
-    fun closesAfter(outcome: ProtectionOutcome): Boolean = outcome != ProtectionOutcome.CANCELLED
+    /**
+     * After `바꾸기`: applied or refused as read-only closes; a cancelled prompt keeps it open (LIB-24),
+     * and so does a refusal for want of a device lock (nothing changed, §6 Q19).
+     */
+    fun closesAfter(outcome: ProtectionOutcome): Boolean = outcome != ProtectionOutcome.CANCELLED && outcome != ProtectionOutcome.NO_DEVICE_LOCK
 
     /** Closes a sheet at most once, whichever path (button, write, re-lock) gets there first. */
     class CloseOnce(private val onClose: () -> Unit) {

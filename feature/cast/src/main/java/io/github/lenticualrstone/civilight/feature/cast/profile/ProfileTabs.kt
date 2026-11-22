@@ -15,7 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.lenticualrstone.civilight.designsystem.component.AddChip
 import io.github.lenticualrstone.civilight.designsystem.component.Avatar
+import io.github.lenticualrstone.civilight.domain.cast.relation.RelationDrafts
 import io.github.lenticualrstone.civilight.designsystem.component.AvatarSize
 import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
@@ -36,6 +38,10 @@ import io.github.lenticualrstone.civilight.domain.cast.relation.DeletedPartnerRo
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationBlock
 import io.github.lenticualrstone.civilight.domain.cast.relation.StepStatus
 import io.github.lenticualrstone.civilight.domain.cast.voice.VoiceLineRow
+import io.github.lenticualrstone.civilight.domain.cast.voice.ArchiveRow
+import io.github.lenticualrstone.civilight.domain.cast.relation.AddressChip
+import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
+import androidx.compose.ui.semantics.Role
 import io.github.lenticualrstone.civilight.domain.cast.voice.VoiceLineState
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.model.Key
@@ -55,6 +61,32 @@ class RecordActions(
     val onAddField: () -> Unit,
     val onMap: () -> Unit,
     val onAddRelation: () -> Unit,
+    /** A partner block: the pair's relation sheet (CST-29). */
+    val onRelation: (partnerKey: Key) -> Unit,
+    /** `되살리기` on a deleted partner's dotted row (CST-43). */
+    val onRestorePartner: (partnerKey: Key) -> Unit,
+    /** `이대로 두기` on a deleted partner's dotted row (CST-41). */
+    val onKeepPartner: (partnerKey: Key, relationKey: Key) -> Unit,
+    /** The `말투` prose (CST-15). */
+    val onEditSpeech: () -> Unit = {},
+    /** A 호칭 chip: that relation's 호칭 slot (CST-15). */
+    val onAddress: (partnerKey: Key) -> Unit = {},
+    /** A voice line's sheet (CST-16). */
+    val onVoiceLine: (lineKey: Key) -> Unit = {},
+    /** The state label of a voice line: `쓰는 중 ↔ 녹음 대본 완료` (CST-16). */
+    val onToggleVoice: (lineKey: Key, label: String) -> Unit = { _, _ -> },
+    /** An archive document's editor; null = a new one (CST-17). */
+    val onArchive: (docKey: Key?) -> Unit = {},
+    /** `+ 호칭` on `말투`: partner picker, then that pair's 호칭 slot (CST-31). */
+    val onAddAddress: () -> Unit = {},
+    /** The `비밀` prose (CST-18). */
+    val onEditSecret: () -> Unit = {},
+    /** A deleted partner's dotted name: that item's check row (CST-42 bulk changes, CST-43). */
+    val onDeletedPartner: (partnerKey: Key) -> Unit = {},
+    /** `레코더 · 정리 안 됨 n ›`: the recorder inbox for this character (CST-49). */
+    val onRecorder: () -> Unit = {},
+    /** `합치기` on the `◇ 같은 이름` row (CST-46): the merge sheet's picker. */
+    val onSameNameMerge: () -> Unit = {},
 )
 
 /** A field row of the header table or the `항목` list with its planned row. */
@@ -78,10 +110,19 @@ fun FieldRowItem(doc: ProjectDoc, row: FieldRow, actions: RecordActions) {
 
 /** `개요` (CST-08): fixed rows and the `항목` list, `빈 항목 N · 보기 | + 항목`, then the `긴 글` sections. */
 @Composable
-fun OverviewTab(doc: ProjectDoc, state: ProfileState, showEmpty: Boolean, actions: RecordActions) {
+fun OverviewTab(doc: ProjectDoc, state: ProfileState, showEmpty: Boolean, actions: RecordActions, recorderLink: String? = null) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
+        // CST-46: `◇ 같은 이름 2 · 노아` with `합치기` (exact same name only).
+        state.sameName?.let { notice ->
+            ListRow(
+                notice,
+                compact = true,
+                divider = RowDivider.DASHED,
+                trailing = if (actions.editable) ({ TextAction(CastUiCopy.BTN_MERGE, actions.onSameNameMerge, color = colors.acc, style = type.label) }) else null,
+            )
+        }
         for (row in state.fixedRows) {
             RecordFieldRow(
                 label = row.label,
@@ -100,8 +141,15 @@ fun OverviewTab(doc: ProjectDoc, state: ProfileState, showEmpty: Boolean, action
             Spacer(Modifier.weight(1f))
             if (actions.editable) TextAction(state.overview.addLabel, actions.onAddField, color = colors.ink2, style = type.label)
         }
-        for (section in state.overview.sections) {
-            SectionLabel("${section.numeral} ${section.title}", Modifier.padding(top = 22.dp))
+        // CST-49: `레코더 · 정리 안 됨 1 ›` right of the first section header (or on its own line without one).
+        if (recorderLink != null && state.overview.sections.isEmpty()) {
+            Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End) {
+                TextAction(recorderLink, actions.onRecorder, color = colors.acc, style = type.small)
+            }
+        }
+        state.overview.sections.forEachIndexed { index, section ->
+            val link = recorderLink.takeIf { index == 0 }
+            SectionLabel("${section.numeral} ${section.title}", Modifier.padding(top = 22.dp), trailing = link, onTrailing = link?.let { actions.onRecorder })
             CivilightText(
                 section.body.docText,
                 type.body,
@@ -124,8 +172,17 @@ fun RelationsTab(state: ProfileState, actions: RecordActions) {
     Column(Modifier.fillMaxWidth().padding(top = 22.dp)) {
         SectionLabel(tab.header, trailing = tab.mapLink, onTrailing = actions.onMap, trailingAccent = false)
         Spacer(Modifier.padding(top = 6.dp))
-        for (block in tab.blocks) RelationBlockView(block)
-        for (row in tab.deletedRows) DeletedPartnerView(row)
+        for (block in tab.blocks) RelationBlockView(block, onClick = if (actions.editable) ({ actions.onRelation(block.partnerKey) }) else null)
+        for (row in tab.deletedRows) {
+            val relationKey = state.deletedPartnerRelations[row.partnerKey]
+            val fixes = actions.editable && relationKey != null && row.partnerKey !in state.keptPartners
+            DeletedPartnerView(
+                row,
+                onOpen = { actions.onDeletedPartner(row.partnerKey) },
+                onRestore = if (fixes) ({ actions.onRestorePartner(row.partnerKey) }) else null,
+                onKeep = if (fixes) ({ actions.onKeepPartner(row.partnerKey, relationKey) }) else null,
+            )
+        }
         tab.hiddenRow?.let { text ->
             ListRow(text, compact = true, divider = RowDivider.DASHED)
         }
@@ -138,10 +195,16 @@ fun RelationsTab(state: ProfileState, actions: RecordActions) {
 }
 
 @Composable
-private fun RelationBlockView(block: RelationBlock) {
+private fun RelationBlockView(block: RelationBlock, onClick: (() -> Unit)?) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 14.dp)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .topHairline(colors.line)
+            .then(if (onClick != null) Modifier.pressable(onClick = onClick, scaleOnPress = false, onClickLabel = block.title) else Modifier)
+            .padding(vertical = 14.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Avatar(block.partnerName, size = AvatarSize.List)
             Column(Modifier.weight(1f)) {
@@ -169,15 +232,32 @@ private fun RelationBlockView(block: RelationBlock) {
     }
 }
 
-/** Dotted row of a partner in the trash: `노아 ◇ 지운 인물 · 관계 1` (CST-41; its fix buttons come with CST-43). */
+/**
+ * Dotted row of a partner in the trash: `노아 ◇ 지운 인물 · 관계 1` with `되살리기 · 이대로 두기`
+ * (CST-41, CST-43). After `이대로 두기` the dotted row stays without its buttons.
+ */
 @Composable
-private fun DeletedPartnerView(row: DeletedPartnerRow) {
+private fun DeletedPartnerView(row: DeletedPartnerRow, onOpen: () -> Unit, onRestore: (() -> Unit)?, onKeep: (() -> Unit)?) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    Column(Modifier.fillMaxWidth().topHairline(colors.line, dashed = true)) {
+        DeletedPartnerLine(row, Modifier.pressable(onClick = onOpen, scaleOnPress = false, onClickLabel = row.label))
+        if (onRestore != null || onKeep != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                onRestore?.let { TextAction(row.actions.getOrElse(0) { CastUiCopy.BTN_RESTORE }, it, color = colors.ink2, style = type.label) }
+                onKeep?.let { TextAction(row.actions.getOrElse(1) { CastUiCopy.BTN_KEEP }, it, color = colors.ink2, style = type.label) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeletedPartnerLine(row: DeletedPartnerRow, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
-            .topHairline(colors.line, dashed = true)
             .heightIn(min = 44.dp)
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -194,15 +274,16 @@ private fun DeletedPartnerView(row: DeletedPartnerRow) {
     }
 }
 
-/** A non-interactive tag (`Tag` style): 30 tall, radius 15, `edge` outline. */
+/** A tag (`Tag` style): 30 tall, radius 15, `edge` outline; tappable when [onClick] is set. */
 @Composable
-private fun TagLabel(text: String) {
+private fun TagLabel(text: String, onClick: (() -> Unit)? = null) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(15.dp)
     CivilightText(
         text,
         CivilightTheme.type.chip,
         Modifier
+            .then(if (onClick != null) Modifier.pressable(onClick = onClick, hitTarget = HitTarget.CHIP, shape = shape, onClickLabel = text) else Modifier)
             .heightIn(min = 30.dp)
             .insetOutline(colors.edge, 1.dp, shape)
             .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -211,29 +292,60 @@ private fun TagLabel(text: String) {
     )
 }
 
-/** `말투` (read-only until CST-15): the prose, then the 호칭 chips read from the relations. */
+/**
+ * `말투` (CST-15): the prose (tap to edit with the shared rich editor), then the 호칭 chips read from
+ * the relations at the lens; tapping a chip edits that relation's 호칭 slot.
+ */
 @Composable
-fun SpeechTab(body: String, chips: List<String>, hiddenRow: String?) {
+fun SpeechTab(body: String, chips: List<AddressChip>, hiddenRow: String?, actions: RecordActions) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(Modifier.fillMaxWidth().padding(top = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel(CastUiCopy.SPEECH)
-        if (body.isNotBlank()) CivilightText(body, type.body, color = colors.ink)
-        if (chips.isNotEmpty()) ChipFlow { chips.forEach { TagLabel(it) } }
+        val edit = if (actions.editable) Modifier.pressable(onClick = actions.onEditSpeech, scaleOnPress = false, onClickLabel = CastUiCopy.SPEECH) else Modifier
+        if (body.isNotBlank()) {
+            CivilightText(body, type.body, Modifier.fillMaxWidth().then(edit), color = colors.ink)
+        } else if (actions.editable) {
+            CivilightText(CastUiCopy.EMPTY_VALUE, type.body, Modifier.fillMaxWidth().heightIn(min = 44.dp).then(edit), color = colors.ink3)
+        }
+        if (chips.isNotEmpty() || actions.editable) {
+            ChipFlow {
+                chips.forEach { chip -> TagLabel(chip.label, if (actions.editable) ({ actions.onAddress(chip.partnerKey) }) else null) }
+                if (actions.editable) AddChip(RelationDrafts.ADDRESS, actions.onAddAddress)
+            }
+        }
         hiddenRow?.let { CivilightText(it, type.small, color = colors.ink3) }
     }
 }
 
-/** `게임 텍스트` (read-only until CST-16, CST-17): voice lines with progress, then archive documents. */
+/**
+ * `게임 텍스트` (`Voice`; CST-16, CST-17): `보이스 · 18 / 24` with the flat progress bar, voice lines
+ * in game order (tap a line to edit it, tap its state to switch `쓰는 중 ↔ 녹음 대본 완료`), then the
+ * archive documents (tap to open the editor; `+` adds one).
+ */
 @Composable
-fun GameTextTab(progressTitle: String, progress: Float, orderLabel: String, lines: List<VoiceLineRow>, archiveTitle: String, archive: List<Pair<String, String>>) {
+fun GameTextTab(
+    progressTitle: String,
+    progress: Float,
+    orderLabel: String,
+    lines: List<VoiceLineRow>,
+    archiveTitle: String,
+    archive: List<ArchiveRow>,
+    actions: RecordActions,
+) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(Modifier.fillMaxWidth().padding(top = 22.dp)) {
         SectionLabel(progressTitle, trailing = orderLabel, trailingAccent = false)
         ProgressBar(progress, Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp))
         for (line in lines) {
-            Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 12.dp)) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .topHairline(colors.line)
+                    .then(if (actions.editable) Modifier.pressable(onClick = { actions.onVoiceLine(line.key) }, scaleOnPress = false, onClickLabel = line.title) else Modifier)
+                    .padding(vertical = 12.dp),
+            ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     CivilightText(line.number, type.number.merge(TextStyle(fontSize = 11.sp)), color = colors.ink3)
                     CivilightText(line.title, type.label, Modifier.weight(1f), color = colors.ink, maxLines = 1)
@@ -242,22 +354,50 @@ fun GameTextTab(progressTitle: String, progress: Float, orderLabel: String, line
                         VoiceLineState.WRITING -> colors.acc
                         VoiceLineState.EMPTY -> colors.ink3
                     }
-                    CivilightText(line.state.label, type.small, color = stateColor, maxLines = 1)
+                    val toggles = actions.editable && line.state != VoiceLineState.EMPTY
+                    CivilightText(
+                        line.state.label,
+                        type.small,
+                        if (toggles) {
+                            Modifier.pressable(onClick = { actions.onToggleVoice(line.key, line.state.label) }, role = Role.Button, hitTarget = HitTarget.CHIP, scaleOnPress = false, onClickLabel = line.state.label)
+                        } else {
+                            Modifier
+                        },
+                        color = stateColor,
+                        maxLines = 1,
+                    )
                 }
                 CivilightText(line.text, type.body, Modifier.padding(top = 4.dp), color = if (line.state == VoiceLineState.EMPTY) colors.ink3 else colors.ink)
             }
         }
-        SectionLabel(archiveTitle, Modifier.padding(top = 22.dp, bottom = 6.dp))
-        for ((title, sub) in archive) ListRow(title, subtitle = sub, compact = true)
+        SectionLabel(
+            archiveTitle,
+            Modifier.padding(top = 22.dp, bottom = 6.dp),
+            trailing = if (actions.editable) CastUiCopy.ADD_MARK else null,
+            onTrailing = if (actions.editable) ({ actions.onArchive(null) }) else null,
+            trailingAccent = false,
+        )
+        for (row in archive) ListRow(row.title, subtitle = row.sub, compact = true, onClick = { actions.onArchive(row.key) })
     }
 }
 
-/** `비밀` (CST-18 fields shown here only; the prose is read-only until CST-18). */
+/**
+ * `비밀` (CST-18, S8 not drawn): the secret fields (shown only here; tap to edit, `◆` opens the
+ * history), then the prose under `비밀` (shared rich editor; `⌁` memo paragraphs kept). An empty body
+ * reads a tappable `비어 있음`, as on `말투`.
+ */
 @Composable
 fun SecretTab(doc: ProjectDoc, rows: List<FieldRow>, body: String, actions: RecordActions) {
     val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
     Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
         for (row in rows) FieldRowItem(doc, row, actions)
-        if (body.isNotBlank()) CivilightText(body, CivilightTheme.type.body, Modifier.padding(top = 18.dp), color = colors.ink)
+        SectionLabel(CastUiCopy.TABS[4], Modifier.padding(top = 22.dp, bottom = 10.dp))
+        val edit = if (actions.editable) Modifier.pressable(onClick = actions.onEditSecret, scaleOnPress = false, onClickLabel = CastUiCopy.TABS[4]) else Modifier
+        if (body.isNotBlank()) {
+            CivilightText(body, type.body, Modifier.fillMaxWidth().then(edit), color = colors.ink)
+        } else if (actions.editable) {
+            CivilightText(CastUiCopy.EMPTY_VALUE, type.body, Modifier.fillMaxWidth().heightIn(min = 44.dp).then(edit), color = colors.ink3)
+        }
     }
 }

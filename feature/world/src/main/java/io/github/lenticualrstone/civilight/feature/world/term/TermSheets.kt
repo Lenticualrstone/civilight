@@ -14,134 +14,135 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.CheckboxRow
-import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.LockRow
 import io.github.lenticualrstone.civilight.designsystem.component.SearchField
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
-import io.github.lenticualrstone.civilight.designsystem.component.SettingsRow
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
-import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
-import io.github.lenticualrstone.civilight.domain.world.term.RevealTarget
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
 import io.github.lenticualrstone.civilight.feature.world.common.RelatedOptions
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
-import io.github.lenticualrstone.civilight.ui.labels.UnitLabels
 import io.github.lenticualrstone.civilight.ui.picker.HiddenGate
 import io.github.lenticualrstone.civilight.ui.picker.PickerCopy
-import io.github.lenticualrstone.civilight.ui.picker.UnitPickerSheet
 import kotlinx.serialization.Serializable
-
-/** `공개 시점 옮기기` (WLD-18), opened from the `첫 공개` row. */
-@Serializable
-data class RevealSheet(val termKey: Key) : SheetKey
-
-/** `원고에서 고르기`, step 1: the scene (the script has no block-pick mode yet, see Requests). */
-@Serializable
-data class RevealScenePickSheet(val termKey: Key) : SheetKey
-
-/** `원고에서 고르기`, step 2: a block of [sceneKey]. */
-@Serializable
-data class RevealBlockPickSheet(val termKey: Key, val sceneKey: Key) : SheetKey
-
-/** `에피소드 · 장으로`: a chapter or episode point (`공개 예정 2-5`). */
-@Serializable
-data class RevealPointPickSheet(val termKey: Key) : SheetKey
+import androidx.compose.foundation.layout.Row
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightTextField
+import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
+import io.github.lenticualrstone.civilight.designsystem.component.ListRow
+import io.github.lenticualrstone.civilight.designsystem.component.RemovableChip
+import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import kotlinx.coroutines.launch
 
 /** `관련` (term fixed field): tick terms, places and factions. */
 @Serializable
 data class RelatedSheet(val termKey: Key) : SheetKey
 
-/** The term card's own sheets; null for other keys. [choose] applies a reveal and closes the sheets. */
+/** `별칭` (WLD-16): the list with per-alias remove and the field with `+`. */
+@Serializable
+data class AliasSheet(val termKey: Key) : SheetKey
+
+/** `⋯ › 아님으로 둔 것` (WLD-22): the term's `아님` records with `되돌리기`. */
+@Serializable
+data class RejectionsSheet(val termKey: Key) : SheetKey
+
+/** The term card's own sheets besides the reveal sheets ([revealSheet]); null for other keys. */
 fun termSheet(
     key: SheetKey,
     doc: ProjectDoc?,
     readOnly: Boolean,
     gate: HiddenGate,
-    choose: (RevealTarget) -> Unit,
-    toggleRelated: (io.github.lenticualrstone.civilight.model.world.ItemRef) -> Unit,
+    vm: TermCardViewModel,
 ): (@Composable SheetScope.() -> Unit)? {
     if (doc == null) return null
     return when (key) {
-        is RevealSheet -> { { RevealContent(key.termKey, doc, readOnly, gate, choose) } }
-        is RevealScenePickSheet -> {
-            {
-                val sheet = this
-                UnitPickerSheet(
-                    doc = doc,
-                    gate = gate,
-                    title = WorldCopy.REVEAL_FROM_SCRIPT,
-                    onPick = { sceneKey ->
-                        sheet.close()
-                        sheet.open(RevealBlockPickSheet(key.termKey, sceneKey))
-                    },
-                    onClose = ::close,
-                    levels = RevealOptions.sceneLevels(doc),
-                )
-            }
-        }
-        is RevealBlockPickSheet -> { { BlockPickContent(key, doc, readOnly, choose) } }
-        is RevealPointPickSheet -> {
-            {
-                val current = io.github.lenticualrstone.civilight.domain.world.term.TermReveals.record(doc, key.termKey)?.anchor
-                UnitPickerSheet(
-                    doc = doc,
-                    gate = gate,
-                    title = WorldCopy.REVEAL_TO_UNIT,
-                    onPick = { unitKey -> if (!readOnly) choose(RevealTarget.Unit(unitKey)) },
-                    onClose = ::close,
-                    selectedKey = (current as? io.github.lenticualrstone.civilight.model.change.Anchor.UnitStart)?.unitKey,
-                    levels = RevealOptions.pointLevels(doc),
-                )
-            }
-        }
-        is RelatedSheet -> { { RelatedContent(key.termKey, doc, readOnly, gate, toggleRelated) } }
+        is RelatedSheet -> { { RelatedContent(key.termKey, doc, readOnly, gate, vm::toggleRelated) } }
+        is AliasSheet -> { { AliasContent(key.termKey, doc, readOnly, vm) } }
+        is RejectionsSheet -> { { RejectionsContent(key.termKey, doc, readOnly, gate, vm) } }
         else -> null
     }
 }
 
 @Composable
-private fun SheetScope.RevealContent(termKey: Key, doc: ProjectDoc, readOnly: Boolean, gate: HiddenGate, choose: (RevealTarget) -> Unit) {
-    val links = remember(doc, gate.open) { RevealOptions.links(doc, termKey, gate.open) }
-    val sheet = this
-    SheetHeader(title = WorldCopy.REVEAL_TITLE, onClose = ::close)
+private fun SheetScope.AliasContent(termKey: Key, doc: ProjectDoc, readOnly: Boolean, vm: TermCardViewModel) {
+    val term = doc.index.term(termKey) ?: return
+    var field by rememberSaveable(termKey) { mutableStateOf("") }
+    var error by rememberSaveable(termKey) { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    SheetHeader(title = WorldCopy.ROW_ALIASES, onClose = ::close, subtitle = term.name)
     SheetScrollBody {
-        if (links.isNotEmpty()) {
-            SectionLabel(WorldCopy.REVEAL_LINKS, Modifier.padding(top = 16.dp, bottom = 4.dp))
-            links.forEach { option ->
-                ListRow(
-                    title = option.label,
-                    subtitle = option.refusal ?: if (readOnly) WorldCopy.READ_ONLY else null,
-                    onClick = if (option.refusal == null && !readOnly && !option.current) ({ choose(option.target) }) else null,
-                    selected = option.current,
-                    compact = true,
-                )
+        if (term.aliases.isNotEmpty()) {
+            ChipFlow(Modifier.padding(top = 12.dp)) {
+                term.aliases.forEach { alias ->
+                    if (readOnly) {
+                        FilterChip(label = alias, selected = false, onClick = {}, enabled = false)
+                    } else {
+                        RemovableChip(
+                            label = alias,
+                            onRemove = { scope.launch { error = vm.removeAlias(alias) } },
+                            removeLabel = WorldCopy.removeAlias(alias),
+                        )
+                    }
+                }
             }
         }
-        SettingsRow(
-            title = WorldCopy.REVEAL_FROM_SCRIPT,
-            onClick = { sheet.open(RevealScenePickSheet(termKey)) },
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        SettingsRow(title = WorldCopy.REVEAL_TO_UNIT, onClick = { sheet.open(RevealPointPickSheet(termKey)) })
+        if (!readOnly) {
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                CivilightTextField(
+                    value = field,
+                    onValueChange = { field = it; error = null },
+                    label = WorldCopy.ROW_ALIASES,
+                    error = error,
+                    modifier = Modifier.weight(1f),
+                )
+                CivilightIconButton(
+                    icon = IconId.Plus,
+                    contentDescription = WorldCopy.ROW_ALIASES,
+                    onClick = {
+                        scope.launch {
+                            val refused = vm.addAlias(field)
+                            error = refused
+                            if (refused == null) field = ""
+                        }
+                    },
+                    enabled = field.isNotBlank(),
+                )
+            }
+        } else {
+            CivilightText(WorldCopy.READ_ONLY, CivilightTheme.type.small, Modifier.padding(top = 12.dp), color = CivilightTheme.colors.ink3)
+        }
     }
 }
 
 @Composable
-private fun SheetScope.BlockPickContent(key: RevealBlockPickSheet, doc: ProjectDoc, readOnly: Boolean, choose: (RevealTarget) -> Unit) {
-    val options = remember(doc, key) { RevealOptions.blocks(doc, key.termKey, key.sceneKey) }
-    val scene = remember(doc, key) { UnitLabels(doc).reference(key.sceneKey) }
-    SheetHeader(title = WorldCopy.REVEAL_FROM_SCRIPT, onClose = ::close, subtitle = scene)
+private fun SheetScope.RejectionsContent(termKey: Key, doc: ProjectDoc, readOnly: Boolean, gate: HiddenGate, vm: TermCardViewModel) {
+    val rows = remember(doc, termKey, gate.open) { RejectionRows.build(doc, termKey, gate.open) }
+    SheetHeader(title = WorldCopy.MENU_REJECTIONS, onClose = ::close, subtitle = doc.index.term(termKey)?.name)
+    if (rows.isEmpty()) {
+        CivilightText(WorldCopy.TODO_COPY_WORLD_NO_REJECTIONS, CivilightTheme.type.small, Modifier.padding(top = 16.dp), color = CivilightTheme.colors.ink3)
+        return
+    }
     LazyColumn(Modifier.weight(1f, fill = false).padding(top = 8.dp)) {
-        items(options, key = { it.id }) { option ->
+        items(rows, key = { it.rejectionKey }) { row ->
             ListRow(
-                title = option.label,
-                subtitle = if (readOnly) WorldCopy.READ_ONLY else null,
-                onClick = if (!readOnly && !option.current) ({ choose(option.target) }) else null,
-                selected = option.current,
-                compact = true,
+                title = row.text,
+                subtitle = row.location,
+                trailing = {
+                    TextAction(
+                        WorldCopy.BTN_UNDO,
+                        onClick = { vm.restoreRejection(row.rejectionKey) },
+                        color = if (readOnly) CivilightTheme.colors.ink3 else CivilightTheme.colors.acc,
+                    )
+                },
             )
         }
     }

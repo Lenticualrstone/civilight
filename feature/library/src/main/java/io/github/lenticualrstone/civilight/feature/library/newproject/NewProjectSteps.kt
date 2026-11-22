@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -113,13 +115,14 @@ internal fun PreviewTree(lines: List<Pair<Int, String>>, modifier: Modifier = Mo
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val deepest = lines.maxOf { it.first }
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(colors.tint).padding(16.dp)) {
+    // Boards `NewStructure` / `NewWide`: box padding 14 · 16, each line 4 dp above and below, 18 dp per level.
+    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(colors.tint).padding(horizontal = 16.dp, vertical = 14.dp)) {
         lines.forEach { (depth, text) ->
             val style = type.lead.merge(TextStyle(fontSize = 15.sp, lineHeight = 22.sp, fontWeight = if (depth == 0) FontWeight.Bold else FontWeight.Normal))
             CivilightText(
                 text,
                 style,
-                Modifier.padding(start = (depth * 14).dp),
+                Modifier.padding(start = (depth * 18).dp, top = 4.dp, bottom = 4.dp),
                 color = if (depth == deepest && depth > 0) colors.ink2 else colors.ink,
             )
         }
@@ -132,8 +135,18 @@ internal fun ColumnScope.StructureStep(form: NewProjectForm, wide: Boolean, show
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     if (wide) {
-        CivilightTextField(value = form.name, onValueChange = {}, label = NewProjectCopy.NAME, enabled = false)
-        FieldCaption(NewProjectCopy.STRUCTURE_HOW)
+        // `NewWide`: the name from step 1, shown read-only (a plain filled box, not a dimmed field).
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FieldCaption(NewProjectCopy.NAME)
+            val shape = RoundedCornerShape(14.dp)
+            Box(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(shape).background(colors.tint).insetOutline(colors.line, 1.dp, shape).padding(horizontal = 14.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                CivilightText(form.name.trim(), type.field, color = colors.ink, maxLines = 1)
+            }
+        }
+        FieldCaption(NewProjectCopy.STRUCTURE_HOW, Modifier.padding(top = 4.dp))
     } else {
         CivilightText(NewProjectCopy.STRUCTURE_DESC, type.lead.merge(TextStyle(fontSize = 15.sp, lineHeight = 25.sp)), color = colors.ink2)
     }

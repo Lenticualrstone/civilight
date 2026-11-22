@@ -7,7 +7,10 @@ import io.github.lenticualrstone.civilight.domain.world.map.Routes
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Point
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.map.DrawnLineKind
+import io.github.lenticualrstone.civilight.model.map.LineOrigin
 import io.github.lenticualrstone.civilight.model.map.MapOverlay
+import io.github.lenticualrstone.civilight.model.map.StampKind
 import io.github.lenticualrstone.civilight.model.map.WorldMap
 import io.github.lenticualrstone.civilight.model.position.LensPoint
 
@@ -21,6 +24,12 @@ enum class SceneMode {
 
     /** 지도에서 고르기: as [VIEW]. */
     PICK,
+
+    /**
+     * 시점별 공개 (WLD-49): as [VIEW], but `숨은 것 흐리게` comes from the screen's switch, not only
+     * from the stored map setting.
+     */
+    REVEAL,
 }
 
 data class ScenePin(val key: Key, val placeKey: Key, val name: String, val at: Point, val dim: Boolean)
@@ -33,16 +42,25 @@ data class SceneLabel(val key: Key, val text: String, val at: Point, val curve: 
 
 data class SceneNode(val key: Key, val name: String, val sub: String?, val at: Point, val dim: Boolean)
 
-data class SceneLink(val key: Key, val a: Point, val b: Point, val label: String?, val dim: Boolean)
+/** A node connection; [aKey] and [bKey] are its two nodes. */
+data class SceneLink(val key: Key, val a: Point, val b: Point, val label: String?, val dim: Boolean, val aKey: Key = "", val bKey: Key = "")
+
+/** A stamp of a detailed-terrain map (WLD-60). */
+data class SceneStamp(val key: Key, val kind: StampKind, val at: Point, val size: Int, val rotation: Int, val dim: Boolean)
+
+/** A river or road of a detailed-terrain map (WLD-60); [edited] when the author drew or moved it. */
+data class SceneLine(val key: Key, val kind: DrawnLineKind, val points: List<Point>, val edited: Boolean)
 
 /** Everything drawn over a map's base, in 0–1 coordinates, in drawing order. */
 data class MapScene(
+    val lines: List<SceneLine> = emptyList(),
     val regions: List<SceneRegion> = emptyList(),
     val routes: List<SceneRoute> = emptyList(),
     val links: List<SceneLink> = emptyList(),
     val labels: List<SceneLabel> = emptyList(),
     val nodes: List<SceneNode> = emptyList(),
     val pins: List<ScenePin> = emptyList(),
+    val stamps: List<SceneStamp> = emptyList(),
 ) {
     fun pin(key: Key): ScenePin? = pins.firstOrNull { it.key == key }
 
@@ -63,8 +81,11 @@ object MapScenes {
         hiddenOpen: Boolean,
         mode: SceneMode,
         layerFilter: Key? = null,
+        /** `숨은 것 흐리게` in [SceneMode.REVEAL]; null = the map's stored setting. */
+        revealDim: Boolean? = null,
     ): MapScene {
         val reveal = MapReveal.at(doc, map, lens, hiddenOpen)
+        val dimHidden = if (mode == SceneMode.REVEAL) revealDim ?: map.revealViewDim else map.revealViewDim
         val byKey = reveal.items.associateBy { it.key }
 
         /** Null when the item is not drawn; else whether it is dimmed. */
@@ -74,14 +95,16 @@ object MapScenes {
             return when {
                 item.visible -> false
                 mode == SceneMode.EDIT -> true
-                map.revealViewDim -> true
+                dimHidden -> true
                 else -> null
             }
         }
 
         val pins = map.pins.mapNotNull { pin ->
             val dim = dimOf(pin.key, pin.layerKey) ?: return@mapNotNull null
-            val name = doc.index.place(pin.placeKey)?.name.orEmpty()
+            // A pin not yet revealed shows its point in the tag (`상층 관문 · 1-7`) outside the editor.
+            val name = byKey[pin.key]?.pendingTag?.takeIf { dim && mode != SceneMode.EDIT }
+                ?: doc.index.place(pin.placeKey)?.name.orEmpty()
             ScenePin(pin.key, pin.placeKey, name, Point(pin.x, pin.y), dim)
         }
         val regions = map.regions.mapNotNull { r ->
@@ -107,9 +130,20 @@ object MapScenes {
             val dim = dimOf(l.key, null) ?: return@mapNotNull null
             val a = nodeAt[l.aNodeKey] ?: return@mapNotNull null
             val b = nodeAt[l.bNodeKey] ?: return@mapNotNull null
-            SceneLink(l.key, a.at, b.at, l.label, dim || a.dim || b.dim)
+            SceneLink(l.key, a.at, b.at, l.label, dim || a.dim || b.dim, a.key, b.key)
         }
-        return MapScene(regions, routes, links, labels, nodes, pins)
+        val stamps = map.stamps.mapNotNull { st ->
+            val kind = st.kind.known ?: return@mapNotNull null
+            val dim = dimOf(st.key, st.layerKey) ?: return@mapNotNull null
+            SceneStamp(st.key, kind, Point(st.x, st.y), st.size, st.rotation, dim)
+        }
+        // Drawn lines are part of the terrain: no layer, no reveal point; only a layer filter hides them.
+        val lines = if (layerFilter != null) emptyList() else map.drawnLines.mapNotNull { l ->
+            val kind = l.kind.known ?: return@mapNotNull null
+            if (l.points.size < 2) return@mapNotNull null
+            SceneLine(l.key, kind, l.points, l.editedByAuthor || l.origin.known == LineOrigin.AUTHOR)
+        }
+        return MapScene(lines, regions, routes, links, labels, nodes, pins, stamps)
     }
 
     /** The overlay kind of a key on [map], or null. */

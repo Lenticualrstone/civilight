@@ -178,7 +178,7 @@ object Manuscript {
                 if (!isShown(b.kind.known, layers, preview)) continue
                 out += Row.BlockRow(
                     b, speakerLabel(doc, b, unlocked), blockText(doc, b, layers), Records.marksOn(doc, b.key, layers),
-                    if (layers.addressHint) addressHints(doc, b) else emptyList(),
+                    if (layers.addressHint) addressHints(doc, b, unlocked) else emptyList(),
                 )
             }
         }
@@ -191,12 +191,20 @@ object Manuscript {
      * How the speaker addresses the other characters of the scene (speakers and silent cast) at the
      * block, from the speaker's side of each relation: `리엔을 ‘꼬마’`.
      */
-    fun addressHints(doc: ProjectDoc, block: Block): List<String> {
+    fun addressHints(doc: ProjectDoc, block: Block): List<String> = addressHints(doc, block, unlocked = true)
+
+    /**
+     * As [addressHints], hiding what rule 19 hides while the hidden items are locked ([unlocked]
+     * false): no hints on a hidden speaker's line, and no hint naming a hidden character.
+     */
+    fun addressHints(doc: ProjectDoc, block: Block, unlocked: Boolean): List<String> {
         val speaker = block.speakerKey?.takeIf { block.kind.known == BlockKind.DIALOGUE } ?: return emptyList()
+        if (!unlocked && isHiddenCharacter(doc, speaker)) return emptyList()
         val scene = doc.index.unit(block.sceneKey) ?: return emptyList()
         val others = (doc.manuscript.liveBlocksOf(scene.key).mapNotNull { it.speakerKey } + scene.silentCast).distinct() - speaker
         val me = EntityRef(RelationEndKind.CHARACTER.open(), speaker)
         return others.mapNotNull { other ->
+            if (!unlocked && isHiddenCharacter(doc, other)) return@mapNotNull null
             val relation = doc.index.relationBetween(me, EntityRef(RelationEndKind.CHARACTER.open(), other)) ?: return@mapNotNull null
             if (!doc.liveness.isLive(relation)) return@mapNotNull null
             val slot = if (relation.endA.key == speaker) RelationSlotName.ADDRESS_A else RelationSlotName.ADDRESS_B
@@ -209,6 +217,9 @@ object Manuscript {
             value?.takeIf { it.isNotBlank() }?.let { "$name${objectParticle(name)} ‘$it’" }
         }
     }
+
+    private fun isHiddenCharacter(doc: ProjectDoc, key: Key): Boolean =
+        doc.index.character(key)?.hidden == true || doc.index.nameTag(key)?.hidden == true
 
     /** `을` after a final consonant, else `를` (Hangul syllables; others get `을`). */
     fun objectParticle(word: String): String {

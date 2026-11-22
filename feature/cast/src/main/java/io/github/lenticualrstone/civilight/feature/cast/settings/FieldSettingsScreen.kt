@@ -40,6 +40,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
+import io.github.lenticualrstone.civilight.designsystem.component.SwitchRow
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
@@ -75,6 +76,10 @@ class FieldSettingsViewModel(
         if (from == to) return
         act(CastUiCopy.REORDER) { doc, ctx -> FieldSettingsModel.move(doc, kind, defKey, from, to, ctx) }
     }
+
+    fun showInHeader(which: HeaderFixed, show: Boolean) {
+        act(which.label) { doc, ctx -> FieldSettingsModel.setShowInHeader(doc, which, show, ctx) }
+    }
 }
 
 /** `RCFields`: kind tabs, fixed fields, project fields with grip handles, `+ 항목`, the start bundle row. */
@@ -94,6 +99,12 @@ fun FieldSettingsScreen(route: FieldSettingsRoute, deps: FeatureDeps) {
             smallLine = screen.head,
             back = IconAction(CastUiCopy.BACK) { deps.navigator.pop() },
             sheets = sheets,
+            localSheets = { key ->
+                when (key) {
+                    is BundleSheet -> { { BundleSheetContent(key, ready.doc, ready.readOnly) { label, change -> vm.act(label) { d, ctx -> change(d, ctx) } } } }
+                    else -> null
+                }
+            },
         ) { padding ->
             Column(
                 Modifier
@@ -114,6 +125,17 @@ fun FieldSettingsScreen(route: FieldSettingsRoute, deps: FeatureDeps) {
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     color = CivilightTheme.colors.ink3,
                 )
+                if (kind == EntityKind.CHARACTER) {
+                    for (which in HeaderFixed.entries) {
+                        SwitchRow(
+                            which.label,
+                            FieldSettingsModel.showsInHeader(ready.doc, which),
+                            { vm.showInHeader(which, it) },
+                            subtitle = CastUiCopy.PLACE_HEADER,
+                            enabled = editable,
+                        )
+                    }
+                }
                 SectionLabel(screen.projectTitle, Modifier.padding(top = 20.dp, bottom = 6.dp), trailing = screen.reorderNote, trailingAccent = false)
                 ReorderableRows(
                     rows = screen.rows,
@@ -122,7 +144,14 @@ fun FieldSettingsScreen(route: FieldSettingsRoute, deps: FeatureDeps) {
                     onMove = { key, from, to -> vm.move(kind, key, from, to) },
                 )
                 if (editable) AddRow { sheets.open(AddFieldSheet(route.projectKey, kind)) }
-                ListRow(screen.bundleTitle, Modifier.padding(top = 4.dp), subtitle = screen.bundleSub, compact = true)
+                ListRow(
+                    screen.bundleTitle,
+                    Modifier.padding(top = 4.dp),
+                    subtitle = screen.bundleSub,
+                    compact = true,
+                    trailing = { CivilightText(screen.bundleAction, CivilightTheme.type.small, color = CivilightTheme.colors.ink2, maxLines = 1) },
+                    onClick = { sheets.open(BundleSheet(route.projectKey, kind)) },
+                )
             }
         }
     }

@@ -20,6 +20,7 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.app.LibraryEntry
 import io.github.lenticualrstone.civilight.model.app.OnboardingState
+import io.github.lenticualrstone.civilight.model.app.RecentItem
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.project.Protections
@@ -58,6 +59,14 @@ data class ShelfUi(
     val headerRelock: Boolean = false,
     val empty: EmptyLibrary? = null,
     val recorderSub: String = ShelfCopy.RECORDER_NO_RECORDS,
+    /** `목록 | 카드` (LIB-04): the card view is on. */
+    val showCards: Boolean = false,
+    /** Card view: `프로젝트 · N · 숨김 M`. */
+    val cardSectionLabel: String = "",
+    /** Card view: visible projects, then the open group's (the lock card is [lockedGroup]). */
+    val cards: List<ProjectCardUi> = emptyList(),
+    /** 최근 연 파일 (LIB-05), newest first, at most the wide count; the cover row shows 3. */
+    val recents: List<RecentCardUi> = emptyList(),
 ) {
     /**
      * Whether [projectKey]'s content may be drawn over the 서재 now: a visible row, or a row of the
@@ -66,6 +75,12 @@ data class ShelfUi(
      */
     fun shows(projectKey: Key): Boolean =
         rows.any { it.key == projectKey } || openGroup?.rows?.any { it.key == projectKey } == true
+
+    /**
+     * 여러 프로젝트 내보내기 (LIB-72): the projects the 서재 shows now, visible rows then the open
+     * group's; a hidden project leaves the list the moment its group locks.
+     */
+    val exportable: List<Key> get() = rows.map { it.key } + openGroup?.rows?.map { it.key }.orEmpty()
 }
 
 /** Builds [ShelfUi] from the stores' current values; pure, so the 서재 rules run on the JVM. */
@@ -96,6 +111,8 @@ object ShelfState {
         now: Timestamp,
         zone: ZoneId,
         loaded: Boolean = true,
+        showCards: Boolean = false,
+        recentItems: List<RecentItem> = emptyList(),
     ): ShelfUi {
         val live = projects.filter { it.entry.deletedAt == null }.sortedByDescending { it.entry.updatedAt }
         val byKey = live.associateBy { it.entry.key }
@@ -108,15 +125,24 @@ object ShelfState {
                 rows = hidden.map(::row),
             )
         }
+        val rows = listing.rows.map(::row)
+        val cards = if (!showCards) emptyList() else {
+            rows.map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = false) } +
+                openGroup?.rows.orEmpty().map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = true) }
+        }
         return ShelfUi(
             loaded = loaded,
             sectionLabel = listing.sectionLabel,
-            rows = listing.rows.map(::row),
+            rows = rows,
             lockedGroup = listing.lockedGroup,
             openGroup = openGroup,
             headerRelock = openGroup != null,
             empty = Onboarding.emptyLibrary(onboarding, live.map { it.entry }),
             recorderSub = recorderSub(recorder, live, access, zone),
+            showCards = showCards,
+            cardSectionLabel = listing.cardSectionLabel,
+            cards = cards,
+            recents = if (showCards) RecentsModel.cards(recentItems, live, now, zone, RecentsModel.WIDE_COUNT) else emptyList(),
         )
     }
 

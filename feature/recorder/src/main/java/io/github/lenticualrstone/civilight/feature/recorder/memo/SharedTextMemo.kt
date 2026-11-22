@@ -7,7 +7,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import io.github.lenticualrstone.civilight.feature.recorder.RecorderLinkPickerSheet
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureHubs
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureProtection
 import io.github.lenticualrstone.civilight.feature.recorder.capture.EntryRoutes
@@ -15,15 +14,20 @@ import io.github.lenticualrstone.civilight.feature.recorder.capture.memoActions
 import io.github.lenticualrstone.civilight.feature.recorder.link.LinkPickerContent
 import io.github.lenticualrstone.civilight.model.recorder.EntryContext
 import io.github.lenticualrstone.civilight.model.recorder.EntrySurface
+import io.github.lenticualrstone.civilight.navigation.RecorderLinkPickerSheet
+import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.TextMemoSheet
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
 import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
 
-/** The entry context of the shared `TextMemoSheet`: the project on screen (its link is pre-filled), or none. */
+/**
+ * The entry context of the shared `TextMemoSheet` (LRC-19): the card, scene or page named by
+ * `targetKind` / `targetKey` (same strings as `Recording`), else the project on screen, else none.
+ */
 fun entryOf(sheet: TextMemoSheet): EntryContext =
-    sheet.projectKey?.let { EntryContext(surface = EntrySurface.OTHER_IN_PROJECT, projectKey = it) }
-        ?: EntryContext(surface = EntrySurface.LIBRARY)
+    if (sheet.projectKey == null) EntryContext(surface = EntrySurface.LIBRARY)
+    else EntryRoutes.entryOf(Recording(projectKey = sheet.projectKey, targetKind = sheet.targetKind, targetKey = sheet.targetKey))
 
 /**
  * The shared text memo sheet (owner RECORDER, opened by other areas over their own screens). Same

@@ -91,7 +91,7 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
     val regionMode = regions ?: (d?.let { PickState.initialRegions(it, route.sceneKey) } ?: false)
     val picked = pickedKey?.let { k -> PlaceRefKind.entries.firstOrNull { it.name == pickedKind }?.let { PlaceRef(it, k) } }
     val ui = remember(d, hiddenOpen, activeMap, regionMode, pickedKind, pickedKey) {
-        if (d == null || activeMap == null) null else PickState.build(d, activeMap, MapScreenViewModel.lensOf(d), hiddenOpen, regionMode, picked, route.sceneKey)
+        if (d == null || activeMap == null) null else PickState.build(d, activeMap, MapScreenViewModel.lensOf(d), hiddenOpen, regionMode, picked, route.sceneKey, route.sceneCount)
     }
 
     CivilightScreen(

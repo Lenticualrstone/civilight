@@ -19,6 +19,15 @@ import io.github.lenticualrstone.civilight.model.recorder.RecordingSession
  */
 enum class CaptureStage { IDLE, MIC_REASON, MIC_OFF, RECORDING, PROCESSING, TYPING }
 
+/** A device unlock the capture screen must ask for before going on (LRC-05). */
+sealed interface UnlockRequest {
+    /** `잠금 화면에서 녹음` is off: unlock, then record. */
+    data class Start(val entry: EntryContext) : UnlockRequest
+
+    /** The link picker on the lock screen lists names: unlock, then open it. */
+    data class Picker(val picker: PickerRequest) : UnlockRequest
+}
+
 /** Which link list the open link picker edits. */
 enum class PickerTarget { SESSION, MEMO }
 
@@ -44,8 +53,13 @@ data class CaptureState(
     /** The memo turns into a recording once the mic permission is granted (LRC-16). */
     val voiceFromMemo: Boolean = false,
     val env: RecorderEnv = RecorderEnv(emptyList()),
+    /** A device unlock to ask for now (lock-screen capture, LRC-05). */
+    val unlock: UnlockRequest? = null,
+    /** The device was unlocked during this capture: the link picker no longer asks. */
+    val deviceUnlocked: Boolean = false,
 ) {
-    val active: Boolean get() = stage != CaptureStage.IDLE
+    /** A capture is open, or waits for the device unlock before starting. */
+    val active: Boolean get() = stage != CaptureStage.IDLE || unlock is UnlockRequest.Start
 }
 
 /** What `취소` did (LRC-07). */

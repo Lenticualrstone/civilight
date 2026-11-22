@@ -147,6 +147,16 @@ object FieldDrafts {
         return FieldValueEdits.normalized(payload?.let { FieldValue.of(it) })
     }
 
+    /**
+     * A `긴 글` saved from the shared rich editor (`@` links and paren runs kept): `알 수 없음` wins,
+     * an empty text is no value (empty is never stored).
+     */
+    fun richValue(draft: FieldDraft, rich: RichDoc): FieldValue? = when {
+        draft.unknown -> FieldValue.UNKNOWN
+        rich.isEmpty() -> null
+        else -> FieldValueEdits.normalized(FieldValue.of(FieldPayload.Rich(rich)))
+    }
+
     /** [isValid] plus whether anything differs from the value the sheet opened with. */
     fun check(def: FieldDef, draft: FieldDraft, initial: FieldDraft, monthCount: Int = 12): DraftCheck =
         DraftCheck(isValid(def, draft, monthCount), draft != initial)
