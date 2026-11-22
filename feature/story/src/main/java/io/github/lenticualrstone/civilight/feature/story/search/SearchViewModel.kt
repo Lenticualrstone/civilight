@@ -81,7 +81,7 @@ class SearchViewModel(
     val ui: StateFlow<SearchUi?> = combine(state, services.unlock, openChecks, inputs) { load, unlock, checks, (q, f, b) ->
         val ready = load as? ProjectLoad.Ready ?: return@combine null
         val context = SearchModel.context(ready.doc, b, itemsLocked(unlock), checks)
-        val result = if (q.isBlank()) null else ProjectSearch(ready.doc, context).search(q, f)
+        val result = if (!SearchModel.listsWithoutQuery(q, f)) null else ProjectSearch(ready.doc, context).search(q, f)
         SearchUi(q, f, result, context)
     }
         .flowOn(Dispatchers.Default)

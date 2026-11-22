@@ -1,23 +1,14 @@
 package io.github.lenticualrstone.civilight.ui.nav
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.metadata
-import androidx.navigation3.scene.Scene
-import androidx.navigation3.ui.NavDisplay
 import io.github.lenticualrstone.civilight.navigation.CastList
 import io.github.lenticualrstone.civilight.navigation.CharacterProfile
 import io.github.lenticualrstone.civilight.navigation.CheckCenter
 import io.github.lenticualrstone.civilight.navigation.EventDetail
 import io.github.lenticualrstone.civilight.navigation.FactionCard
+import io.github.lenticualrstone.civilight.model.app.PaneSplit
 import io.github.lenticualrstone.civilight.navigation.Library
-import io.github.lenticualrstone.civilight.navigation.OverlayRoute
 import io.github.lenticualrstone.civilight.navigation.PlaceCard
 import io.github.lenticualrstone.civilight.navigation.ProjectHome
 import io.github.lenticualrstone.civilight.navigation.RecorderInbox
@@ -30,27 +21,14 @@ import io.github.lenticualrstone.civilight.navigation.World
 
 /**
  * Metadata the shell adds to every entry, so scene strategies can see the route (a `NavEntry`'s key
- * is private).
+ * is private). Overlay routes need no transition of their own: they are Nav3 overlay scenes that fade
+ * themselves (`OverlaySceneStrategy`, motion audit S2).
  */
 object RouteMetadata {
     const val ROUTE = "civilight.route"
 
-    private const val OVERLAY_FADE_MS = 220
-
-    /** [ROUTE] plus, for overlay routes, a fade instead of the push slide. */
-    fun of(key: NavKey): Map<String, Any> {
-        val transitions = if (key is OverlayRoute) {
-            val fade: AnimatedContentTransitionScope<Scene<*>>.() -> ContentTransform =
-                { fadeIn(tween(OVERLAY_FADE_MS)) togetherWith fadeOut(tween(OVERLAY_FADE_MS)) }
-            metadata {
-                put(NavDisplay.TransitionKey, fade)
-                put(NavDisplay.PopTransitionKey, fade)
-            }
-        } else {
-            emptyMap()
-        }
-        return transitions + (ROUTE to key)
-    }
+    /** [ROUTE] for [key]. */
+    fun of(key: NavKey): Map<String, Any> = mapOf(ROUTE to key)
 }
 
 /** The route of an entry made by the shell. */
@@ -62,8 +40,19 @@ val NavEntry<*>.route: NavKey? get() = metadata[RouteMetadata.ROUTE] as? NavKey
  * Only these pairs share the screen; any other stack shows one screen.
  */
 object ListDetailPairs {
-    fun isList(key: NavKey?): Boolean =
-        key == Library || key is ProjectHome || key is CastList || key is World || key is Timeline || key is RecorderInbox || key is CheckCenter
+    fun isList(key: NavKey?): Boolean = moduleOf(key) != null
+
+    /** The CNV-47 ratio id (`PaneSplit.Modules`) of a list module, or null for any other route. */
+    fun moduleOf(list: NavKey?): String? = when {
+        list == Library -> PaneSplit.Modules.LIBRARY
+        list is ProjectHome -> PaneSplit.Modules.HOME
+        list is CastList -> PaneSplit.Modules.CAST
+        list is World -> PaneSplit.Modules.WORLD
+        list is Timeline -> PaneSplit.Modules.TIMELINE
+        list is RecorderInbox -> PaneSplit.Modules.RECORDER
+        list is CheckCenter -> PaneSplit.Modules.CHECKS
+        else -> null
+    }
 
     fun isPair(list: NavKey?, detail: NavKey?): Boolean = when (detail) {
         is ProjectHome -> list == Library

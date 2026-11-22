@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.script.change
 
+import io.github.lenticualrstone.civilight.feature.script.ui.AppearOnJoin
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -84,10 +87,15 @@ fun SheetScope.ChangeSheet(key: ChangeSheetKey, doc: ProjectDoc, draft: ChangeDr
                 onSelect = { i -> actions.edit { it.copy(segment = segments[i]) } },
             )
             val open: (SheetKey) -> Unit = { this@ChangeSheet.open(it) }
-            when (model.segment) {
-                ChangeSegment.RELATION -> model.relation?.let { RelationBody(key, it, draft, actions, open) }
-                ChangeSegment.FIELD -> model.field?.let { FieldBody(key, it, draft, actions, open) }
-                ChangeSegment.TERM -> model.term?.let { TermBody(key, it, open) }
+            // Motion audit P3: a segment's body crossfades with the segment, the sheet follows its height.
+            ContentSwap(model.segment, label = "changeSegment") { segment ->
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    when (segment) {
+                        ChangeSegment.RELATION -> model.relation?.let { RelationBody(key, it, draft, actions, open) }
+                        ChangeSegment.FIELD -> model.field?.let { FieldBody(key, it, draft, actions, open) }
+                        ChangeSegment.TERM -> model.term?.let { TermBody(key, it, open) }
+                    }
+                }
             }
             Column {
                 KeyValueLine(model.startRow.first, model.startRow.second)
@@ -117,16 +125,20 @@ private fun RelationBody(key: ChangeSheetKey, model: RelationSegment, draft: Cha
         CivilightText("·", type.small, color = colors.ink3)
         PersonChip(model.partner, set = draft.partnerKey != null) { open(ChangePickSheetKey(key.projectKey, key.blockKey, PickRole.PARTNER)) }
     }
-    if (draft.viewerKey == null || draft.partnerKey == null) return
-    CivilightText(ChangeCopy.CHANGE_ITEMS, type.small, color = colors.ink3)
-    ChipFlow {
-        model.slotChips.forEach { chip ->
-            FilterChip(chip.label, chip.selected, onClick = {
-                actions.edit { d -> d.copy(slots = if (chip.selected) d.slots - chip.slot else d.slots + chip.slot) }
-            })
+    // The items to change appear once both people are set.
+    if (draft.viewerKey != null && draft.partnerKey != null) AppearOnJoin {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            CivilightText(ChangeCopy.CHANGE_ITEMS, type.small, color = colors.ink3)
+            ChipFlow {
+                model.slotChips.forEach { chip ->
+                    FilterChip(chip.label, chip.selected, onClick = {
+                        actions.edit { d -> d.copy(slots = if (chip.selected) d.slots - chip.slot else d.slots + chip.slot) }
+                    })
+                }
+            }
+            model.sections.forEach { section -> SlotSectionView(section, actions) }
         }
     }
-    model.sections.forEach { section -> SlotSectionView(section, actions) }
 }
 
 @Composable
@@ -150,7 +162,7 @@ private fun SlotSectionView(section: SlotSection, actions: ChangeActions) {
             }
             section.addKind?.let { label -> AddChip(label.removePrefix("+ "), onClick = { adding = true }) }
         }
-        if (adding) {
+        if (adding) AppearOnJoin {
             var name by rememberSaveable(section.slot) { mutableStateOf("") }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CivilightTextField(value = name, onValueChange = { name = it }, modifier = Modifier.weight(1f), label = ChangeCopy.NEW_KIND_FIELD)
@@ -188,7 +200,7 @@ private fun FieldBody(key: ChangeSheetKey, model: FieldSegment, draft: ChangeDra
             }
         }
     }
-    if (model.textInput) {
+    if (model.textInput) AppearOnJoin {
         CivilightTextField(
             value = draft.fieldText,
             onValueChange = { text -> actions.edit { d -> d.copy(fieldText = text) } },

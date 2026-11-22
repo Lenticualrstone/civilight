@@ -104,7 +104,7 @@ fun SheetScope.FieldValueSheetContent(sheet: FieldValueEditSheet) {
                     RichTextEditor(
                         state = rich,
                         projectKey = sheet.projectKey,
-                        linkPickerTitle = CastUiCopy.TODO_COPY_CAST_LINK_PICKER_TITLE,
+                        linkPickerTitle = CastUiCopy.LINK_PICKER_TITLE,
                         openSheet = host::open,
                         modifier = Modifier.fillMaxWidth(),
                     )

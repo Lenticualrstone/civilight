@@ -9,6 +9,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.animation.animateContentSize
+import io.github.lenticualrstone.civilight.designsystem.component.SidePanelHost
+import io.github.lenticualrstone.civilight.designsystem.component.TabContent
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.feature.map.common.FoldSwitch
+import io.github.lenticualrstone.civilight.feature.map.common.MapBar
+import io.github.lenticualrstone.civilight.feature.map.common.MapBarSlot
+import io.github.lenticualrstone.civilight.feature.map.common.MapBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -170,41 +180,53 @@ fun PolygonRegionsScreen(route: PolygonRegionsRoute, deps: FeatureDeps) {
             TopBarTapGuard(padding.calculateTopPadding())
             u.assignChip?.let { MapValueChip(it, Modifier.align(Alignment.TopCenter).padding(top = padding.calculateTopPadding() + 12.dp)) }
             val tools = remember { PolyTool.entries.map { MapTool(it.label, it.icon) } }
+            val motion = CivilightTheme.motion
             val toolbar: @Composable (Modifier) -> Unit = { mod ->
-                Box(mod.horizontalScroll(rememberScrollState())) {
+                Box(mod.animateContentSize(motion.move(CivilightMotion.standard)).horizontalScroll(rememberScrollState())) {
                     MapToolbar(state.tool.ordinal, { set(PolyEditor.chooseTool(state, PolyTool.entries[it])) }, tools = tools, label = MapCopy.TOOLBAR)
                 }
             }
             val panel: @Composable ColumnScope.() -> Unit = {
                 SegmentedControl(listOf(MapCopy.TAB_PROVINCES, MapCopy.TAB_LAYERS), state.panelTab, { set(state.copy(panelTab = it)) })
-                if (state.panelTab == 1) LayersPanel(u.layers, readOnly, layerActions)
-                else ProvincePanel(u, readOnly, state, ::set, vm, onName = { sheets.open(ProvinceNameSheet(it)) }, onFaction = { sheets.open(ProvinceFactionSheet(it)) })
-            }
-            if (inner) {
-                Column(
-                    Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    u.splitBar?.let { (text, ok) -> SplitBar(text, ok, readOnly, Modifier.widthIn(max = 360.dp)) { split(vm, state, ::set) } }
-                    toolbar(Modifier)
+                TabContent(state.panelTab) { tab ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (tab == 1) LayersPanel(u.layers, readOnly, layerActions)
+                        else ProvincePanel(u, readOnly, state, ::set, vm, onName = { sheets.open(ProvinceNameSheet(it)) }, onFaction = { sheets.open(ProvinceFactionSheet(it)) })
+                    }
                 }
-                SidePanel(
-                    onClose = { set(PolyEditor.select(state, null)) },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
-                ) {
+            }
+            SidePanelHost(
+                inner,
+                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
+            ) {
+                SidePanel(onClose = { set(PolyEditor.select(state, null)) }) {
                     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp), content = panel)
                 }
-            } else {
-                Column(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    u.splitBar?.let { (text, ok) -> SplitBar(text, ok, readOnly, Modifier.fillMaxWidth()) { split(vm, state, ::set) } }
-                    GlassCard(Modifier.fillMaxWidth().heightIn(max = 340.dp)) {
-                        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp), content = panel)
+            }
+            FoldSwitch(inner) { isInner ->
+                val slot = u.splitBar?.let { MapBarSlot(MapBars.SPLIT, it) }
+                val splitBar: @Composable () -> Unit = {
+                    MapBar(slot, if (isInner) Modifier else Modifier.fillMaxWidth()) { _, (text, ok) ->
+                        SplitBar(text, ok, readOnly, (if (isInner) Modifier.widthIn(max = 360.dp) else Modifier.fillMaxWidth()).padding(bottom = 10.dp)) { split(vm, state, ::set) }
                     }
-                    toolbar(Modifier)
+                }
+                if (isInner) {
+                    Column(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp)) {
+                        splitBar()
+                        toolbar(Modifier)
+                    }
+                } else {
+                    Column(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        splitBar()
+                        GlassCard(Modifier.fillMaxWidth().heightIn(max = 340.dp)) {
+                            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp), content = panel)
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        toolbar(Modifier)
+                    }
                 }
             }
         }

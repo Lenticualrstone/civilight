@@ -14,9 +14,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import io.github.lenticualrstone.civilight.designsystem.component.FullScreenError
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberUnhide
+import io.github.lenticualrstone.civilight.designsystem.theme.unhide
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.navigation.Library
 import io.github.lenticualrstone.civilight.navigation.resetTo
@@ -78,15 +82,18 @@ fun ProjectEntryFrame(projectKey: Key, deps: FeatureDeps, content: @Composable (
             deps.projects.release(projectKey)
         }
     }
-    when (val l = load) {
-        FrameLoad.Loading -> Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
-        is FrameLoad.Failed -> FullScreenError(
-            icon = IconId.Warn,
-            title = PROJECT_OPEN_FAILED,
-            primaryLabel = LockCopy.TO_LIBRARY,
-            onPrimary = { deps.navigator.resetTo(Library) },
-        )
-        is FrameLoad.Ready -> ReadyFrame(l.store, deps, content)
+    // S9: loading → content → error crossfade (contentKey by kind, so a new store does not re-animate).
+    ContentSwap(load, contentKey = { it::class }, label = "projectFrame") { l ->
+        when (l) {
+            FrameLoad.Loading -> Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
+            is FrameLoad.Failed -> FullScreenError(
+                icon = IconId.Warn,
+                title = PROJECT_OPEN_FAILED,
+                primaryLabel = LockCopy.TO_LIBRARY,
+                onPrimary = { deps.navigator.resetTo(Library) },
+            )
+            is FrameLoad.Ready -> ReadyFrame(l.store, deps, content)
+        }
     }
 }
 
@@ -96,7 +103,11 @@ private fun ReadyFrame(store: ProjectStore, deps: FeatureDeps, content: @Composa
     val unlock by deps.unlock.state.collectAsState()
     val protections = doc.project.protections
     ProtectWindow(WindowProtection.forProject(protections))
-    if (protections.hidden && !unlock.projectOpen(store.key)) {
+    val locked = protections.hidden && !unlock.projectOpen(store.key)
+    // CNV-43: the lock shows at once; unlocking plays the unhide (blur 7 → 0, .55 → 1) on the content while
+    // the lock screen fades out over it. Locked content is never composed.
+    val unhide = rememberUnhide(revealed = !locked)
+    if (locked) {
         val scope = rememberCoroutineScope()
         fun ask(credentialOnly: Boolean) {
             scope.launch {
@@ -116,8 +127,20 @@ private fun ReadyFrame(store: ProjectStore, deps: FeatureDeps, content: @Composa
         )
         return
     }
-    CompositionLocalProvider(LocalProjectStore provides store) { content() }
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().unhide(unhide)) {
+            CompositionLocalProvider(LocalProjectStore provides store) { content() }
+        }
+        if (unhide.value < 1f && protections.hidden) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - unhide.value }) {
+                HiddenProjectLockScreen(onBiometric = {}, onPin = {}, onLibrary = {}, interactive = false)
+            }
+        }
+    }
 }
 
-/** No source gives copy for a project that cannot be opened (library spec rule: TODO copy, raised in shell.md). */
-const val PROJECT_OPEN_FAILED = "TODO_COPY_SHELL_PROJECT_OPEN_FAILED"
+/**
+ * A project that cannot be opened (a restored stack may name a project that is gone). No source gives this
+ * line; it follows the `… 열 수 없음` pattern of `RHRecoveryPw` (60 §5), raised in shell.md for review.
+ */
+const val PROJECT_OPEN_FAILED = "프로젝트 열 수 없음"

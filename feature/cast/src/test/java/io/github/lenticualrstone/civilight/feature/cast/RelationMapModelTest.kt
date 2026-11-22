@@ -175,4 +175,20 @@ class RelationMapModelTest {
         val back = deleted.change.revert(deleted.doc)
         assertNotNull(FactionRelations.of(back, K.FACTION_UPPER_GUARD).singleOrNull())
     }
+
+    @Test
+    fun `a node let go outside the layout area settles back in, one inside stays`() {
+        val inside = Pt(300f, 200f)
+        val kept = RelationMapModel.settled(inside)
+        assertEquals(inside.x, kept.x, 0.01f)
+        assertEquals(inside.y, kept.y, 0.01f)
+        val out = RelationMapModel.settled(Pt(-900f, 5000f))
+        val saved = RelationMapModel.normalized(out)
+        // The settled place saves at the edge of the area, and a second settle changes nothing.
+        assertEquals(0f, saved.x, 0.001f)
+        assertEquals(1f, saved.y, 0.001f)
+        val again = RelationMapModel.settled(out)
+        assertEquals(out.x, again.x, 0.01f)
+        assertEquals(out.y, again.y, 0.01f)
+    }
 }

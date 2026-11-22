@@ -60,7 +60,7 @@ fun ColumnScope.NodeNameContent(initialName: String, initialSub: String, editing
     SheetHeader(MapCopy.NODE, onClose = onClose)
     SheetScrollBody {
         CivilightTextField(name, { name = it }, Modifier.padding(top = 12.dp), label = MapCopy.NAME)
-        CivilightTextField(sub, { sub = it }, Modifier.padding(top = 10.dp), label = MapCopy.TODO_COPY_MAP_NODE_SUB)
+        CivilightTextField(sub, { sub = it }, Modifier.padding(top = 10.dp), label = MapCopy.NODE_SUB)
     }
     SheetActions {
         CivilightButton(if (editing) MapCopy.BTN_DONE else MapCopy.BTN_CREATE, { onDone(name, sub) }, Modifier.weight(1f), enabled = name.isNotBlank())

@@ -28,6 +28,10 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.feature.map.MapCopy
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapCanvas
 import io.github.lenticualrstone.civilight.feature.map.canvas.Viewport
+import io.github.lenticualrstone.civilight.feature.map.canvas.rememberViewportMover
+import io.github.lenticualrstone.civilight.feature.map.common.MapBar
+import io.github.lenticualrstone.civilight.feature.map.common.MapBarSlot
+import io.github.lenticualrstone.civilight.feature.map.common.MapBars
 import io.github.lenticualrstone.civilight.feature.map.common.GlassCard
 import io.github.lenticualrstone.civilight.feature.map.common.TopBarTapGuard
 import io.github.lenticualrstone.civilight.feature.map.common.MapEnv
@@ -83,6 +87,7 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
     var pickedKind by rememberSaveable { mutableStateOf<String?>(null) }
     var pickedKey by rememberSaveable { mutableStateOf<String?>(null) }
     var viewportArray by rememberSaveable { mutableStateOf(Viewport.UNSET.toArray()) }
+    val mover = rememberViewportMover({ Viewport.fromArray(viewportArray) }) { viewportArray = it.toArray() }
     var emptySpot by rememberSaveable { mutableStateOf<FloatArray?>(null) }
     val readOnly by vm.readOnly.collectAsState()
     val sheets = rememberSheetHost()
@@ -132,7 +137,7 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
                     base = state.base,
                     scene = state.scene,
                     viewport = Viewport.fromArray(viewportArray),
-                    onViewportChange = { viewportArray = it.toArray() },
+                    onViewportChange = { mover.cancel(); viewportArray = it.toArray() },
                     selectedKey = state.selectedKey,
                     showRouteChips = false,
                     onTap = { p, hit ->
@@ -160,7 +165,7 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
                         state?.maps?.forEach { chip ->
                             FilterChip(chip.name, chip.selected, {
                                 mapKey = chip.key
-                                viewportArray = Viewport.UNSET.toArray()
+                                mover.moveTo(Viewport())
                             })
                         }
                     }
@@ -172,25 +177,36 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
             val bar = state?.bar
             val ref = state?.picked
             val spot = emptySpot
-            if (ref == null && spot != null && state != null) {
-                GlassCard(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp).fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CivilightText(PlacePickerCopy.NEW_PLACE_ROW, CivilightTheme.type.label, Modifier.weight(1f), maxLines = 2)
-                        CivilightButton(MapCopy.NEW_PLACE, { sheets.open(NewPlaceSheet(spot[0], spot[1])) }, enabled = !readOnly)
-                    }
-                }
+            val slot = when {
+                bar != null && ref != null -> MapBarSlot(MapBars.PICK, PickBarUi.Pick(bar, ref))
+                ref == null && spot != null && state != null -> MapBarSlot(MapBars.PLACE, PickBarUi.NewPlace(spot[0], spot[1]))
+                else -> null
             }
-            if (bar != null && ref != null) {
-                GlassCard(Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp).fillMaxWidth()) {
+            MapBar(slot, Modifier.align(Alignment.BottomCenter).fillMaxWidth()) { _, b ->
+                GlassCard(Modifier.padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp).fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CivilightText(bar, CivilightTheme.type.label, Modifier.weight(1f), maxLines = 1)
-                        CivilightButton(MapCopy.BTN_PICK, {
-                            deps.results.send(route.requestKey, ref)
-                            deps.navigator.pop()
-                        })
+                        when (b) {
+                            is PickBarUi.NewPlace -> {
+                                CivilightText(PlacePickerCopy.NEW_PLACE_ROW, CivilightTheme.type.label, Modifier.weight(1f), maxLines = 2)
+                                CivilightButton(MapCopy.NEW_PLACE, { sheets.open(NewPlaceSheet(b.x, b.y)) }, enabled = !readOnly)
+                            }
+                            is PickBarUi.Pick -> {
+                                CivilightText(b.text, CivilightTheme.type.label, Modifier.weight(1f), maxLines = 1)
+                                CivilightButton(MapCopy.BTN_PICK, {
+                                    deps.results.send(route.requestKey, b.ref)
+                                    deps.navigator.pop()
+                                })
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/** What the bottom card of 지도에서 고르기 draws; the card that leaves keeps its own last content. */
+private sealed interface PickBarUi {
+    data class Pick(val text: String, val ref: PlaceRef) : PickBarUi
+    data class NewPlace(val x: Float, val y: Float) : PickBarUi
 }

@@ -72,6 +72,15 @@ object ItemTrash {
         return if (kind == EntityKind.CHARACTER) CharacterActions.impact(doc, key, recorder) else Impact.of(doc, itemId(kind, key), recorder)
     }
 
+    /**
+     * Whether `지우기` must show the impact sheet: true while something references the item or it owns
+     * records, false when it can go to the trash at once (TC-20-03). The caller decides this **before**
+     * opening any sheet, so a sheet that would only delete and close itself never flashes open; null
+     * when the item is gone or already in the trash.
+     */
+    fun needsSheet(doc: ProjectDoc, kind: EntityKind, key: Key, recorder: RecorderLibrary?): Boolean? =
+        impact(doc, kind, key, recorder)?.needsSheet
+
     /** The sheet for [impact] (`RCDeleteImpact`). A hidden item shows counts only (no scene list). */
     fun sheet(kind: EntityKind, impact: DeleteImpact): ImpactSheetView {
         val sheet = Messages.impactSheet(impact)

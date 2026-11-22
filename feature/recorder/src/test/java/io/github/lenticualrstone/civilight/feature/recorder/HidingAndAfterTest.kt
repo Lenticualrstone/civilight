@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.recorder
 
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
 import io.github.lenticualrstone.civilight.domain.recorder.put.ManuscriptSpot
 import io.github.lenticualrstone.civilight.domain.recorder.state.PlacementStatus
@@ -7,8 +8,8 @@ import io.github.lenticualrstone.civilight.domain.recorder.state.RecordState
 import io.github.lenticualrstone.civilight.feature.recorder.audio.RecordPlayer
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureViews
 import io.github.lenticualrstone.civilight.feature.recorder.capture.EntryRoutes
-import io.github.lenticualrstone.civilight.feature.recorder.inbox.RevealLook
-import io.github.lenticualrstone.civilight.feature.recorder.inbox.RevealMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.UnhideLook
+import io.github.lenticualrstone.civilight.designsystem.theme.UnhideMotion
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.project.Rating
@@ -139,21 +140,21 @@ class HidingAndAfterTest {
 
     @Test
     fun LRC_41_revealBlursSevenToZeroIn320msAndFadesWhenReduced() {
-        assertEquals(RevealLook.BLUR, RevealMotion.look(reducedMotion = false, sdk = 34))
-        assertEquals(RevealLook.FADE, RevealMotion.look(reducedMotion = false, sdk = 29))
-        assertEquals(RevealLook.QUICK_FADE, RevealMotion.look(reducedMotion = true, sdk = 34))
-        assertEquals(320, RevealMotion.durationMs(RevealLook.BLUR))
-        assertEquals(320, RevealMotion.durationMs(RevealLook.FADE))
-        assertEquals(120, RevealMotion.durationMs(RevealLook.QUICK_FADE))
+        assertEquals(UnhideLook.BLUR, UnhideMotion.look(reduced = false, sdk = 34))
+        assertEquals(UnhideLook.FADE, UnhideMotion.look(reduced = false, sdk = 29))
+        assertEquals(UnhideLook.QUICK_FADE, UnhideMotion.look(reduced = true, sdk = 34))
+        assertEquals(320, UnhideMotion.durationMs(UnhideLook.BLUR))
+        assertEquals(320, UnhideMotion.durationMs(UnhideLook.FADE))
+        assertEquals(120, UnhideMotion.durationMs(UnhideLook.QUICK_FADE))
         // Hidden look → clear.
-        assertEquals(7f, RevealMotion.blurDp(RevealLook.BLUR, 0f), 0f)
-        assertEquals(0f, RevealMotion.blurDp(RevealLook.BLUR, 1f), 0f)
-        assertEquals(0.55f, RevealMotion.alpha(RevealLook.BLUR, 0f), 1e-6f)
-        assertEquals(1f, RevealMotion.alpha(RevealLook.BLUR, 1f), 1e-6f)
+        assertEquals(7f, UnhideMotion.blurDp(UnhideLook.BLUR, 0f), 0f)
+        assertEquals(0f, UnhideMotion.blurDp(UnhideLook.BLUR, 1f), 0f)
+        assertEquals(0.55f, UnhideMotion.alpha(UnhideLook.BLUR, 0f), 1e-6f)
+        assertEquals(1f, UnhideMotion.alpha(UnhideLook.BLUR, 1f), 1e-6f)
         // The fades never blur.
-        assertEquals(0f, RevealMotion.blurDp(RevealLook.QUICK_FADE, 0f), 0f)
-        assertEquals(0f, RevealMotion.alpha(RevealLook.FADE, 0f), 0f)
-        assertEquals(0.5f, RevealMotion.alpha(RevealLook.QUICK_FADE, 0.5f), 1e-6f)
+        assertEquals(0f, UnhideMotion.blurDp(UnhideLook.QUICK_FADE, 0f), 0f)
+        assertEquals(0f, UnhideMotion.alpha(UnhideLook.FADE, 0f), 0f)
+        assertEquals(0.5f, UnhideMotion.alpha(UnhideLook.QUICK_FADE, 0.5f), 1e-6f)
     }
 
     @Test
@@ -207,7 +208,7 @@ class HidingAndAfterTest {
         val f = InboxFixture(this)
         f.view(this)
         val done = f.writer.delete(r1)!!
-        assertEquals("TODO_COPY_LRC_19", done.toast.text)
+        assertEquals(ShownCopy.DELETED_TOAST, done.toast.text)
         assertFalse(f.view(this).rows.any { it.row.recordKey == r1 })
         assertNotNull(f.recorder.library.record(r1)!!.deletedAt)
         f.writer.undoDelete(done)

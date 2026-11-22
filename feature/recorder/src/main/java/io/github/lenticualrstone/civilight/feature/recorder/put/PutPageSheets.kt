@@ -15,6 +15,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightTextF
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.put.DestinationStep
 import io.github.lenticualrstone.civilight.domain.recorder.put.PutKind
 import io.github.lenticualrstone.civilight.feature.recorder.PutSheet
@@ -55,7 +56,7 @@ fun PutPageContent(sheet: PutSheet, scope: SheetScope, services: RecorderService
                 )
                 SheetActions(Modifier.padding(top = 16.dp)) {
                     CivilightButton(
-                        RecorderCopy.TODO_PAGE_BUTTON,
+                        ShownCopy.PAGE_BUTTON,
                         { insertAndToast(services, deps, host) { makePage(sheet.recordKey, current.projectKey, name) } },
                         Modifier.weight(1f),
                         enabled = view.canMake(name),

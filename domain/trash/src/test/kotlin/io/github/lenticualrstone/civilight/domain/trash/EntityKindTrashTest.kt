@@ -261,4 +261,12 @@ class EntityKindTrashTest {
         )
         assertTrue(after.changes.records.filter { it.target is ChangeTarget.TermReveal }.all { it.deletedAt == null })
     }
+
+    @Test
+    fun `staying title takes the right particle for each kind`() {
+        val doc = Fx.doc()
+        fun title(id: ItemId) = Messages.impactSheet(Impact.of(doc, id)).stayingTitle
+        assertEquals("제자리에 남음 · 지운 세력으로 보임", title(ItemId.faction(K.FACTION_UPPER_GUARD)))
+        assertEquals("제자리에 남음 · 지운 용어로 보임", title(ItemId.term(K.TERM_BLACKOUT)))
+    }
 }

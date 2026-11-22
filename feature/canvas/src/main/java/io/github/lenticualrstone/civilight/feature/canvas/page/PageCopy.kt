@@ -5,7 +5,7 @@ import java.time.ZoneId
 
 /**
  * UI copy of pages (CNV-13 … CNV-16; board `Page`, rule 19 §6, rule 20 §2, rule 23 §6). Keys starting
- * `BTN_` are buttons; copy no source gives is a `TODO_COPY_CANVAS_*` constant listed under Requests in
+ * `BTN_` are buttons; copy no board gives is the nearest existing wording, listed under Requests in
  * `docs/status/feature-canvas.md`. `CanvasCopyLintTest` lints every value.
  */
 object PageCopy {
@@ -92,13 +92,13 @@ object PageCopy {
     fun rowSub(sectionLabel: String?, date: String): String =
         listOfNotNull(sectionLabel?.trim()?.takeIf { it.isNotEmpty() }, date).joinToString(SEP)
 
-    // --- Missing copy (Requests) ---
-    const val TODO_COPY_CANVAS_NEW_PAGE = "TODO_COPY_CANVAS_NEW_PAGE"
-    const val TODO_COPY_CANVAS_PAGE_NAME_PLACEHOLDER = "TODO_COPY_CANVAS_PAGE_NAME_PLACEHOLDER"
-    const val TODO_COPY_CANVAS_PAGE_LIST_EMPTY = "TODO_COPY_CANVAS_PAGE_LIST_EMPTY"
-    const val TODO_COPY_CANVAS_LINK_PICKER_TITLE = "TODO_COPY_CANVAS_LINK_PICKER_TITLE"
+    // --- Copy no board gives (Q-EM-01, Q-PG-05): the nearest existing words, listed under Requests ---
+    /** The `+` of the page list (accessibility label) and the undo step of a new page. */
+    const val NEW_PAGE = "새 페이지"
+    const val PAGE_LIST_EMPTY = "페이지 없음"
+    const val LINK_PICKER_TITLE = "항목 고르기"
 
     /** Undo-step names (the button copy). */
     const val UNDO_TEXT = BTN_EDIT
-    const val UNDO_NEW_PAGE = TODO_COPY_CANVAS_NEW_PAGE
+    const val UNDO_NEW_PAGE = NEW_PAGE
 }

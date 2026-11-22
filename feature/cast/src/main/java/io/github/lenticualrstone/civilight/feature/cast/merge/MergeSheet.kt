@@ -40,6 +40,9 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.feature.cast.field.rememberCastEditor
 import io.github.lenticualrstone.civilight.model.Key
@@ -65,6 +68,7 @@ import io.github.lenticualrstone.civilight.ui.project.ProjectLoad
  */
 @Composable
 fun SheetScope.MergeItemsContent(sheet: MergeItemsSheet) {
+    val host = this
     val deps = LocalFeatureDeps.current
     val editor = rememberCastEditor(sheet.projectKey)
     val load by editor.state.collectAsState()
@@ -79,15 +83,11 @@ fun SheetScope.MergeItemsContent(sheet: MergeItemsSheet) {
     val doc = ready.doc
     val merged = sheet.otherKey
     val chosen = target
-    if (chosen == null) {
-        TargetPicker(doc, sheet.kind, merged, gate, onPick = { target = it }, onClose = ::close)
-        return
-    }
     var picks by rememberSaveable(sheet, chosen) { mutableStateOf(listOf<String>()) }
     var showSame by rememberSaveable(sheet, chosen) { mutableStateOf(false) }
     val recorder = recorderState.library.takeIf { recorderState.loaded }
-    val view = remember(doc, chosen, picks, recorder, gate.open) { MergeModel.view(doc, sheet.kind, merged, chosen, picks.toSet(), recorder, gate.open) }
-    if (view == null) {
+    val view = if (chosen == null) null else remember(doc, chosen, picks, recorder, gate.open) { MergeModel.view(doc, sheet.kind, merged, chosen, picks.toSet(), recorder, gate.open) }
+    if (chosen != null && view == null) {
         // Either item left (merged, deleted) while the sheet was open.
         LaunchedEffect(Unit) {
             done = true
@@ -95,22 +95,31 @@ fun SheetScope.MergeItemsContent(sheet: MergeItemsSheet) {
         }
         return
     }
-    MergeBody(
-        view = view,
-        editable = !ready.readOnly,
-        showSame = showSame,
-        onToggleSame = { showSame = !showSame },
-        onPick = { id, fromMerged -> picks = MergeModel.pick(picks.toSet(), id, fromMerged).toList() },
-        onCancel = {
-            done = true
-            close()
-        },
-        onConfirm = {
-            done = true
-            flow.merge(sheet.kind, merged, chosen, picks.toSet()) {}
-            close()
-        },
-    )
+    // The target picker and the comparison swap in place (P3).
+    ContentSwap(chosen == null, label = "mergeStep") { picking ->
+        Column(Modifier.fillMaxWidth()) {
+            if (picking) {
+                host.TargetPicker(doc, sheet.kind, merged, gate, onPick = { target = it }, onClose = host::close)
+            } else if (chosen != null && view != null) {
+                host.MergeBody(
+                    view = view,
+                    editable = !ready.readOnly,
+                    showSame = showSame,
+                    onToggleSame = { showSame = !showSame },
+                    onPick = { id, fromMerged -> picks = MergeModel.pick(picks.toSet(), id, fromMerged).toList() },
+                    onCancel = {
+                        done = true
+                        host.close()
+                    },
+                    onConfirm = {
+                        done = true
+                        flow.merge(sheet.kind, merged, chosen, picks.toSet()) {}
+                        host.close()
+                    },
+                )
+            }
+        }
+    }
 }
 
 /** Step 1: the item that stays, from the picker of [kind]; the merged item itself is ignored. */
@@ -161,7 +170,7 @@ private fun SheetScope.MergeBody(
                         CivilightText(label, type.small, Modifier.weight(1f), color = colors.ink3)
                         TextAction(value, onToggleSame, color = colors.ink, style = type.command)
                     }
-                    if (showSame) CivilightText(view.sameLabels.joinToString(CastUiCopy.SEP), type.small, Modifier.padding(bottom = 8.dp), color = colors.ink2)
+                    FoldReveal(showSame) { CivilightText(view.sameLabels.joinToString(CastUiCopy.SEP), type.small, Modifier.padding(bottom = 8.dp), color = colors.ink2) }
                 } else {
                     KeyValueLine(label, value)
                 }
@@ -211,11 +220,14 @@ private fun CellRow(cell: MergeCellView, editable: Boolean, onPick: (String, Boo
 private fun ChoiceCell(text: String, selected: Boolean, editable: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    // Fill and text colour fade; the weight stays constant so a pick never reflows the text (row 8).
+    val fill by animatedColor(if (selected) colors.sel else colors.sel.copy(alpha = 0f), label = "mergeCellFill")
+    val ink by animatedColor(if (selected) colors.ink else colors.ink2, label = "mergeCellInk")
     Row(
         modifier
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(10.dp))
-            .then(if (selected) Modifier.background(colors.sel) else Modifier)
+            .background(fill)
             .pressable(PressAction.Select(selected, onClick), enabled = editable, role = Role.RadioButton, scaleOnPress = false)
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -224,8 +236,8 @@ private fun ChoiceCell(text: String, selected: Boolean, editable: Boolean, modif
         RadioMark(selected)
         CivilightText(
             text,
-            type.itemTitleCompact.merge(TextStyle(fontSize = 14.sp, lineHeight = 19.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)),
-            color = if (selected) colors.ink else colors.ink2,
+            type.itemTitleCompact.merge(TextStyle(fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)),
+            color = ink,
             maxLines = 3,
         )
     }

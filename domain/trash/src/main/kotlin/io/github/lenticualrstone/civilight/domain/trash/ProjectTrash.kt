@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.domain.trash
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.LibraryIndexFile
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.gallery.GalleryFile
 import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.trash.TrashEntry
 import io.github.lenticualrstone.civilight.model.trash.TrashKind
@@ -63,6 +64,8 @@ object ProjectTrash {
             project = doc.project.copy(key = newKey),
             episodes = episodes,
             trash = doc.trash.copy(entries = doc.trash.entries.map { if (it.projectKey == old) it.copy(projectKey = newKey) else it }),
+            // The project gallery is filed under the project key (55 §3.3).
+            gallery = GalleryFile.rekeyProject(doc.gallery, old, newKey),
         )
     }
 

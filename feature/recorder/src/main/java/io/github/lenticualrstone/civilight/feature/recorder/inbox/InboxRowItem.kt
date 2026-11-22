@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.recorder.inbox
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -31,10 +32,15 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.link.Chip
 import io.github.lenticualrstone.civilight.domain.recorder.put.PutKind
 import io.github.lenticualrstone.civilight.feature.recorder.audio.PlayerRow
+import io.github.lenticualrstone.civilight.feature.recorder.link.PresenceItems
+import io.github.lenticualrstone.civilight.feature.recorder.link.chipKey
 
 /**
  * One inbox row (LRC-25, board `LrInbox`): header `음성 0:24` · `오늘 08:41` · state in `acc`; the
@@ -51,9 +57,12 @@ fun InboxRowItem(view: RowView, actions: InboxActions, modifier: Modifier = Modi
     val type = CivilightTheme.type
     val row = view.row
     val head = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold).let { type.label.merge(it) }
+    val motion = CivilightTheme.motion
     Column(
         modifier
             .fillMaxWidth()
+            // A row's content changes (links, state, actions) move the rows below on `standard`.
+            .animateContentSize(motion.move())
             .topHairline(colors.line)
             // The record shown in the right pane (LRC-31 `목록 + 상세`).
             .selectedRowBackground(selected, colors.sel, colors.acc)
@@ -81,10 +90,10 @@ fun InboxRowItem(view: RowView, actions: InboxActions, modifier: Modifier = Modi
         }
         }
         view.audio?.let { audio -> PlayerRow(row.recordKey, audio, actions.player, Modifier.padding(top = 8.dp)) }
-        if (row.linkTags.isNotEmpty()) {
+        FoldRevealValue(row.linkTags.takeIf { it.isNotEmpty() }) { tags ->
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CivilightIcon(IconId.Link, contentDescription = null, size = 14.dp, tint = colors.ink2)
-                ChipFlow { for (tag in row.linkTags) LinkTag(tag) }
+                ChipFlow { PresenceItems(tags, key = ::chipKey) { tag -> LinkTag(tag) } }
             }
         }
         ChipFlow(Modifier.padding(top = 10.dp)) {
@@ -97,7 +106,7 @@ fun InboxRowItem(view: RowView, actions: InboxActions, modifier: Modifier = Modi
                     else -> ActionTag(label, false) {}
                 }
             }
-            CivilightIconButton(IconId.More, RecorderCopy.TODO_MENU_ARIA, onClick = { actions.menu(row.recordKey) }, iconSize = 18.dp)
+            CivilightIconButton(IconId.More, ShownCopy.MENU, onClick = { actions.menu(row.recordKey) }, iconSize = 18.dp)
         }
     }
 }
@@ -105,7 +114,9 @@ fun InboxRowItem(view: RowView, actions: InboxActions, modifier: Modifier = Modi
 /** An action tag; a disabled one is drawn at the DS disabled 38 % (the chip itself does not dim). */
 @Composable
 internal fun ActionTag(label: String, enabled: Boolean, onClick: () -> Unit) {
-    FilterChip(label, selected = false, onClick = onClick, modifier = if (enabled) Modifier else Modifier.alpha(DISABLED_ALPHA), enabled = enabled)
+    // The disabled look comes and goes on `standard` (a put becomes available, a record gets text).
+    val alpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "actionTag")
+    FilterChip(label, selected = false, onClick = onClick, modifier = Modifier.graphicsLayer { this.alpha = alpha.value }, enabled = enabled)
 }
 
 /** DS disabled opacity (DS-30). */

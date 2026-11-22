@@ -1,5 +1,11 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.animateDpAsState
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,17 +65,21 @@ fun TopGlassBar(
     val inset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val start = if (wide) LayoutMetrics.topBarStartInner else LayoutMetrics.topBarStartCover
     val top = if (wide) LayoutMetrics.topBarContentTopInner else LayoutMetrics.topBarContentTopCover
+    val motion = LocalMotion.current
+    // S18a: the back button folds in from the start edge and the row's start padding follows on `standard`.
+    val startPadding by animateDpAsState(if (back != null) start - 12.dp else start, motion.move(CivilightMotion.standard), label = "barStart")
+    val lastBack = rememberLastNonNull(back)
     Box(modifier.fillMaxWidth().heightIn(min = barHeight + inset)) {
         GlassBackground(GlassSurface.TOP_BAR, Modifier.matchParentSize())
         OnGlass {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = inset + top, start = if (back != null) start - 12.dp else start, end = 12.dp),
+                    .padding(top = inset + top, start = startPadding, end = 12.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                if (back != null) {
-                    CivilightIconButton(IconId.Back, back.label, back.onClick, tint = colors.ink)
+                FoldReveal(back != null, horizontal = true, label = "barBack") {
+                    if (lastBack != null) CivilightIconButton(IconId.Back, lastBack.label, lastBack.onClick, tint = colors.ink)
                 }
                 Column(
                     Modifier

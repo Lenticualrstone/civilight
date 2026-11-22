@@ -83,7 +83,7 @@ object NodeEditModel {
             text = text,
             openLabel = openLabel,
             openRoute = route,
-            removeLabel = CanvasCopy.TODO_COPY_CANVAS_REMOVE_NODE,
+            removeLabel = CanvasCopy.BTN_REMOVE_NODE,
             readOnly = readOnly,
             deleted = deleted,
             item = item.takeIf { deleted },

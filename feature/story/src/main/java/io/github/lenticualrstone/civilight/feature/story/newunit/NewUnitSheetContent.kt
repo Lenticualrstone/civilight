@@ -30,6 +30,8 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBod
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.common.StoryViewModel
 import io.github.lenticualrstone.civilight.feature.story.menu.storyActions
@@ -94,75 +96,80 @@ fun SheetScope.NewUnitContent(sheet: NewUnitSheet, deps: FeatureDeps) {
         directText = directText,
     )
 
-    if (picking && setup != null) {
-        PlacePickerSheet(
-            doc = doc,
-            gate = rememberHiddenGate(sheet.projectKey),
-            title = NewUnitCopy.PICK_PLACE,
-            onPick = { ref ->
-                placeMode = PLACE_PICKED
-                placeKind = ref.kind.known?.name
-                placeKey = ref.key
-                picking = false
-            },
-            onClose = { picking = false },
-            selected = NewSceneForms.place(setup, form),
-        )
-        return
-    }
-
-    SheetHeader(title = setup?.title ?: NewUnitCopy.TITLE_AFTER, onClose = ::close, subtitle = setup?.subtitle?.ifEmpty { null })
-    if (setup == null) return
-    val lines = NewSceneForms.lines(doc, setup, form)
-    val readOnly = store.readOnly
-    SheetScrollBody(Modifier.padding(top = 10.dp)) {
-        FieldRow(NewUnitCopy.FIELD_TITLE, lines.title) {
-            if (!titleOpen) TextAction("${NewUnitCopy.WRITE} ›", { titleOpen = true }, style = actionStyle())
-        }
-        if (titleOpen) {
-            CivilightTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
-        }
-        FieldRow(NewUnitCopy.FIELD_PLACE, lines.place) {
-            if (lines.placeClearable) TextAction(NewUnitCopy.CLEAR, { placeMode = PLACE_CLEARED }, style = actionStyle())
-            TextAction("${NewUnitCopy.CHANGE} ›", { picking = true }, style = actionStyle())
-        }
-        FieldRow(NewUnitCopy.FIELD_TIME, lines.time) {
-            if (lines.timeClearable) TextAction(NewUnitCopy.CLEAR, { timeCleared = true }, style = actionStyle())
-        }
-        if (NewSceneForms.baseKey(doc, setup) != null) {
-            val selectedDay = NewSceneForms.dayChipOf(doc, setup, form)
-            val selectedBand = NewSceneForms.bandOf(doc, setup, form)
-            ChipFlow(Modifier.padding(bottom = 10.dp)) {
-                listOf(0 to NewUnitCopy.SAME_DAY, 1 to NewUnitCopy.PLUS_ONE, 2 to NewUnitCopy.PLUS_TWO).forEach { (n, word) ->
-                    FilterChip(word, !timeCleared && selectedDay == n, {
-                        timeCleared = false
-                        dayChip = n
-                    })
-                }
-                Band.entries.forEach { b ->
-                    FilterChip(b.word, !timeCleared && selectedBand == b, {
-                        timeCleared = false
-                        band = b.name
-                    })
+    // The form and the place picker swap in place on the body kind, so the form keeps its state (P3).
+    ContentSwap(picking && setup != null, Modifier.fillMaxWidth()) { pickerBody ->
+        Column(Modifier.fillMaxWidth()) {
+            if (pickerBody && setup != null) {
+                PlacePickerSheet(
+                    doc = doc,
+                    gate = rememberHiddenGate(sheet.projectKey),
+                    title = NewUnitCopy.PICK_PLACE,
+                    onPick = { ref ->
+                        placeMode = PLACE_PICKED
+                        placeKind = ref.kind.known?.name
+                        placeKey = ref.key
+                        picking = false
+                    },
+                    onClose = { picking = false },
+                    selected = NewSceneForms.place(setup, form),
+                )
+            } else {
+                SheetHeader(title = setup?.title ?: NewUnitCopy.TITLE_AFTER, onClose = host::close, subtitle = setup?.subtitle?.ifEmpty { null })
+                if (setup != null) {
+                    val lines = NewSceneForms.lines(doc, setup, form)
+                    val readOnly = store.readOnly
+                    SheetScrollBody(Modifier.padding(top = 10.dp)) {
+                        FieldRow(NewUnitCopy.FIELD_TITLE, lines.title) {
+                            if (!titleOpen) TextAction("${NewUnitCopy.WRITE} ›", { titleOpen = true }, style = actionStyle())
+                        }
+                        FoldReveal(titleOpen) {
+                            CivilightTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                        }
+                        FieldRow(NewUnitCopy.FIELD_PLACE, lines.place) {
+                            if (lines.placeClearable) TextAction(NewUnitCopy.CLEAR, { placeMode = PLACE_CLEARED }, style = actionStyle())
+                            TextAction("${NewUnitCopy.CHANGE} ›", { picking = true }, style = actionStyle())
+                        }
+                        FieldRow(NewUnitCopy.FIELD_TIME, lines.time) {
+                            if (lines.timeClearable) TextAction(NewUnitCopy.CLEAR, { timeCleared = true }, style = actionStyle())
+                        }
+                        FoldReveal(NewSceneForms.baseKey(doc, setup) != null) {
+                            val selectedDay = NewSceneForms.dayChipOf(doc, setup, form)
+                            val selectedBand = NewSceneForms.bandOf(doc, setup, form)
+                            ChipFlow(Modifier.padding(bottom = 10.dp)) {
+                                listOf(0 to NewUnitCopy.SAME_DAY, 1 to NewUnitCopy.PLUS_ONE, 2 to NewUnitCopy.PLUS_TWO).forEach { (n, word) ->
+                                    FilterChip(word, !timeCleared && selectedDay == n, {
+                                        timeCleared = false
+                                        dayChip = n
+                                    })
+                                }
+                                Band.entries.forEach { b ->
+                                    FilterChip(b.word, !timeCleared && selectedBand == b, {
+                                        timeCleared = false
+                                        band = b.name
+                                    })
+                                }
+                            }
+                        }
+                        TransitionRow(lines.transition, lines.autoEnabled) { mode = it.name }
+                        FoldReveal(lines.transition == TransitionMode.DIRECT) {
+                            CivilightTextField(value = directText, onValueChange = { directText = it }, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                    SheetActions {
+                        CivilightButton(
+                            text = NewUnitCopy.CREATE,
+                            onClick = {
+                                actions.createScene(sheet, form)
+                                host.close()
+                            },
+                            modifier = Modifier.weight(1f),
+                            subText = if (readOnly) StoryCopy.READ_ONLY else null,
+                            enabled = !readOnly,
+                        )
+                    }
                 }
             }
         }
-        TransitionRow(lines.transition, lines.autoEnabled) { mode = it.name }
-        if (lines.transition == TransitionMode.DIRECT) {
-            CivilightTextField(value = directText, onValueChange = { directText = it }, modifier = Modifier.fillMaxWidth())
-        }
-    }
-    SheetActions {
-        CivilightButton(
-            text = NewUnitCopy.CREATE,
-            onClick = {
-                actions.createScene(sheet, form)
-                host.close()
-            },
-            modifier = Modifier.weight(1f),
-            subText = if (readOnly) StoryCopy.READ_ONLY else null,
-            enabled = !readOnly,
-        )
     }
 }
 

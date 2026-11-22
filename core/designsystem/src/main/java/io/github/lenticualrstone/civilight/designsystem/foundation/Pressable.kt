@@ -1,7 +1,6 @@
 package io.github.lenticualrstone.civilight.designsystem.foundation
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -27,6 +26,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
 
 /**
  * DS-64 focus ring: a 2 dp outline [gap] outside the shape while keyboard / D-pad focused.
@@ -51,7 +52,9 @@ sealed interface PressAction {
 
 /**
  * The shared interaction of every component: click / toggle / select without ripple, the proposed
- * pressed scale 0.94 for 100 ms (none when motion is reduced), the focus ring, and the DS-11 touch area.
+ * pressed scale 0.94 over `pressMs` on the `standard` curve, the focus ring, and the DS-11 touch area.
+ * Where nothing scales ([scaleOnPress] false, or reduced motion) a pressed overlay of `ink` at 6 % fades in
+ * and out inside [shape] instead (S7), unless [pressOverlay] is false (the caller draws its own state layer).
  */
 @Composable
 fun Modifier.pressable(
@@ -62,16 +65,20 @@ fun Modifier.pressable(
     shape: Shape = RectangleShape,
     scaleOnPress: Boolean = true,
     interactionSource: MutableInteractionSource? = null,
+    pressOverlay: Boolean = true,
 ): Modifier {
     val source = interactionSource ?: remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val focused by source.collectIsFocusedAsState()
-    val reduced = CivilightTheme.reducedMotion
+    val motion = LocalMotion.current
+    val scaling = scaleOnPress && !motion.reduced
     val scale by animateFloatAsState(
-        targetValue = if (pressed && scaleOnPress && !reduced && enabled) CivilightMotion.pressScale else 1f,
-        animationSpec = tween(CivilightMotion.pressMs),
+        targetValue = if (pressed && scaling && enabled) CivilightMotion.pressScale else 1f,
+        animationSpec = motion.spec(CivilightMotion.press),
         label = "press",
     )
+    val overlay = animatedFraction(pressed && enabled && !scaling && pressOverlay, CivilightMotion.press, label = "pressOverlay")
+    val ink = CivilightTheme.colors.ink
     val interactive = when (action) {
         is PressAction.Click -> Modifier.clickable(
             interactionSource = source,
@@ -105,7 +112,15 @@ fun Modifier.pressable(
             scaleX = scale
             scaleY = scale
         }
+        .drawWithContent {
+            drawContent()
+            val a = overlay.value
+            if (a > 0f) drawOutline(shape.createOutline(size, layoutDirection, this), ink, alpha = PRESS_OVERLAY_ALPHA * a)
+        }
 }
+
+/** Pressed overlay strength (`ink` at 6 %, S7). */
+const val PRESS_OVERLAY_ALPHA: Float = 0.06f
 
 /** Convenience for the common click case. */
 @Composable
@@ -118,6 +133,7 @@ fun Modifier.pressable(
     scaleOnPress: Boolean = true,
     onClickLabel: String? = null,
     interactionSource: MutableInteractionSource? = null,
+    pressOverlay: Boolean = true,
 ): Modifier = pressable(
     action = PressAction.Click(onClick, onClickLabel),
     enabled = enabled,
@@ -126,6 +142,7 @@ fun Modifier.pressable(
     shape = shape,
     scaleOnPress = scaleOnPress,
     interactionSource = interactionSource,
+    pressOverlay = pressOverlay,
 )
 
 /** Draws a 2 dp `acc` bar at the start edge and the `sel` fill (DS-40 selected row). */

@@ -2,6 +2,9 @@ package io.github.lenticualrstone.civilight.feature.world.travel
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import androidx.compose.foundation.layout.Box
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -119,9 +122,10 @@ fun TravelModesScreen(route: TravelModes, deps: FeatureDeps) {
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
-                item(key = "title") { SectionLabel(WorldCopy.TRAVEL_MODES, Modifier.padding(top = 12.dp, bottom = 4.dp)) }
+                item(key = "title") { SectionLabel(WorldCopy.TRAVEL_MODES, civilightItem().padding(top = 12.dp, bottom = 4.dp)) }
                 items(state.rows, key = { it.index }) { row ->
                     ListRow(
+                        modifier = civilightItem(),
                         title = row.name,
                         subtitle = row.line,
                         compact = true,
@@ -129,10 +133,14 @@ fun TravelModesScreen(route: TravelModes, deps: FeatureDeps) {
                     )
                 }
                 item(key = "add") {
-                    if (state.readOnly) {
-                        CivilightText(WorldCopy.READ_ONLY, type.small, Modifier.padding(top = 10.dp), color = colors.ink3)
-                    } else {
-                        TextAction(WorldCopy.TRAVEL_ADD, { sheets.open(TravelModeSheet(null)) }, Modifier.padding(top = 8.dp), color = colors.acc, style = type.small)
+                    Box(civilightItem()) {
+                        ContentSwap(state.readOnly, label = "travelAdd") { readOnly ->
+                            if (readOnly) {
+                                CivilightText(WorldCopy.READ_ONLY, type.small, Modifier.padding(top = 10.dp), color = colors.ink3)
+                            } else {
+                                TextAction(WorldCopy.TRAVEL_ADD, { sheets.open(TravelModeSheet(null)) }, Modifier.padding(top = 8.dp), color = colors.acc, style = type.small)
+                            }
+                        }
                     }
                 }
             }
@@ -168,7 +176,7 @@ private fun SheetScope.TravelModeForm(key: TravelModeSheet, initial: TravelModeD
             CivilightTextField(
                 value = draft.hours,
                 onValueChange = { draft = draft.copy(hours = it); refusal = null },
-                label = WorldCopy.TODO_COPY_WORLD_TRAVEL_HOURS,
+                label = WorldCopy.TRAVEL_HOURS,
                 unit = WorldCopy.UNIT_HOURS,
                 modifier = Modifier.weight(1f),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),

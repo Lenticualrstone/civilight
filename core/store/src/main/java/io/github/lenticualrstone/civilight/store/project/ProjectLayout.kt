@@ -18,6 +18,7 @@ import io.github.lenticualrstone.civilight.model.file.StoryIndexFile
 import io.github.lenticualrstone.civilight.model.file.TombstonesFile
 import io.github.lenticualrstone.civilight.model.file.TrashIndexFile
 import io.github.lenticualrstone.civilight.model.file.WorldFile
+import io.github.lenticualrstone.civilight.model.gallery.GalleryFile
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
 import io.github.lenticualrstone.civilight.model.map.WorldMap
 import io.github.lenticualrstone.civilight.model.project.Project
@@ -72,6 +73,8 @@ object ProjectLayout {
         for ((key, canvas) in u.canvases) out[prefix + PackagePaths.canvas(key)] = unit(canvas, Canvas.serializer())
         for ((key, page) in u.pages) out[prefix + PackagePaths.page(key)] = unit(page, Page.serializer())
         if (!mirror || u.assets != AssetsIndexFile()) out[prefix + PackagePaths.ASSETS_INDEX] = unit(u.assets, AssetsIndexFile.serializer())
+        // One unit per gallery owner (55 §3.3, §12.5): a caption keystroke rewrites only that owner's file.
+        for ((key, file) in u.gallery) out[prefix + PackagePaths.gallery(key)] = unit(file, GalleryFile.serializer())
         if (!mirror) {
             out[PackagePaths.CHECKS] = unit(u.checks, ChecksFile.serializer())
             out[PackagePaths.TOMBSTONES] = unit(u.tombstones, TombstonesFile.serializer())
@@ -92,7 +95,7 @@ object ProjectLayout {
         if (rel in FIXED) return true
         if (!rel.endsWith(".json")) return false
         return (rel.startsWith("story/") && rel.count { it == '/' } == 1) ||
-            rel.startsWith("maps/") || rel.startsWith("canvas/") || rel.startsWith("pages/")
+            rel.startsWith("maps/") || rel.startsWith("canvas/") || rel.startsWith("pages/") || PackagePaths.isGalleryUnit(rel)
     }
 
     /** True when an unknown file may be kept at [path] (not a layout path, not store-internal). */
@@ -127,6 +130,7 @@ object ProjectLayout {
             rel.startsWith("maps/") -> u.maps[fileKey("maps/")]
             rel.startsWith("canvas/") -> u.canvases[fileKey("canvas/")]
             rel.startsWith("pages/") -> u.pages[fileKey("pages/")]
+            PackagePaths.isGalleryUnit(rel) -> u.gallery[PackagePaths.galleryOwnerOf(rel)]
             else -> null
         }
     }

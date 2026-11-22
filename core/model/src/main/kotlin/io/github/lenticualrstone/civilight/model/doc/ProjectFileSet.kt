@@ -16,6 +16,7 @@ import io.github.lenticualrstone.civilight.model.file.StoryIndexFile
 import io.github.lenticualrstone.civilight.model.file.TombstonesFile
 import io.github.lenticualrstone.civilight.model.file.TrashIndexFile
 import io.github.lenticualrstone.civilight.model.file.WorldFile
+import io.github.lenticualrstone.civilight.model.gallery.GalleryFile
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
 import io.github.lenticualrstone.civilight.model.map.WorldMap
 import io.github.lenticualrstone.civilight.model.project.Project
@@ -78,6 +79,7 @@ data class ProjectFileSet(
             trash = trash?.index ?: TrashIndexFile(),
             app = app,
             unknownFiles = unknownFiles,
+            gallery = mergeGallery(live.gallery, t?.gallery.orEmpty()),
         )
     }
 
@@ -128,6 +130,14 @@ data class ProjectFileSet(
                 if (deadPins.isNotEmpty()) deadMaps[key] = map.shell().copy(pins = deadPins)
             }
 
+            val liveGallery = LinkedHashMap<Key, GalleryFile>()
+            val deadGallery = LinkedHashMap<Key, GalleryFile>()
+            for ((owner, file) in doc.gallery) {
+                val (liveItems, deadItems) = file.items.partition { l.isLive(it) }
+                if (liveItems.isNotEmpty() || file.ext != null) liveGallery[owner] = file.copy(items = liveItems)
+                if (deadItems.isNotEmpty()) deadGallery[owner] = file.copy(items = deadItems, ext = null)
+            }
+
             val (liveDefs, deadDefs) = doc.project.fieldDefs.partition { it.deletedAt == null }
             val live = FileUnits(
                 project = doc.project.copy(fieldDefs = liveDefs),
@@ -143,6 +153,7 @@ data class ProjectFileSet(
                 checks = doc.checks,
                 tombstones = doc.tombstones,
                 deletions = doc.deletions,
+                gallery = liveGallery,
             )
             val dead = FileUnits(
                 project = doc.project.copy(fieldDefs = deadDefs, tags = emptyList(), relationKinds = emptyList(), travelModes = emptyList()),
@@ -158,6 +169,7 @@ data class ProjectFileSet(
                 checks = ChecksFile(),
                 tombstones = TombstonesFile(),
                 deletions = DeletionsFile(),
+                gallery = deadGallery,
             )
             return ProjectFileSet(live, TrashMirror(doc.trash, dead))
         }
@@ -200,6 +212,7 @@ data class ProjectFileSet(
                 val maps = LinkedHashMap<Key, WorldMap>()
                 val canvases = LinkedHashMap<Key, Canvas>()
                 val pages = LinkedHashMap<Key, Page>()
+                val gallery = LinkedHashMap<Key, GalleryFile>()
                 for (path in files.keys) {
                     if (!path.startsWith(prefix)) continue
                     val rel = path.removePrefix(prefix)
@@ -214,6 +227,11 @@ data class ProjectFileSet(
                             read(path, Canvas.serializer())?.let { canvases[it.key] = it }
                         rel.startsWith("pages/") && rel.endsWith(".json") ->
                             read(path, Page.serializer())?.let { pages[it.key] = it }
+                        PackagePaths.isGalleryUnit(rel) ->
+                            read(path, GalleryFile.serializer())?.let { file ->
+                                // Items of another owner than the file's own are dropped (a damaged or edited file).
+                                gallery[file.ownerKey] = file.copy(items = file.items.filter { it.ownerKey == file.ownerKey })
+                            }
                     }
                 }
                 val base = fallbackProject ?: project!!
@@ -231,6 +249,7 @@ data class ProjectFileSet(
                     checks = read(prefix + PackagePaths.CHECKS, ChecksFile.serializer()) ?: ChecksFile(),
                     tombstones = read(prefix + PackagePaths.TOMBSTONES, TombstonesFile.serializer()) ?: TombstonesFile(),
                     deletions = read(prefix + PackagePaths.DELETIONS, DeletionsFile.serializer()) ?: DeletionsFile(),
+                    gallery = gallery,
                 )
             }
 
@@ -268,6 +287,15 @@ data class ProjectFileSet(
             return out
         }
 
+        private fun mergeGallery(live: Map<Key, GalleryFile>, trash: Map<Key, GalleryFile>): Map<Key, GalleryFile> {
+            val out = LinkedHashMap(live)
+            for ((key, dead) in trash) {
+                val current = out[key]
+                out[key] = current?.copy(items = union(current.items, dead.items) { it.key }) ?: dead
+            }
+            return out
+        }
+
         private fun WorldMap.shell(): WorldMap = copy(
             layers = emptyList(), pins = emptyList(), regions = emptyList(), routes = emptyList(), labels = emptyList(),
             stamps = emptyList(), drawnLines = emptyList(), nodes = emptyList(), nodeLinks = emptyList(),
@@ -301,6 +329,8 @@ data class FileUnits(
     val checks: ChecksFile,
     val tombstones: TombstonesFile,
     val deletions: DeletionsFile,
+    /** Gallery files by owner key (`gallery/<ownerKey>.json`, 55 §3.3); only owners with items. */
+    val gallery: Map<Key, GalleryFile> = emptyMap(),
 ) {
     /**
      * JSON of each unit by path under [prefix]. With a non-empty prefix (the trash mirror) the
@@ -320,6 +350,7 @@ data class FileUnits(
         for ((key, canvas) in canvases) out[prefix + PackagePaths.canvas(key)] = CivilightJson.encodeElement(Canvas.serializer(), canvas)
         for ((key, page) in pages) out[prefix + PackagePaths.page(key)] = CivilightJson.encodeElement(Page.serializer(), page)
         if (!mirror || assets != AssetsIndexFile()) out[prefix + PackagePaths.ASSETS_INDEX] = CivilightJson.encodeElement(AssetsIndexFile.serializer(), assets)
+        for ((key, file) in gallery) out[prefix + PackagePaths.gallery(key)] = CivilightJson.encodeElement(GalleryFile.serializer(), file)
         if (!mirror) {
             out[PackagePaths.CHECKS] = CivilightJson.encodeElement(ChecksFile.serializer(), checks)
             out[PackagePaths.TOMBSTONES] = CivilightJson.encodeElement(TombstonesFile.serializer(), tombstones)

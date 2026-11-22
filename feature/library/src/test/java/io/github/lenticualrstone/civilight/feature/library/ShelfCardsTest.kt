@@ -9,6 +9,7 @@ import io.github.lenticualrstone.civilight.feature.library.LibFx.at
 import io.github.lenticualrstone.civilight.feature.library.LibFx.shelf
 import io.github.lenticualrstone.civilight.feature.library.shelf.RecentsModel
 import io.github.lenticualrstone.civilight.feature.library.shelf.RecentsRecorder
+import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCardItem
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCards
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfProject
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfState
@@ -21,9 +22,11 @@ import io.github.lenticualrstone.civilight.model.app.RecentKind
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
 import io.github.lenticualrstone.civilight.model.app.UnlockSession
 import io.github.lenticualrstone.civilight.model.app.ViewMode
+import io.github.lenticualrstone.civilight.model.asset.Crop
 import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.model.asset.ImageUse
+import io.github.lenticualrstone.civilight.model.asset.Ratio
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
@@ -82,8 +85,13 @@ class ShelfCardsTest {
         assertTrue(ui.cards.none { it.hiddenOpen })
         assertEquals("숨긴 프로젝트 1", ui.lockedGroup?.title)
         assertEquals("이름 · 표지 가림", ui.lockedGroup?.cardSub)
-        assertEquals(3, ShelfCards.pageCount(ui, wide = false))
-        assertEquals("the wide row adds 새 프로젝트", 4, ShelfCards.pageCount(ui, wide = true))
+        val cover = ShelfCards.cardItems(ui, wide = false)
+        assertEquals(listOf("project", "project", "lock"), cover.map { it::class.simpleName!!.lowercase().removeSuffix("card") })
+        assertEquals(3, cover.size)
+        val inner = ShelfCards.cardItems(ui, wide = true)
+        assertEquals("the wide row adds 새 프로젝트", 4, inner.size)
+        assertEquals(ShelfCardItem.NewProject, inner.last())
+        assertEquals("every card has its own lazy key", inner.size, inner.map { it.key }.toSet().size)
     }
 
     @Test
@@ -110,7 +118,7 @@ class ShelfCardsTest {
     }
 
     @Test
-    fun `LIB-04 the view is remembered per screen and the list view builds no cards`() {
+    fun `LIB-04 the view is remembered per screen and both views carry their data`() {
         val settings = AppSettings()
         assertFalse(ShelfCards.showCards(settings))
         val cards = ShelfCards.withView(settings, cards = true)
@@ -118,8 +126,10 @@ class ShelfCardsTest {
         assertEquals(ViewMode.CARD, cards.viewByScreen["library"])
         assertFalse(ShelfCards.showCards(ShelfCards.withView(cards, cards = false)))
         val list = build(cards = false, recents = listOf(recent(ashen, RecentKind.CHARACTER, K.RIEN, "2026-11-21T10:00")))
-        assertTrue(list.cards.isEmpty())
-        assertTrue(list.recents.isEmpty())
+        assertFalse(list.showCards)
+        // Both views carry their data, so a 목록 ↔ 카드 switch can animate the outgoing one (CNV-45).
+        assertEquals(listOf("잿빛 새벽의 등불", "유리 정원"), list.cards.map { it.row.title })
+        assertEquals(1, list.recents.size)
         assertEquals(listOf(3, 4), listOf(ShelfCards.recentLimit(false), ShelfCards.recentLimit(true)))
         assertFalse(ShelfCards.isWide(390))
         assertTrue(ShelfCards.isWide(560))
@@ -226,15 +236,22 @@ class ShelfCardsTest {
     }
 
     @Test
-    fun `MCarousel the settled card's picture rests and its neighbours slide 8 percent the other way`() {
-        val start = 24
-        val stride = 236
-        val width = 222
-        assertEquals(0f, ShelfCards.parallaxShift(start, start, stride, width), 0.001f)
-        assertEquals(-0.08f * width, ShelfCards.parallaxShift(start + stride, start, stride, width), 0.001f)
-        assertEquals(0.04f * width, ShelfCards.parallaxShift(start - stride / 2, start, stride, width), 0.5f)
-        assertEquals("capped at one stride", -0.08f * width, ShelfCards.parallaxShift(start + 3 * stride, start, stride, width), 0.001f)
-        assertEquals("at rest the whole crop shows", 1f, ShelfCards.parallaxScale(0f, width), 0.0001f)
-        assertEquals("a full shift scales enough to cover the card", 1.16f, ShelfCards.parallaxScale(-0.08f * width, width), 0.001f)
+    fun `D6 every row carries a 48 dp thumbnail made from the cover's 1 to 1 crop`() {
+        val ui = build()
+        val byTitle = ui.rows.associateBy { it.title }
+        assertEquals("dawn", byTitle.getValue("유리 정원").thumb.presetId)
+        assertEquals("잿", byTitle.getValue("잿빛 새벽의 등불").thumb.initial)
+        assertNull(byTitle.getValue("잿빛 새벽의 등불").thumb.hash)
+        val withImage = ashen.copy(
+            assets = ashen.assets.copy(
+                imageUses = ashen.assets.imageUses + ImageUse("cover-2", ImageOwnerKind.PROJECT.open(), ashen.key, ImageSlot.PROJECT_COVER.open(), "hash-a")
+                    .withCrop(Ratio.R3X4, Crop(0, 0, 300, 400))
+                    .withCrop(Ratio.R1X1, Crop(10, 10, 300, 300)),
+            ),
+        )
+        val thumb = ShelfCards.thumb(withImage, "잿빛 새벽의 등불")
+        assertEquals("hash-a", thumb.hash)
+        assertEquals("the list thumbnail is the 1:1 crop", 300, thumb.crop?.h)
+        assertEquals("the card cover is the 3:4 crop", 400, ShelfCards.cover(withImage, "잿빛 새벽의 등불").crop?.h)
     }
 }

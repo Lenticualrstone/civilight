@@ -128,7 +128,7 @@ class ExportRulesBatch5Test {
         for (path in listOf(PackagePaths.PROJECT, "story/index.json")) {
             val damaged = damage(bytes, path)
             assertTrue(ProjectPackageReader.open(damaged) is PackageOpen.Damaged)
-            assertEquals(OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB55_DAMAGED), OpenFileFlow.open(damaged, "x.civilight", emptyList(), { 0 }, now, zone))
+            assertEquals(OpenStage.Failed(OpenFileCopy.DAMAGED), OpenFileFlow.open(damaged, "x.civilight", emptyList(), { 0 }, now, zone))
         }
     }
 }

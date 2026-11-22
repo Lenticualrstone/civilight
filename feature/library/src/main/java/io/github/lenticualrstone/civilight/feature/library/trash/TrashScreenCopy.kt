@@ -18,16 +18,17 @@ object TrashScreenCopy {
     const val RESTORED_SUFFIX = " 되살림"
 
     /** `영구 삭제` confirm (LIB-39: "confirm (copy: not in sources)"). */
-    const val TODO_COPY_LIB39_PURGE_CONFIRM = "TODO_COPY_LIB39_PURGE_CONFIRM"
+    const val PURGE_CONFIRM = "영구 삭제 · 되돌릴 수 없음"
 
     /** `비우기` confirm (LIB-39: "confirm (copy: not in sources)"). */
-    const val TODO_COPY_LIB39_EMPTY_CONFIRM = "TODO_COPY_LIB39_EMPTY_CONFIRM"
+    const val EMPTY_CONFIRM = "휴지통 전체 영구 삭제 · 되돌릴 수 없음"
 
     /** An empty trash (no board; LIB-70 lists no trash empty state). */
-    const val TODO_COPY_LIB38_EMPTY = "TODO_COPY_LIB38_EMPTY"
+    const val EMPTY = "휴지통 비어 있음"
 
     /** Accessible label of a block group's expand toggle (the board draws no control). */
-    const val TODO_COPY_LIB38_EXPAND_LABEL = "TODO_COPY_LIB38_EXPAND_LABEL"
+    const val EXPAND_LABEL = "블록 펼치기"
+    const val COLLAPSE_LABEL = "블록 접기"
 
     fun restored(name: String): String = name + RESTORED_SUFFIX
 }

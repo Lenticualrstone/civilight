@@ -27,7 +27,7 @@ class HomeStartModelTest {
         val byId = start.items.associateBy { it.id }
         assertEquals(CastList(fresh.project.key), byId.getValue(ChecklistItem.Id.PROTAGONIST).route)
         assertEquals(World(fresh.project.key, io.github.lenticualrstone.civilight.navigation.WorldTab.TERMS, createTerm = true), byId.getValue(ChecklistItem.Id.TERM).route)
-        assertEquals("no character yet: the undrawn sub line stays empty", "", byId.getValue(ChecklistItem.Id.PROTAGONIST).sub)
+        assertEquals("no character yet: domain:library now draws the sub line (it was TODO_COPY_LIB13_PROTAGONIST_SUB)", "인물", byId.getValue(ChecklistItem.Id.PROTAGONIST).sub)
         assertTrue(start.items.none { it.sub.startsWith("TODO_COPY_") || it.title.startsWith("TODO_COPY_") })
         assertEquals(start.quickWriteRoute, byId.getValue(ChecklistItem.Id.FIRST_LINE).route)
         assertTrue("no linked records → that row is left out", ChecklistItem.Id.LINKED_RECORDS !in byId)

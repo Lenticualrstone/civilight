@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.story.where
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +31,9 @@ import io.github.lenticualrstone.civilight.designsystem.component.SegmentItem
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import io.github.lenticualrstone.civilight.domain.story.time.word
 import io.github.lenticualrstone.civilight.model.project.Band
 import io.github.lenticualrstone.civilight.model.story.TimePrecision
@@ -46,39 +50,42 @@ fun WhereTimeSection(ui: WhereUi, onAction: (WhenAction) -> Unit, onRebase: () -
     val c = ui.controls
     val sheet = ui.sheet
     val enabled = !ui.readOnly && c.editable
-    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    // No `spacedBy`: a folded-away block would still add its gap. Each revealed block carries its own 10 dp.
+    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 12.dp)) {
         Row(Modifier.fillMaxWidth()) {
             CivilightText(sheet.baseLine?.label ?: WhereCopy.FIELD_TIME, type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
-            sheet.baseLine?.value?.let { CivilightText(it, type.small, color = colors.ink2, maxLines = 1) }
+            sheet.baseLine?.value?.let { ValueSwap(it, type.small, color = colors.ink2) }
         }
-        if (c.editable) {
-            ChipFlow {
-                listOf(
-                    WhenDay.SAME_DAY to WhereCopy.SAME_DAY,
-                    WhenDay.PLUS_ONE to WhereCopy.PLUS_ONE,
-                    WhenDay.PLUS_TWO to WhereCopy.PLUS_TWO,
-                    WhenDay.DIRECT to WhereCopy.DIRECT,
-                ).forEach { (day, label) ->
-                    val usable = enabled && (day == WhenDay.DIRECT || !c.onlyDirect)
-                    FilterChip(label, c.day == day, { onAction(WhenAction.Day(day)) }, enabled = usable)
+        FoldReveal(c.editable) {
+            Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                ChipFlow {
+                    listOf(
+                        WhenDay.SAME_DAY to WhereCopy.SAME_DAY,
+                        WhenDay.PLUS_ONE to WhereCopy.PLUS_ONE,
+                        WhenDay.PLUS_TWO to WhereCopy.PLUS_TWO,
+                        WhenDay.DIRECT to WhereCopy.DIRECT,
+                    ).forEach { (day, label) ->
+                        val usable = enabled && (day == WhenDay.DIRECT || !c.onlyDirect)
+                        FilterChip(label, c.day == day, { onAction(WhenAction.Day(day)) }, enabled = usable)
+                    }
+                }
+                FoldReveal(c.day == WhenDay.DIRECT) { Box(Modifier.padding(top = 10.dp)) { DirectDayField(c.directDay, enabled) { onAction(WhenAction.DirectDay(it)) } } }
+                Box(Modifier.padding(top = 10.dp)) { BandRow(c.band, c.clock?.toString(), enabled && c.bandsEnabled, onAction) }
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CivilightText(WhereCopy.PRECISION, type.small, Modifier.weight(1f), color = colors.ink3)
+                    OutlinedSegmented(
+                        items = listOf(SegmentItem(WhereCopy.EXACT), SegmentItem(WhereCopy.APPROX)),
+                        selectedIndex = if (c.precision == TimePrecision.APPROX) 1 else 0,
+                        onSelect = { i -> if (enabled && c.precisionEnabled) onAction(WhenAction.Precision(if (i == 1) TimePrecision.APPROX else TimePrecision.EXACT)) },
+                        height = 32.dp,
+                    )
                 }
             }
-            if (c.day == WhenDay.DIRECT) DirectDayField(c.directDay, enabled) { onAction(WhenAction.DirectDay(it)) }
-            BandRow(c.band, c.clock?.toString(), enabled && c.bandsEnabled, onAction)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                CivilightText(WhereCopy.PRECISION, type.small, Modifier.weight(1f), color = colors.ink3)
-                OutlinedSegmented(
-                    items = listOf(SegmentItem(WhereCopy.EXACT), SegmentItem(WhereCopy.APPROX)),
-                    selectedIndex = if (c.precision == TimePrecision.APPROX) 1 else 0,
-                    onSelect = { i -> if (enabled && c.precisionEnabled) onAction(WhenAction.Precision(if (i == 1) TimePrecision.APPROX else TimePrecision.EXACT)) },
-                    height = 32.dp,
-                )
-            }
         }
-        ui.resultLine?.let { ResultBox(it, onTimeline) }
-        if (sheet.rebaseToPrevious && enabled) TextAction(WhereCopy.REBASE_TO_PREVIOUS, onRebase, color = colors.acc)
+        FoldRevealValue(ui.resultLine) { line -> Box(Modifier.padding(top = 10.dp)) { ResultBox(line, onTimeline) } }
+        FoldReveal(sheet.rebaseToPrevious && enabled) { Box(Modifier.padding(top = 10.dp)) { TextAction(WhereCopy.REBASE_TO_PREVIOUS, onRebase, color = colors.acc) } }
         // `직전 씬보다 앞 · 약 9시간 전` (STO-25): a notice in `ink3`, never a ▲.
-        sheet.orderLine?.let { CivilightText(it, type.small, color = colors.ink3) }
+        FoldRevealValue(sheet.orderLine) { line -> CivilightText(line, type.small, Modifier.padding(top = 10.dp), color = colors.ink3) }
     }
 }
 
@@ -135,8 +142,9 @@ internal fun ResultBox(line: String, onTimeline: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            CivilightText(parts[0], type.itemTitle.merge(TextStyle(fontWeight = FontWeight.Bold)), color = colors.ink, maxLines = 1)
-            subText?.let { CivilightText(it, type.small, color = colors.ink3, maxLines = 1) }
+            // The result changes with every edit of the 때: the value swap of CNV-42 (P4).
+            ValueSwap(parts[0], type.itemTitle.merge(TextStyle(fontWeight = FontWeight.Bold)), color = colors.ink)
+            FoldRevealValue(subText) { ValueSwap(it, type.small, color = colors.ink3) }
         }
         if (sub?.endsWith(WhereCopy.ON_TIMELINE) == true) TextAction(WhereCopy.ON_TIMELINE, onTimeline, color = colors.acc)
     }

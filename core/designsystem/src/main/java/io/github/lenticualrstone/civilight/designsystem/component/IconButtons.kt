@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.getValue
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -169,7 +173,8 @@ fun KeyboardTool(
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(12.dp)
     val isOn = on == true
-    val content = if (isOn) colors.ink else colors.ink2
+    val content by animatedColor(if (isOn) colors.ink else colors.ink2, label = "toolContent")
+    val fill = animatedFraction(isOn, label = "toolFill")
     val action = if (on != null) PressAction.Toggle(on) { onClick() } else PressAction.Click(onClick)
     Row(
         modifier = modifier
@@ -177,7 +182,7 @@ fun KeyboardTool(
             .heightIn(min = 44.dp)
             .widthIn(min = 44.dp)
             .clip(shape)
-            .background(if (isOn) colors.sel else Color.Transparent)
+            .drawBehind { val a = fill.value; if (a > 0f) drawRect(colors.sel, alpha = a) }
             .padding(horizontal = if (text != null) 8.dp else 0.dp)
             .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier),
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),

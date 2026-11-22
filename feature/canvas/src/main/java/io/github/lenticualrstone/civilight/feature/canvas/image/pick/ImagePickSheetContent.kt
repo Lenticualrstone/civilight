@@ -21,6 +21,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +37,8 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBod
 import io.github.lenticualrstone.civilight.designsystem.component.SwitchRow
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.feature.canvas.common.canvasEditContext
 import io.github.lenticualrstone.civilight.feature.canvas.image.CropHandOff
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageCopy
@@ -50,6 +53,7 @@ import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
 import io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
+import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.project.EditResult
 import io.github.lenticualrstone.civilight.ui.project.ProjectLoad
 
@@ -60,7 +64,7 @@ private const val TILE_ASPECT = 108f / 144f
 /**
  * `이미지 고르기` (CNV-27, board `ImagePick`), the shared [ImagePickSheet] other areas open for their slots:
  * title and `닫기`, `<owner> · <ratio chips>`, tabs `기본 이미지 8 · 내 이미지 N`, a three-column grid,
- * the holo row for holo-capable slots, and `갤러리 · 파일 · 고르기`. A preset is placed at once; an
+ * the holo row for holo-capable slots, and `사진 · 파일 · 고르기` (`사진` = the system photo picker, 55 §6 Q1). A preset is placed at once; an
  * original (picked now or from `내 이미지`) opens the crop editor.
  */
 @Composable
@@ -73,8 +77,10 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
     val load by vm.state.collectAsState()
     val settings by deps.settings.collectAsState()
     val ready = load as? ProjectLoad.Ready
-    val view = remember(ready?.doc, owner, settings.holoDefaultForNewImages) {
-        ready?.let { ImagePickModel.build(it.doc, owner, settings.holoDefaultForNewImages, deps.stores.blobs::contains) }
+    // `내 이미지` leaves out originals only hidden things use while locked (55 GAL-19, §3.4).
+    val locked = !rememberHiddenGate(sheet.projectKey).open
+    val view = remember(ready?.doc, owner, settings.holoDefaultForNewImages, locked) {
+        ready?.let { ImagePickModel.build(it.doc, owner, settings.holoDefaultForNewImages, deps.stores.blobs::contains, locked) }
     }
     if (view == null) {
         SheetHeader(ImageSlots.spec(sheet.slot).pickTitle, onClose = ::close, closeLabel = ImageCopy.BTN_CLOSE)
@@ -85,23 +91,26 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
     var tab by rememberSaveable { mutableIntStateOf(view.initialTab) }
     var selected by rememberSaveable { mutableStateOf(view.initialSource) }
     var holoChoice by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    /** Raised when the user switches holo on: the preview sweeps once then, not when another tile is picked. */
+    var holoSweep by rememberSaveable { mutableIntStateOf(0) }
     val holo = holoChoice ?: view.initialHolo
     val bounds = remember { mutableStateMapOf<String, Rect>() }
+    val thumbs = remember { mutableStateMapOf<String, ImageBitmap>() }
     val context = LocalContext.current
 
     fun sayReadOnly() = deps.toasts.show(ImageCopy.READ_ONLY, actionLabel = null)
 
-    fun toCrop(hash: String, tile: Rect?) {
-        CropHandOff.put(CropHandOff(owner.key, owner.slot, hash, tile, holo))
+    fun toCrop(hash: String, tile: Rect?, thumb: ImageBitmap?) {
+        CropHandOff.put(CropHandOff(owner.key, owner.slot, hash, tile, holo, thumb))
         close()
         deps.navigator.push(ImageCrop(sheet.projectKey, owner.kind, owner.key, owner.slot, hash))
     }
 
     val onImported: (ImportResult) -> Unit = { r ->
         when (r) {
-            is ImportResult.Imported -> toCrop(r.blobHash, null)
+            is ImportResult.Imported -> toCrop(r.blobHash, null, null)
             ImportResult.ReadOnly -> sayReadOnly()
-            ImportResult.Failed -> deps.toasts.show(ImageCopy.TODO_COPY_CANVAS_IMAGE_IMPORT_FAILED, actionLabel = null)
+            ImportResult.Failed -> deps.toasts.show(ImageCopy.IMAGE_IMPORT_FAILED, actionLabel = null)
         }
     }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
@@ -114,44 +123,50 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
     SheetHeader(view.title, onClose = ::close, subtitle = view.subtitle, closeLabel = ImageCopy.BTN_CLOSE)
     CivilightTabs(view.tabs, tab, { tab = it }, Modifier.padding(top = 6.dp))
     SheetScrollBody(Modifier.padding(top = 12.dp)) {
-        val tiles = if (tab == ImagePickModel.TAB_PRESETS) view.presets else view.mine
-        if (tiles.isEmpty()) {
-            CivilightText(
-                ImageCopy.TODO_COPY_CANVAS_MY_IMAGES_EMPTY,
-                CivilightTheme.type.small,
-                Modifier.padding(vertical = 24.dp),
-                color = CivilightTheme.colors.ink3,
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            tiles.chunked(COLUMNS).forEach { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    row.forEach { tile ->
-                        ImageTile(
-                            name = tile.name,
-                            selected = selected == tile.source,
-                            onClick = { selected = tile.source },
-                            modifier = Modifier
-                                .weight(1f)
-                                .onGloballyPositioned { bounds[tile.source] = it.boundsInWindow() },
-                            aspectRatio = TILE_ASPECT,
-                        ) {
-                            // The holo row previews on the selected tile; switching it on sweeps once (CNV-45).
-                            Box(Modifier.matchParentSize().holoSurface(holo && selected == tile.source, sweepOnStart = holoChoice == true)) {
-                                tile.preset?.let { PresetArt(it) }
-                                tile.blob?.let { MineThumb(it.hash) }
+        // The tabs swap their tile grids with a crossfade (audit §4 canvas 9, P3).
+        ContentSwap(tab, label = "imagePickTab") { shownTab ->
+            val tiles = if (shownTab == ImagePickModel.TAB_PRESETS) view.presets else view.mine
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (tiles.isEmpty()) {
+                    CivilightText(
+                        ImageCopy.MY_IMAGES_EMPTY,
+                        CivilightTheme.type.small,
+                        Modifier.padding(vertical = 24.dp),
+                        color = CivilightTheme.colors.ink3,
+                    )
+                }
+                tiles.chunked(COLUMNS).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        row.forEach { tile ->
+                            ImageTile(
+                                name = tile.name,
+                                selected = selected == tile.source,
+                                onClick = { selected = tile.source },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .onGloballyPositioned { bounds[tile.source] = it.boundsInWindow() },
+                                aspectRatio = TILE_ASPECT,
+                            ) {
+                                // The holo row previews on the selected tile; switching it on sweeps once (CNV-45).
+                                Box(Modifier.matchParentSize().holoSurface(holo && selected == tile.source, sweepTrigger = holoSweep)) {
+                                    tile.preset?.let { PresetArt(it) }
+                                    tile.blob?.let { blob -> MineThumb(blob.hash) { thumbs[tile.source] = it } }
+                                }
                             }
                         }
+                        repeat(COLUMNS - row.size) { Box(Modifier.weight(1f)) }
                     }
-                    repeat(COLUMNS - row.size) { Box(Modifier.weight(1f)) }
                 }
             }
         }
-        if (view.holoVisible) {
+        FoldReveal(view.holoVisible) {
             SwitchRow(
                 title = ImageCopy.HOLO,
                 checked = holo,
-                onCheckedChange = { holoChoice = it },
+                onCheckedChange = {
+                    holoChoice = it
+                    if (it) holoSweep++
+                },
                 subtitle = ImageCopy.HOLO_SUB,
                 modifier = Modifier.padding(top = 12.dp),
             )
@@ -159,7 +174,7 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
     }
     SheetActions {
         CivilightButton(
-            ImageCopy.BTN_GALLERY,
+            ImageCopy.BTN_PHOTO,
             { if (readOnly) sayReadOnly() else gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
             variant = ButtonVariant.GHOST,
             icon = IconId.Image,
@@ -179,7 +194,7 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
                     is PickAction.PlacePreset -> if (readOnly) sayReadOnly() else vm.placePreset(owner, action.presetId, holo) { r ->
                         if (r == EditResult.READ_ONLY) sayReadOnly() else closeSheet()
                     }
-                    is PickAction.Crop -> if (readOnly) sayReadOnly() else toCrop(action.blobHash, bounds[action.blobHash])
+                    is PickAction.Crop -> if (readOnly) sayReadOnly() else toCrop(action.blobHash, bounds[action.blobHash], thumbs[action.blobHash])
                 }
             },
             variant = ButtonVariant.PRIMARY,

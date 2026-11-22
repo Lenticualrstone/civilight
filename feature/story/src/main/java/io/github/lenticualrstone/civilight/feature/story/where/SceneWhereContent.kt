@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.story.where
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
 import io.github.lenticualrstone.civilight.domain.story.time.CascadeMode
 import io.github.lenticualrstone.civilight.domain.story.travel.TravelSettings
 import io.github.lenticualrstone.civilight.feature.story.check.TravelCard
@@ -40,6 +44,7 @@ import io.github.lenticualrstone.civilight.ui.project.currentProjectStore
  */
 @Composable
 fun SheetScope.SceneWhereContent(sheet: SceneWhereSheet, deps: FeatureDeps) {
+    val host = this
     val store = currentProjectStore
     val doc by store.doc.collectAsState()
     val settings by deps.settings.collectAsState()
@@ -64,7 +69,7 @@ fun SheetScope.SceneWhereContent(sheet: SceneWhereSheet, deps: FeatureDeps) {
     }
 
     if (ui == null) {
-        SheetHeader(title = "", onClose = ::close)
+        SheetHeader(title = "", onClose = host::close)
         return
     }
 
@@ -82,147 +87,151 @@ fun SheetScope.SceneWhereContent(sheet: SceneWhereSheet, deps: FeatureDeps) {
 
     val cascadeScene = pendingScene
     val cascadeTime = WhereModel.decode(pendingTime)
-    if (cascadeScene != null && cascadeTime != null) {
-        val step = remember(doc, cascadeScene, cascadeTime) { WhereModel.step(doc, cascadeScene, cascadeTime) }
-        if (step is TimeStep.Preview) {
-            CascadeBody(step.preview, store.readOnly, onCancel = { pendingScene = null; pendingTime = null }) { mode ->
-                actions.apply(WhereCopy.UNDO_LABEL) { d, ctx -> WhereModel.setTime(d, cascadeScene, cascadeTime, mode, ctx) }
-                pendingScene = null
-                pendingTime = null
-            }
-            return
-        }
+    val cascadeStep = if (cascadeScene != null && cascadeTime != null) remember(doc, cascadeScene, cascadeTime) { WhereModel.step(doc, cascadeScene, cascadeTime) } else null
+    val preview = cascadeStep as? TimeStep.Preview
+    if (cascadeStep != null && preview == null) {
         // The project changed under the preview (nothing depends on the scene any more): back to the form.
-        LaunchedEffect(step) {
-            if (step is TimeStep.Direct) saveTime(cascadeScene, cascadeTime)
+        LaunchedEffect(cascadeStep) {
+            if (cascadeStep is TimeStep.Direct && cascadeScene != null && cascadeTime != null) saveTime(cascadeScene, cascadeTime)
             pendingScene = null
             pendingTime = null
         }
     }
+    val lastPreview = rememberLastNonNull(preview)
 
-    when (picking) {
-        PICK_PLACES, PICK_REGIONS -> {
-            PlacePickerSheet(
-                doc = doc,
-                gate = gate,
-                title = WhereCopy.PICK_PLACE,
-                onPick = { ref ->
-                    actions.apply(WhereCopy.UNDO_LABEL) { d, ctx -> WhereModel.setPlace(d, sheet.sceneKey, ref, ctx) }
-                    picking = null
-                },
-                onClose = { picking = null },
-                selected = ui.place,
-                includeRegions = picking == PICK_REGIONS,
-            )
-            return
-        }
-        PICK_EVENT -> {
-            EventPickerSheet(
-                doc = doc,
-                title = WhereCopy.ANCHOR_EVENT,
-                onPick = { eventKey ->
-                    saveTime(sheet.sceneKey, FlashbackModel.next(currentDoc, sheet.sceneKey, FlashbackAction.Event(eventKey)))
-                    picking = null
-                },
-                onClose = { picking = null },
-                selectedKey = ui.flashback?.eventKey,
-            )
-            return
-        }
-        PICK_CAST -> {
-            CharacterPickerSheet(
-                doc = doc,
-                gate = gate,
-                onPick = { key ->
-                    actions.apply(WhereCopy.CAST) { d, ctx -> CastModel.add(d, sheet.sceneKey, key, ctx) }
-                    picking = null
-                },
-                onClose = { picking = null },
-                title = WhereCopy.CAST,
-                sceneCast = ui.cast.inScene,
-            )
-            return
-        }
-    }
-
-    SheetHeader(title = ui.sheet.title, onClose = ::close)
-    SheetScrollBody(Modifier.padding(bottom = 12.dp)) {
-        WherePlaceSection(
-            ui,
-            onPickList = { regions -> picking = if (regions) PICK_REGIONS else PICK_PLACES },
-            onPickMap = { deps.navigator.push(PickOnMap(sheet.projectKey, mapRequest, sheet.sceneKey)) },
-            onRestore = {
-                if (PlaceFix.needsAuth(currentDoc, sheet.sceneKey) && !gate.open) {
-                    gate.unlock()
-                } else {
-                    actions.restoreWithToast(WhereCopy.RESTORE) { d, ctx -> PlaceFix.restoreStep(d, sheet.sceneKey, ctx, gate.open) }
-                }
-            },
-            onKeep = { actions.apply(WhereCopy.KEEP) { d, ctx -> PlaceFix.keep(d, sheet.sceneKey, ctx) } },
-        )
-        WhereFlashbackRow(ui) { on -> saveTime(sheet.sceneKey, WhereModel.flashbackTime(on)) }
-        if (ui.flashback != null) {
-            WhereFlashbackForm(
-                ui,
-                onAction = { action -> saveTime(sheet.sceneKey, FlashbackModel.next(currentDoc, sheet.sceneKey, action)) },
-                onPickEvent = { picking = PICK_EVENT },
-                onTimeline = { deps.navigator.push(Timeline(sheet.projectKey)) },
-            )
-        } else {
-            WhereTimeSection(
-                ui,
-                onAction = { action -> saveTime(sheet.sceneKey, WhenEdit.next(currentDoc, sheet.sceneKey, action)) },
-                onRebase = { actions.apply(WhereCopy.UNDO_LABEL) { d, ctx -> WhereModel.rebaseToPrevious(d, sheet.sceneKey, ctx) } },
-                onTimeline = { deps.navigator.push(Timeline(sheet.projectKey)) },
-            )
-        }
-        WhereCastRow(
-            ui,
-            onAdd = { picking = PICK_CAST },
-            onRemove = { key -> actions.apply(WhereCopy.CAST) { d, ctx -> CastModel.remove(d, sheet.sceneKey, key, ctx) } },
-            onRestore = { key ->
-                if (CastModel.needsAuth(currentDoc, key) && !gate.open) {
-                    gate.unlock()
-                } else {
-                    actions.restoreWithToast(WhereCopy.RESTORE) { d, ctx -> CastModel.restoreStep(d, key, ctx, gate.open) }
-                }
-            },
-            onKeep = { key -> actions.apply(WhereCopy.KEEP) { d, ctx -> CastModel.keep(d, sheet.sceneKey, key, ctx) } },
-        )
-        WhereTransitionSection(
-            ui,
-            onMode = { mode -> actions.apply(WhereCopy.TRANSITION) { d, ctx -> WhereModel.setTransitionMode(d, sheet.sceneKey, mode, ctx) } },
-            onDirectText = { text ->
-                actions.applyMerged(WhereCopy.TRANSITION, "story.transition.${sheet.sceneKey}") { d, ctx -> WhereModel.writeDirect(d, sheet.sceneKey, text, ctx) }
-            },
-        )
-        ui.sheet.travel.forEach { block ->
-            val title = block.title.split(" | ")
-            val modes = block.warning.modeChips.size
-            TravelCard(
-                title = title.first(),
-                tag = title.getOrNull(1),
-                routeLine = null,
-                warning = block.warning,
-                detail = block.warning.detail,
-                chips = if (store.readOnly) emptyList() else block.chips,
-                onChip = { i ->
-                    when {
-                        i == 0 -> saveTime(block.warning.timeChip.sceneKey, WhereModel.delayedTime(currentDoc, block.warning.timeChip.sceneKey, block.warning.timeChip.days))
-                        i <= modes -> {
-                            val modeKey = block.warning.modeChips[i - 1].modeKey
-                            actions.apply(WhereCopy.UNDO_LABEL) { d, ctx -> WhereModel.applyModeChip(d, block.warning, modeKey, ctx) }
-                        }
-                        else -> actions.apply(WhereCopy.MATCH) { d, ctx -> WhereModel.acknowledgeTravel(d, block.warning, ctx) }
+    // The form, the cascade preview and the pickers swap in place on the body kind (P3); never on the data,
+    // so an edit inside the form does not cross-fade the sheet.
+    ContentSwap(WhereBody.of(preview != null, picking), Modifier.fillMaxWidth()) { body ->
+        Column(Modifier.fillMaxWidth()) {
+            when (body) {
+                WhereBody.CASCADE -> lastPreview?.let { shown ->
+                    CascadeBody(shown.preview, store.readOnly, onCancel = { pendingScene = null; pendingTime = null }) { mode ->
+                        val scene = cascadeScene
+                        val time = cascadeTime
+                        if (scene != null && time != null) actions.apply(WhereCopy.UNDO_LABEL) { d, ctx -> WhereModel.setTime(d, scene, time, mode, ctx) }
+                        pendingScene = null
+                        pendingTime = null
                     }
-                },
-                modifier = Modifier.padding(top = 12.dp),
-            )
+                }
+                WhereBody.PICK_PLACES, WhereBody.PICK_REGIONS -> PlacePickerSheet(
+                    doc = doc,
+                    gate = gate,
+                    title = WhereCopy.PICK_PLACE,
+                    onPick = { ref ->
+                        actions.apply(WhereCopy.UNDO_LABEL) { d, ctx -> WhereModel.setPlace(d, sheet.sceneKey, ref, ctx) }
+                        picking = null
+                    },
+                    onClose = { picking = null },
+                    selected = ui.place,
+                    includeRegions = body == WhereBody.PICK_REGIONS,
+                )
+                WhereBody.PICK_EVENT -> EventPickerSheet(
+                    doc = doc,
+                    title = WhereCopy.ANCHOR_EVENT,
+                    onPick = { eventKey ->
+                        saveTime(sheet.sceneKey, FlashbackModel.next(currentDoc, sheet.sceneKey, FlashbackAction.Event(eventKey)))
+                        picking = null
+                    },
+                    onClose = { picking = null },
+                    selectedKey = ui.flashback?.eventKey,
+                )
+                WhereBody.PICK_CAST -> CharacterPickerSheet(
+                    doc = doc,
+                    gate = gate,
+                    onPick = { key ->
+                        actions.apply(WhereCopy.CAST) { d, ctx -> CastModel.add(d, sheet.sceneKey, key, ctx) }
+                        picking = null
+                    },
+                    onClose = { picking = null },
+                    title = WhereCopy.CAST,
+                    sceneCast = ui.cast.inScene,
+                )
+                WhereBody.FORM -> {
+                    SheetHeader(title = ui.sheet.title, onClose = host::close)
+                    SheetScrollBody(Modifier.padding(bottom = 12.dp)) {
+                        WherePlaceSection(
+                            ui,
+                            onPickList = { regions -> picking = if (regions) KEY_REGIONS else KEY_PLACES },
+                            onPickMap = { deps.navigator.push(PickOnMap(sheet.projectKey, mapRequest, sheet.sceneKey)) },
+                            onRestore = {
+                                if (PlaceFix.needsAuth(currentDoc, sheet.sceneKey) && !gate.open) {
+                                    gate.unlock()
+                                } else {
+                                    actions.restoreWithToast(WhereCopy.RESTORE) { d, ctx -> PlaceFix.restoreStep(d, sheet.sceneKey, ctx, gate.open) }
+                                }
+                            },
+                            onKeep = { actions.apply(WhereCopy.KEEP) { d, ctx -> PlaceFix.keep(d, sheet.sceneKey, ctx) } },
+                        )
+                        WhereFlashbackRow(ui) { on -> saveTime(sheet.sceneKey, WhereModel.flashbackTime(on)) }
+                        // 회상 form and 때 section swap on the kind of the scene (P3).
+                        ContentSwap(ui.flashback != null, Modifier.fillMaxWidth()) { flashback ->
+                            if (flashback) {
+                                WhereFlashbackForm(
+                                    ui,
+                                    onAction = { action -> saveTime(sheet.sceneKey, FlashbackModel.next(currentDoc, sheet.sceneKey, action)) },
+                                    onPickEvent = { picking = KEY_EVENT },
+                                    onTimeline = { deps.navigator.push(Timeline(sheet.projectKey)) },
+                                )
+                            } else {
+                                WhereTimeSection(
+                                    ui,
+                                    onAction = { action -> saveTime(sheet.sceneKey, WhenEdit.next(currentDoc, sheet.sceneKey, action)) },
+                                    onRebase = { actions.apply(WhereCopy.UNDO_LABEL) { d, ctx -> WhereModel.rebaseToPrevious(d, sheet.sceneKey, ctx) } },
+                                    onTimeline = { deps.navigator.push(Timeline(sheet.projectKey)) },
+                                )
+                            }
+                        }
+                        WhereCastRow(
+                            ui,
+                            onAdd = { picking = KEY_CAST },
+                            onRemove = { key -> actions.apply(WhereCopy.CAST) { d, ctx -> CastModel.remove(d, sheet.sceneKey, key, ctx) } },
+                            onRestore = { key ->
+                                if (CastModel.needsAuth(currentDoc, key) && !gate.open) {
+                                    gate.unlock()
+                                } else {
+                                    actions.restoreWithToast(WhereCopy.RESTORE) { d, ctx -> CastModel.restoreStep(d, key, ctx, gate.open) }
+                                }
+                            },
+                            onKeep = { key -> actions.apply(WhereCopy.KEEP) { d, ctx -> CastModel.keep(d, sheet.sceneKey, key, ctx) } },
+                        )
+                        WhereTransitionSection(
+                            ui,
+                            onMode = { mode -> actions.apply(WhereCopy.TRANSITION) { d, ctx -> WhereModel.setTransitionMode(d, sheet.sceneKey, mode, ctx) } },
+                            onDirectText = { text ->
+                                actions.applyMerged(WhereCopy.TRANSITION, "story.transition.${sheet.sceneKey}") { d, ctx -> WhereModel.writeDirect(d, sheet.sceneKey, text, ctx) }
+                            },
+                        )
+                        ui.sheet.travel.forEach { block ->
+                            val title = block.title.split(" | ")
+                            val modes = block.warning.modeChips.size
+                            TravelCard(
+                                title = title.first(),
+                                tag = title.getOrNull(1),
+                                routeLine = null,
+                                warning = block.warning,
+                                detail = block.warning.detail,
+                                chips = if (store.readOnly) emptyList() else block.chips,
+                                onChip = { i ->
+                                    when {
+                                        i == 0 -> saveTime(block.warning.timeChip.sceneKey, WhereModel.delayedTime(currentDoc, block.warning.timeChip.sceneKey, block.warning.timeChip.days))
+                                        i <= modes -> {
+                                            val modeKey = block.warning.modeChips[i - 1].modeKey
+                                            actions.apply(WhereCopy.UNDO_LABEL) { d, ctx -> WhereModel.applyModeChip(d, block.warning, modeKey, ctx) }
+                                        }
+                                        else -> actions.apply(WhereCopy.MATCH) { d, ctx -> WhereModel.acknowledgeTravel(d, block.warning, ctx) }
+                                    }
+                                },
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-private const val PICK_PLACES = "places"
-private const val PICK_REGIONS = "regions"
-private const val PICK_EVENT = "event"
-private const val PICK_CAST = "cast"
+internal const val KEY_PLACES = "places"
+internal const val KEY_REGIONS = "regions"
+internal const val KEY_EVENT = "event"
+internal const val KEY_CAST = "cast"

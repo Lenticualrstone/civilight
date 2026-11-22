@@ -1,5 +1,15 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.AnimatedVisibility
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -76,11 +86,42 @@ class AnchorBelowPositionProvider(private val gapPx: Int, private val marginPx: 
 @Composable
 fun Popover(onDismissRequest: () -> Unit, gap: Dp = 6.dp, content: @Composable () -> Unit) {
     val density = LocalDensity.current
+    val motion = LocalMotion.current
     val provider = remember(density, gap) {
         with(density) { AnchorBelowPositionProvider(gap.roundToPx(), 12.dp.roundToPx()) }
     }
-    Popup(popupPositionProvider = provider, onDismissRequest = onDismissRequest, properties = PopupProperties(focusable = true)) {
-        content()
+    // S8: the card rises 6 dp and fades in on `enter`; an outside tap or back fades it out on `exit` first and
+    // only then calls [onDismissRequest]. Removing the popover from composition is still an instant close.
+    val visible = remember { MutableTransitionState(false) }
+    val closing = remember { mutableStateOf(false) }
+    val dismiss by rememberUpdatedState(onDismissRequest)
+    LaunchedEffect(Unit) { visible.targetState = true }
+    LaunchedEffect(visible) {
+        snapshotFlow { visible.isIdle && !visible.currentState && !visible.targetState }
+            .collect { gone ->
+                if (gone && closing.value) {
+                    dismiss()
+                    // Self-healing: if the caller keeps the popover, show it again instead of an invisible popup.
+                    withFrameNanos { }
+                    withFrameNanos { }
+                    closing.value = false
+                    visible.targetState = true
+                }
+            }
+    }
+    Popup(
+        popupPositionProvider = provider,
+        onDismissRequest = {
+            if (!closing.value) {
+                closing.value = true
+                visible.targetState = false
+            }
+        },
+        properties = PopupProperties(focusable = true),
+    ) {
+        AnimatedVisibility(visible, enter = motion.enter(CivilightMotion.enter, rise = 6.dp), exit = motion.exit(CivilightMotion.exit), label = "popover") {
+            content()
+        }
     }
 }
 

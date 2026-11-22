@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.story.bulk
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,12 +35,17 @@ import io.github.lenticualrstone.civilight.designsystem.component.CheckboxMark
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
+import io.github.lenticualrstone.civilight.designsystem.component.ProgressBar
 import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
 import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.story.bulk.BulkProgress
 import io.github.lenticualrstone.civilight.domain.story.bulk.BulkRow
 import io.github.lenticualrstone.civilight.feature.story.common.MiniMapView
@@ -53,52 +60,50 @@ fun BulkCover(ui: BulkUi, padding: PaddingValues, actions: BulkActions) {
         Modifier.fillMaxSize().background(colors.bg),
         contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp),
     ) {
-        item(key = "progress") { Progress(ui) }
+        item(key = "progress") { Progress(ui, civilightItem()) }
         item(key = "chips") {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(civilightItem().fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ui.chips.forEach { chip -> FilterChip(chip.label, chip.filter == ui.filter, { actions.onFilter(chip.filter) }) }
             }
         }
         ui.groups.forEach { group ->
             if (group.code.isNotEmpty()) {
-                item(key = "g:${group.code}") { CivilightText(group.code, CivilightTheme.type.sec, Modifier.padding(top = 14.dp, bottom = 2.dp), color = colors.ink3) }
+                item(key = "g:${group.code}") { CivilightText(group.code, CivilightTheme.type.sec, civilightItem().padding(top = 14.dp, bottom = 2.dp), color = colors.ink3) }
             }
             items(group.rows, key = { it.sceneKey }) { row ->
-                CoverRow(row, row.sceneKey in ui.selected) { actions.onToggle(row.sceneKey) }
+                CoverRow(row, row.sceneKey in ui.selected, civilightItem()) { actions.onToggle(row.sceneKey) }
             }
         }
     }
 }
 
 @Composable
-private fun Progress(ui: BulkUi) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+private fun Progress(ui: BulkUi, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         ProgressLine(ui.place)
         ProgressLine(ui.time)
     }
 }
 
-/** `장소 | ▬▬▬ | 22/31`: label 34, a flat 6 dp bar (`line` track, `acc` fill), the figures 56 mono. */
+/** `장소 | ▬▬▬ | 22/31`: label 34, the DS `ProgressBar` (its fill follows a change on `standard`), the figures 56 mono. */
 @Composable
 private fun ProgressLine(progress: BulkProgress) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         CivilightText(progress.label, type.small, Modifier.width(34.dp), color = colors.ink3, maxLines = 1)
-        Box(Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)).background(colors.line)) {
-            Box(Modifier.fillMaxWidth(progress.fraction.toFloat()).fillMaxHeight().background(colors.acc))
-        }
-        CivilightText("${progress.filled}/${progress.total}", type.dir, Modifier.width(56.dp), color = colors.ink3, maxLines = 1, textAlign = TextAlign.End)
+        ProgressBar(progress.fraction.toFloat(), Modifier.weight(1f))
+        ValueSwap("${progress.filled}/${progress.total}", type.dir, Modifier.width(56.dp), color = colors.ink3, textAlign = TextAlign.End, contentAlignment = Alignment.CenterEnd)
     }
 }
 
 /** `씬 2 · 오웬의 거래` with its values; the whole row toggles its checkbox (chosen rows: `sel` + `acc` bar). */
 @Composable
-private fun CoverRow(row: BulkRow, checked: Boolean, onToggle: () -> Unit) {
+private fun CoverRow(row: BulkRow, checked: Boolean, modifier: Modifier = Modifier, onToggle: () -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .topHairline(colors.line)
             .selectedRowBackground(checked, colors.sel, colors.acc)
@@ -139,16 +144,16 @@ fun BulkWide(ui: BulkUi, doc: ProjectDoc, padding: PaddingValues, readOnly: Bool
             Modifier.weight(1f).fillMaxHeight(),
             contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp),
         ) {
-            item(key = "progress") { Progress(ui) }
+            item(key = "progress") { Progress(ui, civilightItem()) }
             item(key = "head") {
-                Row(Modifier.fillMaxWidth().padding(top = 12.dp).padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(civilightItem().fillMaxWidth().padding(top = 12.dp).padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(Modifier.width(34.dp))
                     listOf(BulkCopy.COL_SCENE to 1.5f, BulkCopy.COL_PLACE to 1.1f, BulkCopy.COL_TIME to 1.1f, BulkCopy.COL_SUGGEST to 0.9f).forEach { (t, w) ->
                         CivilightText(t, type.sec, Modifier.weight(w), color = colors.ink3, maxLines = 1)
                     }
                 }
             }
-            items(ui.rows, key = { it.sceneKey }) { row -> WideRow(row, row.sceneKey in ui.selected, actions) }
+            items(ui.rows, key = { it.sceneKey }) { row -> WideRow(row, row.sceneKey in ui.selected, actions, civilightItem()) }
         }
         val counts = remember(doc, ui.rows, actions.locked) { placeCounts(doc, ui, actions.locked) }
         val map = remember(doc, counts, actions.locked) { MiniMaps.places(doc, labels = counts.mapValues { it.value.toString() }, prefer = counts.keys, exclude = BulkModel.hiddenPlaces(doc, actions.locked)) }
@@ -176,12 +181,12 @@ private fun placeCounts(doc: ProjectDoc, ui: BulkUi, locked: Boolean): Map<Strin
 }
 
 @Composable
-private fun WideRow(row: BulkRow, checked: Boolean, actions: BulkActions) {
+private fun WideRow(row: BulkRow, checked: Boolean, actions: BulkActions, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val cells = row.tableCells
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .topHairline(colors.line)
             .selectedRowBackground(checked, colors.sel, colors.acc, outset = 0.dp)
@@ -236,17 +241,23 @@ fun BulkFooter(ui: BulkUi, readOnly: Boolean, wide: Boolean, actions: BulkAction
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val can = ui.canApply(readOnly)
-    BottomGlassBar(barHeight = if (wide) 80.dp else 136.dp) {
+    // A fold changes the bar's height: it follows on the fold tokens (open = unfolded = the short inner bar).
+    val barHeight by animateDpAsState(
+        if (wide) 80.dp else 136.dp,
+        LocalMotion.current.move(if (wide) CivilightMotion.foldOpen else CivilightMotion.foldClose),
+        label = "bulkFooterHeight",
+    )
+    BottomGlassBar(barHeight = barHeight) {
         if (wide) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                CivilightText(ui.wideCount, type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
+                ValueSwap(ui.wideCount, type.small, Modifier.weight(1f), color = colors.ink3)
                 CivilightButton(ui.placeButton, actions.onPlace, variant = ButtonVariant.COMPACT_GHOST, enabled = can)
                 CivilightButton(ui.timeButton, actions.onTime, variant = ButtonVariant.COMPACT_GHOST, enabled = can)
                 CivilightButton(ui.suggestButton, actions.onSuggest, variant = ButtonVariant.COMPACT_PRIMARY, enabled = ui.canSuggest())
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ui.footer?.let { CivilightText(it, type.small, Modifier.fillMaxWidth(), color = colors.ink3, maxLines = 2, textAlign = TextAlign.Center) }
+                ui.footer?.let { ValueSwap(it, type.small, Modifier.fillMaxWidth(), color = colors.ink3, maxLines = 2, textAlign = TextAlign.Center, contentAlignment = Alignment.Center) }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CivilightButton(ui.placeButton, actions.onPlace, Modifier.weight(1f), variant = ButtonVariant.GHOST, enabled = can)
                     CivilightButton(ui.timeButton, actions.onTime, Modifier.weight(1f), variant = ButtonVariant.GHOST, enabled = can)

@@ -20,8 +20,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.lenticualrstone.civilight.designsystem.card.CardKind
+import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
@@ -166,7 +169,7 @@ fun NewItemCard(label: String, inner: Boolean, onClick: () -> Unit, modifier: Mo
 }
 
 /**
- * The 최근 연 파일 card (CNV-23): image (cover 150 × 100, inner 176 × 110, radius 14); 8 dp below: kind
+ * The 최근 연 파일 card (CNV-23): image (cover 150 × 100, inner 176 × 110, radius 14 or [imageRadius]); 8 dp below: kind
  * line small, title 700 15 / 21 single line, time small. Also the page card of the page list.
  */
 @Composable
@@ -179,14 +182,17 @@ fun RecentFileCard(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     imageModifier: Modifier = Modifier,
+    imageRadius: Dp = CardMetrics.radius(CardKind.RECENT).dp,
     image: @Composable BoxScope.() -> Unit,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val size = CardMetrics.size(CardKind.RECENT, inner)
+    // [imageRadius] moves with the `목록 ↔ 카드` switch (CNV-45); the press shape stays the card's own.
     val shape = RoundedCornerShape(CardMetrics.radius(CardKind.RECENT).dp)
+    val imageShape = RoundedCornerShape(imageRadius)
     Column(modifier.width(size.width.dp).pressable(PressAction.Select(selected, onClick), role = Role.Button, shape = shape)) {
-        Box(imageModifier.size(size.width.dp, size.height.dp).clip(shape).background(colors.raise), content = image)
+        Box(imageModifier.size(size.width.dp, size.height.dp).clip(imageShape).background(colors.raise), content = image)
         CivilightText(kindLine, type.small, Modifier.padding(top = 8.dp), color = colors.ink3, maxLines = 1)
         CivilightText(title, type.itemTitleCompact.merge(TextStyle(lineHeight = 21.sp)), color = colors.ink, maxLines = 1)
         CivilightText(time, type.small, color = colors.ink3, maxLines = 1)

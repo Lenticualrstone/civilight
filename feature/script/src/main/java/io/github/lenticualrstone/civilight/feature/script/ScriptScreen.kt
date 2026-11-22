@@ -1,7 +1,12 @@
 package io.github.lenticualrstone.civilight.feature.script
 
+import io.github.lenticualrstone.civilight.feature.script.ui.AppearOnJoin
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -44,7 +50,16 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.GlassScaffold
 import io.github.lenticualrstone.civilight.designsystem.component.ToastHost
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.Motion
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.feature.script.motion.barSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.model.app.PaneSplit
+import io.github.lenticualrstone.civilight.ui.window.PaneSplitHandle
+import io.github.lenticualrstone.civilight.ui.window.rememberPaneSplitState
+import io.github.lenticualrstone.civilight.feature.script.motion.ScriptScroll
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.domain.script.BlockOps
 import io.github.lenticualrstone.civilight.domain.script.Labels
@@ -100,6 +115,7 @@ import io.github.lenticualrstone.civilight.feature.script.ui.DirectionSheet
 import io.github.lenticualrstone.civilight.feature.script.ui.DirectionSheetKey
 import io.github.lenticualrstone.civilight.feature.script.ui.KindSheet
 import io.github.lenticualrstone.civilight.feature.script.ui.KindSheetKey
+import io.github.lenticualrstone.civilight.feature.script.editor.FieldOwner
 import io.github.lenticualrstone.civilight.feature.script.ui.EditableBlock
 import io.github.lenticualrstone.civilight.feature.script.ui.EditingTopBar
 import io.github.lenticualrstone.civilight.feature.script.ui.KeyboardToolbar
@@ -115,7 +131,6 @@ import io.github.lenticualrstone.civilight.feature.script.ui.ScriptTopBar
 import io.github.lenticualrstone.civilight.feature.script.ui.SpeakerSheet
 import io.github.lenticualrstone.civilight.feature.script.ui.SpeakerSheetKey
 import io.github.lenticualrstone.civilight.model.Key
-import io.github.lenticualrstone.civilight.feature.script.fold.FoldMotion
 import io.github.lenticualrstone.civilight.feature.script.fold.FoldRules
 import io.github.lenticualrstone.civilight.feature.script.fold.KeepAnchorOnResize
 import io.github.lenticualrstone.civilight.feature.script.fold.PanelHandover
@@ -360,7 +375,31 @@ private fun ScriptFrame(
     val densityScale = androidx.compose.ui.platform.LocalDensity.current.density
     val tabletop = foldPx?.let { TabletopLayout.of(FoldPosture.TABLETOP, heightDp, foldInFrameDp(it, frameTopPx, densityScale)) }
     val split = tabletop?.takeIf { !selecting }
-    val layout = ScriptLayout.of(widthDp, panelOpen && !selecting && tabletop == null)
+    // The manuscript's height follows the fold: it shrinks to the upper half and grows back on the fold tokens.
+    val upperHeight by animateFloatAsState(
+        split?.upper ?: heightDp,
+        CivilightTheme.motion.move(if (split != null) CivilightMotion.foldOpen else CivilightMotion.foldClose),
+        label = "tabletopUpper",
+    )
+    val upperSettled = split == null && kotlin.math.abs(upperHeight - heightDp) < 0.5f
+    val motion = CivilightTheme.motion
+    // CNV-47: the manuscript | panel ratio is the writer's own (drag, or the handle's buttons), stored by the shell.
+    val panelWanted = panelOpen && !selecting && tabletop == null
+    val baseLayout = ScriptLayout.of(widthDp, panelWanted)
+    val paneSplit = rememberPaneSplitState(PaneSplit.Modules.SCRIPT_PANEL, widthDp, ScriptLayout.of(widthDp, panelOpen = true).areaWidth)
+    val targetLayout = if (baseLayout.panel && paneSplit.resizable) ScriptLayout.of(widthDp, true, area = paneSplit.leftDp) else baseLayout
+    // SCR-66: a panel that opens slides in over the manuscript, which re-wraps once, when the panel has arrived;
+    // on close the manuscript takes the width at once and the panel fades out over it.
+    var panelArrived by remember { mutableStateOf(targetLayout.panel) }
+    LaunchedEffect(targetLayout.panel, motion) {
+        if (!targetLayout.panel) {
+            panelArrived = false
+        } else if (!panelArrived) {
+            delay(motion.delayMs(CivilightMotion.foldOpen.durationMs))
+            panelArrived = true
+        }
+    }
+    val layout = if (targetLayout.panel && !panelArrived && !motion.reduced) targetLayout.keepingAreaOf(ScriptLayout.of(widthDp, false)) else targetLayout
     // SCR-27: `대사만` is a read-only view of the same episode.
     val preview = doc.app.view.script.preview
     val previewOnly = !LayersModel.isEditable(preview)
@@ -378,8 +417,6 @@ private fun ScriptFrame(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
-    val reduced = CivilightTheme.reducedMotion
-    val density = androidx.compose.ui.platform.LocalDensity.current
     val fieldFocus = remember { FocusRequester() }
     val commandFocus = remember { FocusRequester() }
     var commandTyping by rememberSaveable { mutableStateOf(false) }
@@ -434,7 +471,7 @@ private fun ScriptFrame(
         val top = listState.layoutInfo.visibleItemsInfo.firstOrNull { ScriptRowKeys.blockKeyOf(it.key.toString()) != null }?.key?.toString()
         vm.saveFoldState(c.unitKey, top, panelScroll.offsets())
     }
-    KeepAnchorOnResize(listState, rows, editor, widthDp)
+    KeepAnchorOnResize(listState, rows, editor, layout.areaWidth)
     PanelHandover(
         // The tabletop's lower half shows the panel, as the side panel does.
         sideLayout = tabletop != null || ScriptLayout.of(widthDp, panelOpen = true).panel,
@@ -456,7 +493,7 @@ private fun ScriptFrame(
         val key = pendingScroll ?: return@LaunchedEffect
         if (rows.none { it.key == key }) return@LaunchedEffect
         // Under the cover panel sheet the row goes to the top, so it stays visible above the sheet (SCR-31).
-        bringIntoView(listState, rows, key, force = sheets.top is PanelSheetKey)
+        bringIntoView(listState, rows, key, motion, force = sheets.top is PanelSheetKey)
         pendingScroll = null
     }
 
@@ -574,7 +611,7 @@ private fun ScriptFrame(
             CommandAction.NewScene -> openNewScene()
             is CommandAction.Jump -> {
                 action.blockKey?.let(vm::selectBlock)
-                scope.launch { bringIntoView(listState, rows, action.rowKey, force = true) }
+                scope.launch { bringIntoView(listState, rows, action.rowKey, motion, force = true) }
             }
             CommandAction.SetLens -> headerScene?.let(vm::setLensToScene)
             is CommandAction.Renumber -> sheets.open(RenumberSheet(route.projectKey, action.unitKey))
@@ -599,7 +636,10 @@ private fun ScriptFrame(
 
     /** The bottom of the script: select bar, keyboard toolbar, or the command row and field (SCR-69: in the lower half). */
     val bottomContent: @Composable () -> Unit = {
-        if (selecting) {
+        val bottomMode = if (selecting) BottomMode.SELECT else if (editor.editing) BottomMode.TOOLBAR else BottomMode.COMMAND
+        // Motion audit, row 1: the bottom bar crossfades between select bar, keyboard toolbar and command row.
+        AnimatedContent(bottomMode, transitionSpec = { motion.barSwap() }, contentAlignment = Alignment.BottomStart, label = "scriptBottomBar") { mode ->
+        if (mode == BottomMode.SELECT) {
             val checked = SelectRules.ordered(select, rows)
             SelectBottomBar(
                 bar = SelectRows.bar(doc, select),
@@ -614,7 +654,7 @@ private fun ScriptFrame(
                     key?.let(sheets::open)
                 }),
             )
-        } else if (editor.editing) {
+        } else if (mode == BottomMode.TOOLBAR) {
             val kind = ScriptOps.currentKind(doc, editor)
             KeyboardToolbar(
                 kindLabel = Labels.kindLabel(kind),
@@ -659,10 +699,10 @@ private fun ScriptFrame(
                     // SCR-40: blocks on the clipboard paste below the selected block.
                     clipboard?.let { entry ->
                         val below = editor.selected?.takeIf { !c.readOnly && doc.manuscript.isLiveBlock(it) }
-                        ClipboardStrip(entry, canPaste = below != null) { below?.let(vm::pasteBelow) }
+                        AppearOnJoin { ClipboardStrip(entry, canPaste = below != null) { below?.let(vm::pasteBelow) } }
                     }
                     // SCR-68: matching commands as rows while typing (a visible path to `에셋` · `블록 고르기`).
-                    if (commandTyping) CommandSuggestionRows(CommandSuggestions.of(doc, c.unitKey, commandText), ::submitCommand)
+                    if (commandTyping) AppearOnJoin { CommandSuggestionRows(CommandSuggestions.of(doc, c.unitKey, commandText), ::submitCommand) }
                     ScriptCommandField(
                         typing = commandTyping,
                         text = commandText,
@@ -686,6 +726,7 @@ private fun ScriptFrame(
                 }
             }
         }
+        }
     }
 
     Box(
@@ -695,39 +736,45 @@ private fun ScriptFrame(
     ) {
         // SCR-03: header, manuscript and bottom bar span the area left of the panel only.
         Box(
-            (if (split != null) Modifier.height(split.upper.dp) else Modifier.fillMaxHeight())
+            (if (upperSettled) Modifier.fillMaxHeight() else Modifier.height(upperHeight.dp))
                 .width(layout.areaWidth.dp)
                 // The writing line (SCR-14) works inside this area: in tabletop posture, the upper half.
                 .onGloballyPositioned { frame.rootTop = it.positionInRoot().y; frame.height = it.size.height.toFloat() },
         ) {
         GlassScaffold(
             topBar = {
-                if (selecting) {
-                    SelectTopBar(header.line, onAll = { vm.checkAll(rows, headerScene) }, onDone = vm::leaveSelect)
-                } else if (editor.editing) {
-                    EditingTopBar(header.line) {
-                        vm.done()
-                        focusManager.clearFocus()
-                        keyboard?.hide()
+                val topMode = when {
+                    selecting -> TopBarMode.SELECT
+                    editor.editing -> TopBarMode.EDIT
+                    c.readOnly -> TopBarMode.READ_ONLY
+                    else -> TopBarMode.READ
+                }
+                // Motion audit, row 1: the header crossfades between reading, typing and select mode.
+                AnimatedContent(topMode, transitionSpec = { motion.barSwap() }, contentAlignment = Alignment.TopStart, label = "scriptTopBar") { mode ->
+                    when (mode) {
+                        TopBarMode.SELECT -> SelectTopBar(header.line, onAll = { vm.checkAll(rows, headerScene) }, onDone = vm::leaveSelect)
+                        TopBarMode.EDIT -> EditingTopBar(header.line) {
+                            vm.done()
+                            focusManager.clearFocus()
+                            keyboard?.hide()
+                        }
+                        // SCR-60: the read-only example's banner header (board `OnbExampleScript`).
+                        TopBarMode.READ_ONLY -> ReadOnlyTopBar(header.line)
+                        TopBarMode.READ -> ScriptTopBar(
+                            title = doc.project.name,
+                            line = header.line,
+                            positionLabel = header.positionLabel,
+                            wide = wide,
+                            onPositionLabel = {
+                                val scene = header.sceneKey ?: return@ScriptTopBar
+                                sheets.open(PositionSheetKey(route.projectKey, scene, header.positionLabel.orEmpty()))
+                            },
+                            onLayers = ::openLayers,
+                        )
                     }
-                } else if (c.readOnly) {
-                    // SCR-60: the read-only example's banner header (board `OnbExampleScript`).
-                    ReadOnlyTopBar(header.line)
-                } else {
-                    ScriptTopBar(
-                        title = doc.project.name,
-                        line = header.line,
-                        positionLabel = header.positionLabel,
-                        wide = wide,
-                        onPositionLabel = {
-                            val scene = header.sceneKey ?: return@ScriptTopBar
-                            sheets.open(PositionSheetKey(route.projectKey, scene, header.positionLabel.orEmpty()))
-                        },
-                        onLayers = ::openLayers,
-                    )
                 }
             },
-            bottomBar = { if (split == null) bottomContent() },
+            bottomBar = { AnimatedVisibility(split == null, enter = motion.enter(CivilightMotion.foldOpen), exit = motion.exit(CivilightMotion.foldClose)) { bottomContent() } },
             overlay = { padding ->
                 Box(
                     Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding() + TOAST_GAP),
@@ -802,7 +849,7 @@ private fun ScriptFrame(
                             parenMode = editor.parenMode,
                             inheritedHint = editor.inheritedHint == row.blockKey,
                             focusRequester = fieldFocus,
-                            onValueChange = vm::onFieldChange,
+                            onValueChange = { value -> vm.onFieldChange(value, FieldOwner(row.key, editor.caretOption.takeIf { row.kind == BlockKind.CHOICE })) },
                             onFocusLost = { option -> if (sheets.top == null) vm.onFieldFocusLost(row.key, option) },
                             onSpeaker = { openOverKeyboard(SpeakerSheetKey.of(route.projectKey, SpeakerTarget(row.blockKey, row.speaker?.characterKey, row.sceneKey))) },
                             onCaret = ::onCaret,
@@ -827,7 +874,7 @@ private fun ScriptFrame(
                             parenMode = editor.parenMode,
                             inheritedHint = editor.pendingSpeaker == null && row.speaker != null,
                             focusRequester = fieldFocus,
-                            onValueChange = vm::onFieldChange,
+                            onValueChange = { value -> vm.onFieldChange(value, FieldOwner(row.key)) },
                             onFocusLost = { option -> if (sheets.top == null) vm.onFieldFocusLost(row.key, option) },
                             onSpeaker = { speakerTarget?.let { t -> openOverKeyboard(SpeakerSheetKey.of(route.projectKey, t)) } },
                             onCaret = ::onCaret,
@@ -882,27 +929,29 @@ private fun ScriptFrame(
                 LayersModel.headerChip(preview),
                 TermCopy.CHIP.takeIf { doc.app.view.script.layers.termCandidates && !previewOnly },
             )
-            if (headerChips.isNotEmpty()) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = padding.calculateTopPadding() + 4.dp)
-                        .padding(horizontal = if (layout.wide) layout.columnStart.dp + 24.dp else 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    headerChips.forEach { chip -> FilterChip(label = chip, selected = true, onClick = ::openLayers) }
+            FoldRevealValue(
+                headerChips.takeIf { it.isNotEmpty() },
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = padding.calculateTopPadding() + 4.dp)
+                    .padding(horizontal = if (layout.wide) layout.columnStart.dp + 24.dp else 24.dp),
+                label = "headerChips",
+            ) { chips ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    chips.forEach { chip -> FilterChip(label = chip, selected = true, onClick = ::openLayers) }
                 }
             }
             }
         }
         }
-        // SCR-66: the panel comes in from 48 dp right on unfold (360 ms decelerate) and fades on fold
-        // (240 ms accelerate); reduced motion: a 120 ms fade.
+        // SCR-66 / CNV-34: the panel comes in 48 dp from the right on `foldOpen` and fades on `foldClose`;
+        // reduced motion: a 120 ms fade. Its width is the writer's ratio (CNV-47).
+        val panelWidth = rememberLastNonNull(targetLayout.panelWidth.takeIf { targetLayout.panel }) ?: ScriptLayout.PANEL_WIDTH
         AnimatedVisibility(
-            visible = layout.panel && !selecting,
+            visible = targetLayout.panel,
             modifier = Modifier.align(Alignment.TopEnd),
-            enter = FoldMotion.panelEnter(reduced, density),
-            exit = FoldMotion.panelExit(reduced),
+            enter = motion.panelEnter(),
+            exit = motion.panelExit(),
         ) {
             val actions = scriptPanelActions(route, deps, vm, gate.open, open = ::openOverKeyboard, leave = {})
             ScriptSidePanel(
@@ -910,21 +959,35 @@ private fun ScriptFrame(
                 onSelectTab = vm::setPanelTab,
                 onClose = { panelOpen = false },
                 scrollOf = panelScroll::state,
+                width = panelWidth.dp,
             ) { tab ->
                 panel?.takeIf { it.tab == tab }?.let { PanelTabBody(it, wide = true, actions = actions) }
             }
         }
+        // CNV-47: the handle sits on the divider, which is the panel's left edge. Nothing shows when the
+        // window is too narrow for two 280 dp panes.
+        if (targetLayout.panel) {
+            PaneSplitHandle(paneSplit, Modifier.align(Alignment.CenterStart).offset(x = (targetLayout.areaWidth - HANDLE_HALF).dp))
+        }
         // SCR-69: the lower half in tabletop posture: panel tabs, then the command area (the keyboard comes up here).
-        if (split != null) {
-            val actions = scriptPanelActions(route, deps, vm, gate.open, open = ::openOverKeyboard, leave = {})
-            TabletopPanel(
-                tab = panelTab,
-                onSelectTab = vm::setPanelTab,
-                scrollOf = panelScroll::state,
-                modifier = Modifier.padding(top = (split.upper + split.gap).dp).height(split.lower.dp).fillMaxWidth(),
-                commandArea = bottomContent,
-            ) { tab ->
-                panel?.takeIf { it.tab == tab }?.let { PanelTabBody(it, wide = true, actions = actions) }
+        // The lower half comes up from the fold and goes back down on the fold tokens (motion audit, row 3).
+        val lastSplit = rememberLastNonNull(split)
+        AnimatedVisibility(
+            visible = split != null,
+            enter = motion.enter(CivilightMotion.foldOpen, rise = TABLETOP_RISE),
+            exit = motion.exit(CivilightMotion.foldClose),
+        ) {
+            if (lastSplit != null) {
+                val actions = scriptPanelActions(route, deps, vm, gate.open, open = ::openOverKeyboard, leave = {})
+                TabletopPanel(
+                    tab = panelTab,
+                    onSelectTab = vm::setPanelTab,
+                    scrollOf = panelScroll::state,
+                    modifier = Modifier.padding(top = (lastSplit.upper + lastSplit.gap).dp).height(lastSplit.lower.dp).fillMaxWidth(),
+                    commandArea = bottomContent,
+                ) { tab ->
+                    panel?.takeIf { it.tab == tab }?.let { PanelTabBody(it, wide = true, actions = actions) }
+                }
             }
         }
     }
@@ -961,11 +1024,12 @@ private fun sceneUnderSelectBar(listState: LazyListState, rows: List<SelectRowMo
 }
 
 /** Scrolls [key] into view when it is not (fully) on screen, or always with [force]. */
-private suspend fun bringIntoView(listState: LazyListState, rows: List<ScriptRow>, key: String, force: Boolean = false) {
+private suspend fun bringIntoView(listState: LazyListState, rows: List<ScriptRow>, key: String, motion: Motion, force: Boolean = false) {
     val index = rows.indexOfFirst { it.key == key }
     if (index < 0) return
     val visible = listState.layoutInfo.visibleItemsInfo.any { it.key == key }
-    if (force || !visible) listState.animateScrollToItem(index)
+    if (!force && visible) return
+    ScriptScroll.show(listState, index, motion)
 }
 
 /** Bar and caret geometry in root pixels, for the fixed writing line. */
@@ -990,8 +1054,20 @@ private fun FrameBounds.updateBars(padding: PaddingValues) {
     }
 }
 
+/** What the script's header shows (motion audit, row 1). */
+private enum class TopBarMode { READ, EDIT, SELECT, READ_ONLY }
+
+/** What the script's bottom bar shows (motion audit, row 1). */
+private enum class BottomMode { COMMAND, TOOLBAR, SELECT }
+
 /** Frames to wait for the caret row's field to attach before focusing it. */
 private const val FOCUS_TRIES = 6
+
+/** Half of the pane split handle's 44 dp touch area (CNV-47): it is centred on the divider. */
+private const val HANDLE_HALF = 22f
+
+/** The tabletop's lower half rises this far on unfold. */
+private val TABLETOP_RISE = 24.dp
 
 /** A toast sits 6 dp above the bottom bar (DS-27, as `CivilightScreen`). */
 private val TOAST_GAP = 6.dp

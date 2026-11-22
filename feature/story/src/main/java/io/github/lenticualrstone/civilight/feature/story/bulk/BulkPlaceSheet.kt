@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.story.bulk
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +31,9 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBod
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import io.github.lenticualrstone.civilight.domain.story.bulk.BulkPlace
 import io.github.lenticualrstone.civilight.domain.story.units.UnitCodes
 import io.github.lenticualrstone.civilight.feature.story.common.MiniMapView
@@ -116,21 +120,24 @@ fun SheetScope.BulkPlaceContent(sheet: BulkPlaceSheet, vm: BulkViewModel, deps: 
             height = 30.dp,
         )
     }
-    if (oneByOne && keys.isNotEmpty()) {
-        ChipFlow(Modifier.padding(top = 10.dp)) {
-            keys.forEachIndexed { i, k ->
-                val label = listOfNotNull(codes.sceneRef(k), perScene[k]?.let { BulkCopy.CHOSEN }).joinToString(BulkCopy.SEP)
-                FilterChip(label, i == step, { step = i })
+    // `씬마다 차례로` brings its scene chips and the step line in with a fold (P2).
+    FoldReveal(oneByOne && keys.isNotEmpty()) {
+        Column(Modifier.fillMaxWidth()) {
+            ChipFlow(Modifier.padding(top = 10.dp)) {
+                keys.forEachIndexed { i, k ->
+                    val label = listOfNotNull(codes.sceneRef(k), perScene[k]?.let { BulkCopy.CHOSEN }).joinToString(BulkCopy.SEP)
+                    FilterChip(label, i == step, { step = i })
+                }
             }
-        }
-        current?.let { k ->
-            val scene = doc.index.unit(k)
-            CivilightText(
-                listOfNotNull(BulkCopy.step(step, keys.size), codes.sceneRef(k), scene?.title).joinToString(BulkCopy.SEP),
-                type.small,
-                Modifier.padding(top = 8.dp),
-                color = colors.ink3,
-            )
+            current?.let { k ->
+                val scene = doc.index.unit(k)
+                ValueSwap(
+                    listOfNotNull(BulkCopy.step(step, keys.size), codes.sceneRef(k), scene?.title).joinToString(BulkCopy.SEP),
+                    type.small,
+                    Modifier.padding(top = 8.dp),
+                    color = colors.ink3,
+                )
+            }
         }
     }
     val accent = setOfNotNull(chosenRef?.takeIf { it.kind.known == PlaceRefKind.PLACE }?.key)
@@ -139,17 +146,23 @@ fun SheetScope.BulkPlaceContent(sheet: BulkPlaceSheet, vm: BulkViewModel, deps: 
         MiniMapView(m, Modifier.padding(top = 12.dp).fillMaxWidth().height(170.dp), onPin = if (regions) null else { k -> pick(PlaceRef(PlaceRefKind.PLACE, k)) })
     }
     SheetScrollBody(Modifier.padding(top = 8.dp)) {
-        options.forEach { option ->
-            val isChosen = chosenRef?.sameAs(option.ref) == true
-            ListRow(
-                title = option.name,
-                subtitle = option.countText,
-                leading = { CivilightIcon(IconId.Pin, contentDescription = null, size = 20.dp, tint = if (isChosen) colors.acc else colors.ink3) },
-                trailing = if (isChosen) { { CivilightText(BulkCopy.CHOSEN, type.small, color = colors.acc) } } else null,
-                onClick = { pick(option.ref) },
-                selected = isChosen,
-                compact = true,
-            )
+        // Places and regions swap on the kind (P3); each list is computed for its own kind.
+        ContentSwap(regions, Modifier.fillMaxWidth()) { regionList ->
+            val listed = remember(doc, scope, regionList, locked) { BulkPlaceForm.options(doc, scope, regionList, locked) }
+            Column(Modifier.fillMaxWidth()) {
+                listed.forEach { option ->
+                    val isChosen = chosenRef?.sameAs(option.ref) == true
+                    ListRow(
+                        title = option.name,
+                        subtitle = option.countText,
+                        leading = { CivilightIcon(IconId.Pin, contentDescription = null, size = 20.dp, tint = if (isChosen) colors.acc else colors.ink3) },
+                        trailing = if (isChosen) { { CivilightText(BulkCopy.CHOSEN, type.small, color = colors.acc) } } else null,
+                        onClick = { pick(option.ref) },
+                        selected = isChosen,
+                        compact = true,
+                    )
+                }
+            }
         }
         ListRow(
             title = BulkCopy.NEW_PLACE,

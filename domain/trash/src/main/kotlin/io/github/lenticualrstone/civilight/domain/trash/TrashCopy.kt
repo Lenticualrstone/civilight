@@ -32,6 +32,11 @@ object TrashCopy {
     const val HIDDEN_PROJECT = "숨긴 프로젝트"
     const val HIDDEN_ITEM = "숨긴 항목"
 
+    /** Gallery (55): the area word, an untitled image, and the hidden count form of the order line. */
+    const val GALLERY = "갤러리"
+    const val UNTITLED_IMAGE = "제목 없음"
+    const val HIDDEN_TAG = "숨김"
+
     /** Copy id of a reference whose target is absent and has no name tag (§3 case 5; no source copy yet). */
     const val MISSING_REFERENCE_COPY_ID = "TODO_COPY_DM_01"
 
@@ -49,6 +54,7 @@ object TrashCopy {
         ItemKind.CANVAS -> "캔버스"
         ItemKind.UNIT -> "씬"
         ItemKind.BLOCK -> "블록"
+        ItemKind.GALLERY_ITEM -> "이미지"
     }
 
     /** `숨긴 인물` / `숨긴 장소` … (trash rows and lists of a hidden item). */

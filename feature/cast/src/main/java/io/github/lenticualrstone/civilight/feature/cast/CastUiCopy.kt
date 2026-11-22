@@ -177,8 +177,11 @@ object CastUiCopy {
     /** The archive document's unlock point (planning `열리는 시점`). */
     const val UNLOCK = "열리는 시점"
 
-    /** No source names the `@` picker of cast text (voice lines, 말투, 비밀, archive documents). */
-    const val TODO_COPY_CAST_LINK_PICKER_TITLE = "TODO_COPY_CAST_LINK_PICKER_TITLE"
+    /**
+     * Title of the `@` picker of cast text (voice lines, 말투, 비밀, archive documents). No source names it,
+     * so it is the nearest existing copy, the `연결` of a link field ([LINK_TARGET]).
+     */
+    const val LINK_PICKER_TITLE = LINK_TARGET
 
     // --- 항목 필터 · 정렬 (CST-03) ---
     /** The header button and its sheet (the feature's own name; §6 Q13 default placement). */
@@ -212,6 +215,19 @@ object CastUiCopy {
 
     /** The separator of joined fragments. */
     const val SEP = " · "
+
+    // --- 갤러리 (GAL-01, GAL-02; 55-gallery.md) ---
+    /** `갤러리 · 8`: the header of the profile section, N = live visible images. */
+    fun gallerySection(count: Int): String = "갤러리 · $count"
+
+    /** `갤러리 8`: the chip on a card of the card view (GAL-02). */
+    fun galleryChip(count: Int): String = "갤러리 $count"
+
+    /** `전체 보기 ›`: opens the character's gallery screen (GAL-04). */
+    const val BTN_GALLERY_ALL = "전체 보기 ›"
+
+    /** The outlined empty card of the section (GAL-01, same look as the empty gallery). */
+    const val GALLERY_EMPTY_ADD = "이미지 넣기"
 
     // --- 숨기기 (CST-39) ---
     /** Record `⋯` row (CST-39) and its undo label. */

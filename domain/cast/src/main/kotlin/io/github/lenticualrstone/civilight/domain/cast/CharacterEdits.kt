@@ -26,6 +26,11 @@ sealed interface CharacterTab {
 }
 
 /** Creating characters and editing their fixed fields (CST-05, CST-11 … CST-13, CST-39, CST-49). */
+/** Tag settings row counts: `인물 0 · 이미지 1` (55 §3.4). */
+data class TagUsage(val characters: Int, val images: Int) {
+    val line: String get() = "인물 $characters · 이미지 $images"
+}
+
 object CharacterEdits {
     const val CREATE_TITLE = "인물 추가"
     const val CREATE_ACTION = "넣기"
@@ -97,6 +102,44 @@ object CharacterEdits {
 
     /** Project tags in order. */
     fun tags(doc: ProjectDoc): List<Tag> = doc.project.tags.sortedWith(compareBy<Tag>({ it.order }, { it.key }))
+
+    /** Renames a tag (names stay unique: an existing other tag with the name refuses with null). Keys stay, so nothing else changes. */
+    fun renameTag(doc: ProjectDoc, tagKey: Key, name: String, ctx: EditContext): ProjectDoc? {
+        val n = name.trim().nfc()
+        require(n.isNotEmpty()) { "tag name is empty" }
+        if (doc.project.tags.any { it.key != tagKey && it.name.nfc() == n }) return null
+        return doc.copy(
+            project = doc.project.copy(
+                tags = doc.project.tags.map { if (it.key == tagKey) it.copy(name = n, updatedAt = ctx.now, updatedBy = ctx.device) else it },
+            ),
+        )
+    }
+
+    /**
+     * Removes a tag from the project and, in the same edit, from every character and every gallery
+     * image that holds it (55 §3.4, T-GAL-31); live and trashed rows alike.
+     */
+    fun removeTag(doc: ProjectDoc, tagKey: Key, ctx: EditContext): ProjectDoc = doc.copy(
+        project = doc.project.copy(tags = doc.project.tags.filterNot { it.key == tagKey }),
+        cast = doc.cast.copy(
+            characters = doc.cast.characters.map {
+                if (tagKey in it.tagKeys) it.copy(tagKeys = it.tagKeys - tagKey, updatedAt = ctx.now, updatedBy = ctx.device) else it
+            },
+        ),
+        gallery = doc.gallery.mapValues { (_, file) ->
+            if (file.items.none { tagKey in it.tagKeys }) {
+                file
+            } else {
+                file.copy(items = file.items.map { if (tagKey in it.tagKeys) it.copy(tagKeys = it.tagKeys - tagKey, updatedAt = ctx.now, updatedBy = ctx.device) else it })
+            }
+        },
+    )
+
+    /** How many live characters and live gallery images hold [tagKey] (tag settings row, T-GAL-31). */
+    fun tagUsage(doc: ProjectDoc, tagKey: Key): TagUsage = TagUsage(
+        characters = doc.cast.characters.count { it.deletedAt == null && tagKey in it.tagKeys },
+        images = doc.galleryItems.count { doc.liveness.isLive(it) && tagKey in it.tagKeys },
+    )
 
     // --- Recorder (CST-49) ---
 

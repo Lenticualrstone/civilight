@@ -10,7 +10,9 @@ import io.github.lenticualrstone.civilight.model.change.AnchorState
 import io.github.lenticualrstone.civilight.model.change.ChangeRecord
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.checks.CheckType
+import io.github.lenticualrstone.civilight.model.doc.BlobRefs
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.serialName
 import io.github.lenticualrstone.civilight.model.trash.DeletionLogEntry
@@ -152,6 +154,10 @@ object PurgeOps {
                 }
                 ItemKind.UNIT -> purgeUnit(item.key)
                 ItemKind.BLOCK -> purgeBlocks(setOf(item.key))
+                ItemKind.GALLERY_ITEM -> {
+                    doc = doc.removeGalleryItems { it.key == item.key }
+                    removed += item.key
+                }
             }
             log += DeletionLogEntry(item.key, logKind(item.kind), ctx.now)
             item.kind.nameTagKind?.takeIf { item.kind.isNamedItem }?.let { tagKind ->
@@ -265,7 +271,16 @@ object PurgeOps {
             doc = doc.copy(changes = doc.changes.copy(records = doc.changes.records - gone.toSet()))
         }
 
+        /** The owner's image uses and, for a character, its gallery items (55 §3.4). */
         private fun removeImages(owner: ImageOwnerKind, key: Key) {
+            if (owner == ImageOwnerKind.CHARACTER) {
+                val items = doc.galleryItems.filter { it.isOwnedBy(GalleryOwnerKind.CHARACTER, key) }
+                if (items.isNotEmpty()) {
+                    removed += items.map { it.key }
+                    val keys = items.map { it.key }.toSet()
+                    doc = doc.removeGalleryItems { it.key in keys }
+                }
+            }
             val gone = doc.assets.imageUses.filter { it.ownerKind.known == owner && it.ownerKey == key }
             if (gone.isEmpty()) return
             removed += gone.map { it.key }
@@ -325,13 +340,9 @@ object PurgeOps {
         else -> kind.trashKind.serialName
     }
 
-    /** Blob hashes referenced by any row (live or trashed) of the project. */
-    internal fun referencedBlobs(doc: ProjectDoc): Set<String> = buildSet {
-        doc.assets.imageUses.mapNotNullTo(this) { it.blobHash }
-        doc.assets.scriptAssets.mapNotNullTo(this) { it.fileHash }
-        doc.maps.values.forEach { m ->
-            m.baseImageHash?.let(::add)
-            m.sketch?.photoHash?.let(::add)
-        }
-    }
+    /**
+     * Blob hashes referenced by any row (live or trashed) of the project, gallery items included:
+     * the one function `core:model` [BlobRefs] (T-GAL-27).
+     */
+    fun referencedBlobs(doc: ProjectDoc): Set<String> = BlobRefs.of(doc)
 }

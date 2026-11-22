@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.recorder
 
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.ProjectSnapshot
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderEnv
@@ -174,7 +175,7 @@ class CaptureHubTest {
     fun LRC_11_withoutAnEngineTheRecordingRunsAndSavesEmptyText() = runTest {
         val f = HubFixture(this, engine = FakeEngine(available = false))
         f.startFromScript()
-        assertEquals(RecorderCopy.TODO_NO_ENGINE, CaptureViews.recording(f.hub.state.value)!!.engineNote)
+        assertEquals(ShownCopy.NO_ENGINE, CaptureViews.recording(f.hub.state.value)!!.engineNote)
         wait(6_000)
         f.hub.stopAndSave()
         val view = CaptureViews.processing(f.hub.state.value)!!.screen

@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.script.scenes
 
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.feature.script.ui.SheetStep
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -86,7 +88,9 @@ fun SheetScope.SceneSplitSheetContent(sheet: SceneSplitSheet, deps: FeatureDeps)
     val gate = rememberHiddenGate(sheet.projectKey)
     var choices by rememberSaveable(stateSaver = splitSaver) { mutableStateOf(SplitChoices()) }
     var picking by rememberSaveable { mutableStateOf(false) }
-    if (picking) {
+    SheetStep(
+        picking = picking,
+        picker = {
         PlacePickerSheet(
             doc = doc,
             gate = gate,
@@ -98,13 +102,13 @@ fun SheetScope.SceneSplitSheetContent(sheet: SceneSplitSheet, deps: FeatureDeps)
             onClose = { picking = false },
             selected = choices.picked,
         )
-        return
-    }
+        },
+    ) {
     val model = remember(doc, sheet.blockKey, choices, gate.open, store.readOnly) {
         SplitModel.of(doc, sheet.blockKey, choices, gate.open, store.readOnly, deps.actionContext())
     }
     SheetHeader(title = model?.title ?: SceneCopy.SPLIT_TITLE, onClose = ::close, subtitle = model?.sub)
-    if (model == null) return
+    if (model == null) return@SheetStep
     var editingTime by rememberSaveable { mutableStateOf(false) }
     var editingTitle by rememberSaveable { mutableStateOf(false) }
     var titleField by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(choices.title, TextRange(choices.title.length))) }
@@ -113,7 +117,7 @@ fun SheetScope.SceneSplitSheetContent(sheet: SceneSplitSheet, deps: FeatureDeps)
         Column(Modifier.padding(top = 10.dp)) {
             FieldRow(SceneCopy.FIELD_PLACE, model.place, SceneCopy.CHANGE.takeIf { model.canApply }) { picking = true }
             FieldRow(SceneCopy.FIELD_TIME, model.time, SceneCopy.CHANGE.takeIf { model.canApply && model.timeChoice }) { editingTime = !editingTime }
-            if (editingTime && model.timeChoice) {
+            FoldReveal(editingTime && model.timeChoice) {
                 SegmentedControl(
                     options = listOf(SceneCopy.SAME_TIME, SceneCopy.NO_TIME),
                     selectedIndex = if (choices.sameTime) 0 else 1,
@@ -122,7 +126,7 @@ fun SheetScope.SceneSplitSheetContent(sheet: SceneSplitSheet, deps: FeatureDeps)
                 )
             }
             FieldRow(SceneCopy.FIELD_TITLE, model.titleLine, SceneCopy.WRITE.takeIf { model.canApply }) { editingTitle = !editingTitle }
-            if (editingTitle) {
+            FoldReveal(editingTitle) {
                 CivilightTextField(
                     value = titleField,
                     onValueChange = {
@@ -178,6 +182,7 @@ fun SheetScope.SceneSplitSheetContent(sheet: SceneSplitSheet, deps: FeatureDeps)
             subText = if (!model.canApply) SceneCopy.READ_ONLY else null,
             enabled = model.canApply,
         )
+    }
     }
 }
 

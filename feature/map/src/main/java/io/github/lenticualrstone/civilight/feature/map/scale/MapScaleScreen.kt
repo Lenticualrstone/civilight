@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.feature.map.common.FoldSwitch
+import io.github.lenticualrstone.civilight.feature.map.common.appear
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -119,12 +122,13 @@ fun MapScaleScreen(route: MapScale, deps: FeatureDeps) {
                 showRouteChips = false,
                 onTap = { p, _ -> if (!readOnly) set(ScaleEdit.tap(draft, scene, p)) },
                 marks = { scope ->
-                    draft.a?.let { p -> val s = scope.screen(p); MapValueChip(MapCopy.SCALE_A, Modifier.mapAt(s.x, s.y)) }
-                    draft.b?.let { p -> val s = scope.screen(p); MapValueChip(MapCopy.SCALE_B, Modifier.mapAt(s.x, s.y)) }
+                    draft.a?.let { p -> val s = scope.screen(p); MapValueChip(MapCopy.SCALE_A, Modifier.mapAt(s.x, s.y).appear()) }
+                    draft.b?.let { p -> val s = scope.screen(p); MapValueChip(MapCopy.SCALE_B, Modifier.mapAt(s.x, s.y).appear()) }
                 },
             )
             TopBarTapGuard(padding.calculateTopPadding())
-            val cardModifier = if (inner) {
+            FoldSwitch(inner) { isInner ->
+            val cardModifier = if (isInner) {
                 Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 16.dp).width(320.dp)
             } else {
                 Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth()
@@ -145,10 +149,11 @@ fun MapScaleScreen(route: MapScale, deps: FeatureDeps) {
                         }
                     }
                 }
-                ui.dayTravel?.let { CardRow(MapCopy.DAY_TRAVEL, it, onClick = { sheets.open(TravelModeSheet(forScale = true)) }) }
+                FoldRevealValue(ui.dayTravel) { text -> CardRow(MapCopy.DAY_TRAVEL, text, onClick = { sheets.open(TravelModeSheet(forScale = true)) }) }
                 ListRow(MapCopy.SCALE_A, subtitle = ui.aLabel, selected = ui.active == 0, compact = true, onClick = { set(ScaleEdit.choose(draft, 0)) })
                 ListRow(MapCopy.SCALE_B, subtitle = ui.bLabel, selected = ui.active == 1, compact = true, onClick = { set(ScaleEdit.choose(draft, 1)) })
                 CivilightButton(MapCopy.BTN_SAVE_SCALE, { vm.save(draft) { deps.navigator.pop() } }, Modifier.fillMaxWidth(), enabled = !readOnly && ui.canSave)
+            }
             }
         }
     }

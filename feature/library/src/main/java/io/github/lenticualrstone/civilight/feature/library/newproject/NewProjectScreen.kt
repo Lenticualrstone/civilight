@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.newproject
 
+import io.github.lenticualrstone.civilight.designsystem.component.DelayedProgress
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -132,9 +133,9 @@ internal fun NewProjectScreen(route: NewProject, services: LibraryServices) {
         },
     ) {
         if (inner) {
-            WideFrame(step, form, enabled, leftLabel, rightLabel, ::back, ::next, ::cancel, body)
+            WideFrame(step, form, enabled, leftLabel, rightLabel, ::back, ::next, ::cancel, creating, body)
         } else {
-            CoverFrame(step, enabled, leftLabel, rightLabel, ::back, ::next, body)
+            CoverFrame(step, enabled, leftLabel, rightLabel, ::back, ::next, creating, body)
         }
     }
 }
@@ -147,10 +148,16 @@ private fun StepHeading(step: NewProjectStep) {
 }
 
 @Composable
-private fun StepButtons(enabled: Boolean, leftLabel: String, rightLabel: String, onLeft: () -> Unit, onRight: () -> Unit, modifier: Modifier = Modifier) {
-    ButtonRow(modifier.fillMaxWidth()) {
-        CivilightButton(leftLabel, onLeft, Modifier.weight(1f), variant = ButtonVariant.GHOST)
-        CivilightButton(rightLabel, onRight, Modifier.weight(1f), variant = ButtonVariant.PRIMARY_LARGE, enabled = enabled)
+private fun StepButtons(enabled: Boolean, leftLabel: String, rightLabel: String, onLeft: () -> Unit, onRight: () -> Unit, modifier: Modifier = Modifier, working: Boolean = false) {
+    Column(modifier.fillMaxWidth()) {
+        // `만들기` can take a while: after a second a small line says so (DS-47), and the buttons stay off.
+        DelayedProgress(working, Modifier.padding(bottom = 6.dp)) {
+            CivilightText(NewProjectCopy.WORKING, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
+        }
+        ButtonRow(Modifier.fillMaxWidth()) {
+            CivilightButton(leftLabel, onLeft, Modifier.weight(1f), variant = ButtonVariant.GHOST)
+            CivilightButton(rightLabel, onRight, Modifier.weight(1f), variant = ButtonVariant.PRIMARY_LARGE, enabled = enabled)
+        }
     }
 }
 
@@ -162,6 +169,7 @@ private fun CoverFrame(
     rightLabel: String,
     onLeft: () -> Unit,
     onRight: () -> Unit,
+    working: Boolean,
     body: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = CivilightTheme.colors
@@ -172,7 +180,7 @@ private fun CoverFrame(
             }
         },
         bottomBar = {
-            BottomGlassBar(barHeight = 120.dp) { StepButtons(enabled, leftLabel, rightLabel, onLeft, onRight) }
+            BottomGlassBar(barHeight = 120.dp) { StepButtons(enabled, leftLabel, rightLabel, onLeft, onRight, working = working) }
         },
     ) { padding ->
         Column(
@@ -197,6 +205,7 @@ private fun WideFrame(
     onLeft: () -> Unit,
     onRight: () -> Unit,
     onCancel: () -> Unit,
+    working: Boolean,
     body: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = CivilightTheme.colors
@@ -222,7 +231,7 @@ private fun WideFrame(
                 PreviewAside(form, Modifier.width(300.dp).fillMaxHeight())
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                StepButtons(enabled, leftLabel, rightLabel, onLeft, onRight, Modifier.width(380.dp))
+                StepButtons(enabled, leftLabel, rightLabel, onLeft, onRight, Modifier.width(380.dp), working)
             }
         }
     }

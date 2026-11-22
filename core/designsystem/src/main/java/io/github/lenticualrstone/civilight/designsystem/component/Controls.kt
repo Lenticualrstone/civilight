@@ -1,10 +1,9 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,12 +17,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.Role
@@ -34,12 +36,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
-import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
+import io.github.lenticualrstone.civilight.designsystem.foundation.animatedInsetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcons
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
 
 /**
  * DS-32 switch: track 46 × 28 radius 14; off `tint` + 1 dp `line`, thumb `ink3` at x 3; on `acc`, thumb `bg`
@@ -55,12 +61,16 @@ fun CivilightSwitch(
 ) {
     val colors = CivilightTheme.colors
     val style = switchStyle(checked, colors)
-    val reduced = CivilightTheme.reducedMotion
+    val motion = LocalMotion.current
     val thumbX by animateDpAsState(
         targetValue = style.thumbX,
-        animationSpec = if (reduced) snap() else CivilightMotion.spec(CivilightMotion.standard, reduced = false),
+        animationSpec = motion.move(CivilightMotion.standard),
         label = "thumb",
     )
+    val track = animatedColor(style.track, label = "track")
+    val thumb = animatedColor(style.thumb, label = "thumbColor")
+    val outline = animatedFraction(style.trackOutline != null, label = "trackOutline")
+    val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
     val interactive = if (onCheckedChange != null) {
         Modifier.pressable(
             PressAction.Toggle(checked, onCheckedChange),
@@ -73,32 +83,46 @@ fun CivilightSwitch(
     } else Modifier
     Canvas(
         modifier
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .graphicsLayer { alpha = enabledAlpha.value }
             .then(interactive)
             .size(46.dp, 28.dp),
     ) {
         val r = CornerRadius(14.dp.toPx())
-        drawRoundRect(style.track, cornerRadius = r)
-        style.trackOutline?.let {
+        drawRoundRect(track.value, cornerRadius = r)
+        val o = outline.value
+        if (o > 0f) {
             val w = 1.dp.toPx()
-            drawRoundRect(it, Offset(w / 2, w / 2), Size(size.width - w, size.height - w), CornerRadius(r.x - w / 2), style = Stroke(w))
+            drawRoundRect(colors.line, Offset(w / 2, w / 2), Size(size.width - w, size.height - w), CornerRadius(r.x - w / 2), style = Stroke(w), alpha = o)
         }
         val t = 22.dp.toPx()
-        drawRoundRect(style.thumb, Offset(thumbX.toPx(), 3.dp.toPx()), Size(t, t), CornerRadius(t / 2))
+        drawRoundRect(thumb.value, Offset(thumbX.toPx(), 3.dp.toPx()), Size(t, t), CornerRadius(t / 2))
     }
 }
 
-/** DS-32 radio: 22 dp circle, 1.5 dp ring; on: `acc` ring + 12 dp `acc` dot. Touch area 44 × 44. */
+/**
+ * DS-32 radio: 22 dp circle, 1.5 dp ring; on: `acc` ring + 12 dp `acc` dot. Touch area 44 × 44. The ring
+ * colour crosses over and the dot scales 0 → 1 on `enter` (S6); reduced motion: the dot fades in place.
+ */
 @Composable
 fun RadioMark(selected: Boolean, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, enabled: Boolean = true) {
-    val style = radioStyle(selected, CivilightTheme.colors)
+    val colors = CivilightTheme.colors
+    val style = radioStyle(selected, colors)
+    val dotColor = radioStyle(true, colors).dot ?: colors.acc
+    val reduced = LocalMotion.current.reduced
+    val ring = animatedColor(style.ring ?: colors.ink3, label = "radioRing")
+    val dot = animatedFraction(selected, if (selected) CivilightMotion.enter else CivilightMotion.exit, label = "radioDot")
+    val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
     val interactive = if (onClick != null) {
-        Modifier.pressable(PressAction.Select(selected, onClick), enabled = enabled, role = Role.RadioButton, hitTarget = HitTarget.RADIO, scaleOnPress = false)
+        Modifier.pressable(PressAction.Select(selected, onClick), enabled = enabled, role = Role.RadioButton, hitTarget = HitTarget.RADIO, shape = CircleShape, scaleOnPress = false)
     } else Modifier
-    Canvas(modifier.alpha(if (enabled) 1f else DISABLED_ALPHA).then(interactive).size(22.dp)) {
+    Canvas(modifier.graphicsLayer { alpha = enabledAlpha.value }.then(interactive).size(22.dp)) {
         val w = style.ringWidth.toPx()
-        style.ring?.let { drawCircle(it, radius = size.minDimension / 2 - w / 2, style = Stroke(w)) }
-        style.dot?.let { drawCircle(it, radius = 6.dp.toPx()) }
+        drawCircle(ring.value, radius = size.minDimension / 2 - w / 2, style = Stroke(w))
+        val d = dot.value
+        if (d > 0f) {
+            if (reduced) drawCircle(dotColor, radius = 6.dp.toPx(), alpha = d)
+            else drawCircle(dotColor, radius = 6.dp.toPx() * d)
+        }
     }
 }
 
@@ -114,30 +138,50 @@ fun CheckboxMark(
     dense: Boolean = false,
     enabled: Boolean = true,
 ) {
-    val style = checkboxStyle(checked, CivilightTheme.colors)
+    val colors = CivilightTheme.colors
+    val on = checkboxStyle(true, colors)
+    val off = checkboxStyle(false, colors)
     val side = if (dense) 20.dp else 22.dp
     val shape = RoundedCornerShape(6.dp)
+    val reduced = LocalMotion.current.reduced
+    val fill = animatedFraction(checked, label = "checkFill")
+    val tick = animatedFraction(checked, if (checked) CivilightMotion.enter else CivilightMotion.exit, label = "checkTick")
+    val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
     val interactive = if (onCheckedChange != null) {
-        Modifier.pressable(PressAction.Toggle(checked, onCheckedChange), enabled = enabled, role = Role.Checkbox, hitTarget = HitTarget.CHECKBOX, scaleOnPress = false)
+        Modifier.pressable(PressAction.Toggle(checked, onCheckedChange), enabled = enabled, role = Role.Checkbox, hitTarget = HitTarget.CHECKBOX, shape = shape, scaleOnPress = false)
     } else Modifier
+    val ringWidth = off.ringWidth
     Box(
         modifier = modifier
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .graphicsLayer { alpha = enabledAlpha.value }
             .then(interactive)
             .size(side)
             .clip(shape)
-            .then(if (style.fill != null) Modifier.background(style.fill) else Modifier)
-            .then(if (style.ring != null) Modifier.insetOutline(style.ring, style.ringWidth, shape) else Modifier),
+            .drawBehind {
+                val f = fill.value
+                if (f > 0f) drawRect(on.fill ?: colors.acc, alpha = f)
+                if (f < 1f) {
+                    val w = ringWidth.toPx()
+                    val outline = shape.createOutline(Size(size.width - w, size.height - w), layoutDirection, this)
+                    translate(w / 2, w / 2) { drawOutline(outline, off.ring ?: colors.ink3, alpha = 1f - f, style = Stroke(w)) }
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
-        if (style.tick != null) {
-            Image(
-                painter = rememberVectorPainter(CivilightIcons.checkBold),
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                colorFilter = ColorFilter.tint(style.tick),
-            )
-        }
+        Image(
+            painter = rememberVectorPainter(CivilightIcons.checkBold),
+            contentDescription = null,
+            modifier = Modifier
+                .size(16.dp)
+                .graphicsLayer {
+                    val t = tick.value
+                    alpha = t
+                    val s = if (reduced) 1f else 0.5f + 0.5f * t
+                    scaleX = s
+                    scaleY = s
+                },
+            colorFilter = ColorFilter.tint(on.tick ?: colors.bg),
+        )
     }
 }
 
@@ -154,10 +198,11 @@ fun RadioRow(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .graphicsLayer { alpha = enabledAlpha.value }
             .then(if (divider) Modifier.topHairline(colors.line) else Modifier)
             .pressable(PressAction.Select(selected, onClick), enabled = enabled, role = Role.RadioButton, scaleOnPress = false)
             .heightIn(min = 44.dp)
@@ -188,10 +233,11 @@ fun CheckboxRow(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .graphicsLayer { alpha = enabledAlpha.value }
             .then(if (divider) Modifier.topHairline(colors.line) else Modifier)
             .pressable(PressAction.Toggle(checked, onCheckedChange), enabled = enabled, role = Role.Checkbox, scaleOnPress = false)
             .heightIn(min = 44.dp)
@@ -221,10 +267,11 @@ fun SwitchRow(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .graphicsLayer { alpha = enabledAlpha.value }
             .then(if (divider) Modifier.topHairline(colors.line) else Modifier)
             .pressable(PressAction.Toggle(checked, onCheckedChange), enabled = enabled, role = Role.Switch, scaleOnPress = false)
             .heightIn(min = 44.dp)
@@ -260,17 +307,15 @@ fun ChoiceCard(
     val type = CivilightTheme.type
     val radius: Dp = if (compact) 14.dp else 16.dp
     val shape = RoundedCornerShape(radius)
+    val on = animatedFraction(selected, label = "choice")
+    val outline = animatedColor(if (selected) selectedOutline ?: colors.acc else colors.edge, label = "choiceOutline")
     Row(
         modifier = modifier
             .fillMaxWidth()
             .pressable(PressAction.Select(selected, onClick), role = Role.RadioButton, shape = shape, scaleOnPress = false)
             .clip(shape)
-            .then(if (selected) Modifier.background(colors.sel) else Modifier)
-            .insetOutline(
-                if (selected) selectedOutline ?: colors.acc else colors.edge,
-                if (selected) 1.5.dp else 1.dp,
-                shape,
-            )
+            .drawBehind { val a = on.value; if (a > 0f) drawRect(colors.sel, alpha = a) }
+            .animatedInsetOutline(outline, { 1.dp + 0.5.dp * on.value }, shape)
             .padding(horizontal = if (compact) 14.dp else 16.dp, vertical = if (compact) 12.dp else 14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -289,12 +334,13 @@ fun ChoiceCard(
 fun TypeGridCell(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(12.dp)
+    val on = animatedFraction(selected, label = "typeCell")
     Row(
         modifier = modifier
             .pressable(PressAction.Select(selected, onClick), role = Role.RadioButton, shape = shape, scaleOnPress = false)
             .heightIn(min = 44.dp)
             .clip(shape)
-            .then(if (selected) Modifier.background(colors.sel) else Modifier)
+            .drawBehind { val a = on.value; if (a > 0f) drawRect(colors.sel, alpha = a) }
             .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,

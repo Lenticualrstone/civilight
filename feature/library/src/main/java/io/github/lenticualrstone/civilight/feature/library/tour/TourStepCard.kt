@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.tour
 
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -84,8 +85,9 @@ internal fun TourStepCard(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         TourProgress(stepCount, stepIndex, label)
-        CivilightText(title, type.itemTitle, color = colors.ink)
-        if (subtitle != null) CivilightText(subtitle, type.small, color = colors.ink3)
+        // The step's words swap with the lens value motion (CNV-42) as `다음` / `이전` move on (audit row 11, P3).
+        ValueSwap(title, type.itemTitle, color = colors.ink, maxLines = Int.MAX_VALUE)
+        if (subtitle != null) ValueSwap(subtitle, type.small, color = colors.ink3, maxLines = Int.MAX_VALUE)
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextAction(buttons.skip, onSkip, style = type.label.merge(TextStyle(fontSize = 12.sp)))
             Spacer(Modifier.weight(1f))

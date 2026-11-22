@@ -29,6 +29,8 @@ Package `io.github.lenticualrstone.civilight.domain.story`. Pure Kotlin over `co
 | STO-40, STO-41 registry markers/filters, open vs acknowledged, `맞음`/`이대로 두기`/`되돌리기`, subject deletion, counts, ▲-before-◇ order, locked hidden collapse, empty state | `checks/Acks.kt`, `checks/CheckCenter.kt`, `checks/Fingerprints.kt` | `AckTest` ORD-03, CHK-04, CHK-05, CHK-07; `CheckCenterTest` CHK-01 … CHK-03; `TravelTest` CHK-06 |
 | STO-42 check switches | `travel/TravelCheck.kt` (`TravelSettings`) | `TravelTest` CHK-06 |
 
+- **Gallery search and the `명령` chip with no query (core agent C, 2026-11-23; additive)**: `search/GallerySearch.kt` (`GallerySearch(doc, locked).search(query)`, `GalleryHit`, `GalleryMatchField` 제목 · 설명 · 태그; label `<owner> · 갤러리 · <title> · 설명`; trashed items and owners, and while locked hidden items and hidden characters, left out; 55 §3.5, GAL-04). `ProjectSearch.search(raw, filter, includeGallery = false)` fills the new `SearchResult.gallery` (last constructor parameter, default empty) under `전체`; it is not a `SearchSectionKind`, so existing `when`s are unchanged. An empty query under `SearchFilter.COMMAND` now returns every command of the context (`commandList()`; QA 2026-11-23 #11). Tests `GallerySearchTest` (6, incl. T-GAL-19). The feature:story screen still gates blank queries and does not ask for gallery hits yet (see `shell.md` "Changes for the feature lanes (0.1.0 wave)").
+
 ## Partial
 
 Features whose engine part is listed under Done but whose screen, sheet or storage lives elsewhere (rules and tests here, no UI):

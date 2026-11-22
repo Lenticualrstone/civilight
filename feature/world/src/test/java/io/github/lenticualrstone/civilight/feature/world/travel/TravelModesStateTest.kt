@@ -32,9 +32,9 @@ class TravelModesStateTest {
     fun `직접 adds a mode after the others and refusals carry their line`() {
         val added = TravelModesState.save(bare(), null, TravelModeDraft("마차", "30", "10"), ctx) as TravelModeSave.Saved
         assertEquals("마차", Travel.modes(added.doc).last().name)
-        assertEquals(TravelModeSave.Refused(WorldCopy.TODO_COPY_WORLD_TRAVEL_DISTANCE_BAD), TravelModesState.save(bare(), null, TravelModeDraft("x", "abc", "8"), ctx))
-        assertEquals(TravelModeSave.Refused(WorldCopy.TODO_COPY_WORLD_TRAVEL_HOURS_BAD), TravelModesState.save(bare(), null, TravelModeDraft("x", "10", "30"), ctx))
-        assertEquals(TravelModeSave.Refused(WorldCopy.TODO_COPY_WORLD_TRAVEL_NAME_TAKEN), TravelModesState.save(added.doc, null, TravelModeDraft("마차", "10", "8"), ctx))
+        assertEquals(TravelModeSave.Refused(WorldCopy.TRAVEL_DISTANCE_BAD), TravelModesState.save(bare(), null, TravelModeDraft("x", "abc", "8"), ctx))
+        assertEquals(TravelModeSave.Refused(WorldCopy.TRAVEL_HOURS_BAD), TravelModesState.save(bare(), null, TravelModeDraft("x", "10", "30"), ctx))
+        assertEquals(TravelModeSave.Refused(WorldCopy.TRAVEL_NAME_TAKEN), TravelModesState.save(added.doc, null, TravelModeDraft("마차", "10", "8"), ctx))
         assertTrue(TravelModesState.save(bare(), null, TravelModeDraft(" ", "10", "8"), ctx) is TravelModeSave.Refused)
     }
 }

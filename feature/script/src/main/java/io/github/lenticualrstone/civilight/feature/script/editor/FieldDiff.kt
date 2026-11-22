@@ -50,15 +50,10 @@ object FieldDiff {
         if (!sentinelKept && newRaw == oldRaw) return FieldChange.BackspaceAtStart
         if (newRaw == oldRaw) return FieldChange.None
         val caret = (if (sentinelKept) rawOffset(newCaretField) else newCaretField).coerceIn(0, newRaw.length)
-        var prefix = 0
-        val maxPrefix = minOf(oldRaw.length, newRaw.length, caret)
-        while (prefix < maxPrefix && oldRaw[prefix] == newRaw[prefix]) prefix++
-        var suffix = 0
-        val maxSuffix = minOf(oldRaw.length - prefix, newRaw.length - maxOf(prefix, caret))
-        while (suffix < maxSuffix && oldRaw[oldRaw.length - 1 - suffix] == newRaw[newRaw.length - 1 - suffix]) suffix++
-        val start = prefix
-        val end = oldRaw.length - suffix
-        val inserted = newRaw.substring(prefix, newRaw.length - suffix)
+        val span = span(oldRaw, newRaw, caret)
+        val start = span.start
+        val end = span.end
+        val inserted = span.inserted
         if (start == end) {
             when (inserted) {
                 "\n" -> return FieldChange.Enter(start)
@@ -67,5 +62,20 @@ object FieldDiff {
             }
         }
         return FieldChange.Text(start, end, inserted)
+    }
+
+    /** Raw [start, end) of the old text that [inserted] replaced. */
+    data class Span(val start: Int, val end: Int, val inserted: String)
+
+    /** The one replaced range between two raw texts, anchored on [caret] (a raw offset of [newRaw]). */
+    fun span(oldRaw: String, newRaw: String, caret: Int): Span {
+        val c = caret.coerceIn(0, newRaw.length)
+        var prefix = 0
+        val maxPrefix = minOf(oldRaw.length, newRaw.length, c)
+        while (prefix < maxPrefix && oldRaw[prefix] == newRaw[prefix]) prefix++
+        var suffix = 0
+        val maxSuffix = minOf(oldRaw.length - prefix, newRaw.length - maxOf(prefix, c))
+        while (suffix < maxSuffix && oldRaw[oldRaw.length - 1 - suffix] == newRaw[newRaw.length - 1 - suffix]) suffix++
+        return Span(prefix, oldRaw.length - suffix, newRaw.substring(prefix, newRaw.length - suffix))
     }
 }

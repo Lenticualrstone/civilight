@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.library.backup
 
+import androidx.compose.foundation.layout.Column
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -83,7 +87,7 @@ internal class RestoreViewModel(private val services: LibraryServices) : ViewMod
     fun connect() {
         viewModelScope.launch {
             if (backups.connect() is DriveConnect.Unavailable) {
-                deps.toasts.show(BackupCopy.TODO_COPY_LIB57_DRIVE_NOT_READY, actionLabel = null)
+                deps.toasts.show(BackupCopy.DRIVE_NOT_READY, actionLabel = null)
             }
             load()
         }
@@ -106,13 +110,13 @@ internal class RestoreViewModel(private val services: LibraryServices) : ViewMod
                     onStarted()
                     backups.restore.start(request, chars, onFirstRunDone = services.onboarding::finish)
                 } else {
-                    _passwordError.value = RestoreCopy.TODO_COPY_LIB59_WRONG_PASSWORD
+                    _passwordError.value = RestoreCopy.WRONG_PASSWORD
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 // Drive could not be reached: nothing started; the sheet stays for another try.
-                deps.toasts.show(RestoreCopy.TODO_COPY_LIB60_PARTLY_FAILED, actionLabel = null)
+                deps.toasts.show(RestoreCopy.PARTLY_FAILED, actionLabel = null)
             } finally {
                 chars.fill('\u0000')
                 _checking.value = false
@@ -172,7 +176,7 @@ internal fun RestoreBackupScreen(services: LibraryServices) {
     ) {
         AccountLine(connected, onConnect = vm::connect)
         SectionLabel(RestoreCopy.RUNS, Modifier.padding(top = 18.dp, bottom = 6.dp))
-        if (ui.runs.isEmpty()) CivilightText(RestoreCopy.TODO_COPY_LIB59_NO_RUNS, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
+        FoldReveal(ui.runs.isEmpty()) { CivilightText(RestoreCopy.NO_RUNS, CivilightTheme.type.small, color = CivilightTheme.colors.ink3) }
         ui.runs.forEach { row ->
             ListRow(
                 title = row.title,
@@ -182,10 +186,12 @@ internal fun RestoreBackupScreen(services: LibraryServices) {
                 trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = CivilightTheme.colors.ink3) },
             )
         }
-        if (ui.projects.isNotEmpty()) {
-            SectionLabel(RestoreCopy.TODO_COPY_LIB59_PROJECTS, Modifier.padding(top = 22.dp, bottom = 6.dp))
-            ui.projects.forEach { row ->
-                CheckboxRow(label = row.label, checked = row.checked, onCheckedChange = { apply(RestoreModel.toggle(picks, row)) })
+        FoldRevealValue(ui.projects.takeIf { it.isNotEmpty() }) { projects ->
+            Column {
+                SectionLabel(RestoreCopy.PROJECTS, Modifier.padding(top = 22.dp, bottom = 6.dp))
+                projects.forEach { row ->
+                    CheckboxRow(label = row.label, checked = row.checked, onCheckedChange = { apply(RestoreModel.toggle(picks, row)) })
+                }
             }
         }
         SectionLabel(RestoreCopy.SAME_NAME, Modifier.padding(top = 22.dp, bottom = 8.dp))
@@ -204,8 +210,8 @@ private fun AccountLine(connected: Boolean, onConnect: () -> Unit) {
     val colors = CivilightTheme.colors
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         CivilightIcon(IconId.Cloud, contentDescription = null, tint = colors.ink2)
-        CivilightText(if (connected) RestoreCopy.CONNECTED else RestoreCopy.TODO_COPY_LIB59_NOT_CONNECTED, CivilightTheme.type.small, Modifier.weight(1f), color = colors.ink3)
-        if (!connected) CivilightButton(RestoreCopy.CONNECT, onClick = onConnect, variant = ButtonVariant.COMPACT_PRIMARY)
+        ValueSwap(if (connected) RestoreCopy.CONNECTED else RestoreCopy.NOT_CONNECTED, CivilightTheme.type.small, Modifier.weight(1f), color = colors.ink3)
+        FoldReveal(!connected, horizontal = true) { CivilightButton(RestoreCopy.CONNECT, onClick = onConnect, variant = ButtonVariant.COMPACT_PRIMARY) }
     }
 }
 

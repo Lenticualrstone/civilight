@@ -240,3 +240,45 @@ object TrackState {
         return stops.getOrNull(i + 1)?.unitKey
     }
 }
+
+/**
+ * The way a position chip takes between two stops (motion audit row 11): along the leg that joins them (a route, or the
+ * straight `추정` line), in whichever direction it is stored, else straight. Pure, so it is tested on the JVM.
+ */
+object TrackPath {
+    private const val SAME = 1e-4f
+
+    private fun same(a: Point, b: Point) = kotlin.math.abs(a.x - b.x) < SAME && kotlin.math.abs(a.y - b.y) < SAME
+
+    /** The polyline from [from] to [to]: a line of [lines] that starts at one and ends at the other, else the straight way. */
+    fun between(lines: List<TrackLine>, from: Point, to: Point): List<Point> {
+        for (l in lines) {
+            val pts = l.points
+            if (pts.size < 2) continue
+            if (same(pts.first(), from) && same(pts.last(), to)) return pts
+            if (same(pts.first(), to) && same(pts.last(), from)) return pts.reversed()
+        }
+        return listOf(from, to)
+    }
+
+    /** The point [t] (0–1) of the way along [path] by length. */
+    fun pointAt(path: List<Point>, t: Float): Point {
+        if (path.isEmpty()) return Point(0f, 0f)
+        if (path.size == 1 || t <= 0f) return path.first()
+        if (t >= 1f) return path.last()
+        val lengths = path.zipWithNext { a, b -> kotlin.math.hypot((b.x - a.x).toDouble(), (b.y - a.y).toDouble()).toFloat() }
+        val total = lengths.sum()
+        if (total <= 0f) return path.last()
+        var left = total * t
+        for (i in lengths.indices) {
+            if (left <= lengths[i] || i == lengths.lastIndex) {
+                val k = if (lengths[i] <= 0f) 1f else (left / lengths[i]).coerceIn(0f, 1f)
+                val a = path[i]
+                val b = path[i + 1]
+                return Point(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k)
+            }
+            left -= lengths[i]
+        }
+        return path.last()
+    }
+}

@@ -11,9 +11,12 @@ import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.text.LinkTarget
 import io.github.lenticualrstone.civilight.model.text.LinkTargetKind
 
-/** Hideable items inside a project (LIB-36; 장소 · 세력 from v1). */
+/** Hideable items inside a project (LIB-36; 장소 · 세력 from v1; gallery images, 55 GAL-19). */
 enum class HideableKind(val word: String) {
     CHARACTER("인물"), TERM("용어"), PAGE("페이지"), SCENE("씬"), PLACE("장소"), FACTION("세력"),
+
+    /** A gallery image with its own `숨기기` (55 GAL-19, §6 Q3). */
+    GALLERY_IMAGE("이미지"),
 }
 
 /**
@@ -31,8 +34,17 @@ class HiddenItems(private val doc: ProjectDoc) {
     val pages: Set<Key> = doc.pages.values.filter { it.hidden && it.deletedAt == null }.map { it.key }.toSet()
     val scenes: Set<Key> = doc.story.units.filter { it.hidden && index.isScene(it) && liveness.isLive(it) }.map { it.key }.toSet()
 
-    /** Number of live hidden items of every kind (`숨긴 항목 <n>`, B-04, E-08). */
-    val count: Int get() = characters.size + terms.size + places.size + factions.size + pages.size + scenes.size
+    /**
+     * Live gallery images with their own `숨기기` (GAL-19). Images of a hidden character are masked by
+     * their owner and are not counted here.
+     */
+    val galleryImages: Set<Key> = doc.galleryItems.filter { it.hidden && liveness.isLive(it) }.map { it.key }.toSet()
+
+    /**
+     * Number of live hidden items of every kind (`숨긴 항목 <n>`, B-04, E-08), hidden gallery images
+     * included: they make the project count as having hidden items (encryption default, LIB-51).
+     */
+    val count: Int get() = characters.size + terms.size + places.size + factions.size + pages.size + scenes.size + galleryImages.size
 
     val any: Boolean get() = count > 0
 
@@ -43,6 +55,7 @@ class HiddenItems(private val doc: ProjectDoc) {
         HideableKind.SCENE -> scenes
         HideableKind.PLACE -> places
         HideableKind.FACTION -> factions
+        HideableKind.GALLERY_IMAGE -> galleryImages
     }
 
     fun isHidden(kind: HideableKind, key: Key): Boolean = key in of(kind)

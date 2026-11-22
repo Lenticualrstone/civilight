@@ -12,7 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
@@ -24,6 +24,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBod
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
 import io.github.lenticualrstone.civilight.domain.story.units.UnitCodes
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.common.storyServices
@@ -151,12 +152,13 @@ fun SheetScope.SceneMoveContent(sheet: SceneMoveSheet, deps: FeatureDeps) {
 @Composable
 private fun SlotRow(label: String, enabled: Boolean, onClick: () -> Unit) {
     val colors = CivilightTheme.colors
+    val alpha by animatedAlpha(if (enabled) 1f else DISABLED)
     Row(
         Modifier
             .fillMaxWidth()
             .topHairline(colors.line)
             .pressable(onClick = onClick, enabled = enabled, scaleOnPress = false)
-            .alpha(if (enabled) 1f else DISABLED)
+            .graphicsLayer { this.alpha = alpha }
             .heightIn(min = 48.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

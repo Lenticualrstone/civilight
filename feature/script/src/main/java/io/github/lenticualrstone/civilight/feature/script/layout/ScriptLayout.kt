@@ -21,7 +21,15 @@ data class ScriptLayout(
     val columnStart: Float,
     /** Width of the reading column (the whole area on cover). */
     val columnWidth: Float,
+    /** Width of the side panel while [panel] (CNV-47: the writer's own ratio; [PANEL_WIDTH] by default). */
+    val panelWidth: Float = PANEL_WIDTH,
 ) {
+    /**
+     * The same layout with the manuscript kept at the width of [other] (the panel is still open): used
+     * while a panel is sliding in, so the text re-wraps once, when the panel has arrived (SCR-66).
+     */
+    fun keepingAreaOf(other: ScriptLayout): ScriptLayout = copy(areaWidth = other.areaWidth, columnStart = other.columnStart, columnWidth = other.columnWidth)
+
     companion object {
         const val WIDE_MIN = 600f
         const val PANEL_WIDTH = 290f
@@ -34,13 +42,18 @@ data class ScriptLayout(
         /** Narrowest column worth keeping the panel for; below it the panel is not drawn. */
         const val COLUMN_MIN = 320f
 
-        fun of(width: Float, panelOpen: Boolean): ScriptLayout {
+        /**
+         * [area] (CNV-47) is the manuscript width the writer chose with the pane split handle; it only
+         * counts while the panel is drawn. Without it the area is what is left of the 290 dp panel.
+         */
+        fun of(width: Float, panelOpen: Boolean, area: Float? = null): ScriptLayout {
             if (width < WIDE_MIN) return ScriptLayout(false, false, width, 0f, width)
             val fitsPanel = width - PANEL_WIDTH - COLUMN_START - PANEL_GAP >= COLUMN_MIN
             val panel = panelOpen && fitsPanel
-            val area = if (panel) width - PANEL_WIDTH else width
-            val room = area - COLUMN_START - (if (panel) PANEL_GAP else 0f)
-            return ScriptLayout(true, panel, area, COLUMN_START, room.coerceAtMost(COLUMN_MAX))
+            val chosen = if (panel && area != null) area.coerceIn(COLUMN_START + PANEL_GAP, width - 1f) else null
+            val areaWidth = chosen ?: if (panel) width - PANEL_WIDTH else width
+            val room = areaWidth - COLUMN_START - (if (panel) PANEL_GAP else 0f)
+            return ScriptLayout(true, panel, areaWidth, COLUMN_START, room.coerceIn(0f, COLUMN_MAX), if (panel) width - areaWidth else PANEL_WIDTH)
         }
     }
 }

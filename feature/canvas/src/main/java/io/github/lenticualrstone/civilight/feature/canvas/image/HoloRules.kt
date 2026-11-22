@@ -4,9 +4,6 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.MotionToken
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.model.asset.ImageUse
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.exp
 
 /** A tilt, each axis −1 … 1 (the DS `holoFoil` input). */
 data class Tilt(val x: Float, val y: Float) {
@@ -29,10 +26,22 @@ object HoloRules {
     /** Device tilt that reads as a full turn of the foil: ±25° (pitch and roll). */
     const val FULL_TILT_DEG = 25f
 
-    /** Released drag: sways back with this period and decay (board `Holo`: `손을 떼면 천천히 흔들림`). */
-    const val SWAY_PERIOD_MS = 1400f
-    const val SWAY_DECAY_MS = 900f
-    const val SWAY_END_MS = 4000L
+    /**
+     * Released drag (board `Holo`: `손을 떼면 천천히 흔들림`): a damped spring back to rest, so the system
+     * animator scale applies. A period of 1.4 s and a decay of 0.9 s give a stiffness of (2π / 1.4 s)² ≈ 20 and a
+     * damping ratio of about 0.25.
+     */
+    const val SWAY_DAMPING = CivilightMotion.holoSwayDamping
+    const val SWAY_STIFFNESS = CivilightMotion.holoSwayStiffness
+
+    /** The sweep fires on the toggle's edge only: [trigger] moved while holo is [on] (not on restore or a tile change). */
+    fun sweepEdge(previousTrigger: Int, trigger: Int, on: Boolean): Boolean = on && trigger != previousTrigger
+
+    /** A point [fraction] of the way from [from] to [to]: the sweep's end settles into the live tilt on `standard`. */
+    fun blend(from: Tilt, to: Tilt, fraction: Float): Tilt {
+        val f = fraction.coerceIn(0f, 1f)
+        return Tilt(from.x + (to.x - from.x) * f, from.y + (to.y - from.y) * f)
+    }
 
     /** The holo row shows only for slots that may carry holo (T-CNV-34). */
     fun showToggle(slot: ImageSlot): Boolean = ImageSlots.holoAllowed(slot)
@@ -65,13 +74,6 @@ object HoloRules {
         (start.y + 2f * dy / height.coerceAtLeast(1f)).coerceIn(-1f, 1f),
     )
 
-    /** After release: a damped sway from [released] back to rest, [elapsedMs] after letting go. */
-    fun sway(released: Tilt, elapsedMs: Long): Tilt {
-        if (elapsedMs >= SWAY_END_MS) return Tilt.ZERO
-        val t = elapsedMs.toFloat()
-        val k = (exp(-t / SWAY_DECAY_MS) * cos(2 * PI * t / SWAY_PERIOD_MS)).toFloat()
-        return Tilt(released.x * k, released.y * k)
-    }
 }
 
 /** The platform side of the tilt sensor; faked in tests. */

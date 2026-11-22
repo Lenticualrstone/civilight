@@ -29,6 +29,9 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import io.github.lenticualrstone.civilight.domain.cast.relation.LineSlot
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
 import io.github.lenticualrstone.civilight.feature.canvas.common.canvasEditContext
@@ -126,32 +129,38 @@ fun ColumnScope.LineLabelRows(
         modifier = Modifier.padding(top = if (compact) 8.dp else 12.dp),
         enabled = !view.readOnly,
     )
-    if (view.relational) {
-        SectionLabel(CanvasCopy.WHAT_TO_RECORD, Modifier.padding(top = if (compact) 10.dp else 18.dp))
-        ChipFlow(Modifier.padding(top = if (compact) 6.dp else 8.dp)) {
-            for (chip in view.slotChips) FilterChip(chip.label, chip.selected, { state.slot(chip.slot) })
-        }
-        CivilightText(CanvasCopy.KIND, type.small, Modifier.padding(top = if (compact) 8.dp else 12.dp), color = colors.ink3)
-        ChipFlow(Modifier.padding(top = if (compact) 6.dp else 8.dp)) {
-            for (chip in view.kindChips) FilterChip(chip.label, chip.selected, { state.kind(chip.key) })
-            FilterChip(CanvasCopy.BTN_NEW_KIND, false, onNewKind, enabled = !view.readOnly)
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = if (compact) 8.dp else 14.dp)
-                .topHairline(colors.line)
-                .pressable(onClick = onPickStart, hitTarget = HitTarget.BUTTON)
-                .heightIn(min = 44.dp)
-                .padding(vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            CivilightText(CanvasCopy.START_POINT, type.label, color = colors.ink3)
-            CivilightText(view.startValue.orEmpty(), type.number, color = colors.ink, maxLines = 1)
+    // The relation rows fold in and out with the line's kind of ends (P2); the kind chips swap with the chosen
+    // `무엇으로 적을지` (P3); the start value swaps like a lens value when it is picked (P4).
+    FoldReveal(view.relational) {
+        Column {
+            SectionLabel(CanvasCopy.WHAT_TO_RECORD, Modifier.padding(top = if (compact) 10.dp else 18.dp))
+            ChipFlow(Modifier.padding(top = if (compact) 6.dp else 8.dp)) {
+                for (chip in view.slotChips) FilterChip(chip.label, chip.selected, { state.slot(chip.slot) })
+            }
+            CivilightText(CanvasCopy.KIND, type.small, Modifier.padding(top = if (compact) 8.dp else 12.dp), color = colors.ink3)
+            ContentSwap(view.slotChips.firstOrNull { it.selected }?.slot to view.kindChips, contentKey = { it.first }, label = "lineKindChips") { (_, kinds) ->
+                ChipFlow(Modifier.padding(top = if (compact) 6.dp else 8.dp)) {
+                    for (chip in kinds) FilterChip(chip.label, chip.selected, { state.kind(chip.key) })
+                    FilterChip(CanvasCopy.BTN_NEW_KIND, false, onNewKind, enabled = !view.readOnly)
+                }
+            }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (compact) 8.dp else 14.dp)
+                    .topHairline(colors.line)
+                    .pressable(onClick = onPickStart, hitTarget = HitTarget.BUTTON)
+                    .heightIn(min = 44.dp)
+                    .padding(vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                CivilightText(CanvasCopy.START_POINT, type.label, color = colors.ink3)
+                ValueSwap(view.startValue.orEmpty(), type.number, color = colors.ink, contentAlignment = Alignment.CenterEnd)
+            }
         }
     }
-    if (view.readOnly) CivilightText(CanvasCopy.READ_ONLY, type.small, Modifier.padding(top = 10.dp), color = colors.ink3)
+    FoldReveal(view.readOnly) { CivilightText(CanvasCopy.READ_ONLY, type.small, Modifier.padding(top = 10.dp), color = colors.ink3) }
     SheetActions(Modifier.padding(top = if (compact) 0.dp else 2.dp)) {
         CivilightButton(
             text = view.keepLabel,
@@ -170,9 +179,9 @@ fun ColumnScope.LineLabelRows(
             )
         }
     }
-    // Take the line off the canvas (the relation, if any, stays; Q-CV-13). Copy missing.
+    // Take the line off the canvas (the relation, if any, stays; Q-CV-13). Copy proposed, see Requests.
     TextAction(
-        CanvasCopy.TODO_COPY_CANVAS_REMOVE_LINE,
+        CanvasCopy.BTN_REMOVE_LINE,
         { state.remove(after) },
         Modifier.align(Alignment.End).padding(top = 4.dp),
         color = if (view.readOnly) colors.ink3 else colors.ink2,

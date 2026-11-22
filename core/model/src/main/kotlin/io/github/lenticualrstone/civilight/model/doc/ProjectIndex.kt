@@ -18,6 +18,7 @@ import io.github.lenticualrstone.civilight.model.cast.VoiceLine
 import io.github.lenticualrstone.civilight.model.change.ChangeRecord
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.checks.Acknowledgement
+import io.github.lenticualrstone.civilight.model.gallery.GalleryItem
 import io.github.lenticualrstone.civilight.model.map.MapRegion
 import io.github.lenticualrstone.civilight.model.map.Pin
 import io.github.lenticualrstone.civilight.model.map.WorldMap
@@ -87,6 +88,10 @@ class ProjectIndex internal constructor(private val doc: ProjectDoc) {
     private val acksByKey = doc.checks.acknowledgements.associateBy { it.key }
     private val nameTagsByKey = doc.tombstones.nameTags.associateBy { it.key }
     private val trashEntriesByKey = doc.trash.entries.associateBy { it.key }
+
+    // Gallery (lazy: most screens never ask).
+    private val galleryByKey: Map<Key, GalleryItem> by lazy { doc.galleryItems.associateBy { it.key } }
+    private val galleryBySource: Map<String, List<GalleryItem>> by lazy { doc.galleryItems.groupBy { it.source } }
 
     // --- Story tree ---
 
@@ -243,6 +248,17 @@ class ProjectIndex internal constructor(private val doc: ProjectDoc) {
     fun scriptAsset(key: Key): ScriptAsset? = scriptAssetsByKey[key]
     fun nameTag(key: Key): NameTag? = nameTagsByKey[key]
     fun trashEntry(key: Key): TrashEntry? = trashEntriesByKey[key]
+
+    // --- Gallery (55 §3, §12.5) ---
+
+    /** One gallery item (live or trashed). */
+    fun galleryItem(key: Key): GalleryItem? = galleryByKey[key]
+
+    /** Every item of one owner (live and trashed) in `직접 순서`. */
+    fun galleryItemsOf(ownerKey: Key): List<GalleryItem> = doc.gallery[ownerKey]?.ordered.orEmpty()
+
+    /** Items holding [source] in any gallery (live and trashed; uniqueness, `이미 있음`, blob references). */
+    fun galleryItemsWithSource(source: String): List<GalleryItem> = galleryBySource[source].orEmpty()
 
     companion object {
         val UNIT_ORDER: Comparator<StoryUnit> = compareBy<StoryUnit> { it.order }.thenBy { it.key }

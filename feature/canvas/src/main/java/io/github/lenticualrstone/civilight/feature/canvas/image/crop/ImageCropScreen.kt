@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -26,6 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -39,7 +43,10 @@ import io.github.lenticualrstone.civilight.designsystem.component.StepSlider
 import io.github.lenticualrstone.civilight.designsystem.component.SwitchRow
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
 import io.github.lenticualrstone.civilight.feature.canvas.common.canvasEditContext
 import io.github.lenticualrstone.civilight.feature.canvas.image.CropHandOff
 import io.github.lenticualrstone.civilight.feature.canvas.image.CropMath
@@ -53,6 +60,8 @@ import io.github.lenticualrstone.civilight.feature.canvas.image.ImageSlots
 import io.github.lenticualrstone.civilight.feature.canvas.image.PixelSize
 import io.github.lenticualrstone.civilight.feature.canvas.image.ProvideHoloTilt
 import io.github.lenticualrstone.civilight.feature.canvas.image.SlotImages
+import io.github.lenticualrstone.civilight.model.asset.ImageSlot
+import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.navigation.ImageCrop
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
@@ -90,14 +99,64 @@ fun ImageCropScreen(route: ImageCrop, deps: FeatureDeps) {
     val owner = ImageOwner(route.ownerKind, route.ownerKey, route.slot)
     val spec = ImageSlots.spec(route.slot)
     val handOff = remember { CropHandOff.take(route.ownerKey, route.slot, route.blobHash) }
+    // The hand-off lives in memory only; its note is kept with the screen so a restore still shows it (GAL-14).
+    val note by rememberSaveable { mutableStateOf(handOff?.note) }
+    val ownerName = ready?.doc?.let { ImageOwners.name(it, route.ownerKind, route.ownerKey) }.orEmpty()
+    CropEditor(
+        doc = ready?.doc,
+        blobHash = route.blobHash,
+        stageSlot = route.slot,
+        header = ImageCopy.cropHeader(ownerName, spec.shortName),
+        handOff = handOff,
+        note = note,
+        deps = deps,
+        start = { doc, size ->
+            val existing = ImageEdits.use(doc, owner)
+            val holo = handOff?.holo ?: HoloRules.initial(route.slot, existing, settings.holoDefaultForNewImages)
+            CropSession.start(route.slot, size, existing, route.blobHash, holo)
+        },
+        onCancel = { deps.navigator.pop() },
+        onApply = { s ->
+            vm.apply(owner, route.blobHash, s) { r ->
+                if (r == EditResult.READ_ONLY) deps.toasts.show(ImageCopy.READ_ONLY, actionLabel = null) else deps.navigator.pop()
+            }
+        },
+    )
+}
+
+/**
+ * The crop editor itself (CNV-28), shared by the `ImageCrop` route and the gallery's in-screen crop (GAL-12):
+ * loads [blobHash], starts the session with [start] once the original's size is known, and hands the session to
+ * [onApply]. Nothing is written here. [handleBack] = back cancels (an in-screen editor has no route to pop).
+ * [note] is shown above the controls (`숨긴 이미지 · 초상에서는 보임`, GAL-14).
+ */
+@Composable
+internal fun CropEditor(
+    doc: ProjectDoc?,
+    blobHash: String,
+    stageSlot: ImageSlot,
+    header: String,
+    handOff: CropHandOff?,
+    note: String?,
+    deps: FeatureDeps,
+    start: (ProjectDoc, PixelSize) -> CropSession,
+    onCancel: () -> Unit,
+    onApply: (CropSession) -> Unit,
+    handleBack: Boolean = false,
+) {
+    if (handleBack) LocalBackHandler.current(true, onCancel)
     var played by rememberSaveable { mutableStateOf(false) }
-    var holoTurnedOn by rememberSaveable { mutableStateOf(false) }
+    /** Raised when the user switches holo on (the foil sweeps once then); never on a restore. */
+    var holoSweep by rememberSaveable { mutableIntStateOf(0) }
+    /** Raised for each step from the controls (turn, mirror, reset, zoom, ratio): those ease; a drag or pinch never raises it. */
+    var controlStep by remember { mutableIntStateOf(0) }
     var session by rememberSaveable(stateSaver = SessionSaver) { mutableStateOf<CropSession?>(null) }
-    val knownSize = ready?.doc?.index?.blob(route.blobHash)?.let { b -> if (b.width != null && b.height != null) PixelSize(b.width!!, b.height!!) else null }
-    val loaded by produceState<OriginalLoad?>(null, route.blobHash, ready != null) {
-        if (ready == null) return@produceState
+    val provisional = remember { CropSession.start(stageSlot, PixelSize(4, 3), null, blobHash, holo = false) }
+    val knownSize = doc?.index?.blob(blobHash)?.let { b -> if (b.width != null && b.height != null) PixelSize(b.width!!, b.height!!) else null }
+    val loaded by produceState<OriginalLoad?>(null, blobHash, doc != null) {
+        if (doc == null) return@produceState
         value = OriginalLoad(withContext(Dispatchers.IO) {
-            val file = deps.stores.blobs.fileOf(route.blobHash) ?: return@withContext null
+            val file = deps.stores.blobs.fileOf(blobHash) ?: return@withContext null
             val size = knownSize ?: BitmapFactory.Options().apply { inJustDecodeBounds = true }.let { o ->
                 BitmapFactory.decodeFile(file.path, o)
                 if (o.outWidth > 0 && o.outHeight > 0) PixelSize(o.outWidth, o.outHeight) else null
@@ -106,39 +165,40 @@ fun ImageCropScreen(route: ImageCrop, deps: FeatureDeps) {
         })
     }
     val original = loaded?.original
-    LaunchedEffect(ready != null, original) {
-        val doc = ready?.doc ?: return@LaunchedEffect
+    LaunchedEffect(doc != null, original) {
+        val d = doc ?: return@LaunchedEffect
         val o = original ?: return@LaunchedEffect
-        if (session == null) {
-            val existing = ImageEdits.use(doc, owner)
-            val holo = handOff?.holo ?: HoloRules.initial(route.slot, existing, settings.holoDefaultForNewImages)
-            session = CropSession.start(route.slot, o.size, existing, route.blobHash, holo)
-        }
+        if (session == null) session = start(d, o.size)
     }
-    val ownerName = ready?.doc?.let { ImageOwners.name(it, route.ownerKind, route.ownerKey) }.orEmpty()
     val inner = LocalWindowLayout.current.isInner
-    val apply: () -> Unit = {
-        val s = session
-        if (s != null) {
-            vm.apply(owner, route.blobHash, s) { r ->
-                if (r == EditResult.READ_ONLY) deps.toasts.show(ImageCopy.READ_ONLY, actionLabel = null) else deps.navigator.pop()
-            }
-        }
-    }
+    val apply: () -> Unit = { session?.let(onApply) }
 
     ProvideHoloTilt {
         CivilightScreen(
             title = ImageCopy.CROP_TITLE,
-            topBar = { CropTopBar(ImageCopy.cropHeader(ownerName, spec.shortName), onCancel = { deps.navigator.pop() }, onApply = apply, canApply = session != null) },
+            topBar = { CropTopBar(header, onCancel = onCancel, onApply = apply, canApply = session != null) },
             bottomBar = {
-                session?.let { s ->
+                // The controls keep their place from the first frame (the stage does not resize when the session
+                // arrives); they fade in on `enter` and take no touches until the session exists.
+                val live = session != null
+                val shown = session ?: provisional
+                val appear by animatedFraction(live, CivilightMotion.enter, label = "cropControls")
+                Box(Modifier.graphicsLayer { alpha = appear }.then(if (live) Modifier else Modifier.blockTouches())) {
                     CropControls(
-                        session = s,
+                        session = shown,
                         inner = inner,
-                        onChange = { session = it },
+                        note = note,
+                        onChange = {
+                            if (live) {
+                                controlStep++
+                                session = it
+                            }
+                        },
                         onHolo = { on ->
-                            holoTurnedOn = on
-                            session = s.holo(on)
+                            if (live) {
+                                session = shown.holo(on)
+                                if (on) holoSweep++
+                            }
                         },
                     )
                 }
@@ -147,31 +207,33 @@ fun ImageCropScreen(route: ImageCrop, deps: FeatureDeps) {
             Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg).padding(padding)) {
                 val o = original
                 val s = session
-                when {
-                    ready == null || loaded == null -> Unit
-                    o == null -> CivilightText(
-                        ImageCopy.TODO_COPY_CANVAS_IMAGE_UNREADABLE,
+                if (loaded != null && o == null) {
+                    CivilightText(
+                        ImageCopy.IMAGE_UNREADABLE,
                         CivilightTheme.type.small,
                         Modifier.align(Alignment.Center).padding(24.dp),
                         color = CivilightTheme.colors.ink3,
                     )
-                    s == null -> Unit
-                    else -> {
-                        // Captured once: the growth plays on the first show only, never after a restore.
-                        val origin = remember { if (played) null else handOff?.tileBounds }
-                        LaunchedEffect(Unit) { played = true }
-                        CropStage(
-                            bitmap = o.bitmap,
-                            session = s,
-                            origin = origin,
-                            holoSweep = holoTurnedOn,
-                            onGesture = { dx, dy, zoom ->
-                                var next = s.pan(dx, dy)
-                                if (zoom != 1f) next = next.zoom(next.edit.zoom * zoom)
-                                session = next
-                            },
-                        )
-                    }
+                } else {
+                    // Captured once: the growth plays on the first show only, never after a restore. The stage is on
+                    // screen from the first frame: the picker's thumbnail grows while the original decodes.
+                    val origin = remember { if (played) null else handOff?.tileBounds }
+                    LaunchedEffect(Unit) { played = true }
+                    CropStage(
+                        bitmap = o?.bitmap,
+                        session = s,
+                        slot = stageSlot,
+                        origin = origin,
+                        tile = handOff?.tileBitmap,
+                        holoSweep = holoSweep,
+                        controlStep = controlStep,
+                        onGesture = { dx, dy, zoom ->
+                            val cur = session ?: return@CropStage
+                            var next = cur.pan(dx, dy)
+                            if (zoom != 1f) next = next.zoom(next.edit.zoom * zoom)
+                            session = next
+                        },
+                    )
                 }
             }
         }
@@ -208,7 +270,7 @@ private fun CropTopBar(header: String, onCancel: () -> Unit, onApply: () -> Unit
 
 /** The `bg` control panel (16 × 20 padding): ratio chips, zoom, tools, holo. */
 @Composable
-private fun CropControls(session: CropSession, inner: Boolean, onChange: (CropSession) -> Unit, onHolo: (Boolean) -> Unit) {
+private fun CropControls(session: CropSession, inner: Boolean, note: String?, onChange: (CropSession) -> Unit, onHolo: (Boolean) -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Box(Modifier.fillMaxWidth().background(colors.bg).navigationBarsPadding(), contentAlignment = Alignment.TopCenter) {
@@ -219,8 +281,10 @@ private fun CropControls(session: CropSession, inner: Boolean, onChange: (CropSe
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // A hidden gallery image used as a main image says what becomes visible (GAL-14).
+            note?.let { CivilightText(it, type.small, color = colors.ink3) }
             CropRatioRow(
-                labels = session.ratios.map { ImageSlots.chip(session.slot, it) },
+                labels = session.ratios.map(session::chip),
                 selectedIndex = session.ratios.indexOf(session.current),
                 onSelect = { i -> onChange(session.select(session.ratios[i])) },
                 note = ImageCopy.FIXED_RATIOS,
@@ -246,5 +310,12 @@ private fun CropControls(session: CropSession, inner: Boolean, onChange: (CropSe
                 SwitchRow(title = ImageCopy.HOLO, checked = session.holo, onCheckedChange = onHolo, subtitle = ImageCopy.HOLO_SUB_CROP)
             }
         }
+    }
+}
+
+/** Swallows every touch on a part of the screen that is drawn but not ready yet. */
+private fun Modifier.blockTouches(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
     }
 }

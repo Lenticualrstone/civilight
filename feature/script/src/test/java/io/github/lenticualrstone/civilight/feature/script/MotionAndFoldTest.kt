@@ -2,7 +2,9 @@ package io.github.lenticualrstone.civilight.feature.script
 
 import io.github.lenticualrstone.civilight.feature.script.fold.FoldRules
 import io.github.lenticualrstone.civilight.feature.script.layout.TabletopLayout
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.feature.script.motion.ScriptMotion
+import io.github.lenticualrstone.civilight.feature.script.motion.ScriptScroll
 import io.github.lenticualrstone.civilight.feature.script.panel.PanelTab
 import io.github.lenticualrstone.civilight.feature.script.state.EditorState
 import io.github.lenticualrstone.civilight.feature.script.state.ScriptRowKeys
@@ -48,20 +50,25 @@ class MotionAndFoldTest {
 
     @Test
     fun `CNV-39 SCR-67 placement - the typed line never moves, a new block's neighbours follow it`() {
-        assertNull(ScriptMotion.placement(isCaretRow = true, entering = true, reduced = false))
-        assertNull(ScriptMotion.placement(isCaretRow = false, entering = true, reduced = true))
-        assertEquals(ScriptMotion.Placement.ENTER, ScriptMotion.placement(isCaretRow = false, entering = true, reduced = false))
-        assertEquals(ScriptMotion.Placement.EXIT, ScriptMotion.placement(isCaretRow = false, entering = false, reduced = false))
-        // While typing, only a new block's entrance moves rows: a growing line pushes the rows below at once.
-        assertNull(ScriptMotion.placement(isCaretRow = false, entering = false, reduced = false, editing = true))
-        assertEquals(ScriptMotion.Placement.ENTER, ScriptMotion.placement(isCaretRow = false, entering = true, reduced = false, editing = true))
+        assertNull(ScriptMotion.placement(isCaretRow = true, entering = true))
+        assertNull(ScriptMotion.placement(isCaretRow = true, entering = false, structural = true))
+        assertEquals(ScriptMotion.Placement.ENTER, ScriptMotion.placement(isCaretRow = false, entering = true))
+        // A removed or inserted row (the key set changed) closes its gap, typing or not.
+        assertEquals(ScriptMotion.Placement.EXIT, ScriptMotion.placement(isCaretRow = false, entering = false, structural = true))
+        // A pure edit moves nothing through placement: a growing line pushes the rows below at once.
+        assertNull(ScriptMotion.placement(isCaretRow = false, entering = false, structural = false))
         assertEquals(320, ScriptMotion.token(ScriptMotion.Placement.ENTER).durationMs)
         assertEquals(160, ScriptMotion.token(ScriptMotion.Placement.EXIT).durationMs)
         assertEquals(8, ScriptMotion.ENTER_SHIFT_DP)
-        assertEquals(160, ScriptMotion.removeMs(reduced = false))
-        assertEquals(120, ScriptMotion.removeMs(reduced = true))
-        assertEquals(200, ScriptMotion.tabMs(reduced = false))
-        assertEquals(120, ScriptMotion.tabMs(reduced = true))
+    }
+
+    @Test
+    fun `SCR-67 a change of the row set is structural, the first composition and a pure edit are not`() {
+        assertFalse(ScriptMotion.structural(null, setOf("a", "b")))
+        assertFalse(ScriptMotion.structural(setOf("a", "b"), setOf("b", "a")))
+        assertTrue(ScriptMotion.structural(setOf("a", "b"), setOf("a", "b", "c")))
+        assertTrue(ScriptMotion.structural(setOf("a", "b"), setOf("a")))
+        assertTrue(ScriptMotion.structural(setOf("a"), setOf("b")))
     }
 
     @Test
@@ -134,5 +141,25 @@ class MotionAndFoldTest {
         assertEquals(TabletopLayout(288f, 24f, 488f), TabletopLayout.of(FoldPosture.TABLETOP, 800f, foldAt = 300f))
         // Too low to split (a landscape cover screen).
         assertNull(TabletopLayout.of(FoldPosture.TABLETOP, 400f))
+    }
+
+    @Test
+    fun `CNV-40 the swipe settle scales with the distance left and never falls under the reduced fade`() {
+        assertEquals(260, ScriptMotion.settle(1f).durationMs)
+        assertEquals(130, ScriptMotion.settle(0.5f).durationMs)
+        assertEquals(120, ScriptMotion.settle(0.1f).durationMs)
+        assertEquals(120, ScriptMotion.settle(0f).durationMs)
+        assertEquals(260, ScriptMotion.settle(3f).durationMs)
+        assertEquals(CivilightMotion.swipe.curve, ScriptMotion.settle(0.5f).curve)
+    }
+
+    @Test
+    fun `a programmatic scroll glides the row under the bar, half a screen at most`() {
+        // The row is 300 px down and the bar covers 120 px: it travels 180.
+        assertEquals(180f, ScriptScroll.travel(rowOffset = 300, beforeContentPadding = 120), 0f)
+        assertEquals(-40f, ScriptScroll.travel(rowOffset = 80, beforeContentPadding = 120), 0f)
+        assertEquals(0f, ScriptScroll.travel(rowOffset = 120, beforeContentPadding = 120), 0f)
+        assertEquals(900, ScriptScroll.glidePx(viewportHeight = 1800))
+        assertEquals(0, ScriptScroll.glidePx(viewportHeight = -5))
     }
 }

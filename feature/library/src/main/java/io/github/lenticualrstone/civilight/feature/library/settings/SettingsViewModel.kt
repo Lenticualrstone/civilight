@@ -107,7 +107,7 @@ internal class SettingsViewModel(private val services: LibraryServices) : ViewMo
         when (AppLockRules.change(deps.settings.value.appLock, wanted, services.deviceSecure())) {
             AppLockChange.NONE -> Unit
             AppLockChange.REFUSED_NO_DEVICE_LOCK ->
-                deps.toasts.show(SettingsCopy.TODO_COPY_LIB35_NO_DEVICE_LOCK, actionLabel = null)
+                deps.toasts.show(SettingsCopy.NO_DEVICE_LOCK, actionLabel = null)
             AppLockChange.TURN_ON -> viewModelScope.launch { settingsStore.setAppLock(true) }
             AppLockChange.TURN_OFF_AFTER_AUTH -> viewModelScope.launch {
                 if (deps.biometric.authenticate(AuthRequest(SettingsCopy.APP_LOCK)) == AuthResult.SUCCESS) {

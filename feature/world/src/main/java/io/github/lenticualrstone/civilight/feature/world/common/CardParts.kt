@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.world.common
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,9 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.text.DecoratedText
 import io.github.lenticualrstone.civilight.designsystem.text.MarkerKind
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
 
 /** Content padding of a card body under the glass bars (board: 20 at the sides). */
@@ -76,32 +80,40 @@ fun CardArt(name: String, label: String?, modifier: Modifier = Modifier) {
     }
 }
 
-/** Eyebrow (`.sec`), name (Myeongjo 800) and description with its links (WLD-08 body 2). */
+/** Eyebrow (`.sec`), name (Myeongjo 800) and description with its links (WLD-08 body 2); lens values swap (CNV-42). */
 @Composable
 fun CardHead(head: CardHeadUi, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(modifier.fillMaxWidth()) {
-        SectionLabel(head.eyebrow, Modifier.padding(top = 20.dp))
-        CivilightText(head.name, type.pageTitle, Modifier.padding(top = 6.dp), color = colors.ink)
+        ValueSwap(head.eyebrow, type.sec, Modifier.fillMaxWidth().padding(top = 20.dp), color = colors.ink3)
+        ValueSwap(head.name, type.pageTitle, Modifier.padding(top = 6.dp), color = colors.ink, maxLines = Int.MAX_VALUE)
         CardDescription(head.description)
     }
 }
 
-/** The description paragraphs (Myeongjo body) with link decorations. */
+/** The description paragraphs (Myeongjo body) with link decorations; a changed text swaps like a lens value. */
 @Composable
 fun CardDescription(paragraphs: List<ParagraphUi>, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    Column(modifier.fillMaxWidth()) {
-        paragraphs.forEach { p ->
-            DecoratedText(
-                text = AnnotatedString(p.text),
-                style = type.body,
-                modifier = Modifier.padding(top = 8.dp),
-                color = colors.ink,
-                decorations = p.decorations,
-            )
+    val motion = CivilightTheme.motion
+    AnimatedContent(
+        targetState = paragraphs,
+        modifier = modifier.fillMaxWidth(),
+        transitionSpec = { motion.valueSwap() },
+        label = "cardDescription",
+    ) { shown ->
+        Column(Modifier.fillMaxWidth()) {
+            shown.forEach { p ->
+                DecoratedText(
+                    text = AnnotatedString(p.text),
+                    style = type.body,
+                    modifier = Modifier.padding(top = 8.dp),
+                    color = colors.ink,
+                    decorations = p.decorations,
+                )
+            }
         }
     }
 }
@@ -129,17 +141,12 @@ fun FieldSection(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(Modifier.fillMaxWidth()) {
-        val rows = if (showEmpty) section.filled + section.empty else section.filled
-        rows.forEach { row ->
-            FieldTableRow(
-                label = row.label,
-                value = row.value ?: WorldCopy.EMPTY_VALUE,
-                marker = if (row.changed) MarkerKind.CHANGE else null,
-                onClick = if (readOnly) null else ({ onEdit(row) }),
-            )
-        }
+        section.filled.forEach { row -> FieldRowView(row, readOnly, onEdit) }
+        // `빈 항목 N · 보기` opens the empty fields: they fold in under the filled ones (P2).
+        section.empty.forEach { row -> FoldReveal(showEmpty) { FieldRowView(row, readOnly, onEdit) } }
         val emptyLine = section.emptyLine
-        if ((emptyLine != null && !showEmpty) || !readOnly) {
+        val showLine = emptyLine != null && !showEmpty
+        FoldReveal(showLine || !readOnly) {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -148,15 +155,21 @@ fun FieldSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                if (emptyLine != null && !showEmpty) {
-                    TextAction(emptyLine, onShowEmpty, color = colors.ink3, style = type.small)
-                } else {
-                    Box(Modifier)
-                }
+                Box { FoldRevealValue(emptyLine.takeIf { showLine }, horizontal = true) { line -> TextAction(line, onShowEmpty, color = colors.ink3, style = type.small) } }
                 if (!readOnly) TextAction(WorldCopy.ADD_FIELD, onAdd, color = colors.acc, style = type.small)
             }
         }
     }
+}
+
+@Composable
+private fun FieldRowView(row: FieldRowUi, readOnly: Boolean, onEdit: (FieldRowUi) -> Unit) {
+    FieldTableRow(
+        label = row.label,
+        value = row.value ?: WorldCopy.EMPTY_VALUE,
+        marker = if (row.changed) MarkerKind.CHANGE else null,
+        onClick = if (readOnly) null else ({ onEdit(row) }),
+    )
 }
 
 /** The whole card while its item is hidden and locked: `숨긴 용어 1 · 지문으로 보기`. */

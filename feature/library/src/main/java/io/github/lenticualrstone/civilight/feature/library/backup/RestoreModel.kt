@@ -91,7 +91,7 @@ object RestoreModel {
         val entries = BackupPlanner.projectEntries(run)
         val visible = entries.filter { !it.hidden }.mapNotNull { e ->
             val key = e.projectKey ?: return@mapNotNull null
-            RestoreProjectUi(key, names[key] ?: RestoreCopy.TODO_COPY_LIB59_UNNAMED_PROJECT, key !in picks.unchecked)
+            RestoreProjectUi(key, names[key] ?: RestoreCopy.UNNAMED_PROJECT, key !in picks.unchecked)
         }
         val hidden = entries.count { it.hidden }
         return if (hidden > 0) visible + RestoreProjectUi(null, "${RestoreCopy.HIDDEN_PROJECTS} $hidden", !picks.hiddenUnchecked) else visible

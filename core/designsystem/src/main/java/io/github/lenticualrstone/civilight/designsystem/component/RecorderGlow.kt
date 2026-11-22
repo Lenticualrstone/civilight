@@ -1,13 +1,7 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
 import android.os.Build
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -15,6 +9,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
@@ -29,7 +28,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
 import io.github.lenticualrstone.civilight.designsystem.theme.FixedColors
 import io.github.lenticualrstone.civilight.designsystem.theme.ResolvedTheme
 import kotlin.math.floor
@@ -42,32 +44,57 @@ val GlowBaseHeights: List<Dp> = listOf(170.dp, 260.dp, 330.dp, 240.dp, 300.dp, 2
 
 const val GLOW_MIN_SCALE: Float = 0.72f
 const val GLOW_MAX_SCALE: Float = 1.08f
-const val GLOW_PERIOD_SEC: Float = 1.6f
-const val GLOW_PHASE_SEC: Float = 0.23f
+const val GLOW_PERIOD_SEC: Float = CivilightMotion.recorderLevelPeriodMs / 1000f
+const val GLOW_PHASE_SEC: Float = CivilightMotion.recorderBandPhaseMs / 1000f
 
-/** CSS `ease-in-out`. */
-private val EaseInOut = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
+/** CSS `ease-in-out` (token curve of the glow). */
+private val EaseInOut = CivilightMotion.easeInOutCurve.easing
 
 /**
  * Scale of band [index] at [timeSec] for input [level] (0…1): a 1.6 s ease-in-out alternate oscillation,
  * phase-shifted 0.23 s per band, mixed half-and-half with the level, between 0.72 and 1.08 of the base.
  */
 fun glowBandScale(index: Int, timeSec: Float, level: Float): Float {
-    val cycle = (timeSec - GLOW_PHASE_SEC * index) / GLOW_PERIOD_SEC
-    val whole = floor(cycle)
-    val frac = cycle - whole
-    val forward = Math.floorMod(whole.toLong(), 2L) == 0L
-    val eased = EaseInOut.transform(if (forward) frac else 1f - frac)
+    val eased = alternate(timeSec - GLOW_PHASE_SEC * index, GLOW_PERIOD_SEC)
     val mix = 0.5f * eased + 0.5f * level.coerceIn(0f, 1f)
     return GLOW_MIN_SCALE + (GLOW_MAX_SCALE - GLOW_MIN_SCALE) * mix
 }
+
+/**
+ * PROCESSING sweep position −1 … 1 at [timeSec]: ease-in-out, alternating every
+ * [CivilightMotion.recorderGlowSweep] (2.4 s), starting at −1.
+ */
+fun glowSweep(timeSec: Float): Float =
+    -1f + 2f * alternate(timeSec, CivilightMotion.recorderGlowSweep.durationMs / 1000f)
+
+/** 0 → 1 → 0 … eased ease-in-out, [periodSec] per leg (CSS `alternate`). */
+private fun alternate(timeSec: Float, periodSec: Float): Float {
+    val cycle = timeSec / periodSec
+    val whole = floor(cycle)
+    val frac = cycle - whole
+    val forward = Math.floorMod(whole.toLong(), 2L) == 0L
+    return EaseInOut.transform(if (forward) frac else 1f - frac)
+}
+
+/**
+ * Glow amounts in a mode: how much the level oscillation ([level]) and the sweep ([sweep]) apply. A mode
+ * change blends between them on `standard` (S13). Both are 0 when loops are off (reduced motion, animator
+ * scale 0) or in [GlowMode.STILL].
+ */
+data class GlowAmounts(val level: Float, val sweep: Float)
+
+fun glowAmounts(mode: GlowMode, loops: Boolean): GlowAmounts = GlowAmounts(
+    level = if (loops && mode == GlowMode.RECORDING) 1f else 0f,
+    sweep = if (loops && mode == GlowMode.PROCESSING) 1f else 0f,
+)
 
 /**
  * DS-61 recorder glow band: seven vertical bands across the full width (+40 dp overflow each side, −60 dp
  * below the bottom), each a gradient from its colour (glow palette, in order) at the bottom to transparent
  * at the top, top corners 40; the group blurred 34 dp (API 31+) with saturation × 1.2, opacity 0.95.
  * Bands, never rings. [GlowMode.RECORDING]: heights follow [level]; [GlowMode.PROCESSING]: the group
- * sweeps ±90 dp (2.4 s alternate), heights frozen; [GlowMode.STILL] (reduced motion): static.
+ * sweeps ±90 dp (2.4 s alternate), heights frozen; [GlowMode.STILL] (and reduced motion or animator scale
+ * 0): static, with no frame clock running. Mode changes blend on `standard`.
  */
 @Composable
 fun RecorderGlowBand(
@@ -77,10 +104,24 @@ fun RecorderGlowBand(
     height: Dp = 360.dp,
 ) {
     val colors = CivilightTheme.colors
+    val motion = LocalMotion.current
     val palette = FixedColors.recorderGlow(if (colors.isDark) ResolvedTheme.DARK else ResolvedTheme.LIGHT).map { saturate(it, 1.2f) }
-    val transition = rememberInfiniteTransition(label = "glow")
-    val clock = transition.animateFloat(0f, 1000f, infiniteRepeatable(tween(1_000_000, easing = LinearEasing)), label = "clock")
-    val sweep = transition.animateFloat(-1f, 1f, infiniteRepeatable(tween(2400, easing = EaseInOut), RepeatMode.Reverse), label = "sweep")
+    val amounts = glowAmounts(mode, motion.loops)
+    val levelAmount = animatedAlpha(amounts.level, label = "glowLevel")
+    val sweepAmount = animatedAlpha(amounts.sweep, label = "glowSweep")
+    val clockOn by remember(motion.loops) {
+        derivedStateOf { motion.loops && (levelAmount.value > 0f || sweepAmount.value > 0f) }
+    }
+    val timeMs = remember { mutableLongStateOf(0L) }
+    if (clockOn || amounts.level > 0f || amounts.sweep > 0f) {
+        LaunchedEffect(Unit) {
+            val base = timeMs.longValue
+            val start = withInfiniteAnimationFrameMillis { it }
+            while (true) {
+                withInfiniteAnimationFrameMillis { now -> timeMs.longValue = base + (now - start) }
+            }
+        }
+    }
     val blur = CivilightTheme.blur.glow
     Canvas(
         modifier
@@ -98,12 +139,14 @@ fun RecorderGlowBand(
         val overflow = 40.dp.toPx()
         val below = 60.dp.toPx()
         val radius = CornerRadius(40.dp.toPx())
-        val shift = if (mode == GlowMode.PROCESSING) sweep.value * 90.dp.toPx() else 0f
+        val time = timeMs.longValue / 1000f
+        val sweep = sweepAmount.value
+        val levelMix = levelAmount.value
+        val shift = if (sweep > 0f) glowSweep(time) * 90.dp.toPx() * sweep else 0f
         val bandW = (size.width + overflow * 2) / palette.size
-        val time = clock.value
         val bottom = size.height + below
         palette.forEachIndexed { i, color ->
-            val scale = if (mode == GlowMode.RECORDING) glowBandScale(i, time, level()) else 1f
+            val scale = if (levelMix > 0f) 1f + (glowBandScale(i, time, level()) - 1f) * levelMix else 1f
             val top = bottom - GlowBaseHeights[i].toPx() * scale
             val left = -overflow + bandW * i + shift
             val path = Path().apply {

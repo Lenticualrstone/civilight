@@ -51,10 +51,10 @@ sealed interface ExportRow {
         override val label: String get() = "PDF 암호"
     }
 
-    /** `.civilight` `암호` switch + password and repeat fields + one warning line (copy not in sources). */
+    /** `.civilight` `암호` switch + password and repeat fields + one warning line (the drawn pattern of the RHRecoveryPw warning). */
     data class Password(val on: Boolean) : ExportRow {
         override val label: String get() = "암호"
-        val warning: String get() = TODO_COPY_LIB41_PASSWORD_WARNING
+        val warning: String get() = PASSWORD_WARNING
     }
 
     /** `레코더 기록 4` · `원본 음성 포함` checkbox · `숨긴 기록 1 제외`. */
@@ -72,7 +72,11 @@ sealed interface ExportRow {
     }
 
     companion object {
-        const val TODO_COPY_LIB41_PASSWORD_WARNING = "TODO_COPY_LIB41_PASSWORD_WARNING"
+        /** The warning line under the password fields (`RHRecoveryPw` pattern `잊으면 … 열 수 없음`). */
+        const val PASSWORD_WARNING = "잊으면 파일을 열 수 없음"
+
+        @Deprecated("The copy exists now.", ReplaceWith("PASSWORD_WARNING"))
+        const val TODO_COPY_LIB41_PASSWORD_WARNING = PASSWORD_WARNING
     }
 }
 
@@ -91,9 +95,19 @@ data class ExportSheet(
 }
 
 object ExportSheets {
-    const val TODO_COPY_LIB41_CREATE_CSV = "TODO_COPY_LIB41_CREATE_CSV"
-    const val TODO_COPY_LIB41_CREATE_JSON = "TODO_COPY_LIB41_CREATE_JSON"
-    const val TODO_COPY_LIB41_CREATE_FILE = "TODO_COPY_LIB41_CREATE_FILE"
+    /** Primary buttons of the other formats follow the drawn `PDF 만들기` (LIB-41: `<형식> 만들기`). */
+    const val CREATE_CSV = "CSV 만들기"
+    const val CREATE_JSON = "JSON 만들기"
+    const val CREATE_FILE = ".civilight 만들기"
+
+    @Deprecated("The copy exists now.", ReplaceWith("CREATE_CSV"))
+    const val TODO_COPY_LIB41_CREATE_CSV = CREATE_CSV
+
+    @Deprecated("The copy exists now.", ReplaceWith("CREATE_JSON"))
+    const val TODO_COPY_LIB41_CREATE_JSON = CREATE_JSON
+
+    @Deprecated("The copy exists now.", ReplaceWith("CREATE_FILE"))
+    const val TODO_COPY_LIB41_CREATE_FILE = CREATE_FILE
 
     /**
      * Rows for [options]. The example project and trashed projects cannot be exported (the caller
@@ -140,9 +154,9 @@ object ExportSheets {
             warnings = warnings,
             primaryButton = when (format) {
                 ExportFormat.PDF -> "PDF 만들기"
-                ExportFormat.CSV -> TODO_COPY_LIB41_CREATE_CSV
-                ExportFormat.ENGINE_JSON -> TODO_COPY_LIB41_CREATE_JSON
-                ExportFormat.PROJECT_FILE -> TODO_COPY_LIB41_CREATE_FILE
+                ExportFormat.CSV -> CREATE_CSV
+                ExportFormat.ENGINE_JSON -> CREATE_JSON
+                ExportFormat.PROJECT_FILE -> CREATE_FILE
             },
         )
     }

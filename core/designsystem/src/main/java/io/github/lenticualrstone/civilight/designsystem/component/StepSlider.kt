@@ -1,6 +1,6 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /** The step nearest to [fraction] (0…1) for a slider of [stepCount] steps. */
@@ -39,7 +43,8 @@ fun sliderStepFor(fraction: Float, stepCount: Int): Int =
 /**
  * DS-34 step slider (`글자 크기`): track 4 dp, radius 2, `line`, filled part `acc`; thumb an 18 × 18 rounded
  * square (radius 5) in `ink`, never a circle; a small `가` (13 sp) at the start and a large `가` (22 sp)
- * at the end, 12 dp from the track. Steps snap with `Standard`; no tick marks. Touch height 44.
+ * at the end, 12 dp from the track. The thumb tracks the finger while dragging; the snap to a step runs on
+ * `Standard` (a jump when reduced); no tick marks. Touch height 44.
  */
 @Composable
 fun StepSlider(
@@ -53,15 +58,19 @@ fun StepSlider(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val reduced = CivilightTheme.reducedMotion
+    val motion = LocalMotion.current
     val target = if (stepCount <= 1) 0f else value.coerceIn(0, stepCount - 1).toFloat() / (stepCount - 1)
     var dragFraction by remember { mutableFloatStateOf(-1f) }
-    val shown by animateFloatAsState(
-        if (dragFraction >= 0f) dragFraction else target,
-        CivilightMotion.spec(CivilightMotion.standard, reduced),
-        label = "slider",
-    )
+    // S18b: the thumb follows the finger directly while dragging; only the snap to a step (release, tap,
+    // accessibility) animates on `standard`, and it snaps when motion is reduced.
+    val settled = remember { Animatable(target) }
+    LaunchedEffect(target) {
+        if (settled.value != target) settled.animateTo(target, motion.move(CivilightMotion.standard))
+    }
+    val shown = if (dragFraction >= 0f) dragFraction else settled.value
     val currentValue by rememberUpdatedState(value)
+    val motionNow by rememberUpdatedState(motion)
+    val scope = rememberCoroutineScope()
     val onChange by rememberUpdatedState(onValueChange)
     Row(
         modifier.fillMaxWidth(),
@@ -93,7 +102,13 @@ fun StepSlider(
                         onDragStart = { dragFraction = (it.x / size.width).coerceIn(0f, 1f) },
                         onDragEnd = {
                             val step = sliderStepFor(dragFraction, stepCount)
-                            dragFraction = -1f
+                            // Start the release snap from where the finger left the thumb.
+                            scope.launch {
+                                settled.snapTo(dragFraction.coerceIn(0f, 1f))
+                                dragFraction = -1f
+                                val to = if (stepCount <= 1) 0f else step.toFloat() / (stepCount - 1)
+                                settled.animateTo(to, motionNow.move(CivilightMotion.standard))
+                            }
                             if (step != currentValue) onChange(step)
                         },
                         onDragCancel = { dragFraction = -1f },

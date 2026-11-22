@@ -38,7 +38,11 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.feature.story.common.ChapterHeaderText
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.common.storyServices
 import io.github.lenticualrstone.civilight.feature.story.menu.StructureMenuContent
@@ -106,16 +110,20 @@ fun StructureScreen(route: StoryStructure, deps: FeatureDeps) {
                 }
             },
         ) { padding ->
-            if (ui == null) {
-                Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
-            } else {
-                StructureList(
-                    ui = ui,
-                    padding = padding,
-                    onToggle = { key -> saved = StructureModel.toggle(expanded, key) },
-                    onScene = { item -> if (item.masked) gate.unlock() else navigator.push(Script(p, sceneKey = item.row.key)) },
-                    onMenu = { key -> sheets.open(UnitMenuSheet(p, key)) },
-                )
+            // Loading -> list swaps on the kind, never on the data (motion audit, feature:story 7).
+            ContentSwap(ui != null, Modifier.fillMaxSize()) { loaded ->
+                val shown = ui
+                if (!loaded || shown == null) {
+                    Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
+                } else {
+                    StructureList(
+                        ui = shown,
+                        padding = padding,
+                        onToggle = { key -> saved = StructureModel.toggle(expanded, key) },
+                        onScene = { item -> if (item.masked) gate.unlock() else navigator.push(Script(p, sceneKey = item.row.key)) },
+                        onMenu = { key -> sheets.open(UnitMenuSheet(p, key)) },
+                    )
+                }
             }
         }
     }
@@ -132,16 +140,21 @@ private fun StructureList(
     val colors = CivilightTheme.colors
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colors.bg),
-        contentPadding = PaddingValues(start = 24.dp, end = 12.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+        // 14 dp margins, with 10 dp inside every row: the `sel` fill of a scene row then spans
+        // 14 to 14 dp from the screen edges, level with the text margin of 24 (QA #13: with a 12 dp
+        // end margin and the DS 10 dp outset the fill ended 2 dp from the edge).
+        contentPadding = PaddingValues(start = ROW_MARGIN, end = ROW_MARGIN, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
     ) {
         item(key = "levels") {
-            CivilightText(ui.levelLine, CivilightTheme.type.small, Modifier.padding(end = 12.dp), color = colors.ink3)
+            CivilightText(ui.levelLine, CivilightTheme.type.small, civilightItem().padding(horizontal = ROW_INSET), color = colors.ink3)
         }
         items(ui.items, key = { it.id }) { item ->
+            // Rows come and go with a fold, so they open and close on the fold tokens (P1).
+            val fold = civilightItem(CivilightMotion.foldOpen, fadeOut = CivilightMotion.foldClose)
             when (item) {
-                is GroupItem -> GroupHeader(item, onToggle)
-                is EpisodeItem -> EpisodeLine(item, onToggle, onMenu)
-                is SceneItem -> SceneLine(item, onScene, onMenu)
+                is GroupItem -> GroupHeader(item, onToggle, civilightItem())
+                is EpisodeItem -> EpisodeLine(item, onToggle, onMenu, fold)
+                is SceneItem -> SceneLine(item, onScene, onMenu, fold)
             }
         }
     }
@@ -149,14 +162,14 @@ private fun StructureList(
 
 /** `Ⅰ 1장 · 등불지기 | 7/10`; a planned one is `ink2` with `0/8 · 계획` and its synopsis. */
 @Composable
-private fun GroupHeader(item: GroupItem, onToggle: (Key) -> Unit) {
+private fun GroupHeader(item: GroupItem, onToggle: (Key) -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val row = item.row
     val toggle = if (item.expandable) Modifier.pressable(onClick = { onToggle(row.key) }, scaleOnPress = false) else Modifier
-    Column(Modifier.fillMaxWidth().padding(top = 26.dp, start = (item.depth * 16).dp, end = 12.dp)) {
+    Column(modifier.fillMaxWidth().padding(top = 26.dp, start = ROW_INSET + (item.depth * 16).dp, end = ROW_INSET)) {
         Row(Modifier.fillMaxWidth().then(toggle).heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
-            CivilightText(row.header, type.title, Modifier.weight(1f), color = if (row.planned) colors.ink2 else colors.ink, maxLines = 1)
+            ChapterHeaderText(row.header, type.title, Modifier.weight(1f), color = if (row.planned) colors.ink2 else colors.ink)
             CivilightText(row.progress, type.number, color = if (row.planned) colors.ink3 else colors.ink2, maxLines = 1)
         }
         row.synopsis?.let { CivilightText(it, type.leadCompact, Modifier.padding(top = 4.dp), color = colors.ink2) }
@@ -165,16 +178,17 @@ private fun GroupHeader(item: GroupItem, onToggle: (Key) -> Unit) {
 
 /** `⠿ 1-7 | 잿빛 새벽의 등불 | 씬 4개 · 5,210자 | ⋯`; unwritten episodes are `ink3`. */
 @Composable
-private fun EpisodeLine(item: EpisodeItem, onToggle: (Key) -> Unit, onMenu: (Key) -> Unit) {
+private fun EpisodeLine(item: EpisodeItem, onToggle: (Key) -> Unit, onMenu: (Key) -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val row = item.row
     val bold = row.expanded || item.current
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .topHairline(colors.line)
             .pressable(onClick = { onToggle(row.key) }, scaleOnPress = false)
+            .padding(start = ROW_INSET)
+            .topHairline(colors.line)
             .heightIn(min = 44.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -198,17 +212,17 @@ private fun EpisodeLine(item: EpisodeItem, onToggle: (Key) -> Unit, onMenu: (Key
  * An unlocked hidden scene carries a small `숨김` tag; a locked one reads `씬 4 · 숨긴 씬` (STO-11).
  */
 @Composable
-private fun SceneLine(item: SceneItem, onScene: (SceneItem) -> Unit, onMenu: (Key) -> Unit) {
+private fun SceneLine(item: SceneItem, onScene: (SceneItem) -> Unit, onMenu: (Key) -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val row = item.row
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .selectedRowBackground(row.current, colors.sel, colors.acc)
+            .selectedRowBackground(row.current, colors.sel, colors.acc, outset = 0.dp)
             .pressable(onClick = { onScene(item) }, scaleOnPress = false)
             .heightIn(min = 44.dp)
-            .padding(start = if (item.indented) 46.dp else 0.dp),
+            .padding(start = ROW_INSET + if (item.indented) 46.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -225,3 +239,7 @@ private fun SceneLine(item: SceneItem, onScene: (SceneItem) -> Unit, onMenu: (Ke
         CivilightIconButton(IconId.More, StructureCopy.MENU, { onMenu(row.key) })
     }
 }
+
+/** List margin; every row adds [ROW_INSET] inside it, so text sits at 24 dp and the DS fill spans the 10 dp between. */
+private val ROW_MARGIN = 14.dp
+private val ROW_INSET = 10.dp

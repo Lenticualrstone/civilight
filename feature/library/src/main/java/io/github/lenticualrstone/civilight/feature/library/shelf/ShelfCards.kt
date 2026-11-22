@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.shelf
 
+import io.github.lenticualrstone.civilight.domain.library.masking.HiddenGroupRow
 import io.github.lenticualrstone.civilight.model.app.AppSettings
 import io.github.lenticualrstone.civilight.model.app.ViewMode
 import io.github.lenticualrstone.civilight.model.asset.Crop
@@ -23,6 +24,24 @@ data class ProjectCardUi(
     /** A hidden project shown because the group is open (`ED`: after the visible cards, `숨김 풀기` in its ⋯). */
     val hiddenOpen: Boolean,
 )
+
+/** One card of the card view's project row (LIB-04). */
+sealed interface ShelfCardItem {
+    /** The row's lazy key. */
+    val key: Any
+
+    data class Project(val card: ProjectCardUi) : ShelfCardItem {
+        override val key: Any get() = card.row.key
+    }
+
+    data class Lock(val group: HiddenGroupRow) : ShelfCardItem {
+        override val key: Any get() = "lockCard"
+    }
+
+    data object NewProject : ShelfCardItem {
+        override val key: Any get() = "newCard"
+    }
+}
 
 /** The card view's pure parts (LIB-04 `LibCards` / `LibCardsWide`). */
 object ShelfCards {
@@ -57,35 +76,30 @@ object ShelfCards {
 
     fun isWide(widthDp: Int): Boolean = widthDp >= WIDE_MIN_DP
 
-    /** `MCarousel` image parallax: 8 % of the card width (WLD-68 card carousel). */
-    const val PARALLAX = 0.08f
-
-    /**
-     * How far a card's picture slides against its card (`MCarousel`): the card's distance from its
-     * resting place [startPx] in strides (card + gap), times [PARALLAX] of the card width, opposite to
-     * the motion, capped at one stride either way. 0 for the settled card.
-     */
-    fun parallaxShift(offsetPx: Int, startPx: Int, stridePx: Int, cardWidthPx: Int): Float {
-        if (stridePx <= 0) return 0f
-        val strides = ((offsetPx - startPx).toFloat() / stridePx).coerceIn(-1f, 1f)
-        return -strides * PARALLAX * cardWidthPx
-    }
-
-    /** The scale that keeps a picture shifted by [shiftPx] covering its card: 1 at rest, so the crop shows whole. */
-    fun parallaxScale(shiftPx: Float, cardWidthPx: Int): Float =
-        if (cardWidthPx <= 0) 1f else 1f + 2f * kotlin.math.abs(shiftPx) / cardWidthPx
-
     fun recentLimit(wide: Boolean): Int = if (wide) RecentsModel.WIDE_COUNT else RecentsModel.COVER_COUNT
 
-    /** Dots under the section label: one per card of the row (projects, the lock card, `새 프로젝트`). */
-    fun pageCount(ui: ShelfUi, wide: Boolean): Int =
-        ui.cards.size + (if (ui.lockedGroup != null) 1 else 0) + (if (wide) 1 else 0)
+    /**
+     * The cards of the project row in order: the projects, the lock card while the hidden group is locked,
+     * and the outlined `새 프로젝트` card on the wide row. The pager dots count exactly these.
+     */
+    fun cardItems(ui: ShelfUi, wide: Boolean): List<ShelfCardItem> =
+        ui.cards.map { ShelfCardItem.Project(it) } +
+            listOfNotNull(ui.lockedGroup?.let { ShelfCardItem.Lock(it) }) +
+            listOfNotNull(ShelfCardItem.NewProject.takeIf { wide })
 
     fun cover(doc: ProjectDoc?, name: String): CoverUi {
         val initial = name.trim().take(1)
         val use = doc?.index?.imageUse(ImageOwnerKind.PROJECT, doc.key, ImageSlot.PROJECT_COVER)
             ?: return CoverUi(null, null, null, initial, holo = false)
         return CoverUi(use.blobHash, use.cropFor(Ratio.R3X4), use.presetId, initial, use.holo)
+    }
+
+    /** The 48 dp list thumbnail (D6): the project cover's 1:1 crop ("목록 썸네일 · 목록 1:1", 55 GAL-14), a preset, or the initial. */
+    fun thumb(doc: ProjectDoc?, name: String): CoverUi {
+        val initial = name.trim().take(1)
+        val use = doc?.index?.imageUse(ImageOwnerKind.PROJECT, doc.key, ImageSlot.PROJECT_COVER)
+            ?: return CoverUi(null, null, null, initial, holo = false)
+        return CoverUi(use.blobHash, use.cropFor(Ratio.R1X1), use.presetId, initial, use.holo)
     }
 
     fun chip(writing: Boolean, holo: Boolean): String? =

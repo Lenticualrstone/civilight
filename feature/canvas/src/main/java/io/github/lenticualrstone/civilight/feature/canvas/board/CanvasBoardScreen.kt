@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.board
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -14,10 +15,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.key
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -25,12 +29,18 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
 import io.github.lenticualrstone.civilight.feature.canvas.common.canvasEditContext
 import io.github.lenticualrstone.civilight.feature.canvas.edit.CanvasEdits
 import io.github.lenticualrstone.civilight.feature.canvas.edit.LineResult
 import io.github.lenticualrstone.civilight.ui.graph.GraphGeometry
+import io.github.lenticualrstone.civilight.ui.graph.NodeLook
+import io.github.lenticualrstone.civilight.ui.graph.Rect
 import io.github.lenticualrstone.civilight.ui.graph.GraphHit
 import io.github.lenticualrstone.civilight.ui.graph.GraphScene
 import io.github.lenticualrstone.civilight.ui.graph.GraphSelection
@@ -65,11 +75,15 @@ import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
 import io.github.lenticualrstone.civilight.ui.scaffold.SheetHost
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
+import kotlinx.coroutines.delay
 
 private val BoardUiSaver = listSaver<BoardUi, String>(
     save = { ui -> ui.save().map { it.orEmpty() } },
     restore = { saved -> BoardUi.restore(saved.map { it.ifEmpty { null } }) },
 )
+
+/** How long the canvas waits for its nodes to be measured before it shows anyway (a wait, not a motion). */
+private const val MEASURE_WAIT_MS = 600L
 
 /** Bottom space the tool bar takes (18 + 56 dp), used when fitting the canvas into view. */
 private const val TOOLBAR_SPACE = 80f
@@ -82,17 +96,27 @@ fun CanvasBoardScreen(route: CanvasBoard, deps: FeatureDeps) {
     val sheets = rememberSheetHost()
     val back = IconAction(CanvasCopy.BACK) { deps.navigator.pop() }
     val ready = load as? ProjectLoad.Ready
-    if (ready == null) {
-        CivilightScreen(title = "", smallLine = CanvasCopy.SMALL_LINE, back = back) { }
-        return
+    val canvas = ready?.let { CanvasEdits.resolveForRoute(it.doc, route.canvasKey) }
+    val state = when {
+        ready == null -> BoardState.LOADING
+        canvas == null -> BoardState.NO_CANVAS
+        else -> BoardState.BOARD
     }
-    val canvas = CanvasEdits.resolveForRoute(ready.doc, route.canvasKey)
-    if (canvas == null) {
-        NoCanvas(ready.readOnly, back, vm)
-        return
+    // Loading, no canvas and the board crossfade (audit §4 canvas 10); an exiting state keeps its last data.
+    val shownReady = rememberLastNonNull(ready)
+    val shownCanvas = rememberLastNonNull(canvas)
+    ContentSwap(state, Modifier.fillMaxSize(), label = "canvasBoardState") { s ->
+        when (s) {
+            BoardState.LOADING -> CivilightScreen(title = "", smallLine = CanvasCopy.SMALL_LINE, back = back) { }
+            BoardState.NO_CANVAS -> NoCanvas(shownReady?.readOnly ?: true, back, vm)
+            BoardState.BOARD -> if (shownReady != null && shownCanvas != null) {
+                CanvasBoard(route, deps, vm, shownReady.doc, shownReady.readOnly, shownCanvas, sheets, back)
+            }
+        }
     }
-    CanvasBoard(route, deps, vm, ready.doc, ready.readOnly, canvas, sheets, back)
 }
+
+private enum class BoardState { LOADING, NO_CANVAS, BOARD }
 
 /** A project without a canvas: one is made (CNV-02 [PROPOSED]); a read-only project shows an empty state. */
 @Composable
@@ -101,7 +125,7 @@ private fun NoCanvas(readOnly: Boolean, back: IconAction, vm: CanvasBoardViewMod
     CivilightScreen(title = "", smallLine = CanvasCopy.SMALL_LINE, back = back) { padding ->
         if (readOnly) {
             Box(Modifier.fillMaxSize().padding(padding).padding(24.dp), contentAlignment = Alignment.Center) {
-                EmptyBlock(title = CanvasCopy.TODO_COPY_CANVAS_NONE)
+                EmptyBlock(title = CanvasCopy.NO_CANVAS)
             }
         }
     }
@@ -128,6 +152,13 @@ private fun CanvasBoard(
     val moved = remember(canvas.key) { mutableStateMapOf<Key, Pt>() }
     val sizes = remember(canvas.key) { mutableStateMapOf<String, Sz>() }
     var viewport by remember(canvas.key) { mutableStateOf(doc.app.view.canvasViewports[canvas.key]?.toGraph()) }
+    /** Once the nodes are measured the view is fitted (or restored) and latched: it never refits by itself again. */
+    var revealed by remember(canvas.key) { mutableStateOf(false) }
+    val reveal = remember(canvas.key) { Animatable(0f) }
+    /** The last zoom change came from `+` / `−` (the percentage then swaps like a lens value; pinching shows it as is). */
+    var zoomByButton by remember(canvas.key) { mutableStateOf(false) }
+    val motion = CivilightTheme.motion
+    LaunchedEffect(revealed) { if (revealed) reveal.animateTo(1f, motion.spec(CivilightMotion.enter)) }
     val relationLines = remember(doc, canvas, lens, gate.open) { BoardScene.relationLines(doc, canvas, lens, gate.open) }
     val scene = BoardScene.build(doc, canvas, lens, gate.open, moved, relationLines)
 
@@ -179,7 +210,7 @@ private fun CanvasBoard(
                             doc = doc,
                             gate = gate,
                             onPick = { kind, ref ->
-                                vm.addItem(key.canvasKey, kind, ref, centred(Pt(key.x, key.y))) { r, _ -> if (r == EditResult.READ_ONLY) readOnlyToast() }
+                                vm.addItem(key.canvasKey, kind, ref, placeCard(Pt(key.x, key.y), scene, sizes)) { r, _ -> if (r == EditResult.READ_ONLY) readOnlyToast() }
                                 close()
                             },
                             onClose = ::close,
@@ -195,7 +226,25 @@ private fun CanvasBoard(
             val vp = viewport ?: GraphViewport.fit(
                 GraphGeometry.bounds(scene, sizes), maxWidth.value, maxHeight.value, topInset, TOOLBAR_SPACE,
             )
-            val center = Pt(maxWidth.value / 2f, topInset + (maxHeight.value - topInset) / 2f)
+            // The middle of what the author sees, between the top bar and the tool bar (screen dp).
+            val center = Pt(maxWidth.value / 2f, topInset + (maxHeight.value - topInset - TOOLBAR_SPACE) / 2f)
+            // New nodes land here (content dp), then step aside from any node already there (QA #10).
+            val viewCentre = vp.toContent(center)
+            val measured = scene.nodes.all { it.look == NodeLook.FRAME || sizes.containsKey(it.key) }
+            LaunchedEffect(measured) {
+                if (!measured || revealed) return@LaunchedEffect
+                if (viewport == null) viewport = vp
+                revealed = true
+            }
+            // Safety net: a node that never reports its size must not leave the canvas invisible.
+            val latestVp by rememberUpdatedState(vp)
+            LaunchedEffect(canvas.key) {
+                delay(MEASURE_WAIT_MS)
+                if (!revealed) {
+                    if (viewport == null) viewport = latestVp
+                    revealed = true
+                }
+            }
             val listener = object : GraphSurfaceListener {
                 override fun onTap(hit: GraphHit, at: Pt) {
                     val (next, action) = BoardReducer.tap(ui, hit, at, readOnly)
@@ -206,15 +255,15 @@ private fun CanvasBoard(
                         BoardAction.ReadOnly -> readOnlyToast()
                         is BoardAction.EditNode -> openNode(action.nodeKey)
                         is BoardAction.EditLine -> openLine(action.edgeKey)
-                        is BoardAction.PickItem -> sheets.open(PlaceItemSheet(projectKey, canvas.key, action.tool, action.at.x, action.at.y))
-                        is BoardAction.AddMemo -> vm.addMemo(canvas.key, centred(action.at)) { r, key ->
+                        is BoardAction.PickItem -> sheets.open(PlaceItemSheet(projectKey, canvas.key, action.tool, viewCentre.x, viewCentre.y))
+                        is BoardAction.AddMemo -> vm.addMemo(canvas.key, placeCard(viewCentre, scene, sizes)) { r, key ->
                             if (r == EditResult.READ_ONLY) readOnlyToast()
                             key?.let {
                                 ui = ui.copy(selection = GraphSelection(nodeKey = it))
                                 openNode(it)
                             }
                         }
-                        is BoardAction.AddGroup -> vm.addGroup(canvas.key, centred(action.at, CanvasEdits.GROUP_SIZE)) { r, _ ->
+                        is BoardAction.AddGroup -> vm.addGroup(canvas.key, placeGroup(viewCentre, scene, sizes)) { r, _ ->
                             if (r == EditResult.READ_ONLY) readOnlyToast()
                         }
                         is BoardAction.DrawLine -> vm.drawLine(canvas.key, action.from, action.to) { r, result ->
@@ -250,6 +299,7 @@ private fun CanvasBoard(
 
                 override fun onViewport(viewport: GraphViewport) {
                     popover = false
+                    zoomByButton = false
                     setViewport(viewport)
                 }
 
@@ -262,21 +312,34 @@ private fun CanvasBoard(
                     viewport = next
                 }
             }
-            GraphSurface(scene = scene, viewport = vp, selection = ui.selection, sizes = sizes, listener = listener, cover = cover)
+            // Held at opacity 0 until the node sizes are known, then it fades in (audit §4 canvas 1); the surface is
+            // re-created at that moment so the fitted view is its first view and nothing glides into place.
+            key(revealed) {
+                GraphSurface(
+                    scene = scene,
+                    viewport = vp,
+                    selection = ui.selection,
+                    sizes = sizes,
+                    listener = listener,
+                    cover = cover,
+                    modifier = Modifier.graphicsLayer { alpha = reveal.value },
+                )
+            }
 
             ZoomColumn(
                 percent = CanvasCopy.zoomPercent(vp.zoom),
+                swapPercent = zoomByButton,
                 canIn = vp.canZoomIn,
                 canOut = vp.canZoomOut,
-                onIn = { vp.zoomIn(center).also { viewport = it; vm.saveViewport(canvas.key, it) } },
-                onOut = { vp.zoomOut(center).also { viewport = it; vm.saveViewport(canvas.key, it) } },
+                onIn = { zoomByButton = true; vp.zoomIn(center).also { viewport = it; vm.saveViewport(canvas.key, it) } },
+                onOut = { zoomByButton = true; vp.zoomOut(center).also { viewport = it; vm.saveViewport(canvas.key, it) } },
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = (topInset + 16f).dp, end = 12.dp),
             )
             Column(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(bottom = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (cover) CanvasHint(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 18.dp))
+                FoldReveal(cover) { CanvasHint(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 18.dp)) }
                 CanvasToolBar(
                     current = ui.tool,
                     cover = cover,
@@ -374,8 +437,16 @@ private fun removeNode(vm: CanvasBoardViewModel, canvasKey: Key, view: NodeEditV
     vm.removeNode(canvasKey, view.nodeKey) { r -> if (r == EditResult.READ_ONLY) readOnlyToast() }
 }
 
-/** Top-left that centres a card (or a 묶음 frame of [size]) on a tapped point. */
-private fun centred(at: Pt, size: Sz = Sz.DEFAULT): Pt = Pt(at.x - size.w / 2f, at.y - size.h / 2f)
+/** Top-left of a new card or memo centred on [centre] (content dp), moved off the cards already there. */
+private fun placeCard(centre: Pt, scene: GraphScene, sizes: Map<String, Sz>): Pt =
+    NodePlacement.place(centre, NodePlacement.CARD, occupiedBy(scene, sizes, frames = false))
+
+/** Top-left of a new 묶음 frame centred on [centre], moved off the frames already there. */
+private fun placeGroup(centre: Pt, scene: GraphScene, sizes: Map<String, Sz>): Pt =
+    NodePlacement.place(centre, CanvasEdits.GROUP_SIZE, occupiedBy(scene, sizes, frames = true))
+
+private fun occupiedBy(scene: GraphScene, sizes: Map<String, Sz>, frames: Boolean): List<Rect> =
+    scene.nodes.filter { (it.look == NodeLook.FRAME) == frames }.map { GraphGeometry.rectOf(it, sizes) }
 
 /** Drops on-screen positions the document now holds. */
 private fun dropSettled(canvas: Canvas, moved: SnapshotStateMap<Key, Pt>) {

@@ -26,7 +26,7 @@ sealed interface OpenStage {
     /** Reading the file (or decrypting it). */
     data object Reading : OpenStage
 
-    /** Nothing can be imported; [message] is a `TODO_COPY_*` constant until copy exists. */
+    /** Nothing can be imported; [message] is the one-line reason (`OpenFileCopy`). */
     data class Failed(val message: String) : OpenStage
 
     /** `RHEncryptedFile`: the password sheet; [error] after a wrong password, [busy] while decrypting. */
@@ -85,7 +85,7 @@ object OpenFileFlow {
         chain: UpgradeChain = UpgradeChain.CURRENT,
         knownFeatures: Set<String> = Features.KNOWN,
     ): OpenStage {
-        if (bytes == null) return OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB52_NOT_A_PROJECT)
+        if (bytes == null) return OpenStage.Failed(OpenFileCopy.NOT_A_PROJECT)
         if (RecorderFiles.isRecorderFile(bytes)) return RecorderFiles.stage(RecorderPackage.read(bytes), fileName)
         return after(ProjectPackageReader.open(bytes, chain, knownFeatures), bytes.size.toLong(), fileName, library, existingSceneCount, now, zone)
     }
@@ -102,9 +102,9 @@ object OpenFileFlow {
         chain: UpgradeChain = UpgradeChain.CURRENT,
         knownFeatures: Set<String> = Features.KNOWN,
     ): OpenStage = if (RecorderFiles.isRecorderFile(outer)) RecorderFiles.unlock(outer, password, sheet) else when (val r = EncryptedFiles.open(outer, password, chain, knownFeatures)) {
-        EncryptedOpen.WrongPassword -> OpenStage.Password(sheet, error = OpenFileCopy.TODO_COPY_LIB54_WRONG_PASSWORD)
-        is EncryptedOpen.Unsupported -> OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB54_UNSUPPORTED)
-        is EncryptedOpen.NotEncrypted -> OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB52_NOT_A_PROJECT)
+        EncryptedOpen.WrongPassword -> OpenStage.Password(sheet, error = OpenFileCopy.WRONG_PASSWORD)
+        is EncryptedOpen.Unsupported -> OpenStage.Failed(OpenFileCopy.UNSUPPORTED)
+        is EncryptedOpen.NotEncrypted -> OpenStage.Failed(OpenFileCopy.NOT_A_PROJECT)
         // The size on the sheet is the file's own (the encrypted container).
         is EncryptedOpen.Opened -> after(r.result, outer.size.toLong(), sheet.fileName, library, existingSceneCount, now, zone)
     }
@@ -118,8 +118,8 @@ object OpenFileFlow {
         now: Timestamp,
         zone: ZoneId,
     ): OpenStage = when (result) {
-        is PackageOpen.NotAPackage -> OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB52_NOT_A_PROJECT)
-        is PackageOpen.Damaged -> OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB55_DAMAGED)
+        is PackageOpen.NotAPackage -> OpenStage.Failed(OpenFileCopy.NOT_A_PROJECT)
+        is PackageOpen.Damaged -> OpenStage.Failed(OpenFileCopy.DAMAGED)
         is PackageOpen.Encrypted -> OpenStage.Password(EncryptedFileSheet.of(result.header, fileName))
         is PackageOpen.Newer -> OpenStage.Newer(result.sheet, result.sheet.summary(sizeBytes, zone))
         is PackageOpen.Ready -> ask(result.pkg, sizeBytes, library, existingSceneCount, now, zone)

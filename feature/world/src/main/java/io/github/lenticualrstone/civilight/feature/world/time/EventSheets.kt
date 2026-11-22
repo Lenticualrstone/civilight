@@ -1,6 +1,10 @@
 package io.github.lenticualrstone.civilight.feature.world.time
 
 import androidx.compose.foundation.layout.Arrangement
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.feature.world.common.SheetSteps
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -87,117 +91,114 @@ private fun SheetScope.EventFormContent(projectKey: Key, eventKey: Key?, saveId:
     val readOnly = store.readOnly
     val ui = remember(doc, draft, gate.open) { EventForms.ui(doc, draft, editing = eventKey != null, hiddenOpen = gate.open) }
 
-    when (pick) {
-        EventPick.SCENE -> {
-            UnitPickerSheet(
+    val sheet = this
+    // A picker opens over the form as the next step (P3): it pushes in, and back pops to the form.
+    SheetSteps(pick, forward = { _, to -> to != EventPick.NONE }) { shownPick ->
+        when (shownPick) {
+            EventPick.SCENE -> UnitPickerSheet(
                 doc = doc, gate = gate, title = WorldCopy.PICK_SCENE,
                 onPick = { draft = draft.copy(sceneKey = it); pick = EventPick.NONE },
                 onClose = { pick = EventPick.NONE },
                 selectedKey = draft.sceneKey,
                 levels = io.github.lenticualrstone.civilight.feature.world.term.RevealOptions.sceneLevels(doc),
             )
-            return
-        }
-        EventPick.PLACE -> {
-            PlacePickerSheet(
+            EventPick.PLACE -> PlacePickerSheet(
                 doc = doc, gate = gate, title = WorldCopy.PICK_PLACE,
                 onPick = { draft = draft.withPlace(it); pick = EventPick.NONE },
                 onClose = { pick = EventPick.NONE },
                 selected = draft.place,
             )
-            return
-        }
-        EventPick.REVEAL -> {
-            UnitPickerSheet(
+            EventPick.REVEAL -> UnitPickerSheet(
                 doc = doc, gate = gate, title = WorldCopy.EVENT_REVEAL,
                 onPick = { draft = draft.copy(revealUnitKey = it); pick = EventPick.NONE },
                 onClose = { pick = EventPick.NONE },
                 selectedKey = draft.revealUnitKey,
                 levels = io.github.lenticualrstone.civilight.feature.world.term.RevealOptions.pointLevels(doc),
             )
-            return
-        }
-        EventPick.TERMS -> {
-            TermTicks(doc, draft.termKeys, gate, onToggle = { draft = draft.toggleTerm(it) }, onClose = { pick = EventPick.NONE })
-            return
-        }
-        EventPick.NONE -> Unit
-    }
-
-    val descriptionLocked = existing != null && CardText.hasLockedLinks(doc, existing.description, gate.open)
-    SheetHeader(title = if (eventKey == null) WorldCopy.CREATE_EVENT else existing!!.title, onClose = ::close)
-    SheetScrollBody {
-        if (ui.kindChoice) {
-            CivilightText(WorldCopy.EVENT_KIND, CivilightTheme.type.small, Modifier.padding(top = 12.dp, bottom = 6.dp), color = CivilightTheme.colors.ink3)
-            SegmentedControl(
-                options = listOf(WorldCopy.EVENT_WORLD, WorldCopy.EVENT_STORY),
-                selectedIndex = if (draft.story) 1 else 0,
-                onSelect = { draft = draft.copy(story = it == 1) },
-            )
-        }
-        CivilightTextField(
-            value = draft.title,
-            onValueChange = { draft = draft.copy(title = it) },
-            label = WorldCopy.NAME,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            enabled = !readOnly,
-        )
-        if (descriptionLocked) {
-            LockRow(title = WorldCopy.HIDDEN_ITEM, actionLabel = WorldCopy.UNLOCK, onAction = gate.unlock, modifier = Modifier.padding(top = 12.dp))
-        } else {
-            CivilightTextField(
-                value = draft.description,
-                onValueChange = { draft = draft.copy(description = it) },
-                label = WorldCopy.DESCRIPTION,
-                singleLine = false,
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                enabled = !readOnly,
-            )
-        }
-        if (ui.showYear) {
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val numbers = KeyboardOptions(keyboardType = KeyboardType.Number)
-                CivilightTextField(
-                    value = draft.year, onValueChange = { draft = draft.copy(year = it) }, label = WorldCopy.EVENT_YEAR,
-                    modifier = Modifier.weight(1f), enabled = !readOnly, keyboardOptions = numbers,
-                    error = if (ui.dateInvalid) WorldCopy.TODO_COPY_WORLD_EVENT_DATE_INVALID else null,
-                )
-                if (ui.showMonthDay) {
+            EventPick.TERMS -> TermTicks(doc, draft.termKeys, gate, onToggle = { draft = draft.toggleTerm(it) }, onClose = { pick = EventPick.NONE })
+            EventPick.NONE -> {
+                val descriptionLocked = existing != null && CardText.hasLockedLinks(doc, existing.description, gate.open)
+                SheetHeader(title = if (eventKey == null) WorldCopy.CREATE_EVENT else existing!!.title, onClose = sheet::close)
+                SheetScrollBody {
+                    FoldReveal(ui.kindChoice) {
+                        Column {
+                            CivilightText(WorldCopy.EVENT_KIND, CivilightTheme.type.small, Modifier.padding(top = 12.dp, bottom = 6.dp), color = CivilightTheme.colors.ink3)
+                            SegmentedControl(
+                                options = listOf(WorldCopy.EVENT_WORLD, WorldCopy.EVENT_STORY),
+                                selectedIndex = if (draft.story) 1 else 0,
+                                onSelect = { draft = draft.copy(story = it == 1) },
+                            )
+                        }
+                    }
                     CivilightTextField(
-                        value = draft.month, onValueChange = { draft = draft.copy(month = it) }, label = WorldCopy.EVENT_MONTH,
-                        modifier = Modifier.weight(1f), enabled = !readOnly, keyboardOptions = numbers,
+                        value = draft.title,
+                        onValueChange = { draft = draft.copy(title = it) },
+                        label = WorldCopy.NAME,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        enabled = !readOnly,
                     )
-                    CivilightTextField(
-                        value = draft.day, onValueChange = { draft = draft.copy(day = it) }, label = WorldCopy.EVENT_DAY,
-                        modifier = Modifier.weight(1f), enabled = !readOnly, keyboardOptions = numbers,
+                    ContentSwap(descriptionLocked, Modifier.fillMaxWidth(), label = "eventDescription") { locked ->
+                        if (locked) {
+                            LockRow(title = WorldCopy.HIDDEN_ITEM, actionLabel = WorldCopy.UNLOCK, onAction = gate.unlock, modifier = Modifier.padding(top = 12.dp))
+                        } else {
+                            CivilightTextField(
+                                value = draft.description,
+                                onValueChange = { draft = draft.copy(description = it) },
+                                label = WorldCopy.DESCRIPTION,
+                                singleLine = false,
+                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                                enabled = !readOnly,
+                            )
+                        }
+                    }
+                    FoldReveal(ui.showYear) {
+                        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val numbers = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            CivilightTextField(
+                                value = draft.year, onValueChange = { draft = draft.copy(year = it) }, label = WorldCopy.EVENT_YEAR,
+                                modifier = Modifier.weight(1f), enabled = !readOnly, keyboardOptions = numbers,
+                                error = if (ui.dateInvalid) WorldCopy.EVENT_DATE_INVALID else null,
+                            )
+                            FoldReveal(ui.showMonthDay, Modifier.weight(2f), horizontal = true) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    CivilightTextField(
+                                        value = draft.month, onValueChange = { draft = draft.copy(month = it) }, label = WorldCopy.EVENT_MONTH,
+                                        modifier = Modifier.weight(1f), enabled = !readOnly, keyboardOptions = numbers,
+                                    )
+                                    CivilightTextField(
+                                        value = draft.day, onValueChange = { draft = draft.copy(day = it) }, label = WorldCopy.EVENT_DAY,
+                                        modifier = Modifier.weight(1f), enabled = !readOnly, keyboardOptions = numbers,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    val rowClick: (EventPick) -> (() -> Unit)? = { p -> if (readOnly) null else ({ pick = p }) }
+                    FoldReveal(ui.showScene) { FieldTableRow(WorldCopy.EVENT_SCENE, ui.sceneLabel, Modifier.padding(top = 12.dp), onClick = rowClick(EventPick.SCENE)) }
+                    FieldTableRow(WorldCopy.EVENT_PLACE, ui.placeLabel, onClick = rowClick(EventPick.PLACE))
+                    FieldTableRow(WorldCopy.EVENT_TERMS, ui.termsLabel, onClick = rowClick(EventPick.TERMS))
+                    FoldReveal(ui.showReveal) { FieldTableRow(WorldCopy.EVENT_REVEAL, ui.revealLabel, onClick = rowClick(EventPick.REVEAL)) }
+                }
+                SheetActions {
+                    CivilightButton(
+                        text = when {
+                            readOnly -> WorldCopy.READ_ONLY
+                            eventKey == null -> WorldCopy.BTN_PUT
+                            else -> WorldCopy.BTN_EDIT
+                        },
+                        onClick = { scope.launch { if (editor.save(draft, eventKey) != null) sheet.close() } },
+                        modifier = Modifier.weight(1f),
+                        enabled = !readOnly && ui.canSave,
                     )
                 }
             }
         }
-        val rowClick: (EventPick) -> (() -> Unit)? = { p -> if (readOnly) null else ({ pick = p }) }
-        if (ui.showScene) FieldTableRow(WorldCopy.EVENT_SCENE, ui.sceneLabel, Modifier.padding(top = 12.dp), onClick = rowClick(EventPick.SCENE))
-        FieldTableRow(WorldCopy.EVENT_PLACE, ui.placeLabel, onClick = rowClick(EventPick.PLACE))
-        FieldTableRow(WorldCopy.EVENT_TERMS, ui.termsLabel, onClick = rowClick(EventPick.TERMS))
-        if (ui.showReveal) FieldTableRow(WorldCopy.EVENT_REVEAL, ui.revealLabel, onClick = rowClick(EventPick.REVEAL))
-    }
-    val sheet = this
-    SheetActions {
-        CivilightButton(
-            text = when {
-                readOnly -> WorldCopy.READ_ONLY
-                eventKey == null -> WorldCopy.BTN_PUT
-                else -> WorldCopy.BTN_EDIT
-            },
-            onClick = { scope.launch { if (editor.save(draft, eventKey) != null) sheet.close() } },
-            modifier = Modifier.weight(1f),
-            enabled = !readOnly && ui.canSave,
-        )
     }
 }
 
 /** `관련 용어`: tick live terms; hidden ones only after `지문으로 보기`. */
 @Composable
-private fun SheetScope.TermTicks(doc: ProjectDoc, selected: List<Key>, gate: HiddenGate, onToggle: (Key) -> Unit, onClose: () -> Unit) {
+private fun androidx.compose.foundation.layout.ColumnScope.TermTicks(doc: ProjectDoc, selected: List<Key>, gate: HiddenGate, onToggle: (Key) -> Unit, onClose: () -> Unit) {
     val terms = remember(doc) { doc.world.terms.filter { it.deletedAt == null }.sortedWith(compareBy({ it.order }, { it.key })) }
     val visible = terms.filter { gate.open || !it.hidden }
     val hiddenCount = terms.size - visible.size

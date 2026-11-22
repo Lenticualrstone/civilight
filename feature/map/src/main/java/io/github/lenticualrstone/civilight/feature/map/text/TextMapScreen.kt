@@ -16,6 +16,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.feature.map.common.appear
+import io.github.lenticualrstone.civilight.feature.map.common.MapMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import androidx.compose.runtime.key
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -171,7 +180,9 @@ fun TextMapScreen(route: TextMapRoute, deps: FeatureDeps) {
         },
     ) { padding ->
         val doc0 = d ?: return@CivilightScreen
-        if (state.page == 0) {
+        // The input page and the result page swap with a crossfade (motion audit row 12).
+        ContentSwap(state.page, Modifier.fillMaxSize()) { page ->
+        if (page == 0) {
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                     .padding(top = padding.calculateTopPadding() + 8.dp, bottom = padding.calculateBottomPadding() + 16.dp, start = 16.dp, end = 16.dp),
@@ -185,30 +196,38 @@ fun TextMapScreen(route: TextMapRoute, deps: FeatureDeps) {
                 }
             }
         } else {
+            val motion = CivilightTheme.motion
             Box(Modifier.fillMaxSize()) {
                 val w = world
-                if (w != null) {
-                    val area = state.highlight?.let { TextConditions.area(TextMapFlow.conditions(state)[it]) }.orEmpty()
-                    val acc = CivilightTheme.colors.acc
-                    MapCanvas(
-                        base = MapBase.Generated(w, null),
-                        scene = MapScene(),
-                        viewport = Viewport.fromArray(viewportArray),
-                        onViewportChange = { viewportArray = it.toArray() },
-                        extraDraw = { scope ->
-                            // The highlighted condition's 3 × 3 cells.
-                            area.forEach { cell ->
-                                val a = scope.screen(io.github.lenticualrstone.civilight.model.Point((cell % 3) / 3f, (cell / 3) / 3f))
-                                val b = scope.screen(io.github.lenticualrstone.civilight.model.Point((cell % 3 + 1) / 3f, (cell / 3 + 1) / 3f))
-                                drawRect(acc.copy(alpha = 0.22f), Offset(a.x, a.y), Size(b.x - a.x, b.y - a.y))
-                            }
-                        },
-                    )
+                val shownWorld = rememberLastNonNull(w)
+                val area = state.highlight?.let { TextConditions.area(TextMapFlow.conditions(state)[it]) }.orEmpty()
+                // The highlight fades in and out; the last area stays drawn while it fades.
+                val areaShown = rememberLastNonNull(area.takeIf { it.isNotEmpty() }).orEmpty()
+                val highlight by animatedFraction(area.isNotEmpty(), label = "condHighlight")
+                val acc = CivilightTheme.colors.acc
+                // The world appears when it is ready and leaves with the old one on a new reading.
+                AnimatedVisibility(w != null, enter = motion.enter(CivilightMotion.enter), exit = motion.exit(CivilightMotion.exit), label = "textWorld") {
+                    shownWorld?.let { shown ->
+                        MapCanvas(
+                            base = MapBase.Generated(shown, null),
+                            scene = MapScene(),
+                            viewport = Viewport.fromArray(viewportArray),
+                            onViewportChange = { viewportArray = it.toArray() },
+                            extraDraw = { scope ->
+                                // The highlighted condition's 3 × 3 cells.
+                                areaShown.forEach { cell ->
+                                    val a = scope.screen(io.github.lenticualrstone.civilight.model.Point((cell % 3) / 3f, (cell / 3) / 3f))
+                                    val b = scope.screen(io.github.lenticualrstone.civilight.model.Point((cell % 3 + 1) / 3f, (cell / 3 + 1) / 3f))
+                                    drawRect(acc.copy(alpha = 0.22f * highlight), Offset(a.x, a.y), Size(b.x - a.x, b.y - a.y))
+                                }
+                            },
+                        )
+                    }
                 }
                 TopBarTapGuard(padding.calculateTopPadding())
                 val cardMod = if (inner) Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp).widthIn(max = 380.dp)
                 else Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp)
-                GlassCard(cardMod.heightIn(max = 460.dp)) {
+                GlassCard(cardMod.heightIn(max = 460.dp).animateContentSize(motion.move(CivilightMotion.standard))) {
                     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         ResultCard(doc0, state, w, readOnly, ::set,
                             onPosition = { c -> positionDraft = (c.userPosition ?: c.where); sheets.open(CondPositionSheet(c.key)) },
@@ -216,6 +235,7 @@ fun TextMapScreen(route: TextMapRoute, deps: FeatureDeps) {
                     }
                 }
             }
+        }
         }
     }
 }
@@ -240,10 +260,16 @@ private fun ColumnScope.InputPage(
         }
     }
     SegmentedControl(MapCopy.ENGINES, state.engine, { set(state.copy(engine = it)) })
-    if (state.unreadable) CivilightText(MapCopy.TODO_COPY_MAP_TEXT_UNREADABLE, type.small, color = colors.warn)
+    if (state.unreadable) CivilightText(MapCopy.TEXT_UNREADABLE, type.small, color = colors.warn)
     CivilightText(TextMapFlow.readLine(state), type.sec, color = colors.ink3)
+    // A row that is read from the text appears on its own, one after another (`rowIn`, D1).
     TextMapFlow.inputRows(doc, state).forEach { row ->
-        ConditionRow(row.name, detail = row.small, coveredCells = row.cells, more = IconAction(MapCopy.CONDITION) { onEdit(state.conditions[row.index]) })
+        key(row.index) {
+            ConditionRow(
+                row.name, Modifier.appear(delayMs = MapMotion.stagger(row.index), token = CivilightMotion.rowIn),
+                detail = row.small, coveredCells = row.cells, more = IconAction(MapCopy.CONDITION) { onEdit(state.conditions[row.index]) },
+            )
+        }
     }
     CivilightText(TextConditions.HINT, type.small, color = colors.ink3)
     ButtonRow(Modifier.padding(top = 6.dp)) {
@@ -265,7 +291,8 @@ private fun ColumnScope.ResultCard(
     CardHeader(world?.let { TextMapFlow.header(state, it) } ?: MapCopy.TEXT_RESULT_TITLE, { set(state.copy(page = 0, highlight = null)) })
     if (world != null) {
         TextMapFlow.resultRows(doc, state, world).forEach { row ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            key(row.index) {
+            Row(Modifier.appear(delayMs = MapMotion.stagger(row.index), token = CivilightMotion.rowIn), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f).clickable { set(TextMapFlow.highlight(state, row.index)) }) {
                     ConditionRow(row.name, detail = row.small, result = if (row.applied == true) ConditionResult.APPLIED else ConditionResult.NEEDS_CHECK)
                 }
@@ -274,6 +301,7 @@ private fun ColumnScope.ResultCard(
                     { onPosition(state.conditions[row.index]) },
                     variant = ButtonVariant.COMPACT_GHOST,
                 )
+            }
             }
         }
     }

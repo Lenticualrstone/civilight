@@ -42,7 +42,7 @@ data class ImpactSheet(
 /** Toasts and sheets built from the trash operations' results. */
 object Messages {
     /** The impact sheet for one or several items (CST-40; TC-20-01, TC-20-10, TC-20-11). */
-    fun impactSheet(impact: DeleteImpact): ImpactSheet {
+    fun impactSheet(impact: DeleteImpact, hiddenLocked: Boolean = false): ImpactSheet {
         val kind = impact.items.firstOrNull()?.kind ?: ItemKind.CHARACTER
         val word = TrashCopy.kindWord(kind)
         val single = impact.items.size == 1
@@ -53,6 +53,7 @@ object Messages {
             row("게임 텍스트", impact.owned(OwnedKind.GAME_TEXT)),
             row("핀", impact.owned(OwnedKind.PIN)),
             row("블록", impact.owned(OwnedKind.BLOCK)),
+            galleryRow(impact, hiddenLocked),
         )
         val staying = STAYING.mapNotNull { (refKind, label) ->
             val sub = if (refKind == RefKind.SPEAKER) impact.speakerLocations else null
@@ -68,10 +69,33 @@ object Messages {
             title = title,
             sub = sub,
             ownedRows = owned,
-            stayingTitle = TrashCopy.join("제자리에 남음", "지운 ${word}로 보임"),
+            stayingTitle = TrashCopy.join("제자리에 남음", "지운 $word${word.directionParticle()} 보임"),
             stayingRows = staying,
             mergeAction = if (kind.isNamedItem && single) "다른 ${word}과 합치기 ›".let { if (word.endsWithVowel()) "다른 ${word}와 합치기 ›" else it } else null,
         )
+    }
+
+    /**
+     * `이미지 10`; while hidden images are locked, the order-line form `이미지 8 · 숨김 2` (55 T-GAL-15).
+     */
+    fun galleryRow(impact: DeleteImpact, hiddenLocked: Boolean): SheetRow? {
+        val total = impact.owned(OwnedKind.GALLERY_ITEM)
+        if (total == 0) return null
+        val hidden = impact.hiddenGalleryItems
+        return if (hiddenLocked && hidden > 0) {
+            SheetRow(TrashCopy.join("이미지 ${total - hidden}", "${TrashCopy.HIDDEN_TAG} $hidden"))
+        } else {
+            SheetRow("이미지 $total")
+        }
+    }
+
+    /**
+     * `이미지 지움 · 등불 고리` with `되돌리기` (GAL-20, T-GAL-14); untitled: `이미지 지움`. Several at
+     * once (GAL-18, `ED`, no source copy): `이미지 3장 지움`.
+     */
+    fun galleryDeleteToast(titles: List<String>): Toast = when (titles.size) {
+        1 -> Toast(TrashCopy.join("이미지 지움", titles.single()), TrashCopy.UNDO)
+        else -> Toast("이미지 ${titles.size}장 지움", TrashCopy.UNDO)
     }
 
     /** After `휴지통으로` (CST-40): `인물 노아 지움 · 참조 20 · 점검 센터 · 되돌리기`; no references: `인물 노아 지움 · 되돌리기`. */
@@ -194,6 +218,14 @@ object Messages {
 
     private fun restoreParts(counts: Map<RefKind, Int>): List<String> = RESTORE_ORDER.mapNotNull { (kind, word) ->
         counts[kind]?.takeIf { it > 0 }?.let { "$word $it" }
+    }
+
+    /** `로` after a vowel or ㄹ (`인물로`, `장소로`, `용어로`), else `으로` (`세력으로`). */
+    private fun String.directionParticle(): String {
+        val last = lastOrNull() ?: return "로"
+        if (last !in '가'..'힣') return "로"
+        val jong = (last - '가') % 28
+        return if (jong == 0 || jong == 8) "로" else "으로"
     }
 
     private fun String.endsWithVowel(): Boolean {

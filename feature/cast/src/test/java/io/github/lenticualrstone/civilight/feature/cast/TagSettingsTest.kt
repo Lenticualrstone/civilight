@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.cast
 
 import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
 import io.github.lenticualrstone.civilight.feature.cast.settings.TagSettingsModel
+import io.github.lenticualrstone.civilight.model.sample.ExampleGallery
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -18,7 +19,31 @@ class TagSettingsTest {
         assertEquals(CharacterEdits.tags(doc).map { it.name }, rows.map { it.name })
         val first = rows.first()
         val live = doc.cast.characters.count { it.deletedAt == null && first.key in it.tagKeys }
-        assertEquals("${first.name} · $live", first.title)
+        assertEquals(live, first.count)
+        // 55 §3.4: the row reads `인물 n · 이미지 m`; no gallery yet means no images.
+        assertEquals("인물 $live · 이미지 0", first.line)
+    }
+
+    @Test
+    fun `55 3_4 rows count gallery images, hidden ones only while hidden items are open`() {
+        val g0 = ExampleGallery.build()
+        fun line(tag: String, unlocked: Boolean) = TagSettingsModel.rows(g0, unlocked).single { it.key == tag }.line.substringAfter(" · ")
+        assertEquals("이미지 4", line(ExampleGallery.TAG_ILLUSTRATION, unlocked = false))
+        assertEquals("이미지 5", line(ExampleGallery.TAG_ILLUSTRATION, unlocked = true))
+        assertEquals("이미지 2", line(ExampleGallery.TAG_SETTING, unlocked = false))
+        assertEquals("이미지 1", line(ExampleGallery.TAG_PROP, unlocked = false))
+        // Unlocked, a row is exactly the domain's usage line.
+        for (row in TagSettingsModel.rows(g0, hiddenUnlocked = true)) {
+            assertEquals(CharacterEdits.tagUsage(g0, row.key), row.usage)
+        }
+    }
+
+    @Test
+    fun `55 3_4 rename keeps gallery images on the tag by key`() {
+        val g0 = ExampleGallery.build()
+        val renamed = TagSettingsModel.rename(g0, ExampleGallery.TAG_PROP, "소지품", CastFx.ctx())!!
+        assertEquals("소지품", renamed.project.tags.single { it.key == ExampleGallery.TAG_PROP }.name)
+        assertEquals(g0.gallery, renamed.gallery)
     }
 
     @Test

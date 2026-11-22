@@ -28,6 +28,7 @@ import io.github.lenticualrstone.civilight.ui.picker.HiddenGate
 import io.github.lenticualrstone.civilight.ui.picker.PickerCopy
 import kotlinx.serialization.Serializable
 import androidx.compose.foundation.layout.Row
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
@@ -80,7 +81,7 @@ private fun SheetScope.AliasContent(termKey: Key, doc: ProjectDoc, readOnly: Boo
     val scope = rememberCoroutineScope()
     SheetHeader(title = WorldCopy.ROW_ALIASES, onClose = ::close, subtitle = term.name)
     SheetScrollBody {
-        if (term.aliases.isNotEmpty()) {
+        FoldReveal(term.aliases.isNotEmpty()) {
             ChipFlow(Modifier.padding(top = 12.dp)) {
                 term.aliases.forEach { alias ->
                     if (readOnly) {
@@ -128,7 +129,7 @@ private fun SheetScope.RejectionsContent(termKey: Key, doc: ProjectDoc, readOnly
     val rows = remember(doc, termKey, gate.open) { RejectionRows.build(doc, termKey, gate.open) }
     SheetHeader(title = WorldCopy.MENU_REJECTIONS, onClose = ::close, subtitle = doc.index.term(termKey)?.name)
     if (rows.isEmpty()) {
-        CivilightText(WorldCopy.TODO_COPY_WORLD_NO_REJECTIONS, CivilightTheme.type.small, Modifier.padding(top = 16.dp), color = CivilightTheme.colors.ink3)
+        CivilightText(WorldCopy.NO_REJECTIONS, CivilightTheme.type.small, Modifier.padding(top = 16.dp), color = CivilightTheme.colors.ink3)
         return
     }
     LazyColumn(Modifier.weight(1f, fill = false).padding(top = 8.dp)) {

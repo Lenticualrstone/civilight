@@ -142,7 +142,7 @@ fun ArchiveDocScreen(route: ArchiveDocEdit, deps: FeatureDeps) {
                 RichTextEditor(
                     state = body,
                     projectKey = p,
-                    linkPickerTitle = CastUiCopy.TODO_COPY_CAST_LINK_PICKER_TITLE,
+                    linkPickerTitle = CastUiCopy.LINK_PICKER_TITLE,
                     openSheet = sheets::open,
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     enabled = editable,

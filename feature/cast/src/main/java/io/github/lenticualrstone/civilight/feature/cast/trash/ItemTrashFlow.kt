@@ -34,8 +34,9 @@ class ItemTrashFlow(private val deps: FeatureDeps, private val projectKey: Key) 
         deps.appScope.launch {
             deps.stores.recorder.ensureLoaded()
             val doc = deps.projects.peekDoc(projectKey) ?: return@launch
-            val impact = ItemTrash.impact(doc, kind, key, deps.stores.recorder.state.value.library) ?: return@launch
-            if (impact.needsSheet) openSheet(DeleteImpactSheet(projectKey, kind, key)) else delete(kind, key)
+            // Decided before any sheet opens (row 9): a sheet is only opened when it has something to show.
+            val needsSheet = ItemTrash.needsSheet(doc, kind, key, deps.stores.recorder.state.value.library) ?: return@launch
+            if (needsSheet) openSheet(DeleteImpactSheet(projectKey, kind, key)) else delete(kind, key)
         }
     }
 

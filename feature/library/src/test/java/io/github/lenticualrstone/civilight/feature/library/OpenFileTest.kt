@@ -175,7 +175,7 @@ class OpenFileTest {
 
         val wrong = OpenFileFlow.unlock(bytes, "등불지기".toCharArray(), asked.sheet, emptyList(), { 0 }, now, zone)
         wrong as OpenStage.Password
-        assertEquals(OpenFileCopy.TODO_COPY_LIB54_WRONG_PASSWORD, wrong.error)
+        assertEquals(OpenFileCopy.WRONG_PASSWORD, wrong.error)
 
         val opened = OpenFileFlow.unlock(bytes, "등불지기1234".toCharArray(), asked.sheet, emptyList(), { 0 }, now, zone) as OpenStage.Ask
         assertEquals("잿빛 새벽의 등불", opened.sheet.title)
@@ -196,8 +196,8 @@ class OpenFileTest {
 
     @Test
     fun `a file that is not a project fails with its own message`() {
-        assertEquals(OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB52_NOT_A_PROJECT), open(null, emptyList()))
-        assertEquals(OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB52_NOT_A_PROJECT), open(byteArrayOf(1, 2, 3, 4), emptyList()))
+        assertEquals(OpenStage.Failed(OpenFileCopy.NOT_A_PROJECT), open(null, emptyList()))
+        assertEquals(OpenStage.Failed(OpenFileCopy.NOT_A_PROJECT), open(byteArrayOf(1, 2, 3, 4), emptyList()))
     }
 
     @Test

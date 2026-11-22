@@ -103,3 +103,29 @@ class MapScenesTest {
         assertTrue(MapColors.artIndex("map-art-ash")!! in 0..4)
     }
 }
+
+/** What is new to a scene fades in; the first scene of a screen does not animate (motion audit row 7). */
+class SceneFreshnessTest {
+    private fun scene(vararg pins: String) = MapScene(pins = pins.map { ScenePin(it, "p$it", it, Point(0.5f, 0.5f), false) })
+
+    @Test
+    fun `keys cover every kind of overlay`() {
+        val s = MapScene(
+            lines = listOf(SceneLine("l", io.github.lenticualrstone.civilight.model.map.DrawnLineKind.RIVER, emptyList(), false)),
+            regions = listOf(SceneRegion("r", "", "", emptyList(), false)),
+            routes = listOf(SceneRoute("o", emptyList(), "", false)),
+            links = listOf(SceneLink("k", Point(0f, 0f), Point(1f, 1f), null, false)),
+            labels = listOf(SceneLabel("t", "", Point(0f, 0f), null, false)),
+            nodes = listOf(SceneNode("n", "", null, Point(0f, 0f), false)),
+            pins = listOf(ScenePin("p", "pl", "", Point(0f, 0f), false)),
+        )
+        assertEquals(setOf("l", "r", "o", "k", "t", "n", "p"), s.keys())
+    }
+
+    @Test
+    fun `the first scene has nothing fresh, later ones only what was added`() {
+        assertEquals(emptySet<String>(), MapScenes.fresh(null, scene("a", "b").keys()))
+        assertEquals(setOf("c"), MapScenes.fresh(scene("a", "b").keys(), scene("a", "b", "c").keys()))
+        assertEquals(emptySet<String>(), MapScenes.fresh(scene("a", "b").keys(), scene("b").keys()))
+    }
+}

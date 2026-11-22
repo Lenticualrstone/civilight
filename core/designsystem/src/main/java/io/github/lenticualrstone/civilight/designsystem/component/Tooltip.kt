@@ -1,5 +1,13 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.animateRectAsState
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -91,8 +99,13 @@ fun TourCard(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         TourProgress(stepCount, stepIndex, label)
-        CivilightText(title, type.itemTitle, color = colors.ink)
-        if (subtitle != null) CivilightText(subtitle, type.small, color = colors.ink3)
+        // The step body crossfades when the step changes (S8); its height follows on `standard`.
+        ContentSwap(Triple(stepIndex, title, subtitle), contentKey = { it.first }, label = "tourStep") { (_, t, sub) ->
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                CivilightText(t, type.itemTitle, color = colors.ink)
+                if (sub != null) CivilightText(sub, type.small, color = colors.ink3)
+            }
+        }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (skipLabel != null && onSkip != null) {
                 TextAction(skipLabel, onSkip, style = type.label.merge(TextStyle(fontSize = 12.sp)))
@@ -106,11 +119,16 @@ fun TourCard(
 /**
  * DS-49 tour dim: `shade` over the screen with a cut-out = [target] padded 6 dp on every side, framed by a
  * rounded rectangle (radius 12) with a 1.5 dp `acc` ring. Never a circle. [target] is in this composable's
- * coordinates (px).
+ * coordinates (px). A new target moves the hole on `standard` (S8; it jumps when reduced); the hole fades
+ * in and out when the target appears or goes.
  */
 @Composable
 fun TourDim(target: Rect?, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
+    val motion = LocalMotion.current
+    val last = rememberLastNonNull(target)
+    val holeRect by animateRectAsState(last ?: Rect.Zero, motion.move(CivilightMotion.standard), label = "tourHole")
+    val holeAlpha = animatedFraction(target != null, label = "tourHoleAlpha")
     Canvas(
         modifier
             .fillMaxSize()
@@ -118,13 +136,15 @@ fun TourDim(target: Rect?, modifier: Modifier = Modifier) {
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
     ) {
         drawRect(colors.shade)
-        if (target != null) {
+        val a = holeAlpha.value
+        if (last != null && a > 0f) {
+            val t = holeRect
             val pad = 6.dp.toPx()
-            val hole = Rect(target.left - pad, target.top - pad, target.right + pad, target.bottom + pad)
+            val hole = Rect(t.left - pad, t.top - pad, t.right + pad, t.bottom + pad)
             val r = CornerRadius(12.dp.toPx())
             val path = Path().apply { addRoundRect(RoundRect(hole, r)) }
-            drawPath(path, colors.shade, blendMode = BlendMode.Clear)
-            drawRoundRect(colors.acc, Offset(hole.left, hole.top), hole.size, r, style = Stroke(1.5.dp.toPx()))
+            drawPath(path, Color.Black, alpha = a, blendMode = BlendMode.DstOut)
+            drawRoundRect(colors.acc, Offset(hole.left, hole.top), hole.size, r, style = Stroke(1.5.dp.toPx()), alpha = a)
         }
     }
 }

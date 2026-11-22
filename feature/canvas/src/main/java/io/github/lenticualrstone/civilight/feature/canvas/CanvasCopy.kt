@@ -5,8 +5,8 @@ import kotlin.math.roundToInt
 
 /**
  * UI copy of `:feature:canvas` (DECISIONS §3). Every value comes from `docs/spec/50-canvas-pages.md`
- * or the boards `Canvas`, `CanvasC`, `CanvasCLabel`; copy no source gives is a `TODO_COPY_CANVAS_*`
- * constant listed under Requests in `docs/status/feature-canvas.md`. Keys starting `BTN_` are buttons.
+ * or the boards `Canvas`, `CanvasC`, `CanvasCLabel`; copy no source gives is the nearest existing
+ * wording, listed under Requests in `docs/status/feature-canvas.md` (never a placeholder string on screen). Keys starting `BTN_` are buttons.
  * `CanvasCopyLintTest` runs the design-system lint over every value.
  */
 object CanvasCopy {
@@ -37,7 +37,8 @@ object CanvasCopy {
 
     // --- Zoom column (CNV-01) ---
     const val ZOOM_IN = "확대"
-    const val TODO_COPY_CANVAS_ZOOM_OUT = "TODO_COPY_CANVAS_ZOOM_OUT"
+    /** Pair of [ZOOM_IN]; no board names the `−` button (proposed, listed under Requests). */
+    const val ZOOM_OUT = "축소"
 
     /** `82%`. */
     fun zoomPercent(zoom: Float): String = "${(zoom * 100).roundToInt()}%"
@@ -108,11 +109,17 @@ object CanvasCopy {
     const val BTN_RESTORE = "되살리기"
     const val BTN_KEEP = "이대로 두기"
     const val BTN_UNLOCK = "지문으로 보기"
-    const val TODO_COPY_CANVAS_REMOVE_NODE = "TODO_COPY_CANVAS_REMOVE_NODE"
-    const val TODO_COPY_CANVAS_REMOVE_LINE = "TODO_COPY_CANVAS_REMOVE_LINE"
+    /** CNV-10 `[PROPOSED]` minimum function "remove the node from this canvas" (the project item stays); copy proposed, see Requests. */
+    const val BTN_REMOVE_NODE = "캔버스에서 빼기"
+
+    /**
+ * CNV-07 loose end: takes a line off the canvas (a relation made from it stays; no trash entry, so not `지우기`, which
+ * the vocabulary keeps for "to trash"); copy proposed, see Requests.
+ */
+    const val BTN_REMOVE_LINE = "선 빼기"
 
     // --- Empty state (Q-EM-01: a read-only project without a canvas) ---
-    const val TODO_COPY_CANVAS_NONE = "TODO_COPY_CANVAS_NONE"
+    const val NO_CANVAS = "캔버스 없음"
 
     /** Undo-step names (shown in undo toasts). */
     const val UNDO_ADD_NODE = TOOL_NODE

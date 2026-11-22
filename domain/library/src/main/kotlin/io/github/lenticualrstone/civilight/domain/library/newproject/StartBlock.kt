@@ -33,7 +33,8 @@ data class StartBlock(
 
     companion object {
         const val TOTAL = 4
-        const val TODO_COPY_LIB13_PROTAGONIST_SUB = "TODO_COPY_LIB13_PROTAGONIST_SUB"
+        /** Sub line of `주인공 만들기` before a protagonist exists: where the tap leads (as `기록함` does for the records row). */
+        const val PROTAGONIST_SUB = "인물"
 
         fun formatLabel(format: ProjectFormat?): String = when (format) {
             ProjectFormat.SERIAL, null -> "연재 장편"
@@ -57,7 +58,7 @@ data class StartBlock(
                 add(
                     ChecklistItem(
                         ChecklistItem.Id.PROTAGONIST, "주인공 만들기",
-                        firstCharacter?.let { "${it.name} · 완료" } ?: TODO_COPY_LIB13_PROTAGONIST_SUB, firstCharacter != null,
+                        firstCharacter?.let { "${it.name} · 완료" } ?: PROTAGONIST_SUB, firstCharacter != null,
                     ),
                 )
                 if (linked.isNotEmpty()) {

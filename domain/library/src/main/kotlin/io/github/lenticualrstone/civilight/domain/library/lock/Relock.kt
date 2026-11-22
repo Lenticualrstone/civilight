@@ -32,11 +32,11 @@ object Relock {
         }
     }
 
-    /** Right text of the open group row; only the default policy's copy is in the sources. */
+    /** Right text of the open group row; the default policy's copy is drawn; the others follow its pattern. */
     fun openGroupNote(policy: RelockPolicy): String = when (policy) {
         RelockPolicy.ON_LEAVE -> "앱을 떠나면 잠김"
-        RelockPolicy.SCREEN_OFF_ONLY -> "TODO_COPY_LIB32_RELOCK_SCREEN_OFF"
-        RelockPolicy.FIVE_MINUTES -> "TODO_COPY_LIB32_RELOCK_FIVE_MINUTES"
+        RelockPolicy.SCREEN_OFF_ONLY -> "화면이 꺼지면 잠김"
+        RelockPolicy.FIVE_MINUTES -> "5분 뒤 잠김"
     }
 
     /** Radio title · sub of 설정 · 숨기기 `다시 잠그는 때` (LIB-64). */

@@ -37,7 +37,6 @@ import io.github.lenticualrstone.civilight.feature.canvas.image.ImageCopy
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageSlots
 import io.github.lenticualrstone.civilight.feature.canvas.image.PresetArt
 import io.github.lenticualrstone.civilight.feature.canvas.image.PresetImages
-import io.github.lenticualrstone.civilight.feature.canvas.image.SlotSpec
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
 import io.github.lenticualrstone.civilight.ui.window.CenterColumn
@@ -62,7 +61,11 @@ fun ImageSpecsScreen(deps: FeatureDeps) {
                 contentPadding = PaddingValues(start = side, end = side, top = padding.calculateTopPadding() + 12.dp, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
                 item { SectionLabel(ImageCopy.SPECS_SECTION_SLOTS, Modifier.padding(bottom = 6.dp)) }
-                items(ImageSlots.all, key = { it.slot.name }) { SlotRow(it) }
+                items(ImageSlots.all, key = { it.slot.name }) { SlotRow(it.name, it.usedIn, it.holoNote, it.holoAllowed, it.ratios) }
+                // The gallery's row (55 GAL-12): items are not an `ImageSlot` (core:model is frozen), so it is drawn here.
+                item(key = "gallery") {
+                    SlotRow(ImageCopy.SLOT_GALLERY, ImageCopy.USED_GALLERY, ImageCopy.HOLO_CHOICE, true, io.github.lenticualrstone.civilight.model.gallery.GalleryItem.RATIOS)
+                }
                 item { SectionLabel(ImageCopy.SPECS_SECTION_RULES, Modifier.padding(top = 24.dp, bottom = 6.dp)) }
                 items(ImageCopy.SPECS_RULES) { line ->
                     val colors = CivilightTheme.colors
@@ -74,7 +77,7 @@ fun ImageSpecsScreen(deps: FeatureDeps) {
 }
 
 @Composable
-private fun SlotRow(spec: SlotSpec) {
+private fun SlotRow(name: String, usedIn: String, holoNote: String, holoAllowed: Boolean, ratios: List<io.github.lenticualrstone.civilight.model.asset.Ratio>) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(
@@ -83,11 +86,11 @@ private fun SlotRow(spec: SlotSpec) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            CivilightText(spec.name, type.itemTitleCompact, color = colors.ink, maxLines = 1)
-            CivilightText(spec.usedIn, type.small, color = colors.ink3, maxLines = 1)
-            CivilightText(spec.holoNote, type.small, color = if (spec.holoAllowed) colors.acc else colors.ink3, maxLines = 1)
+            CivilightText(name, type.itemTitleCompact, color = colors.ink, maxLines = 1)
+            CivilightText(usedIn, type.small, color = colors.ink3, maxLines = 1)
+            CivilightText(holoNote, type.small, color = if (holoAllowed) colors.acc else colors.ink3, maxLines = 1)
         }
-        spec.ratios.forEach { ratio ->
+        ratios.forEach { ratio ->
             val parts = ImageSlots.parts(ratio)
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) { RatioGlyph(parts.value) }

@@ -37,6 +37,7 @@ import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import kotlinx.coroutines.delay
 
 /**
@@ -223,10 +224,12 @@ fun FullScreenError(
 
 /**
  * DS-47 loading rule: nothing for work under 1 s; after [delayMs] the [content] (a progress bar or the work
- * drawing itself) fades in. No spinners or rings.
+ * drawing itself) fades in on `standard` and out on `exit` (S11; 120 ms fades when reduced). The 1 s wait is
+ * a perceived-time rule, not motion, so it does not follow the animator scale. No spinners or rings.
  */
 @Composable
 fun DelayedProgress(working: Boolean, modifier: Modifier = Modifier, delayMs: Long = 1000L, content: @Composable () -> Unit) {
+    val motion = LocalMotion.current
     var show by remember { mutableStateOf(false) }
     LaunchedEffect(working) {
         show = false
@@ -238,7 +241,7 @@ fun DelayedProgress(working: Boolean, modifier: Modifier = Modifier, delayMs: Lo
     AnimatedVisibility(
         visible = working && show,
         modifier = modifier,
-        enter = fadeIn(CivilightMotion.spec(CivilightMotion.standard, true)),
-        exit = fadeOut(CivilightMotion.spec(CivilightMotion.exit, true)),
+        enter = fadeIn(motion.spec(CivilightMotion.standard)),
+        exit = fadeOut(motion.spec(CivilightMotion.exit)),
     ) { content() }
 }

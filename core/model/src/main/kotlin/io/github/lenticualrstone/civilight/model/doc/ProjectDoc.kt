@@ -17,6 +17,8 @@ import io.github.lenticualrstone.civilight.model.file.StoryIndexFile
 import io.github.lenticualrstone.civilight.model.file.TombstonesFile
 import io.github.lenticualrstone.civilight.model.file.TrashIndexFile
 import io.github.lenticualrstone.civilight.model.file.WorldFile
+import io.github.lenticualrstone.civilight.model.gallery.GalleryFile
+import io.github.lenticualrstone.civilight.model.gallery.GalleryItem
 import io.github.lenticualrstone.civilight.model.map.WorldMap
 import io.github.lenticualrstone.civilight.model.position.ManuscriptIndex
 import io.github.lenticualrstone.civilight.model.project.Project
@@ -56,6 +58,11 @@ data class ProjectDoc(
     val app: ProjectAppState = ProjectAppState(),
     /** Files of an imported package this version did not understand (§8.3), by path. */
     val unknownFiles: Map<String, UnknownFile> = emptyMap(),
+    /**
+     * Gallery items by owner key (55 §3, §12.5): one `gallery/<ownerKey>.json` file unit per owner
+     * (the project key for the project gallery), live and trashed items together.
+     */
+    val gallery: Map<Key, GalleryFile> = emptyMap(),
 ) {
     /** Keyed lookups and tree navigation. */
     val index: ProjectIndex by lazy { ProjectIndex(this) }
@@ -72,6 +79,9 @@ data class ProjectDoc(
     val units: List<StoryUnit> get() = story.units
     val characters: List<Character> get() = cast.characters
     val records: List<ChangeRecord> get() = changes.records
+
+    /** Every gallery item of every owner (live and trashed), owners in map order, items in stored order. */
+    val galleryItems: List<GalleryItem> by lazy { gallery.values.flatMap { it.items } }
 
     /** Every block of every numbering unit (live and trashed). */
     val allBlocks: List<Block> by lazy { episodes.values.flatMap { it.blocks } }

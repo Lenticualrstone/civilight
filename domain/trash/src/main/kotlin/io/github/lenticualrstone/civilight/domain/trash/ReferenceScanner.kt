@@ -81,6 +81,9 @@ enum class RefKind {
 enum class LinkSurface {
     BLOCK, TRANSITION, CHARACTER_BODY, FIELD, VOICE_LINE, ARCHIVE_DOC, WORLD_DESCRIPTION, EVENT_DESCRIPTION, PAGE,
     RECORD_VALUE, RECORDER,
+
+    /** The description of a live gallery image (55 GAL-13). */
+    GALLERY,
 }
 
 /**
@@ -148,7 +151,7 @@ class ReferenceScanner(private val doc: ProjectDoc, private val recorder: Record
         ItemKind.MAP -> subMapsOfMap(item.key) + regionRefsOfMap(item.key)
         ItemKind.UNIT -> baseScenes(item.key) + eventScenes(item.key) + linkRefs(item.key, LinkTargetKind.UNIT) +
             recorderLinks(item.key, RecorderTargetKind.UNIT)
-        ItemKind.FIELD_DEF, ItemKind.CHANGE, ItemKind.CANVAS, ItemKind.BLOCK -> emptyList()
+        ItemKind.FIELD_DEF, ItemKind.CHANGE, ItemKind.CANVAS, ItemKind.BLOCK, ItemKind.GALLERY_ITEM -> emptyList()
     }
 
     // --- Manuscript ---
@@ -328,6 +331,7 @@ class ReferenceScanner(private val doc: ProjectDoc, private val recorder: Record
         for (faction in doc.world.factions.filter { it.deletedAt == null }) rich(faction.description, LinkSurface.WORLD_DESCRIPTION, faction.key)
         for (event in doc.world.events.filter { it.deletedAt == null }) rich(event.description, LinkSurface.EVENT_DESCRIPTION, event.key)
         for (page in doc.pages.values.filter { it.deletedAt == null }) rich(page.blocks, LinkSurface.PAGE, page.key)
+        for (item in doc.galleryItems.filter { live.isLive(it) }) item.caption?.let { rich(it, LinkSurface.GALLERY, item.key) }
         for (record in doc.changes.records.filter { live.isLive(it) && it.target is ChangeTarget.Field }) {
             val payload = record.fieldValue()?.payload as? FieldPayload.Rich ?: continue
             rich(payload.doc, LinkSurface.RECORD_VALUE, record.key)

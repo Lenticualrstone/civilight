@@ -1,6 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.world.time
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,11 +33,13 @@ import io.github.lenticualrstone.civilight.feature.world.WorldCopy
  * whole calendar as one step. The problem line under the button says what stops `저장`.
  */
 @Composable
-fun CalendarEditor(draft: CalendarDraft, readOnly: Boolean, onChange: (CalendarDraft) -> Unit, onSave: () -> Unit) {
+fun CalendarEditor(draft: CalendarDraft, readOnly: Boolean, onChange: (CalendarDraft) -> Unit, onSave: () -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val enabled = !readOnly
-    Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
+    val motion = CivilightTheme.motion
+    // A month or weekday row coming or going moves what is below it on `standard` (snaps when reduced).
+    Column(modifier.fillMaxWidth().padding(top = 18.dp).animateContentSize(motion.move())) {
         SectionLabel(WorldCopy.CALENDAR_TITLE, Modifier.padding(bottom = 4.dp))
         draft.months.forEachIndexed { i, month ->
             Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -82,7 +87,7 @@ fun CalendarEditor(draft: CalendarDraft, readOnly: Boolean, onChange: (CalendarD
         }
         TextAction(WorldCopy.ADD_WEEKDAY, { onChange(draft.addWeekday()) }, Modifier.padding(top = 4.dp), color = colors.acc, style = type.small)
 
-        CivilightText(WorldCopy.TODO_COPY_WORLD_CALENDAR_START_LABEL, type.small, Modifier.padding(top = 14.dp), color = colors.ink3)
+        CivilightText(WorldCopy.CALENDAR_START_LABEL, type.small, Modifier.padding(top = 14.dp), color = colors.ink3)
         ChipFlow(Modifier.padding(top = 6.dp)) {
             draft.months.forEachIndexed { i, month ->
                 FilterChip(
@@ -101,16 +106,18 @@ fun CalendarEditor(draft: CalendarDraft, readOnly: Boolean, onChange: (CalendarD
             enabled = enabled,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
-        if (draft.weekdays.isNotEmpty()) {
-            CivilightText(WorldCopy.TODO_COPY_WORLD_CALENDAR_START_WEEKDAY_LABEL, type.small, Modifier.padding(top = 14.dp), color = colors.ink3)
-            ChipFlow(Modifier.padding(top = 6.dp)) {
-                draft.weekdays.forEachIndexed { i, name ->
-                    FilterChip(
-                        label = name.ifBlank { (i + 1).toString() },
-                        selected = draft.startWeekday == i + 1,
-                        onClick = { onChange(draft.copy(startWeekday = i + 1)) },
-                        enabled = enabled,
-                    )
+        FoldReveal(draft.weekdays.isNotEmpty()) {
+            Column {
+                CivilightText(WorldCopy.CALENDAR_START_WEEKDAY_LABEL, type.small, Modifier.padding(top = 14.dp), color = colors.ink3)
+                ChipFlow(Modifier.padding(top = 6.dp)) {
+                    draft.weekdays.forEachIndexed { i, name ->
+                        FilterChip(
+                            label = name.ifBlank { (i + 1).toString() },
+                            selected = draft.startWeekday == i + 1,
+                            onClick = { onChange(draft.copy(startWeekday = i + 1)) },
+                            enabled = enabled,
+                        )
+                    }
                 }
             }
         }
@@ -121,6 +128,6 @@ fun CalendarEditor(draft: CalendarDraft, readOnly: Boolean, onChange: (CalendarD
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
             enabled = enabled && problem == null,
         )
-        if (problem != null && enabled) CivilightText(problem, type.small, Modifier.padding(top = 6.dp), color = colors.ink3)
+        FoldRevealValue(problem.takeIf { enabled }) { line -> CivilightText(line, type.small, Modifier.padding(top = 6.dp), color = colors.ink3) }
     }
 }

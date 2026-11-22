@@ -142,7 +142,7 @@ private fun AddRowItem(
             .selectedRowBackground(selected && !dimmed, colors.sel, colors.acc)
             .pressable(PressAction.Click(onClick), enabled = enabled, role = Role.Button, scaleOnPress = false)
             .heightIn(min = 44.dp)
-            .alpha(if (dimmed) 0.38f else 1f)
+            .dimmedWhen(dimmed)
             .padding(vertical = 11.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,

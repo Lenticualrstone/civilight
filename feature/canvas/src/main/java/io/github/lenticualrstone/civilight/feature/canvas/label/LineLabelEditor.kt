@@ -48,10 +48,10 @@ class LineLabelEditor(
 
     /**
      * Takes the line off the canvas (Q-CV-13 default: a converted line's relation stays). One undo step
-     * named by the button (copy missing: `TODO_COPY_CANVAS_REMOVE_LINE`).
+     * named by the button (copy missing: `BTN_REMOVE_LINE`, proposed).
      */
     fun remove(canvasKey: Key, edgeKey: Key, then: (EditResult) -> Unit) {
-        act(CanvasCopy.TODO_COPY_CANVAS_REMOVE_LINE, then = { r -> if (r == EditResult.APPLIED) discard(edgeKey); then(r) }) { doc, ctx ->
+        act(CanvasCopy.BTN_REMOVE_LINE, then = { r -> if (r == EditResult.APPLIED) discard(edgeKey); then(r) }) { doc, ctx ->
             CanvasEdits.removeLine(doc, canvasKey, edgeKey, ctx)
         }
     }

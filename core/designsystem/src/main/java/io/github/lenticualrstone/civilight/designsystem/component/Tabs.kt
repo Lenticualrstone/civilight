@@ -1,6 +1,5 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,9 +8,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -24,8 +21,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
-import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -48,7 +45,8 @@ object TabGap {
 
 /**
  * DS-37 text tabs: `tab` role, selected `ink` with a 2 dp `acc` underline at the bottom of its 44 dp box that
- * slides with `Standard`. One line only; the row scrolls horizontally when it does not fit.
+ * slides with `Standard`; label colours cross over (S6). Reduced motion: the underline does not move, it
+ * crossfades from the old tab to the new one. One line only; the row scrolls horizontally when it does not fit.
  */
 @Composable
 fun CivilightTabs(
@@ -60,29 +58,15 @@ fun CivilightTabs(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val reduced = CivilightTheme.reducedMotion
-    val bounds = remember { mutableStateMapOf<Int, Pair<Float, Float>>() }
-    val x = remember { Animatable(0f) }
-    val w = remember { Animatable(0f) }
-    val target = bounds[selectedIndex]
-    LaunchedEffect(target) {
-        val t = target ?: return@LaunchedEffect
-        if (w.value == 0f || reduced) {
-            x.snapTo(t.first)
-            w.snapTo(t.second)
-        } else {
-            val spec = CivilightMotion.spec<Float>(CivilightMotion.standard, reduced = false)
-            launchBoth({ x.animateTo(t.first, spec) }, { w.animateTo(t.second, spec) })
-        }
-    }
+    val indicator = rememberSlidingIndicator(selectedIndex)
     Row(
         modifier = modifier
             .horizontalScroll(rememberScrollState())
             .selectableGroup()
             .drawBehind {
-                if (w.value > 0f) {
-                    val h = 2.dp.toPx()
-                    drawRect(colors.acc, Offset(x.value, size.height - h), Size(w.value, h))
+                val h = 2.dp.toPx()
+                with(indicator) {
+                    drawIndicator { x, w, a -> drawRect(colors.acc, Offset(x, size.height - h), Size(w, h), alpha = a) }
                 }
             },
         horizontalArrangement = Arrangement.spacedBy(gap),
@@ -90,14 +74,15 @@ fun CivilightTabs(
     ) {
         tabs.forEachIndexed { i, label ->
             val style = tabStyle(i == selectedIndex, colors)
+            val text by animatedColor(style.text, label = "tabText")
             Box(
                 modifier = Modifier
                     .heightIn(min = 44.dp)
-                    .onPlaced { bounds[i] = it.positionInParent().x to it.size.width.toFloat() }
+                    .onPlaced { indicator.bounds[i] = it.positionInParent().x to it.size.width.toFloat() }
                     .pressable(PressAction.Select(i == selectedIndex) { onSelect(i) }, role = Role.Tab, scaleOnPress = false),
                 contentAlignment = Alignment.Center,
             ) {
-                CivilightText(label, type.tab, color = style.text, maxLines = 1)
+                CivilightText(label, type.tab, color = text, maxLines = 1)
             }
         }
     }

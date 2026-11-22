@@ -77,7 +77,7 @@ class RestoreJob internal constructor(
                 }
                 deps.toasts.show(LibraryNotices.restoreDone(profiles), actionLabel = null)
             }
-            if (result == null || result.failed > 0) deps.toasts.show(RestoreCopy.TODO_COPY_LIB60_PARTLY_FAILED, actionLabel = null)
+            if (result == null || result.failed > 0) deps.toasts.show(RestoreCopy.PARTLY_FAILED, actionLabel = null)
             deps.stores.appState.ensureLoaded()
             when (RestoreEnd.of(result, firstRun = !deps.stores.appState.onboarding.state.value.firstRunCompleted)) {
                 RestoreEnd.FINISH_ONBOARDING -> onFirstRunDone()

@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.story.where
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,9 @@ import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import io.github.lenticualrstone.civilight.model.project.CalendarMonth
 import io.github.lenticualrstone.civilight.model.story.FlashbackMode
 import io.github.lenticualrstone.civilight.model.story.FlashbackRelation
@@ -35,7 +39,8 @@ fun WhereFlashbackForm(ui: WhereUi, onAction: (FlashbackAction) -> Unit, onPickE
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val enabled = !ui.readOnly
-    Column(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    // No `spacedBy`: a folded-away block would still add its gap. Each block carries its own 10 dp.
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             CivilightText(WhereCopy.FLASHBACK_BASE, type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
             CivilightText(WhereCopy.FLASHBACK_NO_BASE, type.small, color = colors.ink3, maxLines = 1)
@@ -44,38 +49,44 @@ fun WhereFlashbackForm(ui: WhereUi, onAction: (FlashbackAction) -> Unit, onPickE
             options = listOf(WhereCopy.ANCHOR_EVENT, WhereCopy.DIRECT),
             selectedIndex = if (f.mode == FlashbackMode.ANCHOR) 0 else 1,
             onSelect = { i -> if (enabled) onAction(FlashbackAction.Mode(if (i == 0) FlashbackMode.ANCHOR else FlashbackMode.DIRECT)) },
+            modifier = Modifier.padding(top = 10.dp),
         )
-        when (f.mode) {
-            FlashbackMode.ANCHOR -> {
-                EventRow(f, enabled, onPickEvent)
-                ChipFlow {
-                    listOf(
-                        FlashbackRelation.BEFORE to WhereCopy.BEFORE,
-                        FlashbackRelation.ON to WhereCopy.ON_THE_DAY,
-                        FlashbackRelation.AFTER to WhereCopy.AFTER,
-                    ).forEach { (relation, label) ->
-                        FilterChip(label, f.relation == relation, { onAction(FlashbackAction.Relation(relation)) }, enabled = enabled && f.eventKey != null)
+        // The two modes swap on the mode, not on the data (P3).
+        ContentSwap(f.mode, Modifier.fillMaxWidth().padding(top = 10.dp)) { mode ->
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                when (mode) {
+                    FlashbackMode.ANCHOR -> {
+                        EventRow(f, enabled, onPickEvent)
+                        ChipFlow {
+                            listOf(
+                                FlashbackRelation.BEFORE to WhereCopy.BEFORE,
+                                FlashbackRelation.ON to WhereCopy.ON_THE_DAY,
+                                FlashbackRelation.AFTER to WhereCopy.AFTER,
+                            ).forEach { (relation, label) ->
+                                FilterChip(label, f.relation == relation, { onAction(FlashbackAction.Relation(relation)) }, enabled = enabled && f.eventKey != null)
+                            }
+                        }
+                    }
+                    FlashbackMode.DIRECT -> {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CivilightText(WhereCopy.YEAR, type.small, color = colors.ink2)
+                            CommitField(
+                                seed = f.year?.toString().orEmpty(),
+                                onCommit = { text -> FlashbackModel.parseYear(text)?.takeIf { it != f.year }?.let { onAction(FlashbackAction.Year(it)) } },
+                                modifier = Modifier.width(120.dp),
+                                enabled = enabled,
+                            )
+                        }
+                        f.months?.let { months -> CalendarDateRow(months, f, enabled, onAction) }
                     }
                 }
             }
-            FlashbackMode.DIRECT -> {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CivilightText(WhereCopy.YEAR, type.small, color = colors.ink2)
-                    CommitField(
-                        seed = f.year?.toString().orEmpty(),
-                        onCommit = { text -> FlashbackModel.parseYear(text)?.takeIf { it != f.year }?.let { onAction(FlashbackAction.Year(it)) } },
-                        modifier = Modifier.width(120.dp),
-                        enabled = enabled,
-                    )
-                }
-                f.months?.let { months -> CalendarDateRow(months, f, enabled, onAction) }
-            }
         }
-        ui.resultLine?.let { ResultBox(it, onTimeline) }
-        f.skipLine?.let { (label, value) ->
-            Row(Modifier.fillMaxWidth().topHairline(colors.line).padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        FoldRevealValue(ui.resultLine) { line -> Box(Modifier.padding(top = 10.dp)) { ResultBox(line, onTimeline) } }
+        FoldRevealValue(f.skipLine) { (label, value) ->
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp).topHairline(colors.line).padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 CivilightText(label, type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
-                CivilightText(value, type.small, color = colors.ink2, maxLines = 1)
+                ValueSwap(value, type.small, color = colors.ink2)
             }
         }
     }

@@ -17,6 +17,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.RadioRow
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.common.StoryServices
 import io.github.lenticualrstone.civilight.feature.story.common.StoryViewModel
@@ -58,29 +59,32 @@ fun NotationScreen(route: SceneNotationSettings, deps: FeatureDeps) {
             smallLine = ui?.projectName,
             back = if (LocalPaneRole.current == PaneRole.DETAIL) null else IconAction(StoryCopy.BACK) { deps.navigator.pop() },
         ) { padding ->
-            val u = ui
-            if (u == null) {
-                Box(Modifier.fillMaxSize().background(colors.bg))
-                return@CivilightScreen
-            }
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .background(colors.bg)
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
-            ) {
-                u.options.forEach { option ->
-                    RadioRow(
-                        title = option.label,
-                        selected = option.selected,
-                        onClick = { if (!option.selected) vm.setNotation(option.notation, NotationCopy.TITLE) },
-                        subtitle = option.sample,
-                        enabled = !u.readOnly,
-                    )
+            // Loading -> content swaps on the kind, never on the data (motion audit, feature:story 7).
+            ContentSwap(ui != null, Modifier.fillMaxSize()) { loaded ->
+                val u = ui
+                if (!loaded || u == null) {
+                    Box(Modifier.fillMaxSize().background(colors.bg))
+                } else {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .background(colors.bg)
+                            .verticalScroll(rememberScrollState())
+                            .padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+                    ) {
+                        u.options.forEach { option ->
+                            RadioRow(
+                                title = option.label,
+                                selected = option.selected,
+                                onClick = { if (!option.selected) vm.setNotation(option.notation, NotationCopy.TITLE) },
+                                subtitle = option.sample,
+                                enabled = !u.readOnly,
+                            )
+                        }
+                        CivilightText(NotationCopy.TIMELINE_NOTE, type.small, Modifier.padding(top = 12.dp), color = colors.ink3)
+                        if (u.readOnly) CivilightText(StoryCopy.READ_ONLY, type.small, Modifier.padding(top = 4.dp), color = colors.ink3)
+                    }
                 }
-                CivilightText(NotationCopy.TIMELINE_NOTE, type.small, Modifier.padding(top = 12.dp), color = colors.ink3)
-                if (u.readOnly) CivilightText(StoryCopy.READ_ONLY, type.small, Modifier.padding(top = 4.dp), color = colors.ink3)
             }
         }
     }

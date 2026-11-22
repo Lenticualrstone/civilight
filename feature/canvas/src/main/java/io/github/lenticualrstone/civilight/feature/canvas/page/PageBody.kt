@@ -33,15 +33,16 @@ import io.github.lenticualrstone.civilight.model.text.DocBlockKind
  * One block of a page as the board `Page` reads it: paragraphs Nanum Myeongjo 400 16 / 28 on `bg`,
  * sub-headings 700 17 / 24, the author memo in a `tint` box (radius 14, padding 12 × 14) with its
  * `⌁ 작가 메모` label. Links are underlined 1 dp `ink3`; a link to a deleted item is dotted with `◇`.
- * A tap on a link calls [onLink]; a tap elsewhere in the text calls [onText] (tap into text to edit).
+ * A tap on a link calls [onLink]; a tap elsewhere in the text calls [onText] (tap into text to edit). [modifier]
+ * goes on the block (the list's item motion and the unhide).
  */
 @Composable
-fun PageBlockText(paragraph: PageParagraph, first: Boolean, onLink: (PageLink) -> Unit, onText: () -> Unit) {
+fun PageBlockText(paragraph: PageParagraph, first: Boolean, onLink: (PageLink) -> Unit, onText: () -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     when (paragraph.kind) {
         DocBlockKind.MEMO -> Column(
-            Modifier
+            modifier
                 .padding(top = 16.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
@@ -51,8 +52,8 @@ fun PageBlockText(paragraph: PageParagraph, first: Boolean, onLink: (PageLink) -
             CivilightText(paragraph.memoLabel ?: PageCopy.MEMO_LABEL, type.small, color = colors.ink3)
             LinkedText(paragraph, type.command.merge(TextStyle(lineHeight = 22.sp)), colors.ink2, Modifier.padding(top = 4.dp), onLink, onText)
         }
-        DocBlockKind.HEADING -> LinkedText(paragraph, type.heading, colors.ink, Modifier.padding(top = if (first) 18.dp else 22.dp), onLink, onText)
-        DocBlockKind.PARAGRAPH -> LinkedText(paragraph, bodyStyle(type.lead), colors.ink, Modifier.padding(top = if (first) 18.dp else 6.dp), onLink, onText)
+        DocBlockKind.HEADING -> LinkedText(paragraph, type.heading, colors.ink, modifier.padding(top = if (first) 18.dp else 22.dp), onLink, onText)
+        DocBlockKind.PARAGRAPH -> LinkedText(paragraph, bodyStyle(type.lead), colors.ink, modifier.padding(top = if (first) 18.dp else 6.dp), onLink, onText)
     }
 }
 

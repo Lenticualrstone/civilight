@@ -19,7 +19,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
@@ -31,7 +32,10 @@ import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.trash.TrashFilter
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
@@ -101,7 +105,7 @@ internal fun TrashScreen(route: Trash, services: LibraryServices) {
                 ),
             ) {
                 item(key = "chips") {
-                    ChipFlow(Modifier.fillMaxWidth()) {
+                    ChipFlow(civilightItem().fillMaxWidth()) {
                         ui.chips.forEach { chip ->
                             FilterChip(chip.label, selected = chip.filter == filter, onClick = { filterName = chip.filter.name })
                         }
@@ -109,13 +113,14 @@ internal fun TrashScreen(route: Trash, services: LibraryServices) {
                 }
                 if (ui.loaded && rows.isEmpty()) {
                     item(key = "empty") {
-                        // LIB-70 shared empty form (DS `EmptyBlock`); its title is not in the sources yet.
-                        EmptyBlock(title = TrashScreenCopy.TODO_COPY_LIB38_EMPTY)
+                        // LIB-70 shared empty form (DS `EmptyBlock`); no board draws an empty 휴지통, so the title is a fragment.
+                        Column(civilightItem()) { EmptyBlock(title = TrashScreenCopy.EMPTY) }
                     }
                 }
                 item(key = "gap") { Column(Modifier.padding(top = 10.dp)) {} }
                 items(rows, key = { it.key }) { row ->
                     TrashRowItem(
+                        modifier = civilightItem(),
                         row = row,
                         expanded = row.key in expanded,
                         enabled = !working,
@@ -132,7 +137,7 @@ internal fun TrashScreen(route: Trash, services: LibraryServices) {
     purging?.let { key ->
         val row = ui.row(key) ?: return@let
         ConfirmDialog(
-            title = TrashScreenCopy.TODO_COPY_LIB39_PURGE_CONFIRM,
+            title = TrashScreenCopy.PURGE_CONFIRM,
             confirmLabel = TrashScreenCopy.PURGE,
             cancelLabel = TrashScreenCopy.CANCEL,
             hardToUndo = true,
@@ -145,7 +150,7 @@ internal fun TrashScreen(route: Trash, services: LibraryServices) {
     }
     if (emptying) {
         ConfirmDialog(
-            title = TrashScreenCopy.TODO_COPY_LIB39_EMPTY_CONFIRM,
+            title = TrashScreenCopy.EMPTY_CONFIRM,
             confirmLabel = TrashScreenCopy.EMPTY_TRASH,
             cancelLabel = TrashScreenCopy.CANCEL,
             hardToUndo = true,
@@ -164,6 +169,7 @@ internal fun TrashScreen(route: Trash, services: LibraryServices) {
  */
 @Composable
 private fun TrashRowItem(
+    modifier: Modifier,
     row: TrashRowUi,
     expanded: Boolean,
     enabled: Boolean,
@@ -175,31 +181,36 @@ private fun TrashRowItem(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     row.protections?.let { ProtectWindow(WindowProtection.forProject(it)) }
-    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 13.dp)) {
+    val motion = CivilightTheme.motion
+    // Chevron turns on `standard` (snaps when reduced); the block lines fold open and closed (audit row 10).
+    val turn by animateFloatAsState(if (expanded) 90f else 0f, motion.move(CivilightMotion.standard), label = "trashChevron")
+    Column(modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 13.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CivilightText(row.row.title, type.itemTitleCompact, Modifier.weight(1f), color = colors.ink)
             CivilightText(row.row.daysLeftLabel, type.small, color = colors.ink3, maxLines = 1)
             if (row.isBlockGroup && row.row.lines.isNotEmpty()) {
                 CivilightIconButton(
                     IconId.Next,
-                    TrashScreenCopy.TODO_COPY_LIB38_EXPAND_LABEL,
+                    if (expanded) TrashScreenCopy.COLLAPSE_LABEL else TrashScreenCopy.EXPAND_LABEL,
                     onToggle,
-                    Modifier.rotate(if (expanded) 90f else 0f),
+                    Modifier.graphicsLayer { rotationZ = turn },
                     tint = colors.ink3,
                 )
             }
         }
         CivilightText(row.row.sub, type.small, color = colors.ink3)
-        if (expanded) {
-            row.row.lines.forEach { line ->
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    CivilightText("#" + line.number.toString().padStart(3, '0'), type.number, color = colors.ink3)
-                    CivilightText(line.firstLine, type.command, Modifier.weight(1f), color = colors.ink2, maxLines = 1)
-                    TextAction(TrashScreenCopy.RESTORE, { if (enabled) onRestoreBlock(line.blockKey) })
+        FoldReveal(expanded && row.row.lines.isNotEmpty()) {
+            Column {
+                row.row.lines.forEach { line ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CivilightText("#" + line.number.toString().padStart(3, '0'), type.number, color = colors.ink3)
+                        CivilightText(line.firstLine, type.command, Modifier.weight(1f), color = colors.ink2, maxLines = 1)
+                        TextAction(TrashScreenCopy.RESTORE, { if (enabled) onRestoreBlock(line.blockKey) })
+                    }
                 }
             }
         }

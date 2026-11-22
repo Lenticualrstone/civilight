@@ -29,16 +29,16 @@ object RecorderFiles {
     fun stage(open: RecorderPackageOpen, fileName: String): OpenStage = when (open) {
         is RecorderPackageOpen.Ready -> OpenStage.Recorder(open.content)
         is RecorderPackageOpen.Encrypted -> OpenStage.Password(EncryptedFileSheet.of(open.header, fileName))
-        is RecorderPackageOpen.Newer -> OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB48_NEWER)
-        is RecorderPackageOpen.Damaged -> OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB55_DAMAGED)
-        is RecorderPackageOpen.NotAPackage -> OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB52_NOT_A_PROJECT)
+        is RecorderPackageOpen.Newer -> OpenStage.Failed(OpenFileCopy.NEWER)
+        is RecorderPackageOpen.Damaged -> OpenStage.Failed(OpenFileCopy.DAMAGED)
+        is RecorderPackageOpen.NotAPackage -> OpenStage.Failed(OpenFileCopy.NOT_A_PROJECT)
     }
 
     fun unlock(outer: ByteArray, password: CharArray, sheet: EncryptedFileSheet): OpenStage = when (val d = PackageCrypto.decrypt(outer, password)) {
         is DecryptResult.Ok -> stage(RecorderPackage.read(d.inner), sheet.fileName)
-        DecryptResult.WrongPassword -> OpenStage.Password(sheet, error = OpenFileCopy.TODO_COPY_LIB54_WRONG_PASSWORD)
-        is DecryptResult.Unsupported -> OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB54_UNSUPPORTED)
-        is DecryptResult.NotEncrypted -> OpenStage.Failed(OpenFileCopy.TODO_COPY_LIB52_NOT_A_PROJECT)
+        DecryptResult.WrongPassword -> OpenStage.Password(sheet, error = OpenFileCopy.WRONG_PASSWORD)
+        is DecryptResult.Unsupported -> OpenStage.Failed(OpenFileCopy.UNSUPPORTED)
+        is DecryptResult.NotEncrypted -> OpenStage.Failed(OpenFileCopy.NOT_A_PROJECT)
     }
 
     /** `열기`: audio into the blob store, then the records merged into the library as it is now. */

@@ -1,5 +1,10 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.ui.graphics.graphicsLayer
+import io.github.lenticualrstone.civilight.designsystem.foundation.animatedInsetOutline
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -77,8 +82,11 @@ fun CivilightTextField(
     val source = remember { MutableInteractionSource() }
     val focused by source.collectIsFocusedAsState()
     val outline = fieldOutline(focused, error != null, colors)
+    val outlineColor = animatedColor(outline.color, label = "fieldOutline")
+    val outlineWidth = animatedAlpha(outline.width.value, label = "fieldOutlineWidth")
+    val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
     val shape = RoundedCornerShape(12.dp)
-    Column(modifier.alpha(if (enabled) 1f else DISABLED_ALPHA), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier.graphicsLayer { alpha = enabledAlpha.value }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (label != null) CivilightText(label, type.label, color = colors.ink2)
         BasicTextField(
             value = value,
@@ -99,7 +107,7 @@ fun CivilightTextField(
                         .heightIn(min = 46.dp)
                         .clip(shape)
                         .background(colors.tint)
-                        .insetOutline(outline.color, outline.width, shape)
+                        .animatedInsetOutline(outlineColor, { outlineWidth.value.dp }, shape)
                         .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -114,9 +122,10 @@ fun CivilightTextField(
                 }
             },
         )
-        when {
-            error != null -> CivilightText(error, type.small, color = colors.r18)
-            hint != null -> CivilightText(hint, type.small, color = colors.ink3)
+        // Error and hint lines fold in and out (S6); the text colour crosses over between hint and error.
+        FoldRevealValue(error ?: hint, label = "fieldLine") { line ->
+            val lineColor by animatedColor(if (error != null) colors.r18 else colors.ink3, label = "fieldLineColor")
+            CivilightText(line, type.small, color = lineColor)
         }
     }
 }

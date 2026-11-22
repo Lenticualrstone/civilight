@@ -14,6 +14,9 @@ import io.github.lenticualrstone.civilight.model.project.WorldTimeMode
 import io.github.lenticualrstone.civilight.model.story.StoryUnit
 import io.github.lenticualrstone.civilight.navigation.CanvasBoard
 import io.github.lenticualrstone.civilight.navigation.CastList
+import io.github.lenticualrstone.civilight.navigation.CheckCenter
+import io.github.lenticualrstone.civilight.navigation.Gallery
+import io.github.lenticualrstone.civilight.navigation.PageList
 import io.github.lenticualrstone.civilight.navigation.ProjectSettings
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.navigation.StoryStructure
@@ -46,13 +49,20 @@ data class HomeRow(
     val hiddenTag: Boolean = false,
 )
 
-/** The `작업` shortcuts (STO-01): `스토리 · 인물 · 세계 · 연표 · 캔버스 · 설정`; `설정` is drawn `ink3`. */
+/**
+ * The `작업` shortcuts (STO-01, GAL-03): `스토리 · 인물 · 세계 · 연표 · 캔버스 · 갤러리 · 페이지 · 점검 센터 · 설정`;
+ * `설정` is drawn `ink3` and keeps its own last row ([HomeModel.shortcutRows]). `페이지` (CNV-14) and
+ * `점검 센터` (CNV-17) are the entry points QA 2026-11-23 found missing.
+ */
 enum class HomeShortcut(val label: String, val dim: Boolean = false) {
     STORY(HomeCopy.SHORTCUT_STORY),
     CAST(HomeCopy.SHORTCUT_CAST),
     WORLD(HomeCopy.SHORTCUT_WORLD),
     TIMELINE(HomeCopy.SHORTCUT_TIMELINE),
     CANVAS(HomeCopy.SHORTCUT_CANVAS),
+    GALLERY(HomeCopy.SHORTCUT_GALLERY),
+    PAGES(HomeCopy.SHORTCUT_PAGES),
+    CHECKS(HomeCopy.SHORTCUT_CHECKS),
     SETTINGS(HomeCopy.SHORTCUT_SETTINGS, dim = true),
     ;
 
@@ -63,6 +73,9 @@ enum class HomeShortcut(val label: String, val dim: Boolean = false) {
         WORLD -> World(projectKey)
         TIMELINE -> Timeline(projectKey)
         CANVAS -> CanvasBoard(projectKey)
+        GALLERY -> Gallery.ofProject(projectKey)
+        PAGES -> PageList(projectKey)
+        CHECKS -> CheckCenter(projectKey)
         SETTINGS -> ProjectSettings(projectKey)
     }
 }
@@ -147,6 +160,12 @@ object HomeModel {
     /** The `작업` shortcuts; `연표` is left out in `시간 없이` (WLD-29 `[PROPOSED]`, the 연표 is off there). */
     fun shortcuts(doc: ProjectDoc): List<HomeShortcut> =
         if (doc.project.worldTime.mode.known == WorldTimeMode.NONE) HomeShortcut.entries - HomeShortcut.TIMELINE else HomeShortcut.entries
+
+    /** The grid lines: three to a line, `설정` alone on the last one (GAL-03 "`설정` keeps its own row"). */
+    fun shortcutRows(shortcuts: List<HomeShortcut>): List<List<HomeShortcut>> {
+        val (last, rest) = shortcuts.partition { it == HomeShortcut.SETTINGS }
+        return rest.chunked(3) + listOfNotNull(last.firstOrNull()?.let { listOf(it) })
+    }
 
     /** `7/10` · `1장 에피소드` (3+ levels); `k/n` · `<episode level name>` (2) or `<scene level name>` (1), `ED`. */
     private fun progressStat(view: StoryOverview, levels: Int): HomeStat? {

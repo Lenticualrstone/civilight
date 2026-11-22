@@ -13,6 +13,7 @@ import io.github.lenticualrstone.civilight.model.cast.Character
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.nfc
 import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLink
@@ -56,6 +57,8 @@ data class ReferenceSnapshot(
     val speakerOptions: List<String> = emptyList(),
     val appearanceScenes: List<Key> = emptyList(),
     val linkKeys: List<Key> = emptyList(),
+    /** The character's live gallery images at delete time, in order (55 §3.4); they come back with it. */
+    val galleryItemKeys: List<Key> = emptyList(),
 )
 
 /** Result of a restore: what re-linked and what the author had changed meanwhile. */
@@ -252,6 +255,9 @@ object DeletedItems {
                 .map { "${it.ownerKey}:${it.field.removePrefix("options:")}" },
             appearanceScenes = refs.filter { it.kind == RefKind.APPEARANCE }.map { it.ownerKey },
             linkKeys = refs.filter { it.kind == RefKind.LINK }.map { it.field.removePrefix("link:") },
+            galleryItemKeys = doc.index.galleryItemsOf(characterKey)
+                .filter { it.ownerKind.known == GalleryOwnerKind.CHARACTER && doc.liveness.isLive(it) }
+                .map { it.key },
         )
     }
 
@@ -333,6 +339,8 @@ object DeletedItems {
             assets = next.assets.copy(imageUses = next.assets.imageUses.filterNot {
                 it.ownerKind.known == ImageOwnerKind.CHARACTER && it.ownerKey == characterKey
             }),
+            // Its gallery images go with it (55 §3.4); the owner's file is dropped.
+            gallery = next.gallery.filterValues { !(it.ownerKind.known == GalleryOwnerKind.CHARACTER && it.ownerKey == characterKey) },
             tombstones = next.tombstones.copy(nameTags = next.tombstones.nameTags.filterNot { it.key == characterKey } + nameTag(c, ctx)),
             trash = next.trash.copy(entries = next.trash.entries.filterNot { it.key == c.trashEntryKey }),
             deletions = next.deletions.copy(entries = next.deletions.entries + DeletionLogEntry(characterKey, "character", ctx.now)),

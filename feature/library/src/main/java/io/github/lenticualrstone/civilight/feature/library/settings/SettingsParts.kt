@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.library.settings
 
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import androidx.compose.foundation.layout.Row
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -87,7 +91,29 @@ internal fun SettingsSection(text: String, first: Boolean = false) {
 
 @Composable
 internal fun LinkRow(row: SettingsLinkRow, onClick: () -> Unit) {
-    SettingsRow(title = row.title, onClick = onClick, value = row.value, subtitle = row.sub)
+    SettingsValueRow(title = row.title, onClick = onClick, value = row.value, subtitle = row.sub)
+}
+
+/**
+ * The DS `SettingsRow` with its value drawn through `ValueSwap` (audit row 15, P4): a changed value
+ * leaves up and the new one comes in from below (CNV-42); reduced motion crossfades.
+ */
+@Composable
+internal fun SettingsValueRow(title: String, onClick: () -> Unit, modifier: Modifier = Modifier, value: String? = null, subtitle: String? = null) {
+    val colors = CivilightTheme.colors
+    ListRow(
+        title = title,
+        modifier = modifier,
+        subtitle = subtitle,
+        onClick = onClick,
+        compact = true,
+        trailing = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (value != null) ValueSwap(value, CivilightTheme.type.small, color = colors.ink2, contentAlignment = Alignment.CenterEnd)
+                CivilightText(if (value != null) " ›" else "›", CivilightTheme.type.small, color = colors.ink2, maxLines = 1)
+            }
+        },
+    )
 }
 
 @Composable

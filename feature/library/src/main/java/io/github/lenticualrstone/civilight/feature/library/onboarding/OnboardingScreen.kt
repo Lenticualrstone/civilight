@@ -169,7 +169,7 @@ private fun SafePage(services: LibraryServices, onNext: () -> Unit, onSkip: () -
                             when (services.backups.connect()) {
                                 is DriveConnect.Connected -> Unit
                                 DriveConnect.Cancelled -> Unit
-                                DriveConnect.Unavailable -> services.deps.toasts.show(OnboardingCopy.TODO_COPY_LIB15_DRIVE_NOT_READY, actionLabel = null)
+                                DriveConnect.Unavailable -> services.deps.toasts.show(OnboardingCopy.DRIVE_NOT_READY, actionLabel = null)
                             }
                         }
                     },
@@ -264,7 +264,7 @@ private fun VoicePage(onNext: () -> Unit, onSkip: () -> Unit) {
                 onClick = {
                     if (widgetPlaced) return@ChoiceCard
                     if (DeviceChoices.requestWidget(context)) widgetAsked++
-                    else toasts.show(OnboardingCopy.TODO_COPY_LIB15_WIDGET_UNSUPPORTED, actionLabel = null)
+                    else toasts.show(OnboardingCopy.WIDGET_UNSUPPORTED, actionLabel = null)
                 },
                 subtitle = OnboardingCopy.WIDGET_SUB,
             )

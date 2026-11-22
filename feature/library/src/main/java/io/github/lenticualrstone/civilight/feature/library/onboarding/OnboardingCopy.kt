@@ -40,7 +40,7 @@ object OnboardingCopy {
      * `연결` cannot sign in yet: Google sign-in and Drive authorization arrive with LIB-57
      * (needsExternal). Shown as a toast; no source copy.
      */
-    const val TODO_COPY_LIB15_DRIVE_NOT_READY = "TODO_COPY_LIB15_DRIVE_NOT_READY"
+    const val DRIVE_NOT_READY = "Drive 연결 준비 중"
 
     // OnbVoice
     const val VOICE_TITLE = "라이프 레코더"
@@ -53,7 +53,7 @@ object OnboardingCopy {
     const val WIDGET_SUB = "앱을 열지 않고 바로 녹음"
 
     /** The launcher cannot pin widgets (or the app has none): no source copy. */
-    const val TODO_COPY_LIB15_WIDGET_UNSUPPORTED = "TODO_COPY_LIB15_WIDGET_UNSUPPORTED"
+    const val WIDGET_UNSUPPORTED = "위젯 추가 불가"
 
     // Walkthrough
     const val WALK_1_TITLE = "밀어서 탭 고르기"

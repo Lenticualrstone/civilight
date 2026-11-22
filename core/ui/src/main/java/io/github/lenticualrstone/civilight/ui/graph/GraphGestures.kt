@@ -27,6 +27,7 @@ fun Modifier.graphGestures(
     viewportOf: () -> GraphViewport,
     sizes: Map<String, Sz>,
     listenerOf: () -> GraphSurfaceListener,
+    onPinch: (GraphViewport) -> Unit = {},
 ): Modifier = this
     .pointerInput(Unit) {
         val slop = viewConfiguration.touchSlop
@@ -56,6 +57,7 @@ fun Modifier.graphGestures(
                     current = current
                         .panBy(pan.x / density, pan.y / density)
                         .zoomAround(Pt(centroid.x / density, centroid.y / density), zoom)
+                    onPinch(current)
                     listenerOf().onViewport(current)
                     event.changes.forEach { if (it.positionChanged()) it.consume() }
                 } else if (mode == GestureMode.PENDING || mode == GestureMode.DRAG_NODE) {

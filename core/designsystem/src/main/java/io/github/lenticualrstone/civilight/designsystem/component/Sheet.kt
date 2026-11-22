@@ -1,7 +1,9 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
 import android.os.Build
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -34,6 +36,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -60,6 +64,7 @@ import io.github.lenticualrstone.civilight.designsystem.glass.glassSource
 import io.github.lenticualrstone.civilight.designsystem.glass.rememberGlassSource
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.LayoutMetrics
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import kotlinx.coroutines.launch
@@ -71,7 +76,10 @@ import kotlinx.coroutines.launch
  * 40 % of its height. The sheet is glass (blurring [content]), top corners 28, 1 dp `line` inset, grab
  * handle, padding 10 top / [sidePadding] sides / navigation inset bottom; its top never rises above the
  * status bar + 56 dp, and longer content scrolls inside it.
- * [centered] draws the inner-screen centred sheet (max width 560, all corners rounded).
+ * [centered] draws the inner-screen centred sheet (max width 560, all corners rounded); it scales .96 → 1
+ * with its fade. The back screen scales from 50 % / 30 % (CNV-41); while the sheet is dragged down, the
+ * scrim and the back screen's scale and blur follow the drag (S5). The sheet's height changes animate on
+ * `standard` (S4; snap when reduced).
  * With the keyboard up both kinds sit above it ([KeyboardLift], consumption-aware): the bottom sheet's
  * bottom edge rides on the keyboard and its maximum height shrinks by the keyboard; the centred sheet
  * centres in the space above the keyboard.
@@ -87,19 +95,25 @@ fun CivilightSheetLayout(
     content: @Composable () -> Unit,
 ) {
     val colors = CivilightTheme.colors
-    val reduced = CivilightTheme.reducedMotion
+    val motion = LocalMotion.current
+    val reduced = motion.reduced
     val source = rememberGlassSource()
     val progress = remember { Animatable(if (sheetVisible) 1f else 0f) }
+    val drag = remember { Animatable(0f) }
+    val sheetHeight = remember { mutableFloatStateOf(0f) }
     var composed by remember { mutableStateOf(sheetVisible) }
     LaunchedEffect(sheetVisible) {
         if (sheetVisible) {
             composed = true
-            progress.animateTo(1f, CivilightMotion.spec(CivilightMotion.enter, reduced))
+            drag.snapTo(0f)
+            progress.animateTo(1f, motion.spec(CivilightMotion.enter))
         } else {
-            progress.animateTo(0f, CivilightMotion.spec(CivilightMotion.exit, reduced))
+            progress.animateTo(0f, motion.spec(CivilightMotion.exit))
             composed = false
         }
     }
+    // Open amount as the back screen and scrim see it: the drag-to-dismiss gesture takes it back (S5).
+    val shown = { sheetOpenAmount(progress.value, drag.value, sheetHeight.floatValue) }
     LocalBackHandler.current(sheetVisible, onDismissRequest)
 
     Box(modifier.fillMaxSize()) {
@@ -108,9 +122,10 @@ fun CivilightSheetLayout(
                 .fillMaxSize()
                 .glassSource(source)
                 .graphicsLayer {
-                    val p = progress.value
+                    val p = shown()
                     if (!reduced && p > 0f) {
                         val s = 1f - (1f - CivilightMotion.sheetBackScale) * p
+                        transformOrigin = SheetBackOrigin
                         scaleX = s
                         scaleY = s
                         if (Build.VERSION.SDK_INT >= 31) {
@@ -129,13 +144,13 @@ fun CivilightSheetLayout(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = progress.value }
+                    .graphicsLayer { alpha = shown() }
                     .background(colors.shade)
                     .clearAndSetSemantics { }
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismissRequest),
             )
             CompositionLocalProvider(LocalGlassSource provides source) {
-                SheetSurface(progress, reduced, centered, sidePadding, onDismissRequest, sheet)
+                SheetSurface(progress, drag, sheetHeight, centered, sidePadding, onDismissRequest, sheet)
             }
         }
     }
@@ -144,18 +159,20 @@ fun CivilightSheetLayout(
 @Composable
 private fun SheetSurface(
     progress: Animatable<Float, *>,
-    reduced: Boolean,
+    drag: Animatable<Float, AnimationVector1D>,
+    sheetHeightState: MutableFloatState,
     centered: Boolean,
     sidePadding: Dp,
     onDismissRequest: () -> Unit,
     sheet: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = CivilightTheme.colors
+    val motion = LocalMotion.current
+    val reduced = motion.reduced
     val scope = rememberCoroutineScope()
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    var sheetHeight by remember { mutableFloatStateOf(0f) }
-    val drag = remember { Animatable(0f) }
+    var sheetHeight by sheetHeightState
     val shape: Shape = if (centered) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     BoxWithConstraints(
         Modifier.fillMaxSize().windowInsetsPadding(KeyboardLift),
@@ -170,8 +187,14 @@ private fun SheetSurface(
                 .onSizeChanged { sheetHeight = it.height.toFloat() }
                 .graphicsLayer {
                     val p = progress.value
-                    if (reduced || centered) {
+                    if (reduced) {
                         alpha = p
+                        translationY = drag.value
+                    } else if (centered) {
+                        alpha = p
+                        val s = CENTRED_START_SCALE + (1f - CENTRED_START_SCALE) * p
+                        scaleX = s
+                        scaleY = s
                         translationY = drag.value
                     } else {
                         translationY = (1f - p) * sheetHeight + drag.value
@@ -185,9 +208,9 @@ private fun SheetSurface(
                     onDragStopped = {
                         if (sheetHeight > 0f && drag.value > sheetHeight * DISMISS_FRACTION) {
                             onDismissRequest()
-                            drag.animateTo(0f, CivilightMotion.spec(CivilightMotion.exit, reduced))
+                            drag.animateTo(0f, motion.move(CivilightMotion.exit))
                         } else {
-                            drag.animateTo(0f, CivilightMotion.spec(CivilightMotion.standard, reduced))
+                            drag.animateTo(0f, motion.move(CivilightMotion.standard))
                         }
                     },
                 ),
@@ -196,6 +219,7 @@ private fun SheetSurface(
             OnGlass {
                 Column(
                     Modifier
+                        .animateContentSize(motion.move(CivilightMotion.standard))
                         .clip(shape)
                         .insetOutline(colors.line, 1.dp, shape)
                         .padding(top = 10.dp, start = sidePadding, end = sidePadding, bottom = if (centered) 20.dp else navBottom + 16.dp),
@@ -218,6 +242,21 @@ private fun SheetSurface(
 
 /** Drag distance (fraction of the sheet height) past which a drag closes the sheet (proposed). */
 private const val DISMISS_FRACTION = 0.4f
+
+/** CNV-41: the back screen scales towards 50 % / 30 %. */
+private val SheetBackOrigin = TransformOrigin(0.5f, 0.3f)
+
+/** Start scale of the centred sheet (S5). */
+private const val CENTRED_START_SCALE = 0.96f
+
+/**
+ * How open the sheet looks to the back screen and the scrim: the open [progress] times the part of the
+ * sheet still up while it is dragged [drag] px of [height] (S5).
+ */
+fun sheetOpenAmount(progress: Float, drag: Float, height: Float): Float {
+    val held = if (height > 0f) (1f - drag / height).coerceIn(0f, 1f) else 1f
+    return progress.coerceIn(0f, 1f) * held
+}
 
 /**
  * DS-23 title row: title in the `title` role at the left, `닫기` (`label`, `ink2`) at the right,

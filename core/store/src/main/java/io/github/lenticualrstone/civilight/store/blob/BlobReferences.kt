@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.store.blob
 
+import io.github.lenticualrstone.civilight.model.doc.BlobRefs
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 
@@ -9,26 +10,14 @@ import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
  * index rows are metadata, not references.
  */
 object BlobReferences {
-    /** Hashes referenced by one project: image uses, script assets, map bases and sketch photos. */
+    /** Hashes referenced by one project: image uses, script assets, map bases, sketch photos and gallery items. */
     fun of(doc: ProjectDoc): Set<String> = counts(doc).keys
 
     /** Hashes of kept recorder audio. */
     fun of(library: RecorderLibrary): Set<String> = library.records.mapNotNullTo(HashSet()) { it.audio?.hash }
 
-    /** Reference count per hash in one project. */
-    fun counts(doc: ProjectDoc): Map<String, Int> {
-        val out = HashMap<String, Int>()
-        fun add(hash: String?) {
-            if (!hash.isNullOrEmpty()) out[hash] = (out[hash] ?: 0) + 1
-        }
-        doc.assets.imageUses.forEach { add(it.blobHash) }
-        doc.assets.scriptAssets.forEach { add(it.fileHash) }
-        doc.maps.values.forEach { map ->
-            add(map.baseImageHash)
-            add(map.sketch?.photoHash)
-        }
-        return out
-    }
+    /** Reference count per hash in one project: the one function `core:model` [BlobRefs] (55 §3.4, T-GAL-27). */
+    fun counts(doc: ProjectDoc): Map<String, Int> = BlobRefs.counts(doc)
 
     /** Reference count per hash over several projects and the recorder library. */
     fun counts(docs: Iterable<ProjectDoc>, recorder: RecorderLibrary? = null): Map<String, Int> {

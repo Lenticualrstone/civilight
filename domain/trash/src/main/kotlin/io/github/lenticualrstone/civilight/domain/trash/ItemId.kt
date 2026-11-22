@@ -15,7 +15,10 @@ enum class ItemKind {
     UNIT,
 
     /** A non-empty block; trash kind `blockGroup` (one entry per scene per local day). */
-    BLOCK;
+    BLOCK,
+
+    /** One gallery image of a character or the project (55 GAL-20); trash kind `galleryItem`. */
+    GALLERY_ITEM;
 
     val trashKind: TrashKind
         get() = when (this) {
@@ -31,6 +34,7 @@ enum class ItemKind {
             CANVAS -> TrashKind.CANVAS
             UNIT -> TrashKind.SCENE
             BLOCK -> TrashKind.BLOCK_GROUP
+            GALLERY_ITEM -> TrashKind.GALLERY_ITEM
         }
 
     /** Kinds that leave a name tag when purged (§5.3) and that can be merged (CST-45, WLD-15). */
@@ -82,6 +86,7 @@ enum class ItemKind {
             TrashKind.CANVAS -> CANVAS
             TrashKind.SCENE -> UNIT
             TrashKind.BLOCK_GROUP -> BLOCK
+            TrashKind.GALLERY_ITEM -> GALLERY_ITEM
             TrashKind.PROJECT, TrashKind.RECORDER, null -> null
         }
 
@@ -109,5 +114,6 @@ data class ItemId(val kind: ItemKind, val key: Key) {
         fun canvas(key: Key) = ItemId(ItemKind.CANVAS, key)
         fun unit(key: Key) = ItemId(ItemKind.UNIT, key)
         fun block(key: Key) = ItemId(ItemKind.BLOCK, key)
+        fun galleryItem(key: Key) = ItemId(ItemKind.GALLERY_ITEM, key)
     }
 }

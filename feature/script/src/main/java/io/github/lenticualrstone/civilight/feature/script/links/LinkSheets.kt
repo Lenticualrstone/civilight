@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.script.links
 
+import io.github.lenticualrstone.civilight.feature.script.ui.SheetStep
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -64,22 +65,24 @@ class LinkCardActions(
 @Composable
 fun SheetScope.LinkCardSheet(key: LinkCardSheetKey, doc: ProjectDoc, gate: HiddenGate, readOnly: Boolean, actions: LinkCardActions) {
     var picking by rememberSaveable { mutableStateOf(false) }
-    if (picking) {
-        LinkPickerSheet(
-            doc = doc,
-            gate = gate,
-            title = LinkCopy.PICK_TITLE,
-            onPick = { kind, target, _ ->
-                actions.relink(kind, target)
-                close()
-            },
-            onClose = { picking = false },
-        )
-        return
-    }
+    SheetStep(
+        picking = picking,
+        picker = {
+            LinkPickerSheet(
+                doc = doc,
+                gate = gate,
+                title = LinkCopy.PICK_TITLE,
+                onPick = { kind, target, _ ->
+                    actions.relink(kind, target)
+                    close()
+                },
+                onClose = { picking = false },
+            )
+        },
+    ) {
     val card = LinkFixes.card(doc, key.blockKey, key.linkKey, gate.open)
     SheetHeader(title = card?.title.orEmpty(), onClose = ::close)
-    if (card == null || readOnly) return
+    if (card == null || readOnly) return@SheetStep
     val kept = LinkFixes.isKept(doc, card.targetKey, key.blockKey)
     val host = this
     Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
@@ -100,6 +103,7 @@ fun SheetScope.LinkCardSheet(key: LinkCardSheetKey, doc: ProjectDoc, gate: Hidde
                 host.close()
             }
         }
+    }
     }
 }
 

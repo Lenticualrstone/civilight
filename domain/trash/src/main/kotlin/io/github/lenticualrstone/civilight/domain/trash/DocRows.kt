@@ -4,6 +4,9 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.Trashable
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.gallery.GalleryFile
+import io.github.lenticualrstone.civilight.model.gallery.GalleryItem
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.script.Block
 import io.github.lenticualrstone.civilight.model.script.TrashPlacement
 import io.github.lenticualrstone.civilight.model.text.plainText
@@ -25,6 +28,7 @@ internal fun ProjectDoc.rowOf(item: ItemId): Trashable? = when (item.kind) {
     ItemKind.CANVAS -> canvases[item.key]
     ItemKind.UNIT -> index.unit(item.key)
     ItemKind.BLOCK -> index.block(item.key)
+    ItemKind.GALLERY_ITEM -> index.galleryItem(item.key)
 }
 
 internal fun ProjectDoc.exists(item: ItemId): Boolean = rowOf(item) != null
@@ -43,6 +47,7 @@ internal fun ProjectDoc.isItemLive(item: ItemId): Boolean = when (item.kind) {
     ItemKind.CANVAS -> liveness.isCanvasLive(item.key)
     ItemKind.UNIT -> liveness.isUnitLive(item.key)
     ItemKind.BLOCK -> liveness.isBlockLive(item.key)
+    ItemKind.GALLERY_ITEM -> liveness.isGalleryItemLive(item.key)
 }
 
 /** The name an item is shown by (its row's name or title); null for a change record. */
@@ -59,6 +64,8 @@ internal fun ProjectDoc.itemName(item: ItemId): String? = when (item.kind) {
     ItemKind.CANVAS -> canvases[item.key]?.name
     ItemKind.UNIT -> index.unit(item.key)?.title
     ItemKind.BLOCK -> index.block(item.key)?.firstLine()
+    // An untitled image is named by its kind word (`이미지 되살림`, `ED`); trash rows show `제목 없음`.
+    ItemKind.GALLERY_ITEM -> index.galleryItem(item.key)?.title?.ifBlank { TrashCopy.kindWord(ItemKind.GALLERY_ITEM) }
 }
 
 /** Rule-19 hiding of the item itself (a block follows its scene). */
@@ -70,6 +77,10 @@ internal fun ProjectDoc.itemHidden(item: ItemId): Boolean = when (item.kind) {
     ItemKind.PAGE -> pages[item.key]?.hidden ?: false
     ItemKind.UNIT -> index.unit(item.key)?.hidden ?: false
     ItemKind.BLOCK -> index.block(item.key)?.let { index.unit(it.sceneKey)?.hidden } ?: false
+    // A gallery image follows its own flag and its owner character's (55 GAL-19).
+    ItemKind.GALLERY_ITEM -> index.galleryItem(item.key)?.let { g ->
+        g.hidden || (g.ownerKind.known == GalleryOwnerKind.CHARACTER && index.character(g.ownerKey)?.hidden == true)
+    } ?: false
     else -> false
 }
 
@@ -162,7 +173,28 @@ internal fun ProjectDoc.setMark(item: ItemId, deletedAt: Timestamp?, entryKey: K
                 updatedAt = at, updatedBy = by,
             )
         }
+        ItemKind.GALLERY_ITEM -> updateGalleryItem(key) {
+            it.copy(deletedAt = deletedAt, trashEntryKey = entryKey, updatedAt = at, updatedBy = by)
+        }
     }
+}
+
+/** Replaces one gallery item in its owner's file. */
+internal fun ProjectDoc.updateGalleryItem(key: Key, transform: (GalleryItem) -> GalleryItem): ProjectDoc {
+    val item = index.galleryItem(key) ?: return this
+    val file = gallery[item.ownerKey] ?: return this
+    return copy(gallery = gallery + (item.ownerKey to file.copy(items = file.items.mapIf({ it.key == key }, transform))))
+}
+
+/** Removes gallery items matching [predicate]; files left without items (and without `ext`) are dropped. */
+internal fun ProjectDoc.removeGalleryItems(predicate: (GalleryItem) -> Boolean): ProjectDoc {
+    if (galleryItems.none(predicate)) return this
+    val out = LinkedHashMap<Key, GalleryFile>()
+    for ((owner, file) in gallery) {
+        val keep = file.items.filterNot(predicate)
+        if (keep.isNotEmpty() || file.ext != null) out[owner] = if (keep.size == file.items.size) file else file.copy(items = keep)
+    }
+    return copy(gallery = out)
 }
 
 /** Replaces one block wherever it is filed. */

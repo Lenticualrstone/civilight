@@ -21,6 +21,10 @@ import io.github.lenticualrstone.civilight.domain.script.SceneTimeSource
 import io.github.lenticualrstone.civilight.domain.script.StoryTimes
 import io.github.lenticualrstone.civilight.feature.script.editor.FieldChange
 import io.github.lenticualrstone.civilight.feature.script.editor.FieldDiff
+import io.github.lenticualrstone.civilight.feature.script.editor.FieldOwner
+import io.github.lenticualrstone.civilight.feature.script.editor.FieldSync
+import io.github.lenticualrstone.civilight.feature.script.editor.Judgement
+import io.github.lenticualrstone.civilight.feature.script.editor.TypedAhead
 import io.github.lenticualrstone.civilight.feature.script.editor.RunEdit
 import io.github.lenticualrstone.civilight.feature.script.layers.LayerRow
 import io.github.lenticualrstone.civilight.feature.script.layers.LayersModel
@@ -205,14 +209,14 @@ class ScriptViewModel(
         .flatMapLatest { if (it is ProjectLoad.Ready) projectStore?.undoState?.map { u -> u.canUndo } ?: flowOf(false) else flowOf(false) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    private val _entered = MutableStateFlow<Key?>(null)
+    private val _entered = MutableStateFlow<Set<Key>>(emptySet())
 
-    /** The block that was just created; it enters from 8 dp below (SCR-12, SCR-67). */
-    val entered: StateFlow<Key?> = _entered.asStateFlow()
+    /** The blocks just created; each enters from 8 dp below (SCR-12, SCR-67). A set, so quick adds do not cut each other. */
+    val entered: StateFlow<Set<Key>> = _entered.asStateFlow()
 
     /** The enter motion of [blockKey] has played. */
     fun enteredShown(blockKey: Key) {
-        _entered.compareAndSet(blockKey, null)
+        _entered.update { it - blockKey }
     }
 
     private val _scrollTo = MutableSharedFlow<String>(extraBufferCapacity = 8)
@@ -529,6 +533,7 @@ class ScriptViewModel(
         committedRuns = runs
         seedField(runs, rawOffset)
         _editor.update { EditorRules.edit(it, blockKey, optionKey).copy(inheritedHint = hint) }
+        fieldSync.caretIn(FieldOwner(ScriptRowKeys.block(blockKey), optionKey))
     }
 
     private fun seedField(runs: List<TextRun>, rawCaret: Int) {
@@ -538,11 +543,27 @@ class ScriptViewModel(
 
     // --- Typing (SCR-14, SCR-15) ---
 
-    /** Every change of the caret block's text field. */
-    fun onFieldChange(value: TextFieldValue) {
+    /** What the text fields' rejected Enters left behind (QA #5): see [FieldSync]. */
+    private val fieldSync = FieldSync()
+
+    /**
+     * Every change of the caret block's text field. [from] names the field that emitted it (its
+     * row and option line), so a change from a field whose Enter was just taken is not read as an
+     * edit of the block that took the caret.
+     */
+    fun onFieldChange(value: TextFieldValue, from: FieldOwner? = null) {
         val state = _editor.value
         if (!state.editing || isReadOnly) return
         val oldRaw = editRuns.plainText
+        val judged = fieldSync.judge(from, value.text, value.selection.end)
+        if (judged is Judgement.Ahead) {
+            // Typed after Enter: it belongs to the new block. While the Enter is in flight the field keeps what
+            // it holds (exactly what the sync has seen); once the new block has the caret, the field shown is
+            // the new block's and a stale field's value must not replace it.
+            if (!fieldSync.advanced) fieldValue = value
+            judged.edits.forEach { edit -> enqueue { replayTypedAhead(edit) } }
+            return
+        }
         when (val change = FieldDiff.classify(oldRaw, value.text, value.selection.end, state.parenMode, parens = caretTakesParens())) {
             FieldChange.None -> {
                 val moved = FieldDiff.rawOffset(value.selection.end) != rawCaret
@@ -560,11 +581,20 @@ class ScriptViewModel(
                 }
             }
             is FieldChange.Enter -> {
-                fieldValue = fieldValue
+                if (from != null) {
+                    // The field is not given its old text back: it takes a published value only at its next
+                    // recomposition, and a key typed before that is built on this buffer (QA #5). It keeps the
+                    // line break until the new block has the caret (see [FieldSync]).
+                    fieldValue = value
+                    fieldSync.rejectEnter(from, oldRaw, change.at)
+                } else {
+                    // The old text back, without the composition the Enter ended.
+                    fieldValue = fieldValue.copy(composition = null)
+                }
                 enter(change.at)
             }
             FieldChange.BackspaceAtStart -> {
-                fieldValue = fieldValue
+                fieldValue = fieldValue.copy(composition = null)
                 backspaceAtStart()
             }
             is FieldChange.OpenParen -> {
@@ -593,6 +623,18 @@ class ScriptViewModel(
         } else {
             seedField(runs, change.start + change.inserted.length)
         }
+        afterTyping(state)
+    }
+
+    /** An edit that did not come from the field itself (typed-ahead text): the field is seeded with the result. */
+    private fun insertTyped(change: FieldChange.Text, state: EditorState) {
+        val runs = RunEdit.replace(editRuns, change.start, change.end, change.inserted, state.parenMode)
+        editRuns = runs
+        seedField(runs, change.start + change.inserted.length)
+        afterTyping(state)
+    }
+
+    private fun afterTyping(state: EditorState) {
         if (state.inheritedHint != null && state.inheritedHint == state.selected) _editor.update { it.copy(inheritedHint = null) }
         onTextEdited()
     }
@@ -651,7 +693,7 @@ class ScriptViewModel(
         val outcome = runOp(ScriptCopy.UNDO_ADD_BLOCK) { d -> ScriptOps.materialize(d, scene, state.pendingSpeaker, runs, ctx()) }
         materializing = false
         val key = outcome?.caret?.blockKey ?: return
-        _entered.value = key
+        _entered.update { it + key }
         committedRuns = runs
         _editor.update { it.copy(selected = key, virtualScene = null, editing = true, pendingSpeaker = null, inheritedHint = null) }
         if (editRuns != runs) {
@@ -664,16 +706,41 @@ class ScriptViewModel(
 
     private fun enter(at: Int) {
         enqueue {
-            commitNow()
-            val key = _editor.value.caretBlock ?: return@enqueue
-            val option = _editor.value.caretOption
-            if (option != null) {
-                apply(runOp(ScriptCopy.UNDO_ADD_OPTION) { d -> ScriptOps.enterOption(d, key, option, at, ctx()) })
-                return@enqueue
+            val before = caretOwner()
+            try {
+                commitNow()
+                val key = _editor.value.caretBlock ?: return@enqueue
+                val option = _editor.value.caretOption
+                if (option != null) {
+                    apply(runOp(ScriptCopy.UNDO_ADD_OPTION) { d -> ScriptOps.enterOption(d, key, option, at, ctx()) })
+                    return@enqueue
+                }
+                val atEnd = at >= Runs.length(editRuns)
+                val label = if (atEnd) ScriptCopy.UNDO_ADD_BLOCK else ScriptCopy.UNDO_SPLIT
+                apply(runOp(label) { d -> ScriptOps.enter(d, key, at, ctx()) })
+            } finally {
+                // An Enter that changed nothing leaves the caret in the same field: it gets its old text back.
+                val stayed = caretOwner() == before
+                fieldSync.landed(stayed)
+                if (stayed && _editor.value.editing) seedField(editRuns, at.coerceIn(0, Runs.length(editRuns)))
             }
-            val atEnd = at >= Runs.length(editRuns)
-            val label = if (atEnd) ScriptCopy.UNDO_ADD_BLOCK else ScriptCopy.UNDO_SPLIT
-            apply(runOp(label) { d -> ScriptOps.enter(d, key, at, ctx()) })
+        }
+    }
+
+    /** The field that holds the caret: its row and option line. */
+    private fun caretOwner(): FieldOwner? = _editor.value.let { e -> e.caretRowKey?.let { FieldOwner(it, e.caretOption) } }
+
+    /** Text typed after an Enter, written to the block or option line the Enter made (runs after the Enter's operation). */
+    private fun replayTypedAhead(edit: TypedAhead) {
+        val state = _editor.value
+        if (!fieldSync.advanced || !state.editing || isReadOnly || state.virtualScene != null) return
+        when (edit) {
+            is TypedAhead.Enter -> enter(edit.offset.coerceIn(0, Runs.length(editRuns)))
+            is TypedAhead.Edit -> {
+                val start = edit.offset.coerceIn(0, Runs.length(editRuns))
+                val end = (start + edit.length).coerceIn(start, Runs.length(editRuns))
+                insertTyped(FieldChange.Text(start, end, edit.text), state)
+            }
         }
     }
 
@@ -695,7 +762,7 @@ class ScriptViewModel(
     /** Moves the caret or selection after an operation and shows its toast. */
     internal fun apply(outcome: ScriptOps.Outcome?) {
         outcome ?: return
-        outcome.created?.let { _entered.value = it }
+        outcome.created?.let { created -> _entered.update { it + created } }
         val caret = outcome.caret
         val select = outcome.select
         when {

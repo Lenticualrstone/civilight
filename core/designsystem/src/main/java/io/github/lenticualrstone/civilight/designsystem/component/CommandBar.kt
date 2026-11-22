@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,13 +58,16 @@ fun CommandBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CivilightText("/", type.number.merge(TextStyle(fontSize = 13.sp)), color = colors.ink2, maxLines = 1)
-        Box(Modifier.weight(1f)) {
-            if (typedText != null) {
+        // S18a: hint ↔ typed text and mic ↔ 닫기 crossfade (the typed line itself never moves).
+        val lastTyped = rememberLastNonNull(typedText)
+        ContentSwap(typedText != null, Modifier.weight(1f), contentAlignment = Alignment.CenterStart, label = "commandText") { typing ->
+            val typed = if (typing) typedText ?: lastTyped else null
+            if (typing && typed != null) {
                 DecoratedText(
-                    AnnotatedString(typedText),
+                    AnnotatedString(typed),
                     type.command,
                     color = colors.ink,
-                    caretOffset = typedText.length,
+                    caretOffset = typed.length,
                     caretHeight = 18.dp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -71,9 +76,19 @@ fun CommandBar(
                 CivilightText(hint, type.command, color = colors.ink3, maxLines = 1)
             }
         }
-        when {
-            onClose != null -> TextAction(closeLabel, onClose, style = type.small)
-            onMic != null -> MicButton(onClick = onMic, contentDescription = micLabel)
+        val trailing = when {
+            onClose != null -> 2
+            onMic != null -> 1
+            else -> 0
+        }
+        if (trailing != 0) {
+            ContentSwap(trailing, contentAlignment = Alignment.CenterEnd, label = "commandTrailing") { t ->
+                when (t) {
+                    2 -> if (onClose != null) TextAction(closeLabel, onClose, style = type.small)
+                    1 -> if (onMic != null) MicButton(onClick = onMic, contentDescription = micLabel)
+                    else -> Unit
+                }
+            }
         }
     }
 }

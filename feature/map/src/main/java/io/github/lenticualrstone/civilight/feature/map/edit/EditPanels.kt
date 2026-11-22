@@ -25,6 +25,10 @@ import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.SwitchRow
 import io.github.lenticualrstone.civilight.designsystem.component.SegmentedControl
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.designsystem.component.AddChip
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
@@ -242,25 +246,32 @@ internal fun ColorRow(current: String, onPick: (String) -> Unit) {
 fun ColumnScope.LayersPanel(layers: List<LayerRowUi>, readOnly: Boolean, actions: LayerActions) {
     val colors = CivilightTheme.colors
     if (layers.isEmpty()) CivilightText(MapCopy.NONE, CivilightTheme.type.small, color = colors.ink3)
-    layers.forEach { l ->
-        Column(Modifier.padding(bottom = 6.dp)) {
-            SwitchRow(l.name, l.visible, { actions.setVisible(l.key, it) }, enabled = !readOnly)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CardRow(MapCopy.NAME, l.name, Modifier.weight(1f), onClick = if (readOnly) null else ({ actions.rename(l.key) }))
-                CivilightIconButton(IconId.Back, MapCopy.TODO_COPY_MAP_LAYER_UP, { actions.move(l.key, true) }, Modifier.rotate(90f), enabled = !readOnly && l.canUp)
-                CivilightIconButton(IconId.Back, MapCopy.TODO_COPY_MAP_LAYER_DOWN, { actions.move(l.key, false) }, Modifier.rotate(-90f), enabled = !readOnly && l.canDown)
+    // A keyed lazy list, so a layer that is added, removed or moved by the order buttons glides (motion audit row 13).
+    // The height is bounded because the panel sits in a scrolling column.
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = PANEL_LIST_MAX_HEIGHT)) {
+        items(layers, key = { it.key }) { l ->
+            Column(civilightItem().padding(bottom = 6.dp)) {
+                SwitchRow(l.name, l.visible, { actions.setVisible(l.key, it) }, enabled = !readOnly)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CardRow(MapCopy.NAME, l.name, Modifier.weight(1f), onClick = if (readOnly) null else ({ actions.rename(l.key) }))
+                    CivilightIconButton(IconId.Back, MapCopy.LAYER_UP, { actions.move(l.key, true) }, Modifier.rotate(90f), enabled = !readOnly && l.canUp)
+                    CivilightIconButton(IconId.Back, MapCopy.LAYER_DOWN, { actions.move(l.key, false) }, Modifier.rotate(-90f), enabled = !readOnly && l.canDown)
+                }
+                CardRow(MapCopy.REVEAL_POINT, l.reveal, onClick = if (readOnly) null else ({ actions.reveal(l.key) }))
             }
-            CardRow(MapCopy.REVEAL_POINT, l.reveal, onClick = if (readOnly) null else ({ actions.reveal(l.key) }))
         }
+        if (!readOnly) item(key = "add") { AddChip(MapCopy.LAYER, actions::add, civilightItem().padding(top = 4.dp)) }
     }
-    if (!readOnly) AddChip(MapCopy.LAYER, actions::add, Modifier.padding(top = 4.dp))
 }
+
+/** The tallest a layer or item list grows inside a panel before it scrolls on its own. */
+private val PANEL_LIST_MAX_HEIGHT = 320.dp
 
 /** `목록` tab: every overlay (`핀 · 결사의 문`), tap to select. */
 @Composable
 fun ColumnScope.ItemsPanel(items: List<ItemRowUi>, onSelect: (Key) -> Unit) {
     if (items.isEmpty()) CivilightText(MapCopy.NONE, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
-    Column {
-        items.forEach { item -> ListRow(item.text, onClick = { onSelect(item.key) }, selected = item.selected, compact = true) }
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = PANEL_LIST_MAX_HEIGHT)) {
+        items(items, key = { it.key }) { item -> ListRow(item.text, onClick = { onSelect(item.key) }, selected = item.selected, compact = true, modifier = civilightItem()) }
     }
 }

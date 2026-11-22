@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.library.projectsettings
 
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,8 +85,10 @@ internal fun StructureLevelsScreen(route: StructureLevels, services: LibraryServ
         smallLine = loaded?.third,
         back = IconAction(BACK_LABEL) { navigator.pop() },
     ) { padding ->
-        val current = loaded ?: return@CivilightScreen
-        val names = draft ?: return@CivilightScreen
+      ContentSwap(loaded != null && draft != null, Modifier.fillMaxSize(), label = "structureLevels") { ready ->
+        val current = loaded
+        val names = draft
+        if (!ready || current == null || names == null) return@ContentSwap
         val (levels, readOnly) = current
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
@@ -102,7 +106,7 @@ internal fun StructureLevelsScreen(route: StructureLevels, services: LibraryServ
                         enabled = !readOnly,
                     )
                 }
-                if (!readOnly) {
+                FoldReveal(!readOnly) {
                     CivilightButton(
                         text = ProjectSettingsCopy.CHANGE,
                         onClick = { vm.save(names) { navigator.pop() } },
@@ -112,5 +116,6 @@ internal fun StructureLevelsScreen(route: StructureLevels, services: LibraryServ
                 }
             }
         }
+      }
     }
 }

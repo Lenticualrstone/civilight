@@ -66,8 +66,8 @@ object FactionCardState {
         }
         val sections = listOf(
             FactionSectionUi("linked", WorldCopy.LINKED_CHARACTERS, linked),
-            FactionSectionUi("areas", WorldCopy.TODO_COPY_WORLD_FACTION_AREAS, areas),
-            FactionSectionUi("events", WorldCopy.TODO_COPY_WORLD_FACTION_EVENTS, events),
+            FactionSectionUi("areas", WorldCopy.FACTION_AREAS, areas),
+            FactionSectionUi("events", WorldCopy.FACTION_EVENTS, events),
         ).filter { it.rows.isNotEmpty() }
         return FactionCardUi(
             factionKey = factionKey,

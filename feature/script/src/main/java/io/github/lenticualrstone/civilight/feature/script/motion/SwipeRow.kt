@@ -60,22 +60,34 @@ fun StaggeredSwipeRow(
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val reduced = CivilightTheme.reducedMotion
+    val motion = CivilightTheme.motion
+    val reduced = motion.reduced
     val colors = CivilightTheme.colors
     val width = CivilightTheme.sizes.swipeRow
     val widthPx = with(LocalDensity.current) { width.toPx() }
     val density = LocalDensity.current
     val offset = remember { Animatable(if (revealed) -widthPx else 0f) }
+    // Reduced motion: the block never slides on its own, the buttons fade on their own run (motion audit, row 7).
+    val fade = remember { Animatable(if (revealed) 1f else 0f) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(revealed, widthPx) {
-        offset.animateTo(if (revealed) -widthPx else 0f, CivilightMotion.spec(CivilightMotion.swipe, reduced))
-    }
     val progress = { (-offset.value / widthPx).coerceIn(0f, 1f) }
+    suspend fun settle(open: Boolean) {
+        val target = if (open) -widthPx else 0f
+        if (reduced) {
+            offset.snapTo(target)
+            fade.animateTo(if (open) 1f else 0f, motion.spec(CivilightMotion.swipe))
+        } else {
+            val token = ScriptMotion.settle(distanceLeft = kotlin.math.abs(target - offset.value) / widthPx)
+            offset.animateTo(target, motion.move(token))
+        }
+    }
+    LaunchedEffect(revealed, widthPx) { settle(revealed) }
+    val buttonsShown = { if (reduced) fade.value > 0f else progress() > 0f }
     Box(modifier) {
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
             // Closed, the buttons are not read by TalkBack (the row's custom actions offer the same three).
             val hidden = if (revealed) Modifier else Modifier.clearAndSetSemantics { }
-            Row(Modifier.width(width).fillMaxHeight().then(hidden).graphicsLayer { alpha = if (progress() > 0f) 1f else 0f }.background(colors.raise)) {
+            Row(Modifier.width(width).fillMaxHeight().then(hidden).graphicsLayer { alpha = if (buttonsShown()) 1f else 0f }.background(colors.raise)) {
                 val actions = listOf(onTime, onReference, onProperties)
                 actions.forEachIndexed { i, action ->
                     SwipeButton(
@@ -83,7 +95,7 @@ fun StaggeredSwipeRow(
                         onClick = action,
                         labelColor = if (i == 0 && timeHasChange) colors.acc else colors.ink,
                         modifier = Modifier.graphicsLayer {
-                            val p = ScriptMotion.buttonProgress(progress(), i, reduced)
+                            val p = if (reduced) fade.value else ScriptMotion.buttonProgress(progress(), i, reduced = false)
                             alpha = p
                             translationX = with(density) { ScriptMotion.buttonShiftDp(p, reduced).dp.toPx() }
                         },
@@ -105,11 +117,15 @@ fun StaggeredSwipeRow(
                     orientation = Orientation.Horizontal,
                     enabled = enabled,
                     state = rememberDraggableState { delta ->
-                        scope.launch { offset.snapTo((offset.value + delta).coerceIn(-widthPx, 0f)) }
+                        scope.launch {
+                            offset.snapTo((offset.value + delta).coerceIn(-widthPx, 0f))
+                            // The buttons follow the finger under reduced motion too.
+                            if (reduced) fade.snapTo(progress())
+                        }
                     },
                     onDragStopped = {
                         val open = offset.value < -widthPx / 2
-                        offset.animateTo(if (open) -widthPx else 0f, CivilightMotion.spec(CivilightMotion.swipe, reduced))
+                        settle(open)
                         if (open != revealed) onRevealedChange(open)
                     },
                 ),

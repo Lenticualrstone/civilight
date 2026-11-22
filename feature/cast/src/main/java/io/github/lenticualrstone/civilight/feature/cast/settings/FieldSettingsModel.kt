@@ -27,6 +27,23 @@ object FieldSettingsModel {
         return keys.toMutableList().apply { add(target, removeAt(from)) }
     }
 
+    /** The order and the dragged row's remaining offset after [dragStep]. */
+    data class DragStep(val order: List<Key>, val offsetPx: Float)
+
+    /**
+     * One step of a live drag: when the dragged row [key] (at [offsetPx] from its resting place in [order])
+     * has crossed into another slot, [order] is reordered at once and the offset is reduced by the rows
+     * crossed, so the row stays under the finger while its neighbours move aside (the list animates
+     * their placement). Nothing changes while the row is still within its own slot.
+     */
+    fun dragStep(order: List<Key>, key: Key, offsetPx: Float, rowHeightPx: Float): DragStep {
+        val from = order.indexOf(key)
+        if (from < 0 || rowHeightPx <= 0f) return DragStep(order, offsetPx)
+        val to = dropIndex(from, offsetPx, rowHeightPx, order.size)
+        if (to == from) return DragStep(order, offsetPx)
+        return DragStep(reorder(order, from, to), offsetPx - (to - from) * rowHeightPx)
+    }
+
     /** The drop index of a drag of [offsetPx] from [from], rows [rowHeightPx] tall. */
     fun dropIndex(from: Int, offsetPx: Float, rowHeightPx: Float, count: Int): Int {
         if (rowHeightPx <= 0f || count == 0) return from

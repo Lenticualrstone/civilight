@@ -74,6 +74,16 @@ class ItemTrashTest {
     }
 
     @Test
+    fun `delete decides the sheet before anything opens`() {
+        val (doc, created) = CharacterEdits.create(CastFx.doc(), "유령", CastFx.ctx())
+        assertEquals(false, ItemTrash.needsSheet(doc, EntityKind.CHARACTER, created.key, recorder))
+        assertEquals(true, ItemTrash.needsSheet(noahLive(), EntityKind.CHARACTER, K.NOAH, recorder))
+        // Gone or already in the trash: no sheet and no delete.
+        assertNull(ItemTrash.needsSheet(CastFx.doc(), EntityKind.CHARACTER, K.NOAH, recorder))
+        assertNull(ItemTrash.needsSheet(doc, EntityKind.CHARACTER, "missing", recorder))
+    }
+
+    @Test
     fun `CST-40 delete with references, then 되돌리기 brings back exactly the document`() {
         val doc = noahLive()
         val done = ItemTrash.delete(doc, EntityKind.CHARACTER, K.NOAH, CastFx.ctx(5).toAction(), recorder)!!

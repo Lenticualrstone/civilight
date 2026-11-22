@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.recorder.capture
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +30,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -52,8 +56,14 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.link.Chip
 import io.github.lenticualrstone.civilight.feature.recorder.RecorderUiCopy
 import io.github.lenticualrstone.civilight.feature.recorder.link.LinkChipRow
@@ -68,12 +78,25 @@ private val COLUMN = 560.dp
  */
 @Composable
 fun CaptureFrame(glow: GlowMode?, level: () -> Float, glass: Boolean, content: @Composable ColumnScope.() -> Unit) {
+    val motion = CivilightTheme.motion
+    // The glass fill fades with the stage (row 1) and the glow band fades in and out on its own mode (row 2);
+    // the band keeps its last mode while it leaves. Mode blends (record to process) are the DS band's.
+    val glassFill = animatedFraction(glass, label = "captureGlass")
+    val fill = CivilightTheme.colors.glass
+    val shownGlow = rememberLastNonNull(glow)
     Box(
         Modifier
             .fillMaxSize()
-            .then(if (glass) Modifier.background(CivilightTheme.colors.glass) else Modifier),
+            .drawBehind { drawRect(fill.copy(alpha = fill.alpha * glassFill.value)) },
     ) {
-        if (glow != null) RecorderGlowBand(glow, Modifier.align(Alignment.BottomCenter), level = level)
+        AnimatedVisibility(
+            visible = glow != null,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = motion.enter(),
+            exit = motion.exit(),
+        ) {
+            if (shownGlow != null) RecorderGlowBand(shownGlow, level = level)
+        }
         Column(
             Modifier
                 .align(Alignment.TopCenter)
@@ -97,7 +120,10 @@ private fun CaptureHeader(timer: String, live: Boolean?, cancel: String?, onCanc
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (live != null) RecordingMark(Modifier.alpha(if (live) 1f else 0.4f))
+        if (live != null) {
+            val mark = animatedAlpha(if (live) 1f else 0.4f, label = "recordingMark")
+            RecordingMark(Modifier.graphicsLayer { alpha = mark.value })
+        }
         CivilightText(RecorderCopy.APP_NAME, CivilightTheme.type.label.copy(fontWeight = FontWeight.SemiBold), color = colors.ink, maxLines = 1)
         CivilightText(timer, CivilightTheme.type.number.copy(fontSize = 13.sp), color = colors.ink2, maxLines = 1)
         Spacer(Modifier.weight(1f))
@@ -111,7 +137,10 @@ private fun ColumnScope.Transcript(label: String?, note: String?, confirmed: Str
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val scroll = rememberScrollState()
-    LaunchedEffect(confirmed, tail) { scroll.animateScrollTo(scroll.maxValue) }
+    val motion = CivilightTheme.motion
+    // Reduced motion: `move` is a snap, so the scroll jumps to the end instead of gliding.
+    LaunchedEffect(confirmed, tail) { scroll.animateScrollTo(scroll.maxValue, motion.move()) }
+    val caretOn = rememberCaretOn()
     Column(
         Modifier
             .weight(1f)
@@ -131,7 +160,7 @@ private fun ColumnScope.Transcript(label: String?, note: String?, confirmed: Str
         }
         val caretContent = mapOf(
             CARET to InlineTextContent(Placeholder(5.sp, 26.sp, PlaceholderVerticalAlign.TextCenter)) {
-                Box(Modifier.padding(start = 3.dp).size(2.dp, 26.dp).background(colors.acc))
+                Box(Modifier.padding(start = 3.dp).size(2.dp, 26.dp).graphicsLayer { alpha = if (caretOn.value) 1f else 0f }.background(colors.acc))
             },
         )
         BasicText(text, Modifier.padding(top = 12.dp), style = type.recorderLive.copy(color = colors.ink), inlineContent = caretContent)
@@ -168,7 +197,7 @@ fun ColumnScope.RecordingPane(
         CivilightButton(screen.stopAndSave, onStop, Modifier.weight(1f).heightIn(min = 56.dp), variant = ButtonVariant.PRIMARY_LARGE)
         RoundButton(
             icon = if (view.paused) IconId.Mic else IconId.Pause,
-            label = screen.pauseLabel,
+            label = ShownCopy.of(screen.pauseLabel),
             size = 56,
             onClick = onPause,
         )
@@ -189,6 +218,7 @@ fun ColumnScope.ProcessingPane(
 ) {
     val screen = view.screen
     val colors = CivilightTheme.colors
+    val motion = CivilightTheme.motion
     CaptureHeader(screen.duration, live = null, cancel = null, onCancel = {})
     Column(
         Modifier
@@ -197,27 +227,31 @@ fun ColumnScope.ProcessingPane(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp),
     ) {
-        Spacer(Modifier.height(64.dp))
-        screen.sectionLabel?.let { CivilightText(it, CivilightTheme.type.sec, color = colors.ink3) }
-        CivilightText(screen.text, CivilightTheme.type.recorderLive, Modifier.padding(top = 12.dp), color = colors.ink)
-        LinkChipRow(screen.chips, onAddLink, onReplaceLink, onRemoveLink, Modifier.padding(top = 22.dp))
-        screen.hideRow?.let { row ->
-            SwitchRow(title = row.title, subtitle = row.sub, checked = row.on, onCheckedChange = onHide, modifier = Modifier.padding(top = 12.dp))
+        // Rows that come and go (the finalising label, the hide row, the note) fold; the text under them follows.
+        Column(Modifier.fillMaxWidth().animateContentSize(motion.move())) {
+            Spacer(Modifier.height(64.dp))
+            FoldRevealValue(screen.sectionLabel) { CivilightText(it, CivilightTheme.type.sec, color = colors.ink3) }
+            CivilightText(screen.text, CivilightTheme.type.recorderLive, Modifier.padding(top = 12.dp), color = colors.ink)
+            LinkChipRow(screen.chips, onAddLink, onReplaceLink, onRemoveLink, Modifier.padding(top = 22.dp))
+            FoldRevealValue(screen.hideRow) { row ->
+                SwitchRow(title = row.title, subtitle = row.sub, checked = row.on, onCheckedChange = onHide, modifier = Modifier.padding(top = 12.dp))
+            }
+            CivilightText(
+                ShownCopy.of(screen.note),
+                CivilightTheme.type.small.copy(fontSize = 13.sp, lineHeight = 20.sp),
+                Modifier.padding(top = 18.dp),
+                color = colors.ink3,
+            )
         }
-        CivilightText(
-            screen.note,
-            CivilightTheme.type.small.copy(fontSize = 13.sp, lineHeight = 20.sp),
-            Modifier.padding(top = 18.dp),
-            color = colors.ink3,
-        )
     }
     Column(
         Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 26.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        screen.putHere?.let { CivilightButton(it, onPutHere, Modifier.fillMaxWidth(), variant = ButtonVariant.GHOST) }
+        FoldRevealValue(screen.putHere) { label ->
+            CivilightButton(label, onPutHere, Modifier.fillMaxWidth().padding(bottom = 10.dp), variant = ButtonVariant.GHOST)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             CivilightButton(screen.buttons[0], onContinue, Modifier.weight(1f), variant = ButtonVariant.GHOST)
             CivilightButton(screen.buttons[1], onKeep, Modifier.weight(1f), variant = ButtonVariant.PRIMARY)
@@ -278,6 +312,8 @@ private fun RoundButton(icon: IconId, label: String, size: Int, onClick: () -> U
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        CivilightIcon(icon, contentDescription = null, size = 20.dp, tint = colors.ink)
+        Crossfade(icon, animationSpec = CivilightTheme.motion.spec(CivilightMotion.standard), label = "roundIcon") { shown ->
+            CivilightIcon(shown, contentDescription = null, size = 20.dp, tint = colors.ink)
+        }
     }
 }

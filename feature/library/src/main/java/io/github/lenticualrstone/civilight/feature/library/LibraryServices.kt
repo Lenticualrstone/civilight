@@ -49,7 +49,7 @@ class LibraryServices(val deps: FeatureDeps) {
     fun deviceSecure(): Boolean = deps.biometric.availability() != AuthAvailability.NONE
 
     /** Hiding was refused for want of a device lock: say so once (copy not in sources). */
-    fun showNoDeviceLock() = deps.toasts.show(ProtectionCopy.TODO_COPY_LIB31_NO_DEVICE_LOCK, actionLabel = null)
+    fun showNoDeviceLock() = deps.toasts.show(ProtectionCopy.NO_DEVICE_LOCK, actionLabel = null)
 
     /** The one user-visible consequence of a protection outcome; cancel and success stay silent (LIB-37). */
     fun report(outcome: ProtectionOutcome) {

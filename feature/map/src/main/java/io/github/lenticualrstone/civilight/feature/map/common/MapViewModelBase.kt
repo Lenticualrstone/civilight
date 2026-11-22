@@ -163,7 +163,7 @@ abstract class MapScreenViewModel(projectKey: Key, protected val env: MapEnv) : 
             null
         }
         if (blob == null || !blob.mime.startsWith("image/")) {
-            env.toasts.show(MapCopy.TODO_COPY_MAP_IMPORT_FAILED, actionLabel = null)
+            env.toasts.show(MapCopy.IMPORT_FAILED, actionLabel = null)
             return null
         }
         val ctx = editContext()
@@ -230,7 +230,7 @@ abstract class MapScreenViewModel(projectKey: Key, protected val env: MapEnv) : 
         val ctx = editContext()
         val result = withContext(Dispatchers.Default) { StepReroll.apply(current, mapKey, step, seed, mode, ctx) }
         if (result !is RerollResult.Applied) {
-            env.toasts.show(MapCopy.TODO_COPY_MAP_REROLL_OTHER_VERSION, actionLabel = null)
+            env.toasts.show(MapCopy.REROLL_OTHER_VERSION, actionLabel = null)
             return@launch
         }
         val label = MapCopy.rerollStep(StepChoices.stepName(step))

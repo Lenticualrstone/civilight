@@ -4,7 +4,7 @@ package io.github.lenticualrstone.civilight.feature.map
  * Every UI string of feature:map (DECISIONS §3). Terse fragments joined with ` · `, no 해요체, no em
  * dash; `BTN_` constants are button labels (CopyLint button rules). Copy is from `40-world.md` and
  * the boards `MapNew`, `Map`, `MapC`, `MapSoft`, `MapEdit`, `MapRouteC`, `MapDetail`, `SceneWhere`.
- * Missing copy is a `TODO_COPY_MAP_…` constant whose value is its own name (listed under Requests).
+ * Copy not given verbatim by a board is composed from the nearest existing words and listed under "Copy to confirm" in the status file; no `TODO_COPY_` value remains.
  */
 object MapCopy {
     const val SEP = " · "
@@ -267,31 +267,33 @@ object MapCopy {
     const val SHAPE = "모양"
     const val COMPARE = "비교"
 
-    // --- Missing copy (value = name; listed under Requests) ---
+    // --- Copy picked from the nearest existing words (to confirm; listed under Requests) ---
 
     /** A stored map from another generator version cannot be re-rolled (WLD-53: never changed silently). */
-    const val TODO_COPY_MAP_REROLL_OTHER_VERSION = "TODO_COPY_MAP_REROLL_OTHER_VERSION"
+    const val REROLL_OTHER_VERSION = "다른 버전 지도 · 다시 만들기 안 됨"
 
-    /** The play button of the 인물 동선 scrubber (WLD-62: `can play`, no label drawn). */
-    const val TODO_COPY_MAP_TRACK_PLAY = "TODO_COPY_MAP_TRACK_PLAY"
+    /** The play and pause buttons of the 인물 동선 scrubber (WLD-62: `can play`, no label drawn). */
+    const val TRACK_PLAY = "재생"
+    const val TRACK_PAUSE = "멈춤"
 
     /** Shown when no reader can read the text (no on-device model, cloud off; WLD-61). */
-    const val TODO_COPY_MAP_TEXT_UNREADABLE = "TODO_COPY_MAP_TEXT_UNREADABLE"
+    const val TEXT_UNREADABLE = "읽어 낼 수 없음 · 기기 안 모델 없음 · 클라우드 꺼짐"
 
     /** 인물 동선 with no stop on this map, or no character chosen (WLD-62). */
-    const val TODO_COPY_MAP_TRACK_EMPTY = "TODO_COPY_MAP_TRACK_EMPTY"
-    /** Toast when an image or photo cannot be read or stored. Proposed: `이미지 가져오기 · 안 됨`. */
-    const val TODO_COPY_MAP_IMPORT_FAILED = "TODO_COPY_MAP_IMPORT_FAILED"
+    const val TRACK_EMPTY = "동선 없음 · 인물 고르기"
 
-    /** Accessibility labels of the layer order buttons (WLD-45 order is `[PROPOSED]`, no copy). */
-    const val TODO_COPY_MAP_LAYER_UP = "TODO_COPY_MAP_LAYER_UP"
-    const val TODO_COPY_MAP_LAYER_DOWN = "TODO_COPY_MAP_LAYER_DOWN"
+    /** Toast when an image or photo cannot be read or stored. */
+    const val IMPORT_FAILED = "이미지 가져오기 · 안 됨"
+
+    /** Accessibility labels of the layer order buttons (WLD-45 order is `[PROPOSED]`). */
+    const val LAYER_UP = "위로"
+    const val LAYER_DOWN = "아래로"
 
     /** Field label of a node's sub line (`세라 · 1-3`); the board shows the line, not its name. */
-    const val TODO_COPY_MAP_NODE_SUB = "TODO_COPY_MAP_NODE_SUB"
+    const val NODE_SUB = "부제"
 
     /** Toast when a map image cannot be made or shared (WLD-51). */
-    const val TODO_COPY_MAP_EXPORT_FAILED = "TODO_COPY_MAP_EXPORT_FAILED"
+    const val EXPORT_FAILED = "이미지 내보내기 · 안 됨"
 
     // --- Formatted ---
 

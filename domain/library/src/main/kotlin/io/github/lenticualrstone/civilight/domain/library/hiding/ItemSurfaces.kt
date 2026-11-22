@@ -8,6 +8,8 @@ import io.github.lenticualrstone.civilight.model.cast.Relation
 import io.github.lenticualrstone.civilight.model.cast.RelationEndKind
 import io.github.lenticualrstone.civilight.model.change.ChangeRecord
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.gallery.GalleryItem
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.map.MapRegion
 import io.github.lenticualrstone.civilight.model.map.Pin
 import io.github.lenticualrstone.civilight.model.map.WorldMap
@@ -128,11 +130,13 @@ class ItemSurfaces(private val doc: ProjectDoc) {
             doc.pages.values.filter { it.deletedAt == null }.forEach { add(it.key) }
         }
         val scenes = doc.manuscript.liveScenes.map { it.key }
-        if (!locked) return ItemSearchScope(cards, scenes.toSet(), null)
+        val liveGallery = doc.galleryItems.filter { liveness.isLive(it) }
+        if (!locked) return ItemSearchScope(cards, scenes.toSet(), null, liveGallery.mapTo(HashSet()) { it.key })
         val hiddenCards = hidden.characters + hidden.places + hidden.terms + hidden.factions + hidden.pages
         val visibleScenes = scenes.filterNot { it in hidden.scenes }.toSet()
-        val excluded = hiddenCards.isNotEmpty() || hidden.scenes.isNotEmpty()
-        return ItemSearchScope(cards - hiddenCards, visibleScenes, if (excluded) FOOTER_HIDDEN_ITEMS else null)
+        val visibleGallery = liveGallery.filter { isGalleryItemVisible(it, locked = true) }.mapTo(HashSet()) { it.key }
+        val excluded = hiddenCards.isNotEmpty() || hidden.scenes.isNotEmpty() || visibleGallery.size < liveGallery.size
+        return ItemSearchScope(cards - hiddenCards, visibleScenes, if (excluded) FOOTER_HIDDEN_ITEMS else null, visibleGallery)
     }
 
     /** I-08: other characters' relations; relations with a hidden character collapse into one row. */
@@ -161,6 +165,48 @@ class ItemSurfaces(private val doc: ProjectDoc) {
     /** I-12: a stretch through a hidden scene is drawn dashed with this label while locked. */
     fun routeStretchLabel(sceneKey: Key, locked: Boolean): String? =
         if (locked && sceneKey in hidden.scenes) HIDDEN_SCENE else null
+
+    // --- Gallery (55 GAL-19, GAL-10) ---
+
+    /**
+     * True when [item] may appear on a surface: live, not a hidden image while [locked], and not
+     * owned by a hidden character while [locked].
+     */
+    fun isGalleryItemVisible(item: GalleryItem, locked: Boolean): Boolean {
+        if (!liveness.isLive(item)) return false
+        if (!locked) return true
+        if (item.key in hidden.galleryImages) return false
+        return !(item.ownerKind.known == GalleryOwnerKind.CHARACTER && item.ownerKey in hidden.characters)
+    }
+
+    /**
+     * One gallery in `직접 순서`: live items; while [locked] hidden images collapse into the locked
+     * tile or row (`숨긴 이미지 <H>`), while open they are tagged `숨김` (GAL-19).
+     */
+    fun gallery(ownerKey: Key, locked: Boolean): MaskedList<GalleryItem> =
+        list(index.galleryItemsOf(ownerKey).filter { liveness.isLive(it) }, HideableKind.GALLERY_IMAGE, { it.key }, locked)
+
+    /**
+     * The project gallery groups (GAL-10): the project's own items first, then every visible
+     * character with items in cast order. While [locked], hidden characters with items collapse into
+     * one row `숨긴 인물 <H>` (no image count).
+     */
+    fun projectGallery(locked: Boolean): ProjectGalleryGroups {
+        val own = gallery(doc.key, locked)
+        val characters = doc.cast.characters.filter { it.deletedAt == null }.sortedBy { it.order }
+        val groups = ArrayList<CharacterGalleryGroup>()
+        var hiddenWithItems = 0
+        for (c in characters) {
+            val items = gallery(c.key, locked)
+            if (items.items.isEmpty() && items.lockedRow == null) continue
+            if (locked && c.key in hidden.characters) {
+                hiddenWithItems++
+                continue
+            }
+            groups += CharacterGalleryGroup(c, items)
+        }
+        return ProjectGalleryGroups(own, groups, if (hiddenWithItems > 0) LockedItemsRow(HideableKind.CHARACTER, hiddenWithItems) else null)
+    }
 
     /** I-18: pins of hidden places are not drawn while locked. */
     fun visiblePins(map: WorldMap, locked: Boolean): List<Pin> =
@@ -201,8 +247,23 @@ class ItemSurfaces(private val doc: ProjectDoc) {
     }
 }
 
-/** Search scope after item masking (I-07). */
-data class ItemSearchScope(val cardKeys: Set<Key>, val sceneKeys: Set<Key>, val footer: String?)
+/** Search scope after item masking (I-07); [galleryItemKeys] = gallery images search may return (GAL-04). */
+data class ItemSearchScope(
+    val cardKeys: Set<Key>,
+    val sceneKeys: Set<Key>,
+    val footer: String?,
+    val galleryItemKeys: Set<Key> = emptySet(),
+)
+
+/** One character's group in the project gallery (GAL-10): header `<name> · <N>`. */
+data class CharacterGalleryGroup(val character: Character, val items: MaskedList<GalleryItem>)
+
+/** The project gallery after masking (GAL-10): own items, character groups, the hidden characters' row. */
+data class ProjectGalleryGroups(
+    val project: MaskedList<GalleryItem>,
+    val characters: List<CharacterGalleryGroup>,
+    val hiddenCharacters: LockedItemsRow?,
+)
 
 /** Relations after masking (I-08). */
 data class MaskedRelations(val visible: List<Relation>, val hiddenCount: Int) {

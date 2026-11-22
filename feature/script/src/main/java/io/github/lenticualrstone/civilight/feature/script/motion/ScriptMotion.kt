@@ -47,21 +47,33 @@ object ScriptMotion {
     fun buttonShiftDp(progress: Float, reduced: Boolean): Float =
         if (reduced) 0f else (1f - progress.coerceIn(0f, 1f)) * BUTTON_SHIFT_DP
 
+    /**
+     * The swipe row's settle (CNV-40): the 260 ms slide scaled by the distance left, never under the
+     * 120 ms of a reduced fade, so a short settle is not as slow as a full one.
+     */
+    fun settle(distanceLeft: Float): MotionToken {
+        val swipe = CivilightMotion.swipe
+        val ms = (swipe.durationMs * distanceLeft.coerceIn(0f, 1f)).toInt().coerceAtLeast(CivilightMotion.reducedFadeMs)
+        return MotionToken(swipe.curve, ms)
+    }
+
     /** How a row's position change animates, or null for none. */
     enum class Placement { ENTER, EXIT }
 
     /**
      * Placement motion of a manuscript row: never for the row being typed (the typed line never
-     * moves) or with reduced motion; while a new block enters, the rows around it follow its 320 ms
-     * decelerate. Outside typing, a delete, merge or move closing a gap uses the 160 ms accelerate.
-     * While typing, nothing else moves: the typed block growing a line pushes the rows below at once,
-     * as the writing line scrolls (SCR-67 animates add and delete only).
+     * moves); while a new block enters, the rows around it follow its 320 ms decelerate; a delete,
+     * merge or move closing a gap, and any other change of the row set, uses the 160 ms accelerate.
+     * A pure edit or a selection change moves nothing through placement: the typed block growing a
+     * line pushes the rows below at once, as the writing line scrolls, and a selection's padding
+     * animates on its own (SCR-67 animates add and delete only). [structural] = the set of row keys
+     * changed in this composition. Reduced motion is the shared `Motion.placement`'s (null).
      */
-    fun placement(isCaretRow: Boolean, entering: Boolean, reduced: Boolean, editing: Boolean = false): Placement? = when {
-        reduced || isCaretRow -> null
+    fun placement(isCaretRow: Boolean, entering: Boolean, structural: Boolean = false): Placement? = when {
+        isCaretRow -> null
         entering -> Placement.ENTER
-        editing -> null
-        else -> Placement.EXIT
+        structural -> Placement.EXIT
+        else -> null
     }
 
     fun token(placement: Placement): MotionToken = when (placement) {
@@ -69,9 +81,6 @@ object ScriptMotion {
         Placement.EXIT -> CivilightMotion.exit
     }
 
-    /** A removed row fades out over 160 ms accelerate; reduced motion 120 ms. */
-    fun removeMs(reduced: Boolean): Int = if (reduced) CivilightMotion.reducedFadeMs else CivilightMotion.exit.durationMs
-
-    /** A panel tab's content swaps with a 200 ms standard fade; reduced motion 120 ms. */
-    fun tabMs(reduced: Boolean): Int = if (reduced) CivilightMotion.reducedFadeMs else CivilightMotion.standard.durationMs
+    /** Whether a recomposition's row keys differ from the last one's (an insert, a remove or a reorder). */
+    fun structural(previous: Set<String>?, now: Set<String>): Boolean = previous != null && previous != now
 }

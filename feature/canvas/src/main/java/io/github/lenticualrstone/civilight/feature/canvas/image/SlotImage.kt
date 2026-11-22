@@ -13,7 +13,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import io.github.lenticualrstone.civilight.feature.canvas.card.ImagePlaceholder
 import io.github.lenticualrstone.civilight.model.asset.Crop
@@ -29,7 +28,8 @@ import kotlin.math.max
  * What an image slot shows: the placed image (a picked original cut by the slot's crop for [ratio], or a
  * preset, CNV-26), with the holo foil when the use has it and its slot allows it (CNV-30), or the
  * initial-letter placeholder (CNV-24) when nothing is placed; [onPick] draws its `이미지 고르기` tag.
- * [shiftDp] moves the image inside its frame (card parallax, CNV-22).
+ * [imageModifier] goes on the image layer inside the frame's clip: a card row's parallax and constant 1.1
+ * scale (`SnapCardRow`, CNV-22; read in the draw phase, none when reduced).
  */
 @Composable
 fun BoxScope.SlotImage(
@@ -37,40 +37,54 @@ fun BoxScope.SlotImage(
     ratio: Ratio,
     ownerName: String,
     onPick: (() -> Unit)?,
-    shiftDp: Float = 0f,
+    imageModifier: Modifier = Modifier,
     compactPlaceholder: Boolean = false,
     contentDescription: String? = null,
 ) {
-    val shift = Modifier.graphicsLayer {
-        translationX = shiftDp * density
-        if (shiftDp != 0f) {
-            scaleX = 1.1f
-            scaleY = 1.1f
-        }
-    }
     val holo = Modifier.holoSurface(HoloRules.shows(use))
     when {
         use == null -> ImagePlaceholder(ownerName, onPick, compactPlaceholder)
         use.isPreset -> {
             val preset = PresetImages.byId(use.presetId)
             if (preset == null) ImagePlaceholder(ownerName, onPick, compactPlaceholder)
-            else Box(Modifier.matchParentSize().then(holo)) { PresetArt(preset, shift) }
+            else Box(Modifier.matchParentSize().then(holo)) { PresetArt(preset, imageModifier) }
         }
-        else -> {
-            val deps = LocalFeatureDeps.current
-            val hash = use.blobHash
-            val crop = use.cropFor(ratio)
-            val bitmap by produceState<ImageBitmap?>(null, hash, crop) {
-                value = withContext(Dispatchers.IO) {
-                    hash?.let { deps.stores.blobs.fileOf(it) }?.let { runCatching { SlotImages.decode(it, crop, 720) }.getOrNull() }?.asImageBitmap()
-                }
-            }
-            val shown = bitmap
-            if (shown == null) ImagePlaceholder(ownerName, onPick = null, compact = compactPlaceholder)
-            else Box(Modifier.matchParentSize().then(holo)) {
-                Image(shown, contentDescription = contentDescription, modifier = shift.fillMaxSize(), contentScale = ContentScale.Crop)
-            }
+        else -> BlobImage(use.blobHash, use.cropFor(ratio), SLOT_MAX_SIDE, contentDescription, imageModifier, Modifier.then(holo)) {
+            ImagePlaceholder(ownerName, onPick = null, compact = compactPlaceholder)
         }
+    }
+}
+
+/** Decode size of slot images (cards and headers). */
+private const val SLOT_MAX_SIDE = 720
+
+/**
+ * A stored original drawn with its [crop], decoded off the main thread at most [maxSide] px on its long side
+ * (WLD-38: never a full decode of a large image); [placeholder] while decoding or when the blob is missing.
+ * [layerModifier] wraps the image layer (the holo surface); [imageModifier] goes on the image itself (parallax,
+ * shared element). Shared by slot images and the gallery.
+ */
+@Composable
+fun BoxScope.BlobImage(
+    hash: String?,
+    crop: Crop?,
+    maxSide: Int,
+    contentDescription: String?,
+    imageModifier: Modifier = Modifier,
+    layerModifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    placeholder: @Composable BoxScope.() -> Unit,
+) {
+    val deps = LocalFeatureDeps.current
+    val bitmap by produceState<ImageBitmap?>(null, hash, crop, maxSide) {
+        value = withContext(Dispatchers.IO) {
+            hash?.let { deps.stores.blobs.fileOf(it) }?.let { runCatching { SlotImages.decode(it, crop, maxSide) }.getOrNull() }?.asImageBitmap()
+        }
+    }
+    val shown = bitmap
+    if (shown == null) placeholder()
+    else Box(Modifier.matchParentSize().then(layerModifier)) {
+        Image(shown, contentDescription = contentDescription, modifier = imageModifier.fillMaxSize(), contentScale = contentScale)
     }
 }
 

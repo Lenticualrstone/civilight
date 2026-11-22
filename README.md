@@ -7,7 +7,7 @@
 
 # Civilight
 
-이야기와 세계관이 무거운 게임을 위한 시나리오 작성 앱. 폴더블 전용.
+이야기와 세계관이 무거운 게임을 위한 시나리오 작성 앱. 폴더블에 맞춰 만들었다.
 
 ![Android 10+](https://img.shields.io/badge/Android-10%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)

@@ -70,7 +70,7 @@ fun PutCardContent(sheet: PutSheet, scope: SheetScope, services: RecorderService
                         value = query,
                         onValueChange = { query = it },
                         modifier = Modifier.padding(top = 10.dp),
-                        placeholder = RecorderUiCopy.TODO_CARD_SEARCH,
+                        placeholder = RecorderUiCopy.CARD_SEARCH,
                     )
                     SheetScrollBody(Modifier.padding(top = 6.dp)) {
                         for (row in view.cards) {

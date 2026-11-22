@@ -14,6 +14,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.designsystem.component.TabContent
+import io.github.lenticualrstone.civilight.feature.map.common.MapMotion
+import io.github.lenticualrstone.civilight.feature.map.common.FoldSwitch
+import io.github.lenticualrstone.civilight.feature.map.canvas.MapMarkScope
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.component.SidePanelHost
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.runtime.key
+import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -98,9 +108,11 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
         d?.let { TrackState.build(it, mapKey, selected.orEmpty(), MapScreenViewModel.lensOf(it), hiddenOpen, layerFilter) }
     }
     val stopsNow by rememberUpdatedState(ui?.scrubber.orEmpty())
+    val motion = CivilightTheme.motion
     LaunchedEffect(playing) {
         while (playing) {
-            delay(900)
+            // The pause between two stops is a named step (no token yet, see Requests), scaled by the animator scale.
+            delay(motion.delayMs(MapMotion.PLAY_STEP_MS))
             val next = TrackState.nextStop(stopsNow)
             if (next == null) playing = false else lens.set(LensPoint.UnitEnd(next))
         }
@@ -116,6 +128,8 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
     ) { padding ->
         val u = ui ?: return@CivilightScreen
         val colors = CivilightTheme.colors
+        // The focused leg's stroke eases in and out when the focus moves (per line).
+        val focus = u.lines.mapIndexed { i, l -> key(i) { animatedFraction(l.focused, label = "trackFocus") } }
         Box(Modifier.fillMaxSize()) {
             MapCanvas(
                 base = u.base,
@@ -125,12 +139,13 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
                 showRouteChips = false,
                 extraDraw = { scope ->
                     val dash = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 5.dp.toPx()))
-                    for (l in u.lines) {
+                    for ((n, l) in u.lines.withIndex()) {
+                        val sel = focus.getOrNull(n)?.value ?: 0f
                         val path = Path()
                         l.points.forEachIndexed { i, q -> val s0 = scope.screen(q); if (i == 0) path.moveTo(s0.x, s0.y) else path.lineTo(s0.x, s0.y) }
                         drawPath(
-                            path, if (l.focused) colors.acc else colors.ink2,
-                            style = Stroke((if (l.focused) 2.5 else 1.5).dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = if (l.dashed) dash else null),
+                            path, lerp(colors.ink2, colors.acc, sel),
+                            style = Stroke((1.5 + sel).dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = if (l.dashed) dash else null),
                         )
                     }
                 },
@@ -139,13 +154,13 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
                         midpoint(l.points.map { scope.screen(it) })?.let { m -> MapValueChip(l.label!!, Modifier.mapAt(m.x, m.y, ay = 1.2f)) }
                     }
                     u.stops.forEach { s -> val p = scope.screen(s.at); RouteStop(s.label, s.focused, Modifier.mapAt(p.x, p.y)) }
-                    u.positions.forEach { pos -> val p = scope.screen(pos.at); PersonChip(pos.name, Modifier.mapAt(p.x, p.y, ay = 1.6f)) }
+                    u.positions.forEach { pos -> key(pos.name) { WalkingChip(pos, u.lines, scope) } }
                 },
             )
             TopBarTapGuard(padding.calculateTopPadding())
             val scrubber: @Composable ColumnScope.() -> Unit = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    CivilightIconButton(if (playing) IconId.Pause else IconId.Next, MapCopy.TODO_COPY_MAP_TRACK_PLAY, { playing = !playing })
+                    CivilightIconButton(if (playing) IconId.Pause else IconId.Next, if (playing) MapCopy.TRACK_PAUSE else MapCopy.TRACK_PLAY, { playing = !playing })
                     Column(Modifier.weight(1f)) { Scrubber(u.scrubber) { key -> playing = false; lens.set(LensPoint.UnitEnd(key)) } }
                 }
             }
@@ -154,13 +169,15 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
                     u.chips.forEach { c -> FilterChip(c.name, c.selected, { selected = TrackState.tapChip(selected.orEmpty(), c.key) }) }
                 }
                 SegmentedControl(listOf(MapCopy.TAB_TRACK, MapCopy.TAB_TRACK_PLACES, MapCopy.TAB_LAYERS), tab, { tab = it })
-                when (tab) {
+                TabContent(tab) { t ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                when (t) {
                     1 -> u.places.forEach { CivilightText(it, CivilightTheme.type.label, maxLines = 1) }
                     2 -> Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         u.layerChips.forEach { chip -> FilterChip(chip.label, chip.selected, { layerFilter = chip.layerKey }) }
                     }
                     else -> {
-                        if (u.listTitle == null) CivilightText(MapCopy.TODO_COPY_MAP_TRACK_EMPTY, CivilightTheme.type.small, color = colors.ink3)
+                        if (u.listTitle == null) CivilightText(MapCopy.TRACK_EMPTY, CivilightTheme.type.small, color = colors.ink3)
                         u.listTitle?.let { CivilightText(it, CivilightTheme.type.sec, color = colors.ink3) }
                         u.rows.forEach { r ->
                             ListRow(
@@ -171,27 +188,54 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
                         CivilightText(DomainTrack.NOTE, CivilightTheme.type.small, color = colors.ink3)
                     }
                 }
+                    }
+                }
             }
-            if (inner) {
-                SidePanel(
-                    onClose = { deps.navigator.pop() },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
-                ) {
+            SidePanelHost(
+                inner,
+                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
+            ) {
+                SidePanel(onClose = { deps.navigator.pop() }) {
                     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp), content = panel)
                 }
-                GlassCard(
-                    Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 16.dp)
-                        .width(LocalWindowLayout.current.widthDp.dp - CivilightTheme.sizes.sidePanel - 56.dp),
-                    content = scrubber,
-                )
-            } else {
-                GlassCard(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp).heightIn(max = 420.dp)) {
-                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        panel()
-                        scrubber()
+            }
+            FoldSwitch(inner) { isInner ->
+                if (isInner) {
+                    GlassCard(
+                        Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 16.dp)
+                            .width(LocalWindowLayout.current.widthDp.dp - CivilightTheme.sizes.sidePanel - 56.dp),
+                        content = scrubber,
+                    )
+                } else {
+                    GlassCard(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp).heightIn(max = 420.dp)) {
+                        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            panel()
+                            scrubber()
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/** The position chip of a character: when the lens moves it walks along the leg to the new stop on `enter` (it jumps when motion is reduced). */
+@Composable
+private fun WalkingChip(pos: TrackPosition, lines: List<TrackLine>, scope: MapMarkScope) {
+    val motion = CivilightTheme.motion
+    val progress = remember { Animatable(1f) }
+    var path by remember { mutableStateOf(listOf(pos.at)) }
+    var target by remember { mutableStateOf(pos.at) }
+    LaunchedEffect(pos.at) {
+        if (pos.at != target) {
+            // An interrupted walk goes on from where the chip is.
+            val here = TrackPath.pointAt(path, progress.value)
+            path = TrackPath.between(lines, here, pos.at)
+            target = pos.at
+            progress.snapTo(0f)
+            progress.animateTo(1f, motion.move(CivilightMotion.enter))
+        }
+    }
+    val p = scope.screen(TrackPath.pointAt(path, progress.value))
+    PersonChip(pos.name, Modifier.mapAt(p.x, p.y, ay = 1.6f))
 }

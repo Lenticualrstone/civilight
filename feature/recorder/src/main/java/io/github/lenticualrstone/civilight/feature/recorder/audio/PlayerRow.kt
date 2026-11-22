@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.recorder.audio
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -26,7 +28,9 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import io.github.lenticualrstone.civilight.feature.recorder.RecorderUiCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.recorder.RecorderAudio
@@ -50,23 +54,26 @@ fun PlayerRow(recordKey: Key, audio: RecorderAudio, player: RecordPlayer, modifi
                 .size(32.dp)
                 .clip(CircleShape)
                 .background(colors.tint)
-                .semantics { contentDescription = if (playing) RecorderUiCopy.TODO_PAUSE else RecorderUiCopy.TODO_PLAY },
+                .semantics { contentDescription = if (playing) RecorderUiCopy.PAUSE else RecorderUiCopy.PLAY },
             contentAlignment = Alignment.Center,
         ) {
-            if (playing) {
-                CivilightIcon(IconId.Pause, contentDescription = null, size = 14.dp, tint = colors.ink)
-            } else {
-                val ink = colors.ink
-                // The board's glyph `M8 5l11 7-11 7z` in a 24 box.
-                Canvas(Modifier.size(14.dp)) {
-                    val u = size.width / 24f
-                    val path = Path().apply {
-                        moveTo(8f * u, 5f * u)
-                        lineTo(19f * u, 12f * u)
-                        lineTo(8f * u, 19f * u)
-                        close()
+            // Play and pause cross-fade on `standard` (reduced: 120 ms).
+            Crossfade(playing, animationSpec = CivilightTheme.motion.spec(CivilightMotion.standard), label = "playPause") { isPlaying ->
+                if (isPlaying) {
+                    CivilightIcon(IconId.Pause, contentDescription = null, size = 14.dp, tint = colors.ink)
+                } else {
+                    val ink = colors.ink
+                    // The board's glyph `M8 5l11 7-11 7z` in a 24 box.
+                    Canvas(Modifier.size(14.dp)) {
+                        val u = size.width / 24f
+                        val path = Path().apply {
+                            moveTo(8f * u, 5f * u)
+                            lineTo(19f * u, 12f * u)
+                            lineTo(8f * u, 19f * u)
+                            close()
+                        }
+                        drawPath(path, ink)
                     }
-                    drawPath(path, ink)
                 }
             }
         }
@@ -76,12 +83,14 @@ fun PlayerRow(recordKey: Key, audio: RecorderAudio, player: RecordPlayer, modifi
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             bars.forEachIndexed { i, level ->
+                // The played bars change colour on `standard`; the playhead walks bar by bar.
+                val barColor = animatedColor(if (i < played) colors.acc else colors.ink3, label = "playedBar")
                 Box(
                     Modifier
                         .width(3.dp)
                         .height(Waveforms.heightDp(level).dp)
                         .clip(RoundedCornerShape(1.dp))
-                        .background(if (i < played) colors.acc else colors.ink3),
+                        .drawBehind { drawRect(barColor.value) },
                 )
             }
         }

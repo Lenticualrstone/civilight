@@ -46,9 +46,9 @@ class AliasRejectionTest {
     fun `invalid aliases are refused with their line`() {
         val a = WorldTestFixture.stateA()
         val index = WorldTestFixture.index(a)
-        assertEquals(AliasChange.Refused(WorldCopy.TODO_COPY_WORLD_ALIAS_SAME_AS_NAME), AliasEditor.add(a, T1, "오리지늄 등불", index, access, ctx))
-        assertEquals(AliasChange.Refused(WorldCopy.TODO_COPY_WORLD_ALIAS_DUPLICATE), AliasEditor.add(a, T1, " 오리지늄", index, access, ctx))
-        assertEquals(AliasChange.Refused(WorldCopy.TODO_COPY_WORLD_ALIAS_EMPTY), AliasEditor.add(a, T1, "  ", index, access, ctx))
+        assertEquals(AliasChange.Refused(WorldCopy.ALIAS_SAME_AS_NAME), AliasEditor.add(a, T1, "오리지늄 등불", index, access, ctx))
+        assertEquals(AliasChange.Refused(WorldCopy.ALIAS_DUPLICATE), AliasEditor.add(a, T1, " 오리지늄", index, access, ctx))
+        assertEquals(AliasChange.Refused(WorldCopy.ALIAS_EMPTY), AliasEditor.add(a, T1, "  ", index, access, ctx))
     }
 
     @Test

@@ -1,5 +1,10 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.ui.draw.drawBehind
+import io.github.lenticualrstone.civilight.designsystem.foundation.animatedInsetOutline
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,12 +48,15 @@ fun NodeCard(
     val type = CivilightTheme.type
     val shape = RoundedCornerShape(14.dp)
     val look = nodeCardLook(memo = memo, selected = selected, deleted = deleted, colors = colors)
+    val outline = animatedColor(look.outline, label = "nodeOutline")
+    val width = animatedAlpha(look.outlineWidth.value, label = "nodeOutlineWidth")
+    val filled = animatedFraction(look.filled, label = "nodeFill")
     Column(
         modifier = modifier
             .then(if (onClick != null) Modifier.pressable(onClick = onClick, shape = shape) else Modifier)
             .clip(shape)
-            .then(if (look.filled) Modifier.background(colors.raise) else Modifier)
-            .insetOutline(look.outline, look.outlineWidth, shape, dashed = look.dashed, dotted = look.dotted)
+            .drawBehind { val a = filled.value; if (a > 0f) drawRect(colors.raise, alpha = a) }
+            .animatedInsetOutline(outline, { width.value.dp }, shape, dashed = look.dashed, dotted = look.dotted)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         val titleStyle = type.command.merge(TextStyle(fontWeight = FontWeight.Bold))

@@ -40,6 +40,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FixedColors
 import io.github.lenticualrstone.civilight.designsystem.theme.ResolvedTheme
 import io.github.lenticualrstone.civilight.feature.canvas.image.HoloTilt
@@ -49,6 +50,7 @@ import io.github.lenticualrstone.civilight.feature.canvas.image.ProvideHoloTilt
 import io.github.lenticualrstone.civilight.feature.canvas.image.Tilt
 import io.github.lenticualrstone.civilight.feature.canvas.image.holoDrag
 import io.github.lenticualrstone.civilight.feature.canvas.image.holoFoilAt
+import io.github.lenticualrstone.civilight.feature.canvas.image.rememberSpringTilt
 import io.github.lenticualrstone.civilight.feature.canvas.image.rememberHoloTilt
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
@@ -79,10 +81,15 @@ fun HoloExperimentScreen(deps: FeatureDeps) {
                 ) {
                     CivilightTabs(HoloCopy.TABS, tab, { tab = it })
                     val tilt = rememberHoloTilt()
-                    when (tab) {
-                        0 -> HoloCardPanel(tilt)
-                        1 -> HoloKitPanel(tilt)
-                        else -> HoloMomentPanel(tilt)
+                    // The three experiments crossfade when the tab changes (audit §4 canvas 11, P3).
+                    ContentSwap(tab, Modifier.fillMaxWidth(), label = "holoTab") { shown ->
+                        Column(Modifier.fillMaxWidth()) {
+                            when (shown) {
+                                0 -> HoloCardPanel(tilt)
+                                1 -> HoloKitPanel(tilt)
+                                else -> HoloMomentPanel(tilt)
+                            }
+                        }
                     }
                 }
             }
@@ -105,9 +112,12 @@ private fun silverText(tilt: Tilt): TextStyle {
 private fun ColumnScope.HoloCardPanel(tilt: HoloTilt) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val t = tilt.value
+    // The card follows a sensor's tilt through a spring so a noisy reading is smooth; a dragging finger is tracked
+    // as it is (the release sway is already a spring).
+    val sprung = rememberSpringTilt(tilt.value)
+    val t = if (tilt.usesDrag) tilt.value else sprung
     val shape = RoundedCornerShape(22.dp)
-    val reduced = CivilightTheme.reducedMotion
+    val loops = CivilightTheme.motion.loops
     CivilightText(HoloCopy.CARD_LINE, type.sec, Modifier.padding(top = 18.dp), color = colors.ink3)
     CivilightText(HoloCopy.CARD_HINT, type.small, color = colors.ink3)
     Box(
@@ -132,7 +142,7 @@ private fun ColumnScope.HoloCardPanel(tilt: HoloTilt) {
         }
     }
     val input = when {
-        reduced -> HoloCopy.INPUT_STILL
+        !loops -> HoloCopy.INPUT_STILL
         tilt.usesDrag -> HoloCopy.INPUT_DRAG
         else -> HoloCopy.INPUT_GYRO
     }

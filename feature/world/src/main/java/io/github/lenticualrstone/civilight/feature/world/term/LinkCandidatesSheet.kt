@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.world.term
 
 import androidx.compose.foundation.layout.Arrangement
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -153,55 +154,60 @@ fun SheetScope.LinkCandidatesContent(termKey: Key, initialMode: BulkMode) {
         onSelect = { modeName = LinkCandidatesState.modes[it].name },
         modifier = Modifier.padding(top = 12.dp),
     )
-    when (state) {
-        BulkSheetState.Pending -> CivilightText(WorldCopy.SCANNING, type.small, Modifier.padding(top = 16.dp), color = colors.ink3)
-        BulkSheetState.Empty -> CivilightText(WorldCopy.TODO_COPY_WORLD_NO_CANDIDATES, type.small, Modifier.padding(top = 16.dp), color = colors.ink3)
-        is BulkSheetState.Ready -> {
-            val ui = state.ui
-            SheetScrollBody(Modifier.padding(top = 12.dp)) {
-                ui.rows.forEach { row ->
-                    BulkRow(row) { checked ->
-                        unchecked = if (checked) unchecked - row.id else (unchecked + row.id).distinct()
-                    }
-                }
-            }
-            ui.footer?.let { footer ->
-                val warnAt = footer.indexOf('▲')
-                Row(Modifier.fillMaxWidth().topHairline(colors.line).padding(top = 10.dp)) {
-                    if (warnAt > 0) {
-                        CivilightText(footer.substring(0, warnAt), type.small, color = colors.ink3)
-                        CivilightText(footer.substring(warnAt), type.small, color = colors.warn)
-                    } else {
-                        CivilightText(footer, type.small, color = colors.ink3)
-                    }
-                }
-            }
-            SheetActions {
-                CivilightButton(
-                    text = ui.button,
-                    modifier = Modifier.weight(1f),
-                    enabled = !readOnly && ui.checkedCount > 0,
-                    onClick = {
-                        scope.launch {
-                            when (val r = vm.apply(termKey, mode, unchecked.toSet())) {
-                                is BulkApply.Done -> {
-                                    sheet.close()
-                                    deps.toasts.show(WorldCopy.bulkDone(mode, r.count)) { vm.undoLast() }
-                                }
-                                // The text changed under the sheet: rows are rebuilt from the new index.
-                                BulkApply.Stale, BulkApply.Nothing -> Unit
+    // Scanning, nothing to link and the rows swap as bodies (P3); toggling a row stays inside `Ready`.
+    ContentSwap(state, Modifier.fillMaxWidth(), contentKey = { it::class }, label = "bulkBody") { shown ->
+        Column(Modifier.fillMaxWidth()) {
+            when (shown) {
+                BulkSheetState.Pending -> CivilightText(WorldCopy.SCANNING, type.small, Modifier.padding(top = 16.dp), color = colors.ink3)
+                BulkSheetState.Empty -> CivilightText(WorldCopy.NO_CANDIDATES, type.small, Modifier.padding(top = 16.dp), color = colors.ink3)
+                is BulkSheetState.Ready -> {
+                    val ui = shown.ui
+                    SheetScrollBody(Modifier.padding(top = 12.dp)) {
+                        ui.rows.forEach { row ->
+                            BulkRow(row) { checked ->
+                                unchecked = if (checked) unchecked - row.id else (unchecked + row.id).distinct()
                             }
                         }
-                    },
-                )
+                    }
+                    ui.footer?.let { footer ->
+                        val warnAt = footer.indexOf('▲')
+                        Row(Modifier.fillMaxWidth().topHairline(colors.line).padding(top = 10.dp)) {
+                            if (warnAt > 0) {
+                                CivilightText(footer.substring(0, warnAt), type.small, color = colors.ink3)
+                                CivilightText(footer.substring(warnAt), type.small, color = colors.warn)
+                            } else {
+                                CivilightText(footer, type.small, color = colors.ink3)
+                            }
+                        }
+                    }
+                    SheetActions {
+                        CivilightButton(
+                            text = ui.button,
+                            modifier = Modifier.weight(1f),
+                            enabled = !readOnly && ui.checkedCount > 0,
+                            onClick = {
+                                scope.launch {
+                                    when (val r = vm.apply(termKey, mode, unchecked.toSet())) {
+                                        is BulkApply.Done -> {
+                                            sheet.close()
+                                            deps.toasts.show(WorldCopy.bulkDone(mode, r.count)) { vm.undoLast() }
+                                        }
+                                        // The text changed under the sheet: rows are rebuilt from the new index.
+                                        BulkApply.Stale, BulkApply.Nothing -> Unit
+                                    }
+                                }
+                            },
+                        )
+                    }
+                    CivilightText(
+                        if (readOnly) WorldCopy.READ_ONLY else ui.note,
+                        type.small,
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        color = colors.ink3,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
-            CivilightText(
-                if (readOnly) WorldCopy.READ_ONLY else ui.note,
-                type.small,
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                color = colors.ink3,
-                textAlign = TextAlign.Center,
-            )
         }
     }
 }

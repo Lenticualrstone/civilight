@@ -33,6 +33,9 @@ enum class OwnedKind {
 
     /** Nodes and edges of a deleted canvas. */
     CANVAS_PART,
+
+    /** Gallery images of a deleted character (55 GAL-20): sheet row `이미지 <n>`. */
+    GALLERY_ITEM,
 }
 
 /**
@@ -53,6 +56,8 @@ data class DeleteImpact(
     val heldWarnings: Int,
     /** Scenes of the speaker lines (`1-6 씬 2 · 씬 4`); null for hidden items. */
     val speakerLocations: String?,
+    /** Of [OwnedKind.GALLERY_ITEM], how many are hidden images (locked form `이미지 8 · 숨김 2`). */
+    val hiddenGalleryItems: Int = 0,
 ) {
     val referenceCounts: Map<RefKind, Int> get() = references.groupingBy { it.kind }.eachCount()
 
@@ -114,11 +119,13 @@ object Impact {
                 OwnedKind.BLOCK to owned.blocks.size,
                 OwnedKind.MAP_OVERLAY to owned.overlays.size,
                 OwnedKind.CANVAS_PART to owned.canvasParts.size,
+                OwnedKind.GALLERY_ITEM to owned.galleryItems.size,
             ),
             relationPartners = partners,
             references = references,
             heldWarnings = present.filter { it.kind == ItemKind.TERM }.sumOf { heldWarnings(unmarked, marked, it.key) },
             speakerLocations = if (hidden || speakerScenes.isEmpty()) null else UnitCodes(doc).locations(speakerScenes),
+            hiddenGalleryItems = owned.galleryItems.count { unmarked.index.galleryItem(it)?.hidden == true },
         )
     }
 

@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.library.projectsettings
 
+import io.github.lenticualrstone.civilight.feature.library.settings.SettingsValueRow
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,7 +89,10 @@ internal fun ProjectSettingsScreen(route: ProjectSettings, services: LibraryServ
             }
         },
     ) { padding ->
-        if (current == null) return@CivilightScreen
+      // Loading → content (audit row 7): the page fades in once the document is read.
+      ContentSwap(current != null, Modifier.fillMaxSize(), label = "projectSettings") { ready ->
+        val current = current
+        if (!ready || current == null) return@ContentSwap
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
                 Modifier
@@ -107,6 +112,7 @@ internal fun ProjectSettingsScreen(route: ProjectSettings, services: LibraryServ
                 ScriptSection(current.script, !current.readOnly, onSwitch = vm::scriptSwitch, onOpen = open)
             }
         }
+      }
     }
 }
 
@@ -138,7 +144,7 @@ private fun LinkSection(title: String, rows: List<ProjectLinkRow>, enabled: Bool
 @Composable
 private fun LinkRow(row: ProjectLinkRow, enabled: Boolean, onOpen: (ProjectSettingsTarget) -> Unit) {
     Box(Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA)) {
-        SettingsRow(title = row.title, onClick = { if (enabled) onOpen(row.target) }, value = row.value, subtitle = row.sub)
+        SettingsValueRow(title = row.title, onClick = { if (enabled) onOpen(row.target) }, value = row.value, subtitle = row.sub)
     }
 }
 
@@ -157,7 +163,7 @@ private fun ProtectionSection(ui: ProjectSettingsUi, onRating: () -> Unit, onSwi
     val enabled = !ui.readOnly
     SectionHead(ProjectSettingsCopy.SECTION_PROTECTION, first = false)
     Box(Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA)) {
-        SettingsRow(title = p.ratingRowTitle, onClick = { if (enabled) onRating() }, value = p.ratingRowValue, subtitle = p.ratingRowSub)
+        SettingsValueRow(title = p.ratingRowTitle, onClick = { if (enabled) onRating() }, value = p.ratingRowValue, subtitle = p.ratingRowSub)
     }
     p.rows.forEach { row -> ProtectionSwitchRow(row, enabled) { on -> onSwitch(row.protection, on) } }
 }

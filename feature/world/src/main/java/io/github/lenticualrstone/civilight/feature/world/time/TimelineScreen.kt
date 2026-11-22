@@ -2,6 +2,10 @@ package io.github.lenticualrstone.civilight.feature.world.time
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.feature.world.common.dimmed
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,7 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -141,23 +145,26 @@ fun TimelineScreen(route: Timeline, deps: FeatureDeps) {
         },
     ) { padding ->
         CenterColumn {
-            when {
-                timeline == null -> Unit
-                !timeline.available -> EmptyBlock(
-                    title = WorldCopy.TIMELINE_OFF,
-                    modifier = Modifier.padding(top = padding.calculateTopPadding() + 48.dp),
-                    primaryLabel = WorldCopy.WORLD_TIME,
-                    onPrimary = { deps.navigator.push(WorldCalendar(route.projectKey)) },
-                )
-                else -> TimelineList(
-                    ui = timeline,
-                    padding = padding,
-                    selectedKey = selected,
-                    onChip = { chip ->
-                        if (chip.view == TimelineView.ANCHOR) sheets.open(AnchorPickSheet) else viewName = chip.view.name
-                    },
-                    onRow = { row -> row.eventKey?.let { deps.navigator.openDetail(EventDetail(route.projectKey, it)) } },
-                )
+            // P3: no timeline yet, `시간 없이`, and the line list swap as bodies.
+            ContentSwap(timeline?.available, Modifier.fillMaxSize(), label = "timelineBody") { available ->
+                when {
+                    timeline == null || available == null -> Unit
+                    !available -> EmptyBlock(
+                        title = WorldCopy.TIMELINE_OFF,
+                        modifier = Modifier.padding(top = padding.calculateTopPadding() + 48.dp),
+                        primaryLabel = WorldCopy.WORLD_TIME,
+                        onPrimary = { deps.navigator.push(WorldCalendar(route.projectKey)) },
+                    )
+                    else -> TimelineList(
+                        ui = timeline,
+                        padding = padding,
+                        selectedKey = selected,
+                        onChip = { chip ->
+                            if (chip.view == TimelineView.ANCHOR) sheets.open(AnchorPickSheet) else viewName = chip.view.name
+                        },
+                        onRow = { row -> row.eventKey?.let { deps.navigator.openDetail(EventDetail(route.projectKey, it)) } },
+                    )
+                }
             }
         }
     }
@@ -183,20 +190,20 @@ private fun TimelineList(
         ),
     ) {
         item(key = "info") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(civilightItem().fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 CivilightText(ui.infoLine, type.small, Modifier.weight(1f), color = colors.ink3)
                 CivilightText(WorldCopy.AGES_AUTO, type.small, Modifier.padding(start = 8.dp), color = colors.ink3)
             }
         }
         item(key = "chips") {
-            ChipFlow(Modifier.padding(top = 10.dp)) {
+            ChipFlow(civilightItem().padding(top = 10.dp)) {
                 ui.chips.forEach { chip -> FilterChip(label = chip.label, selected = chip.selected, onClick = { onChip(chip) }) }
             }
         }
         items(ui.rows, key = { it.id }) { row ->
             if (row.kind == TimelineRowKind.DIVIDER) {
                 Box(
-                    Modifier
+                    civilightItem()
                         .fillMaxWidth()
                         .padding(top = 6.dp, bottom = 10.dp)
                         .topHairline(colors.line)
@@ -205,11 +212,11 @@ private fun TimelineList(
                     CivilightText(row.title, type.sec, color = colors.ink3)
                 }
             } else {
-                TimelineLine(row, selected = row.eventKey != null && row.eventKey == selectedKey, onClick = row.eventKey?.let { { onRow(row) } })
+                TimelineLine(row, selected = row.eventKey != null && row.eventKey == selectedKey, onClick = row.eventKey?.let { { onRow(row) } }, modifier = civilightItem())
             }
         }
         ui.footer?.let { footer ->
-            item(key = "footer") { CivilightText(footer, type.small, Modifier.padding(top = 14.dp), color = colors.ink3) }
+            item(key = "footer") { CivilightText(footer, type.small, civilightItem().padding(top = 14.dp), color = colors.ink3) }
         }
     }
 }
@@ -219,18 +226,19 @@ private fun TimelineList(
  * the mono time in 64 dp, the title (Myeongjo 700 16; world events `ink2`) and the sub line.
  */
 @Composable
-private fun TimelineLine(row: TimelineRowUi, selected: Boolean, onClick: (() -> Unit)?) {
+private fun TimelineLine(row: TimelineRowUi, selected: Boolean, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val dot = if (row.current) 9.dp else 5.dp
+    val hl by animatedFraction(selected)
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.pressable(PressAction.Click(onClick), role = Role.Button, scaleOnPress = false) else Modifier)
-            .then(if (selected) Modifier.background(colors.hl) else Modifier)
+            .drawBehind { drawRect(colors.hl.copy(alpha = colors.hl.alpha * hl)) }
             .heightIn(min = 44.dp)
             .height(IntrinsicSize.Min)
-            .alpha(if (row.dimmed) 0.5f else 1f),
+            .dimmed(row.dimmed),
     ) {
         // The line and its diamond (board: 1 px `line` with the dot centred on it).
         Box(Modifier.width(24.dp).fillMaxHeight()) {

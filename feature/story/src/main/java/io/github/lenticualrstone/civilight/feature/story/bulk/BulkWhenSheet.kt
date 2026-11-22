@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -27,6 +28,8 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import io.github.lenticualrstone.civilight.domain.story.bulk.WhenMode
 import io.github.lenticualrstone.civilight.domain.story.bulk.WhenPreviewRow
 import io.github.lenticualrstone.civilight.domain.story.time.word
@@ -72,7 +75,7 @@ fun SheetScope.BulkWhenContent(sheet: BulkWhenSheet, vm: BulkViewModel) {
             BulkWhenForm.DAY_CHIPS.forEach { n ->
                 FilterChip(dayWord(n), !form.perScene && form.dayChip == n, { set(form.copy(dayChip = n, perScene = false)) })
             }
-            if (form.mode == WhenMode.CHAIN) FilterChip(BulkCopy.PER_SCENE, form.perScene, { set(form.copy(perScene = true)) })
+            FoldReveal(form.mode == WhenMode.CHAIN, horizontal = true) { FilterChip(BulkCopy.PER_SCENE, form.perScene, { set(form.copy(perScene = true)) }) }
         }
         Label(BulkCopy.BAND)
         ChipFlow(Modifier.padding(top = 6.dp)) {
@@ -91,11 +94,13 @@ fun SheetScope.BulkWhenContent(sheet: BulkWhenSheet, vm: BulkViewModel) {
         }
         CivilightText(BulkCopy.PREVIEW, type.sec, Modifier.padding(top = 14.dp, bottom = 4.dp), color = colors.ink3)
         plan.rows.forEach { row ->
-            PreviewRow(row, perScene = form.perScene && form.mode == WhenMode.CHAIN, chip = form.chipOf(row.sceneKey)) { n ->
-                set(form.copy(perSceneChips = form.perSceneChips + (row.sceneKey to n)))
+            key(row.sceneKey) {
+                PreviewRow(row, perScene = form.perScene && form.mode == WhenMode.CHAIN, chip = form.chipOf(row.sceneKey)) { n ->
+                    set(form.copy(perSceneChips = form.perSceneChips + (row.sceneKey to n)))
+                }
             }
         }
-        if (form.precision == TimePrecision.APPROX) CivilightText(BulkCopy.APPROX_NOTE, type.small, Modifier.padding(top = 8.dp), color = colors.ink3)
+        FoldReveal(form.precision == TimePrecision.APPROX) { CivilightText(BulkCopy.APPROX_NOTE, type.small, Modifier.padding(top = 8.dp), color = colors.ink3) }
     }
     CivilightButton(
         text = plan.button,
@@ -118,14 +123,16 @@ private fun Label(text: String) {
 private fun PreviewRow(row: WhenPreviewRow, perScene: Boolean, chip: Int, onChip: (Int) -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    // No `spacedBy`: the per-scene chips fold, and a folded block would keep its gap.
+    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
             CivilightText(row.scene, type.itemTitleCompact.merge(TextStyle(fontWeight = FontWeight.Bold)), Modifier.weight(1f), color = colors.ink, maxLines = 1)
-            CivilightText(row.label, type.dir, color = colors.ink, maxLines = 1)
+            // The preview value follows every change of the form: the value swap of CNV-42 (P4).
+            ValueSwap(row.label, type.dir, color = colors.ink, contentAlignment = Alignment.CenterEnd)
         }
-        CivilightText(row.baseNote, type.small, color = colors.ink3)
-        if (perScene) {
-            ChipFlow(Modifier.padding(top = 4.dp)) {
+        ValueSwap(row.baseNote, type.small, Modifier.padding(top = 2.dp), color = colors.ink3, maxLines = 2)
+        FoldReveal(perScene) {
+            ChipFlow(Modifier.padding(top = 6.dp)) {
                 BulkWhenForm.DAY_CHIPS.forEach { n -> FilterChip(dayWord(n), chip == n, { onChip(n) }) }
             }
         }

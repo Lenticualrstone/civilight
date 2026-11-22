@@ -17,5 +17,5 @@ object ProtectionCopy {
      * Toast when hiding is refused on a device without a secure lock screen (§6 Q19 `ED`: hiding
      * needs a device credential; copy not in sources).
      */
-    const val TODO_COPY_LIB31_NO_DEVICE_LOCK = "TODO_COPY_LIB31_NO_DEVICE_LOCK"
+    const val NO_DEVICE_LOCK = "기기 잠금 필요"
 }

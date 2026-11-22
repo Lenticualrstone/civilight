@@ -38,7 +38,13 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.feature.story.common.ChapterHeaderText
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.common.storyServices
 import io.github.lenticualrstone.civilight.navigation.Library
@@ -75,11 +81,14 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
             smallLine = HomeCopy.LIBRARY,
             back = if (inDetailPane) null else IconAction(HomeCopy.LIBRARY) { if (!navigator.popTo(Library)) navigator.resetTo(Library) },
             actions = {
-                // `NewReady` draws neither: the rating sits in the summary line under the name.
-                ui?.takeIf { !it.newReady }?.let { u ->
-                    RatingBadge(ThemeBridge.rating(u.rating))
-                    Spacer(Modifier.width(4.dp))
-                    LensChip(u.lens.text, u.lens.state, { sheets.open(LensSheet(route.projectKey)) })
+                // `NewReady` draws neither: the rating sits in the summary line under the name. The group
+                // folds in and out when the state changes (motion audit, feature:story 8).
+                FoldRevealValue(ui?.takeIf { !it.newReady }, horizontal = true) { u ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RatingBadge(ThemeBridge.rating(u.rating))
+                        Spacer(Modifier.width(4.dp))
+                        LensChip(u.lens.text, u.lens.state, { sheets.open(LensSheet(route.projectKey)) })
+                    }
                 }
             },
             commandBar = {
@@ -91,23 +100,27 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
             },
             sheets = sheets,
         ) { padding ->
-            val u = ui
-            if (u == null) {
-                Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
-            } else {
-                HomeContent(
-                    ui = u,
-                    padding = padding,
-                    onResume = { navigator.push(Script(u.projectKey, blockKey = it.blockKey, caretAtEnd = true)) },
-                    onEpisode = { navigator.openDetail(StoryStructure(u.projectKey, focusUnitKey = it.key)) },
-                    onShortcut = { shortcut ->
-                        val target = shortcut.route(u.projectKey)
-                        if (target is StoryStructure) navigator.openDetail(target) else navigator.push(target)
-                    },
-                    onStartRoute = { navigator.push(it) },
-                    onDismissStart = { vm.dismissStart() },
-                    selectedKey = HomeModel.selectedKey(navigator.backStack, route.projectKey),
-                )
+            // Loading -> content swaps on the kind (loaded or not), never on the data, so an edit does
+            // not cross-fade the whole screen (motion audit, feature:story 7).
+            ContentSwap(ui != null, Modifier.fillMaxSize()) { loaded ->
+                val u = ui
+                if (!loaded || u == null) {
+                    Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
+                } else {
+                    HomeContent(
+                        ui = u,
+                        padding = padding,
+                        onResume = { navigator.push(Script(u.projectKey, blockKey = it.blockKey, caretAtEnd = true)) },
+                        onEpisode = { navigator.openDetail(StoryStructure(u.projectKey, focusUnitKey = it.key)) },
+                        onShortcut = { shortcut ->
+                            val target = shortcut.route(u.projectKey)
+                            if (target is StoryStructure) navigator.openDetail(target) else navigator.push(target)
+                        },
+                        onStartRoute = { navigator.push(it) },
+                        onDismissStart = { vm.dismissStart() },
+                        selectedKey = HomeModel.selectedKey(navigator.backStack, route.projectKey),
+                    )
+                }
             }
         }
     }
@@ -132,7 +145,7 @@ private fun HomeContent(
         contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 24.dp),
     ) {
         item(key = "name") {
-            Column {
+            Column(civilightItem()) {
                 CivilightText(ui.name, type.displayM, color = colors.ink)
                 if (start != null && ui.newReady) {
                     StartSummary(ui, start)
@@ -143,18 +156,19 @@ private fun HomeContent(
         }
         if (!ui.newReady) homeHead(ui, onResume)
         if (start != null) {
-            item(key = "start") { StartBlockView(start, onStartRoute, onDismissStart) }
+            // The block folds away on `목록 닫기` and back in on a new project (P1, fold tokens).
+            item(key = "start") { StartBlockView(start, onStartRoute, onDismissStart, civilightItem(CivilightMotion.foldOpen, fadeOut = CivilightMotion.foldClose)) }
         }
         if (ui.rows.isNotEmpty()) {
             item(key = "listHeader") {
-                Column(Modifier.padding(top = 28.dp, bottom = 6.dp)) {
-                    ui.listHeader?.let { SectionLabel(it) }
+                Column(civilightItem().padding(top = 28.dp, bottom = 6.dp)) {
+                    ui.listHeader?.let { ChapterHeaderLabel(it) }
                 }
             }
-            ui.rows.forEach { row -> item(key = "row:${row.key}") { EpisodeLine(row, onEpisode, selected = row.key == selectedKey) } }
+            ui.rows.forEach { row -> item(key = "row:${row.key}") { EpisodeLine(row, onEpisode, selected = row.key == selectedKey, modifier = civilightItem()) } }
         }
         item(key = "work") {
-            Column(Modifier.padding(top = 28.dp)) {
+            Column(civilightItem().padding(top = 28.dp)) {
                 SectionLabel(HomeCopy.WORK)
                 ShortcutGrid(ui.shortcuts, onShortcut, Modifier.padding(top = 4.dp))
             }
@@ -162,31 +176,37 @@ private fun HomeContent(
     }
 }
 
+/** `Ⅰ 1장 · 등불지기` in the `sec` section style, the numeral in the serif face. */
+@Composable
+private fun ChapterHeaderLabel(text: String) {
+    ChapterHeaderText(text, CivilightTheme.type.sec, color = CivilightTheme.colors.ink3)
+}
+
 /** Stats and `이어 쓰기` (board `Home`); not drawn in the `NewReady` state. */
 private fun LazyListScope.homeHead(ui: HomeUi, onResume: (HomeResume) -> Unit) {
     item(key = "stats") {
         val colors = CivilightTheme.colors
         val type = CivilightTheme.type
-        Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+        Row(civilightItem().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
             ui.stats.forEach { stat ->
                 Column {
-                    CivilightText(stat.value, type.stat, color = colors.ink, maxLines = 1)
-                    CivilightText(stat.label, type.small, color = colors.ink3, maxLines = 1)
+                    ValueSwap(stat.value, type.stat, color = colors.ink)
+                    ValueSwap(stat.label, type.small, color = colors.ink3)
                 }
             }
         }
     }
     ui.resume?.let { resume ->
-        item(key = "resume") { ResumeBlock(resume, onResume) }
+        item(key = "resume") { ResumeBlock(resume, onResume, civilightItem()) }
     }
 }
 
 @Composable
-private fun ResumeBlock(resume: HomeResume, onResume: (HomeResume) -> Unit) {
+private fun ResumeBlock(resume: HomeResume, onResume: (HomeResume) -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(
-        modifier = Modifier
+        modifier = modifier
             .padding(top = 30.dp)
             .fillMaxWidth()
             .topHairline(colors.line)
@@ -198,20 +218,20 @@ private fun ResumeBlock(resume: HomeResume, onResume: (HomeResume) -> Unit) {
     ) {
         Column(Modifier.weight(1f)) {
             CivilightText(HomeCopy.RESUME, type.micro, color = colors.acc, maxLines = 1)
-            CivilightText(resume.where, type.heading, Modifier.padding(top = 4.dp), color = colors.ink, maxLines = 1)
-            CivilightText(resume.quote, type.command, Modifier.padding(top = 2.dp), color = colors.ink2, maxLines = 1)
+            ValueSwap(resume.where, type.heading, Modifier.padding(top = 4.dp), color = colors.ink)
+            ValueSwap(resume.quote, type.command, Modifier.padding(top = 2.dp), color = colors.ink2)
         }
         CivilightIcon(IconId.Next, contentDescription = null)
     }
 }
 
 @Composable
-private fun EpisodeLine(row: HomeRow, onEpisode: (HomeRow) -> Unit, selected: Boolean = false) {
+private fun EpisodeLine(row: HomeRow, onEpisode: (HomeRow) -> Unit, selected: Boolean = false, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val titleStyle = type.itemTitle.merge(TextStyle(fontWeight = if (row.current) FontWeight.Bold else FontWeight.Normal))
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .topHairline(colors.line)
             .selectedRowBackground(selected, colors.sel, colors.acc)
@@ -225,7 +245,7 @@ private fun EpisodeLine(row: HomeRow, onEpisode: (HomeRow) -> Unit, selected: Bo
         if (row.hiddenTag) {
             CivilightText(StoryCopy.HIDDEN_TAG, type.small, Modifier.weight(1f).padding(end = 12.dp), color = colors.ink3, maxLines = 1)
         }
-        CivilightText(row.status, type.small, color = if (row.writing) colors.acc else colors.ink3, maxLines = 1)
+        ValueSwap(row.status, type.small, color = if (row.writing) colors.acc else colors.ink3)
     }
 }
 
@@ -234,7 +254,7 @@ private fun ShortcutGrid(shortcuts: List<HomeShortcut>, onShortcut: (HomeShortcu
     val colors = CivilightTheme.colors
     val style = CivilightTheme.type.itemTitle.merge(TextStyle(fontWeight = FontWeight.Normal))
     Column(modifier, verticalArrangement = Arrangement.spacedBy(0.dp)) {
-        shortcuts.chunked(3).forEach { line ->
+        HomeModel.shortcutRows(shortcuts).forEach { line ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 line.forEach { shortcut ->
                     Box(
@@ -267,10 +287,10 @@ private fun StartSummary(ui: HomeUi, start: HomeStart) {
  * Each row opens its place; done rows are struck through behind an `acc` box.
  */
 @Composable
-private fun StartBlockView(start: HomeStart, onRoute: (Route) -> Unit, onDismiss: () -> Unit) {
+private fun StartBlockView(start: HomeStart, onRoute: (Route) -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    Column {
+    Column(modifier) {
         start.quickWrite?.let { line ->
             Row(
                 Modifier.padding(top = 26.dp).fillMaxWidth().topHairline(colors.line).padding(top = 16.dp),

@@ -1002,3 +1002,81 @@ These stay with the product owner; the area specs' defaults remain in force and 
 | Label for a reference whose target is absent and has no name tag | new | `TODO_COPY_DM_01` (§3) |
 | `notExported` name tags shown as `지운 <kind> · <name>` without `되살리기` | new | confirm the wording (§5.6) |
 | Engineering defaults made in this file: `unplaced` anchor, `worldEvent` anchors after an event purge, `PointRef` resolution for a non-live unit, re-keying a replaced or trashed same-key project, `NameTag.state = notExported`, `VoiceState.lastExport`, `Project.counters`, `blob_owner`, unknown anchor kinds sorting as `unplaced` | new | marked `ED` where defined; confirm or replace |
+
+## 12. Addendum (2026-11-23) · Gallery — model owner: lane `feature:canvas` (renderers: CST, STO, LIB) · spec `55-gallery.md` (GAL)
+
+Additive only: nothing above changes; §12.6 lists the rows to fold into §1.7, §2.11 and §10 at the next pass of this file. `ED` defaults here are listed in `55-gallery.md` §6.
+
+### 12.1 `GalleryItem` · P · `gallery/<ownerKey>.json › items`
+
+An ordered image of a character or of the project. It references a `Blob` (or a preset) exactly like `ImageUse` does, but it is a list per owner, so `ImageUse` keeps its one-row-per-(owner, slot) rule.
+
+```ts
+GalleryItem = {
+  key: Key,
+  ownerKind: "project" | "character",
+  ownerKey: Key,                       // Project.key or Character.key
+  source: "preset:<id>" | "<blob hash>",
+  order: OrderKey,                     // 직접 순서 within (ownerKind, ownerKey), §1.2
+  title: string,                       // "" = untitled (`제목 없음`)
+  caption?: RichDoc,                   // description; LinkRun targets as §1.4 / C-05; names resolve at 최신 (ED)
+  tagKeys: Key[],                      // project Tag keys (§2.5 `Tag`)
+  sceneKey?: Key,                      // a scene (StoryUnit); label and 때 computed on read
+  crops: { r3x4?: Crop, r1x1?: Crop }, // gallery slot ratios; missing = centred largest frame; presets in registry pixels
+  holo: boolean,
+  hidden: boolean,                     // item hiding (GAL-19, ED extension of LIB-36)
+  createdAt: Instant, updatedAt: Instant, updatedBy: DeviceId,
+  deletedAt?: Instant, trashEntryKey?: Key,
+  ext?: object
+}
+GalleryFile = { ownerKind, ownerKey, items: GalleryItem[] }   // one file unit per owner
+```
+
+- **Uniqueness** (`ED`): at most one item per `(ownerKind, ownerKey, source)` among live **and trashed** items, so restore never creates a duplicate; purge frees the source.
+- **Main image is derived**: an item is `초상` / `배경` / `표지` when the owner's `ImageUse` of that slot has the same `source`. No flag is stored. `초상으로` · `배경으로` · `표지로` write that `ImageUse` (same source, new crops).
+- **Slot registry**: a new `SlotSpec GALLERY` (ratios `r3x4`, `r1x1`; holo allowed) is used by the crop editor only; `ImageSlot` in `ImageUse` does **not** gain a gallery value.
+- **Scene link** is a reference: trashed or purged scene → dotted `지운 씬 · <code>` per §3 (purged: code from the `NameTag` of kind `unit`); hidden scene while locked → `숨긴 씬` (rule 19 §6). Either sorts as unlinked in `씬 순서`.
+- **Hiding** (`ED`): while locked a hidden item is absent from every surface (lists, counts, positions, search, picker `내 이미지`, `이미 있음` marks) but still holds its source for uniqueness; adds and copies of that source are skipped without naming it (55 GAL-19).
+- **Copy** (`다른 곳에도 넣기`): a new item with every field except `key`, owner, `order` and bookkeeping (`hidden` included).
+- **Merge** (CST-45, `MergeOps`): the merged character's items move to the target, appended in their order; one whose source the target already holds stays with the merged character. Each move is a `MergeRecord.movedRefs` entry `{ ownerKind: "galleryItem", ownerKey: <item key>, field: "ownerKey" }`.
+- **Naming**: the existing `Blob.source = gallery` (`BlobSource.GALLERY`) means "system photo picker" and is unrelated to this entity; its UI word is `사진`. The serial name stays.
+
+### 12.2 Liveness, trash, blobs
+
+| Row | Owners (all must be live) | Notes |
+| --- | --- | --- |
+| `GalleryItem` | owner (project or character) | `sceneKey`, `tagKeys` are references |
+
+- Deleting one item: direct mark + `TrashEntry.kind = galleryItem` (filters `전체`, plus `인물` for character items, `ED`). Restore clears the mark; the item sorts by its kept `order`. A hidden item's trash row is masked and restore needs authentication.
+- Deleting the owner character: items are not live by derivation and come back with it (§5.1); the impact sheet counts them (`OwnedKind.GALLERY_ITEM`, `이미지 <n>`). Purge of the owner deletes them (§5.3).
+- **Blob references.** Three computations exist today: `BlobReferences.counts` (core:store), `PurgeOps.referencedBlobs` (domain:trash) and `PurgeActions.heldBlobs` (domain:actions). They must become one function, and it counts `GalleryItem.source` hashes of live and trashed items. Otherwise a purge of any unrelated item deletes originals only gallery items use. Done 2026-11-23: `core:model` `BlobRefs` is that function; the other three delegate to it.
+- Undo: `DocChange.revert` gains a row list for gallery items (as for `imageUses`); `LiveRows`, `RestoreOps`, `TrashListing`, `PurgeOps.removeImages` and the `DeletedItems` snapshot each gain a gallery branch (55 §3.4).
+
+### 12.3 Package (format 1.0)
+
+- New file units: `gallery/<ownerKey>.json` (`GalleryFile`, live items) and `trash/gallery/<ownerKey>.json` (trashed items, `휴지통도 포함`, §7.9 pattern).
+- Originals of gallery items: `gallery/files/<hash>.<ext>`, written for every blob a written gallery item references, also when `assets/<hash>.<ext>` holds the same bytes for another row (the package may hold such a file twice; the device stores it once). Every written blob keeps its metadata row in `assets/index.json › blobs`. The reader finds `gallery/` by path whether or not the manifest lists `gallery`, and a file without `gallery/` opens with empty galleries. `ED`, 55 §6 Q16.
+- Manifest feature id (§7.3): `gallery` · optional · covers `gallery/` · present when any gallery file is written. `Features.GALLERY` joins `Features.OPTIONAL` (and so `KNOWN`).
+- Version (correction 2026-11-23): the gallery is part of **format 1.0**, because 0.1.0 is not released yet and ships with it. `formatVersion "1.0"`, `minReaderVersion "1.0"`; no format 1.1 and no upgrade step. The 1.0 regression file `app/src/test/resources/format/1.0/` (LIB-56) gains G0.
+- On read: `gallery/files/*` go into the one blob store; gallery files whose owner is missing from the file are dropped (a damaged or hand-edited file).
+- Item hiding counts as "the project has hidden items" for the encryption default (rule 19 §5, LIB-51); the user can still turn encryption off.
+- PDF, CSV and engine JSON exports carry no gallery content (`ED`).
+
+### 12.4 App state (never exported)
+
+- `AppSettings.viewByScreen` keys `characterGallery`, `projectGallery` with values `LIST` · `GRID` · `CARD` (`ViewMode.GRID` is new; screens without it never store it; the codec's fallback for unknown values stays `LIST`).
+- `AppSettings.galleryTextOn: Boolean = true` (viewer `설명` toggle).
+- Saved UI state (process death, CNV-35): picked gallery item key, panel expanded flag, row scroll per gallery screen.
+
+### 12.5 Working store (§8.2)
+
+- `ProjectDoc.gallery: Map<ownerKey, GalleryFile>`, stored as the file units `gallery/<ownerKey>.json` and `trash/gallery/<ownerKey>.json` under `files/projects/<projectKey>/`. An edit (a caption keystroke included) rewrites only that owner's unit, debounced as §8.2.
+- `ProjectIndex` accessors: items by owner in `order`, items by `source` (uniqueness, `이미 있음`, `휴지통에 있음`, blob references).
+- Liveness check (the existing live-row helpers, §5.1) for a gallery item = not directly marked and owner live.
+
+### 12.6 Rows to fold into the body later
+
+- §1.7 glossary: `GalleryItem` · 갤러리 이미지 · — · `ImageUse` (one image per slot), `BlobSource.GALLERY` (system photo picker).
+- §2.11 `TrashEntry.kind` gains `galleryItem`.
+- §7.3 feature table gains `gallery` · optional · `gallery/` · any gallery item.
+- §10 conflict row C-33 · gallery: new trash kind `galleryItem`, feature id `gallery` (format 1.0), `ViewMode.GRID`, one blob reference function · resolution as §12.2–12.4.

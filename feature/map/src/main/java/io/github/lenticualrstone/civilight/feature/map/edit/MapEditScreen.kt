@@ -42,6 +42,14 @@ import io.github.lenticualrstone.civilight.feature.map.canvas.MapCanvas
 import io.github.lenticualrstone.civilight.feature.map.canvas.Viewport
 import io.github.lenticualrstone.civilight.feature.map.canvas.mapAt
 import io.github.lenticualrstone.civilight.feature.map.common.GlassCard
+import io.github.lenticualrstone.civilight.feature.map.common.FoldSwitch
+import io.github.lenticualrstone.civilight.feature.map.common.MapBar
+import io.github.lenticualrstone.civilight.feature.map.common.MapBarSlot
+import io.github.lenticualrstone.civilight.feature.map.common.MapBars
+import androidx.compose.animation.animateContentSize
+import io.github.lenticualrstone.civilight.designsystem.component.SidePanelHost
+import io.github.lenticualrstone.civilight.designsystem.component.TabContent
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.feature.map.common.TopBarTapGuard
 import io.github.lenticualrstone.civilight.feature.map.common.MapEnv
 import io.github.lenticualrstone.civilight.feature.map.common.MapNav
@@ -438,26 +446,26 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
                         val c = scope.screen(props.data.at)
                         val r = maxOf(StampGlyphs.radius(props.data.size) * scope.math.contentW(scope.viewport), with(density) { (4 + 3 * props.data.size).dp.toPx() })
                         MapValueChip(props.data.chip, Modifier.mapAt(c.x, c.y + r + with(density) { 22.dp.toPx() }))
-                        MapVertex(Modifier.mapAt(c.x, c.y - r * 1.6f), last = editor.handle == StampHandles.ROTATE, onClick = { set(Editor.chooseHandle(editor, StampHandles.ROTATE)) })
-                        MapVertex(Modifier.mapAt(c.x + r * 1.1f, c.y + r * 1.1f), last = editor.handle == StampHandles.SIZE, onClick = { set(Editor.chooseHandle(editor, StampHandles.SIZE)) })
+                        MapVertex(Modifier.mapAt(c.x, c.y - r * 1.6f), last = editor.handle == StampHandles.ROTATE, onClick = { set(Editor.chooseHandle(editor, StampHandles.ROTATE)) }, popOnAppear = false)
+                        MapVertex(Modifier.mapAt(c.x + r * 1.1f, c.y + r * 1.1f), last = editor.handle == StampHandles.SIZE, onClick = { set(Editor.chooseHandle(editor, StampHandles.SIZE)) }, popOnAppear = false)
                     }
                     if (props is PropsUi.LineProps && editor.tool == EditTool.MOVE) {
                         props.points.forEachIndexed { i, q ->
                             val s0 = scope.screen(q)
-                            MapVertex(Modifier.mapAt(s0.x, s0.y), last = editor.vertex == i, onClick = { set(Editor.chooseVertex(editor, i)) })
+                            MapVertex(Modifier.mapAt(s0.x, s0.y), last = editor.vertex == i, onClick = { set(Editor.chooseVertex(editor, i)) }, popOnAppear = false)
                         }
                     }
                     if (editor.tool == EditTool.MOVE || editor.tool == EditTool.LAYER) {
                         if (props is PropsUi.RegionProps) {
                             props.vertices.forEachIndexed { i, q ->
                                 val s = scope.screen(q)
-                                MapVertex(Modifier.mapAt(s.x, s.y), last = editor.vertex == i, onClick = { set(Editor.chooseVertex(editor, i)) })
+                                MapVertex(Modifier.mapAt(s.x, s.y), last = editor.vertex == i, onClick = { set(Editor.chooseVertex(editor, i)) }, popOnAppear = false)
                             }
                         }
                         if (props is PropsUi.LabelProps) {
                             props.curve?.forEachIndexed { i, q ->
                                 val s = scope.screen(q)
-                                MapVertex(Modifier.mapAt(s.x, s.y), last = editor.handle == i, onClick = { set(Editor.chooseHandle(editor, i)) })
+                                MapVertex(Modifier.mapAt(s.x, s.y), last = editor.handle == i, onClick = { set(Editor.chooseHandle(editor, i)) }, popOnAppear = false)
                             }
                         }
                     }
@@ -465,95 +473,116 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
             )
             TopBarTapGuard(padding.calculateTopPadding())
             val toolCells = remember(detail) { tools.map { MapTool(it.label, it.icon) } }
+            val motion = CivilightTheme.motion
             val toolbar: @Composable (Modifier) -> Unit = { mod ->
-                MapToolbar(tools.indexOf(editor.tool).coerceAtLeast(0), { set(Editor.chooseTool(editor, tools[it], detail)) }, mod, tools = toolCells, label = MapCopy.TOOLBAR)
+                MapToolbar(tools.indexOf(editor.tool).coerceAtLeast(0), { set(Editor.chooseTool(editor, tools[it], detail)) }, mod.animateContentSize(motion.move(CivilightMotion.standard)), tools = toolCells, label = MapCopy.TOOLBAR)
             }
             val shapeEdit = editor.shapeEdit
-            val shapeBar: (@Composable (Modifier) -> Unit)? = shapeEdit?.let { pending ->
-                val choice = d?.let { ShapeEdits.choice(it, route.mapKey, pending.regionKey, lens) } as? EditChoice.TwoButtons
-                choice?.let { c ->
-                    { mod ->
-                        ShapeChoiceBar(
-                            c, readOnly,
-                            onOverwrite = { vm.overwriteShape(pending.regionKey, lens, pending.index, pending.to); set(Editor.endShapeEdit(editor)) },
-                            onFromHere = { vm.changeShapeFromHere(pending.regionKey, lens, pending.index, pending.to); set(Editor.endShapeEdit(editor)) },
-                            onCancel = { set(Editor.endShapeEdit(editor)) },
-                            modifier = mod,
-                        )
+            val shapeChoice = shapeEdit?.let { pending -> d?.let { ShapeEdits.choice(it, route.mapKey, pending.regionKey, lens) } as? EditChoice.TwoButtons }
+            val moving = state.moving
+            val scaleLabel = map?.let { m -> d?.let { ScaleBars.label(it, m, contentWidth, barPx) } } ?: state.scale
+            // The bar above the tool bar (move, shape choice, and on the cover the layer, property and stamp cards).
+            val barContent: @Composable (EditBar, String, Boolean) -> Unit = { b, kind, isInner ->
+                val st = b.state
+                val ed = b.editor
+                val mod = Modifier.padding(bottom = 10.dp)
+                when (kind) {
+                    MapBars.MOVE -> {
+                        val mv = st.moving
+                        if (mv != null) {
+                            MovePinBar(mv.first, mv.second != null && !b.readOnly, { set(Editor.endMovePin(ed)) }, {
+                                val to = mv.second ?: return@MovePinBar
+                                ed.movingPin?.let { k -> vm.movePin(k, to) { set(Editor.endMovePin(EditorState.decode(editorText))) } }
+                            }, if (isInner) mod.widthIn(max = 360.dp) else mod.fillMaxWidth())
+                        }
+                    }
+                    MapBars.SHAPE -> {
+                        val pending = b.pending
+                        val choice = b.choice
+                        if (pending != null && choice != null) {
+                            ShapeChoiceBar(
+                                choice, b.readOnly,
+                                onOverwrite = { vm.overwriteShape(pending.regionKey, lens, pending.index, pending.to); set(Editor.endShapeEdit(ed)) },
+                                onFromHere = { vm.changeShapeFromHere(pending.regionKey, lens, pending.index, pending.to); set(Editor.endShapeEdit(ed)) },
+                                onCancel = { set(Editor.endShapeEdit(ed)) },
+                                modifier = if (isInner) mod.widthIn(max = 360.dp) else mod.fillMaxWidth(),
+                            )
+                        }
+                    }
+                    MapBars.LAYERS -> GlassCard(mod.fillMaxWidth().heightIn(max = 320.dp)) {
+                        Column(Modifier.verticalScroll(rememberScrollState())) { LayersPanel(st.layers, b.readOnly, layerActions) }
+                    }
+                    MapBars.PROPS -> st.props?.let { props ->
+                        GlassCard(mod.fillMaxWidth().heightIn(max = 360.dp)) {
+                            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { PropsPanel(props, b.readOnly, actions, ed.compare) }
+                        }
+                    }
+                    MapBars.STAMPS -> GlassCard(mod.fillMaxWidth().heightIn(max = 320.dp)) {
+                        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StampPalette(ed.stampKind, ed.stampSize, { set(Editor.chooseStamp(ed, it)) }, { set(Editor.chooseStampSize(ed, it)) })
+                        }
                     }
                 }
             }
-            val moving = state.moving
-            if (inner) {
-                Column(
-                    Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    (map?.let { m -> d?.let { ScaleBars.label(it, m, contentWidth, barPx) } } ?: state.scale)?.let { ScaleBar(it) }
-                    if (moving != null) {
-                        MovePinBar(moving.first, moving.second != null && !readOnly, { set(Editor.endMovePin(editor)) }, {
-                            val to = moving.second ?: return@MovePinBar
-                            editor.movingPin?.let { k -> vm.movePin(k, to) { set(Editor.endMovePin(EditorState.decode(editorText))) } }
-                        }, Modifier.widthIn(max = 360.dp))
-                    }
-                    shapeBar?.invoke(Modifier.widthIn(max = 360.dp))
-                    toolbar(Modifier)
-                }
+            SidePanelHost(
+                inner,
+                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
+            ) {
                 SidePanel(
                     onClose = actions::deselect,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
                     tabs = if (detail) listOf(MapCopy.TAB_STAMPS, MapCopy.TAB_LEGEND, MapCopy.TAB_LAYERS) else listOf(MapCopy.TAB_PROPS, MapCopy.TAB_LAYERS, MapCopy.TAB_LIST),
                     selectedTab = editor.panelTab,
                     onSelectTab = { set(editor.copy(panelTab = it)) },
                 ) {
-                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (detail) {
-                            when (editor.panelTab) {
-                                1 -> LegendPanel(state.legend)
-                                2 -> LayersPanel(state.layers, readOnly, layerActions)
-                                else -> {
-                                    state.props?.let { PropsPanel(it, readOnly, actions, editor.compare) }
-                                    if (state.props == null || editor.tool == EditTool.STAMP) {
-                                        StampPalette(editor.stampKind, editor.stampSize, { set(Editor.chooseStamp(editor, it)) }, { set(Editor.chooseStampSize(editor, it)) })
+                    TabContent(editor.panelTab) { tab ->
+                        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (detail) {
+                                when (tab) {
+                                    1 -> LegendPanel(state.legend)
+                                    2 -> LayersPanel(state.layers, readOnly, layerActions)
+                                    else -> {
+                                        state.props?.let { PropsPanel(it, readOnly, actions, editor.compare) }
+                                        if (state.props == null || editor.tool == EditTool.STAMP) {
+                                            StampPalette(editor.stampKind, editor.stampSize, { set(Editor.chooseStamp(editor, it)) }, { set(Editor.chooseStampSize(editor, it)) })
+                                        }
                                     }
                                 }
-                            }
-                        } else {
-                            when (editor.panelTab) {
-                                1 -> LayersPanel(state.layers, readOnly, layerActions)
-                                2 -> ItemsPanel(state.items) { set(Editor.select(editor, it)) }
-                                else -> state.props?.let { PropsPanel(it, readOnly, actions, editor.compare) }
+                            } else {
+                                when (tab) {
+                                    1 -> LayersPanel(state.layers, readOnly, layerActions)
+                                    2 -> ItemsPanel(state.items) { set(Editor.select(editor, it)) }
+                                    else -> state.props?.let { PropsPanel(it, readOnly, actions, editor.compare) }
+                                }
                             }
                         }
                     }
                 }
-            } else {
-                Column(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    when {
-                        moving != null -> MovePinBar(moving.first, moving.second != null && !readOnly, { set(Editor.endMovePin(editor)) }, {
-                            val to = moving.second ?: return@MovePinBar
-                            editor.movingPin?.let { k -> vm.movePin(k, to) { set(Editor.endMovePin(EditorState.decode(editorText))) } }
-                        }, Modifier.fillMaxWidth())
-                        shapeBar != null -> shapeBar(Modifier.fillMaxWidth())
-                        editor.tool == EditTool.LAYER -> GlassCard(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
-                            Column(Modifier.verticalScroll(rememberScrollState())) { LayersPanel(state.layers, readOnly, layerActions) }
-                        }
-                        state.props != null -> GlassCard(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
-                            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { PropsPanel(state.props, readOnly, actions, editor.compare) }
-                        }
-                        detail && editor.tool == EditTool.STAMP -> GlassCard(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
-                            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                StampPalette(editor.stampKind, editor.stampSize, { set(Editor.chooseStamp(editor, it)) }, { set(Editor.chooseStampSize(editor, it)) })
-                            }
-                        }
+            }
+            FoldSwitch(inner) { isInner ->
+                val kind = MapBars.edit(
+                    moving != null, shapeChoice != null, editor.tool == EditTool.LAYER, state.props != null,
+                    detail && editor.tool == EditTool.STAMP, isInner,
+                )
+                val slot = kind?.let { MapBarSlot(it, EditBar(state, editor, shapeChoice, shapeEdit, readOnly)) }
+                if (isInner) {
+                    Column(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp)) {
+                        scaleLabel?.let { ScaleBar(it, Modifier.padding(bottom = 10.dp)) }
+                        MapBar(slot) { k, b -> barContent(b, k, true) }
+                        toolbar(Modifier)
                     }
-                    toolbar(Modifier)
+                } else {
+                    Column(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        MapBar(slot, Modifier.fillMaxWidth()) { k, b -> barContent(b, k, false) }
+                        toolbar(Modifier)
+                    }
                 }
             }
         }
     }
 }
+
+/** What the bar above the tool bar draws: a snapshot of everything it needs, so the bar that leaves keeps its last content. */
+private data class EditBar(val state: EditUi, val editor: EditorState, val choice: EditChoice.TwoButtons?, val pending: ShapeEditState?, val readOnly: Boolean)

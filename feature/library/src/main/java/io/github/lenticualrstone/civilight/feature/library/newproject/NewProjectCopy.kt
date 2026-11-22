@@ -42,8 +42,11 @@ object NewProjectCopy {
     const val PREVIEW_LIVE = "실시간 미리 보기"
 
     /** The `직접 정하기` editor's add and remove buttons (LIB-10: layout `ED`, copy not in sources). */
-    const val TODO_COPY_LIB10_ADD_LEVEL = "TODO_COPY_LIB10_ADD_LEVEL"
-    const val TODO_COPY_LIB10_REMOVE_LEVEL = "TODO_COPY_LIB10_REMOVE_LEVEL"
+    /** While `만들기` runs (DS-47 `DelayedProgress`: shown only after a second). */
+    const val WORKING = "만드는 중"
+
+    const val ADD_LEVEL = "단계 추가"
+    const val REMOVE_LEVEL = "단계 빼기"
 
     // 3/4
     const val TIME_YEAR = "연도만"

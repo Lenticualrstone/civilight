@@ -34,7 +34,7 @@ fun SketchStraightenScreen(route: SketchStraighten, deps: FeatureDeps) {
             .onFailure { if (it is CancellationException) throw it }
             .getOrNull()
         if (photo == null) {
-            deps.toasts.show(MapCopy.TODO_COPY_MAP_IMPORT_FAILED, actionLabel = null)
+            deps.toasts.show(MapCopy.IMPORT_FAILED, actionLabel = null)
             deps.navigator.pop()
         }
     }
@@ -52,7 +52,7 @@ fun SketchStraightenScreen(route: SketchStraighten, deps: FeatureDeps) {
                         .onFailure { if (it is CancellationException) throw it }
                         .getOrNull()
                     if (result == null) {
-                        deps.toasts.show(MapCopy.TODO_COPY_MAP_IMPORT_FAILED, actionLabel = null)
+                        deps.toasts.show(MapCopy.IMPORT_FAILED, actionLabel = null)
                         return@launch
                     }
                     val key = vm.createSketchMap(result, parent)

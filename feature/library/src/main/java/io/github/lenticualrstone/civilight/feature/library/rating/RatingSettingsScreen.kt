@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.library.rating
 
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,7 +67,7 @@ internal fun RatingSettingsScreen(services: LibraryServices) {
                         RatingBadge(ThemeBridge.rating(group.rating))
                         CivilightText(group.gloss, type.small, color = colors.ink3)
                     }
-                    if (group.switches.isEmpty()) {
+                    FoldReveal(group.switches.isEmpty()) {
                         CivilightText(RatingCopy.ALL_LABEL_ONLY, type.small, color = colors.ink3)
                     }
                     group.switches.forEach { s ->
@@ -76,7 +78,7 @@ internal fun RatingSettingsScreen(services: LibraryServices) {
                             subtitle = s.sub,
                         )
                     }
-                    group.tag?.let { tag ->
+                    FoldRevealValue(group.tag) { tag ->
                         TextAction(tag, { deps.navigator.push(RatingDefaultsApply(group.rating)) }, color = colors.acc, style = type.small)
                     }
                 }

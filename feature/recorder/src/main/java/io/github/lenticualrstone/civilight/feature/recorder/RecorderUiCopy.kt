@@ -1,9 +1,12 @@
 package io.github.lenticualrstone.civilight.feature.recorder
 
+import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.ui.picker.PickerCopy
+
 /**
  * UI copy of this feature that `domain:recorder` `RecorderCopy` does not hold (that object keeps
  * the rule-23 copy and the `TODO_COPY_LRC_<n>` ids; screens use both). Verbatim from the spec and
- * the boards (`ErrMic`, `OnbVoice`, `LrRecord`, `LrText`). Missing copy stays a `TODO_COPY_` id.
+ * the boards (`ErrMic`, `OnbVoice`, `LrRecord`, `LrText`). Copy no source gives is an `ED` pick built from existing copy, listed in the status file to confirm; the `TODO_COPY_LRC_<n>` ids of `RecorderCopy` resolve through `ShownCopy`.
  */
 object RecorderUiCopy {
     // 마이크 꺼짐 (LRC-06, `ErrMic`).
@@ -30,28 +33,28 @@ object RecorderUiCopy {
     // 기록함 (LRC-25 … LRC-27).
     const val BACK = "뒤로"
 
-    /** Label of the header icon that opens the text search over the records (§6 Q11 `ED`); no source names it. */
-    const val TODO_SEARCH_ICON = "TODO_COPY_LRC_SEARCH_ICON"
+    /** Label of the header icon that opens the text search over the records (§6 Q11 `ED`; no source names it). */
+    const val SEARCH_ICON = "검색"
 
-    /** Placeholder of that search field (no source gives one). */
-    const val TODO_SEARCH_PLACEHOLDER = "TODO_COPY_LRC_SEARCH_FIELD"
+    /** Placeholder of that search field: the picker's own (`ED`). */
+    const val SEARCH_PLACEHOLDER = PickerCopy.SEARCH_PLACEHOLDER
 
     // 넣기 sheets (LRC-32, LRC-33).
     /** Title of the scene list behind `씬 고르기 ›` (the row's words without the chevron). */
     const val PICK_SCENE_TITLE = "씬 고르기"
 
-    /** Title of the biometric prompt when an R-18 project is chosen as a 넣기 destination (no source gives it). */
-    const val TODO_R18_PROMPT = "TODO_COPY_LRC_R18_PROMPT"
+    /** Title of the biometric prompt when an R-18 project is chosen as a 넣기 destination (`ED`: the shared mask label). */
+    const val R18_PROMPT = "R-18 프로젝트"
 
-    /** Placeholder of the card search in `카드에 넣기` (LRC-35; the sheet is not drawn). */
-    const val TODO_CARD_SEARCH = "TODO_COPY_LRC_CARD_SEARCH"
+    /** Placeholder of the card search in `카드에 넣기` (LRC-35; `ED`: the picker's own). */
+    const val CARD_SEARCH = PickerCopy.SEARCH_PLACEHOLDER
 
-    /** Confirm button of `인물로 만들기` (LRC-38; the sheet is not drawn and no source names the button). */
-    const val TODO_CHARACTER_BUTTON = "TODO_COPY_LRC_CHARACTER_BUTTON"
+    /** Confirm button of `인물로 만들기` (LRC-38; `ED`: the menu row's own words). */
+    const val CHARACTER_BUTTON = RecorderCopy.MAKE_CHARACTER
 
-    // 원본 음성 (LRC-14): labels of the round play button (the board draws only the glyph).
-    const val TODO_PLAY = "TODO_COPY_LRC_PLAY"
-    const val TODO_PAUSE = "TODO_COPY_LRC_PAUSE"
+    // 원본 음성 (LRC-14): labels of the round play button (the board draws only the glyph; `ED`).
+    const val PLAY = "재생"
+    const val PAUSE = RecorderCopy.PAUSE
 
     /** 빠른 설정 타일 label: TODO_COPY_LRC_01, `ED` the app-wide name until decided (LRC-03). */
     const val TILE_LABEL = "라이프 레코더"

@@ -61,7 +61,7 @@ object MoveCopy {
     fun clipboard(count: Int, cut: Boolean): String = "블록 ${count}개 · ${if (cut) CUT else COPY}"
 
     /** Paste: the spec names no word for it (SCR-40 "Pasting"). */
-    const val PASTE = "TODO_COPY_SCRIPT_PASTE"
+    const val PASTE = "붙이기"
 
     /** Back from the position list to the scene list (DS `‹` icon label, as the shell's `뒤로`). */
     const val BACK = "뒤로"

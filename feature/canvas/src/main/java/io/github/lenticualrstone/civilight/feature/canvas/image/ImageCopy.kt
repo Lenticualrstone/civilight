@@ -2,8 +2,8 @@ package io.github.lenticualrstone.civilight.feature.canvas.image
 
 /**
  * Copy of the image area (CNV-25 … CNV-31): boards `ImageSlots`, `ImagePick`, `ImageCrop`, `MHolo` and
- * the spec 50 tables. `BTN_` keys are buttons. Missing copy is a `TODO_COPY_CANVAS_*` constant that holds
- * its own name (listed under Requests).
+ * the spec 50 tables. `BTN_` keys are buttons. Copy no board gives is the nearest existing wording
+ * (listed under Requests).
  */
 object ImageCopy {
     const val BACK = "뒤로"
@@ -15,6 +15,9 @@ object ImageCopy {
     const val SLOT_CHARACTER_BACKGROUND = "인물 배경"
     const val SLOT_CARD_REFERENCE = "장소 · 용어 · 세력"
     const val SLOT_PAGE_HEADER = "페이지 머리 이미지"
+
+    const val SLOT_GALLERY = "갤러리"
+    const val USED_GALLERY = "갤러리 카드 · 목록 썸네일 · 보기는 원본"
 
     const val USED_PROJECT_COVER = "서재 카드 · 목록 썸네일"
     const val USED_CHARACTER_PORTRAIT = "인물 카드 · 아바타"
@@ -65,7 +68,8 @@ object ImageCopy {
     const val TAB_MINE = "내 이미지"
     const val HOLO = "홀로그램 효과"
     const val HOLO_SUB = "은빛 · 기울이면 흐름"
-    const val BTN_GALLERY = "갤러리"
+    /** The system photo picker button: `사진`, not `갤러리`, which is the gallery feature's word (55 §6 Q1 default). */
+    const val BTN_PHOTO = "사진"
     const val BTN_FILE = "파일"
     const val BTN_PICK = "고르기"
     const val BTN_CLOSE = "닫기"
@@ -81,10 +85,10 @@ object ImageCopy {
     const val BTN_RESET = "처음대로"
     const val HOLO_SUB_CROP = "은빛 · 기울이면 흐름 · 애니메이션 줄이기면 고정"
 
-    // Missing copy (Q-EM-01, Q-IM-05).
-    const val TODO_COPY_CANVAS_MY_IMAGES_EMPTY = "TODO_COPY_CANVAS_MY_IMAGES_EMPTY"
-    const val TODO_COPY_CANVAS_IMAGE_IMPORT_FAILED = "TODO_COPY_CANVAS_IMAGE_IMPORT_FAILED"
-    const val TODO_COPY_CANVAS_IMAGE_UNREADABLE = "TODO_COPY_CANVAS_IMAGE_UNREADABLE"
+    // Copy no board gives (Q-EM-01, Q-IM-05): the nearest existing words, listed under Requests.
+    const val MY_IMAGES_EMPTY = "내 이미지 없음"
+    const val IMAGE_IMPORT_FAILED = "이미지 가져오기 실패"
+    const val IMAGE_UNREADABLE = "이미지 열 수 없음"
 
     /** `기본 이미지 8`, `내 이미지 3`: tab with its count. */
     fun tab(label: String, count: Int): String = "$label $count"

@@ -74,7 +74,7 @@ object ScriptCopy {
     const val UNDO_LABEL = "되돌리기"
 
     /** Link picker title (SCR-55 names none). */
-    const val LINK_PICKER_TITLE = "TODO_COPY_SCRIPT_LINK_PICKER_TITLE"
+    const val LINK_PICKER_TITLE = "잇기"
 
     // --- Undo step names (shown by undo history; spec words where one exists) ---
 
@@ -85,7 +85,7 @@ object ScriptCopy {
     const val UNDO_SPEAKER = "화자"
     const val UNDO_RESTORE = "되살리기"
     const val UNDO_LINE_BREAK = LINE_BREAK
-    const val UNDO_TYPING = "TODO_COPY_SCRIPT_UNDO_TYPING"
+    const val UNDO_TYPING = "쓰기"
     const val UNDO_ADD_OPTION = "선택지"
     const val UNDO_KIND = "종류 바꾸기"
     const val UNDO_CUE = "연출 지시"
@@ -125,7 +125,7 @@ object ScriptCopy {
     const val REMOVE_CUE = "빼기"
 
     /** A cue kind without assets of that kind (the asset form is SCR-61). */
-    const val NO_ASSETS = "TODO_COPY_SCRIPT_NO_ASSETS"
+    const val NO_ASSETS = "비어 있음"
 
     // --- Commands (SCR-68) ---
 
@@ -203,7 +203,7 @@ object ScriptCopy {
     fun deletedPartners(names: String): String = "지운 인물 · $names"
 
     /** `참고` for a block that is not a dialogue line with a speaker (Q-15 has no answer). */
-    const val REF_NOT_DIALOGUE = "TODO_COPY_SCRIPT_REF_NOT_DIALOGUE"
+    const val REF_NOT_DIALOGUE = "화자 없음"
 
     // --- Panel `속성` (SCR-34, SCR-25, SCR-23) ---
 
@@ -288,10 +288,10 @@ object ScriptCopy {
     fun checkNoSpeaker(n: Int): String = "화자 없음 $n"
 
     /** `점검` card of a scene with no `▲` (not drawn by the boards). */
-    const val MODS_NO_CHECKS = "TODO_COPY_SCRIPT_MODS_NO_CHECKS"
+    const val MODS_NO_CHECKS = "없음"
 
     /** `이 씬 분량` of a scene without dialogue or narration. */
-    const val MODS_SCENE_EMPTY = "TODO_COPY_SCRIPT_MODS_SCENE_EMPTY"
+    const val MODS_SCENE_EMPTY = "비어 있음"
 
     /** Toast after `되살리기` of a block (as the trash area's `노아 되살림`): `블록 #043 되살림`. */
     fun blockRestored(number: String): String = "블록 $number 되살림"

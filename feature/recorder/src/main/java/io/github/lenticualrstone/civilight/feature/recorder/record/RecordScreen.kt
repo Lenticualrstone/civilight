@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.recorder.record
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -36,7 +37,11 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.put.PutKind
 import io.github.lenticualrstone.civilight.domain.recorder.state.PlacementStatus
 import io.github.lenticualrstone.civilight.feature.recorder.DeletedTargetSheet
@@ -104,52 +109,57 @@ fun RecordDetailScreen(route: RecorderRecordDetail, deps: FeatureDeps) {
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    when (val s = status) {
-        RecordStatus.Loading -> CenterColumn { CivilightScreen(title = RecorderCopy.APP_NAME, back = back) {} }
-        RecordStatus.Gone -> LaunchedEffect(route) { if (deps.navigator.current == route) deps.navigator.pop() }
-        RecordStatus.Locked -> LockedRecord(deps, back, askOnArrival = !unlockAsked) { unlockAsked = true }
-        is RecordStatus.Ready -> {
-            val view = s.view
-            env?.let { ProtectWindow(CaptureProtection.of(it, view.protectedProjects)) }
-            val openPut = { kind: PutKind ->
-                vm.flushSoon()
-                sheets.open(PutSheet(route.recordKey, kind.name))
-            }
-            CenterColumn {
-                CivilightScreen(
-                    title = view.screen.kindLabel,
-                    smallLine = view.screen.meta,
-                    back = back,
-                    actions = {
-                        CivilightIconButton(IconId.More, RecorderCopy.TODO_MENU_ARIA, onClick = {
-                            vm.flushSoon()
-                            sheets.open(RecordMenuSheet(route.recordKey))
-                        })
-                    },
-                    sheets = sheets,
-                    localSheets = { key ->
-                        when (key) {
-                            is RecordMenuSheet -> { { RecordMenuContent(key, this, c, view, deps, sheets) } }
-                            is PutSheet -> { { PutSheetContent(key, this, vm.services, deps, sheets) } }
-                            is PutScenePickSheet -> { { PutScenePickContent(key, this, vm.services, deps, sheets) } }
-                            is RecordLinkSheet -> { { RecordLinkPickContent(key, this, c, vm.services.recorder, deps) } }
-                            is DeletedTargetSheet -> { { DeletedTargetContent(key, this, c, deps, sheets) } }
-                            else -> null
-                        }
-                    },
-                ) { padding ->
-                    RecordBody(
-                        view = view,
-                        padding = padding,
-                        c = c,
-                        onAddLink = { sheets.open(RecordLinkSheet(route.recordKey)) },
-                        onReplaceLink = { chip -> sheets.open(RecordLinkSheet(route.recordKey, replaceLinkKeys = chip.links.map { it.key })) },
-                        onRemoveLink = { chip -> deps.appScope.launch { c.removeLinks(chip.links.map { it.key }) } },
-                        onCard = { chip -> chip.links.firstOrNull()?.let { sheets.open(DeletedTargetSheet(route.recordKey, it.key)) } },
-                        onPlacement = { route -> deps.navigator.push(route) },
-                        onPut = openPut,
-                        player = vm.services.player,
-                    )
+    // Loading, gone, locked and ready swap by kind; a new `Ready` for every autosave is no swap, so the
+    // text field is never recreated (Hangul composition) and the screen never fades while typing.
+    ContentSwap(status, Modifier.fillMaxSize(), contentKey = { it::class }) { s ->
+        when (s) {
+            RecordStatus.Loading -> CenterColumn { CivilightScreen(title = RecorderCopy.APP_NAME, back = back) {} }
+            RecordStatus.Gone -> LaunchedEffect(route) { if (deps.navigator.current == route) deps.navigator.pop() }
+            RecordStatus.Locked -> LockedRecord(deps, back, askOnArrival = !unlockAsked) { unlockAsked = true }
+            // A re-lock shows the lock at once (D5): the record that leaves is not drawn while it fades.
+            is RecordStatus.Ready -> if (status !is RecordStatus.Locked) {
+                val view = s.view
+                env?.let { ProtectWindow(CaptureProtection.of(it, view.protectedProjects)) }
+                val openPut = { kind: PutKind ->
+                    vm.flushSoon()
+                    sheets.open(PutSheet(route.recordKey, kind.name))
+                }
+                CenterColumn {
+                    CivilightScreen(
+                        title = view.screen.kindLabel,
+                        smallLine = view.screen.meta,
+                        back = back,
+                        actions = {
+                            CivilightIconButton(IconId.More, ShownCopy.MENU, onClick = {
+                                vm.flushSoon()
+                                sheets.open(RecordMenuSheet(route.recordKey))
+                            })
+                        },
+                        sheets = sheets,
+                        localSheets = { key ->
+                            when (key) {
+                                is RecordMenuSheet -> { { RecordMenuContent(key, this, c, view, deps, sheets) } }
+                                is PutSheet -> { { PutSheetContent(key, this, vm.services, deps, sheets) } }
+                                is PutScenePickSheet -> { { PutScenePickContent(key, this, vm.services, deps, sheets) } }
+                                is RecordLinkSheet -> { { RecordLinkPickContent(key, this, c, vm.services.recorder, deps) } }
+                                is DeletedTargetSheet -> { { DeletedTargetContent(key, this, c, deps, sheets) } }
+                                else -> null
+                            }
+                        },
+                    ) { padding ->
+                        RecordBody(
+                            view = view,
+                            padding = padding,
+                            c = c,
+                            onAddLink = { sheets.open(RecordLinkSheet(route.recordKey)) },
+                            onReplaceLink = { chip -> sheets.open(RecordLinkSheet(route.recordKey, replaceLinkKeys = chip.links.map { it.key })) },
+                            onRemoveLink = { chip -> deps.appScope.launch { c.removeLinks(chip.links.map { it.key }) } },
+                            onCard = { chip -> chip.links.firstOrNull()?.let { sheets.open(DeletedTargetSheet(route.recordKey, it.key)) } },
+                            onPlacement = { route -> deps.navigator.push(route) },
+                            onPut = openPut,
+                            player = vm.services.player,
+                        )
+                    }
                 }
             }
         }
@@ -180,6 +190,8 @@ private fun RecordBody(
             .verticalScroll(rememberScrollState())
             .padding(start = side, end = side, top = padding.calculateTopPadding() + 8.dp, bottom = padding.calculateBottomPadding() + 24.dp),
     ) {
+      // What comes and goes (links, `넣은 곳`, the `@` list) moves what is under it on `standard`.
+      Column(Modifier.fillMaxWidth().animateContentSize(CivilightTheme.motion.move())) {
         view.audio?.let { audio -> PlayerRow(screen.recordKey, audio, player, Modifier.padding(bottom = 14.dp)) }
         MemoField(
             text = view.text,
@@ -191,9 +203,9 @@ private fun RecordBody(
             textStyle = type.recorderLive,
             boxed = false,
         )
-        if (view.atOpen && view.atCandidates.isNotEmpty()) {
+        FoldRevealValue(view.atCandidates.takeIf { view.atOpen && it.isNotEmpty() }) { candidates ->
             Column(Modifier.padding(top = 6.dp)) {
-                for (candidate in view.atCandidates) {
+                for (candidate in candidates) {
                     val row = LinkPickerRows.row(candidate)
                     ListRow(title = row.title, subtitle = row.sub.takeIf { it.isNotEmpty() }, compact = true, onClick = { c.pickAt(candidate) })
                 }
@@ -208,11 +220,13 @@ private fun RecordBody(
             hasCard = { chip -> c.cardOf(chip) != null },
             onCard = onCard,
         )
-        if (view.placements.isNotEmpty() || screen.placementsGoneMark != null) {
-            SectionLabel(screen.placementsLabel, Modifier.padding(top = 28.dp, bottom = 4.dp))
-            for (placement in view.placements) PlacementLine(placement, onPlacement)
-            screen.placementsGoneMark?.let { mark ->
-                CivilightText(mark, type.small, Modifier.padding(top = 8.dp), color = colors.ink3)
+        FoldReveal(view.placements.isNotEmpty() || screen.placementsGoneMark != null) {
+            Column {
+                SectionLabel(screen.placementsLabel, Modifier.padding(top = 28.dp, bottom = 4.dp))
+                for (placement in view.placements) PlacementLine(placement, onPlacement)
+                screen.placementsGoneMark?.let { mark ->
+                    CivilightText(mark, type.small, Modifier.padding(top = 8.dp), color = colors.ink3)
+                }
             }
         }
         ChipFlow(Modifier.padding(top = 24.dp)) {
@@ -225,6 +239,7 @@ private fun RecordBody(
                 }
             }
         }
+      }
     }
 }
 

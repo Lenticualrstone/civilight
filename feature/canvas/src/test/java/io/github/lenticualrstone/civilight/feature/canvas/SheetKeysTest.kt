@@ -11,6 +11,15 @@ import io.github.lenticualrstone.civilight.feature.canvas.page.PageMenuSheet
 import io.github.lenticualrstone.civilight.feature.canvas.page.RelinkSheet
 import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
+import io.github.lenticualrstone.civilight.feature.canvas.gallery.GalleryCopySheet
+import io.github.lenticualrstone.civilight.feature.canvas.gallery.GallerySceneSheet
+import io.github.lenticualrstone.civilight.feature.canvas.gallery.GallerySortSheet
+import io.github.lenticualrstone.civilight.feature.canvas.gallery.GalleryTagsSheet
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
+import io.github.lenticualrstone.civilight.model.sample.ExampleGallery
+import io.github.lenticualrstone.civilight.navigation.GalleryAddSheet
+import io.github.lenticualrstone.civilight.navigation.GalleryInfoSheet
+import io.github.lenticualrstone.civilight.navigation.GalleryMenuSheet
 import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
 import io.github.lenticualrstone.civilight.navigation.LineLabelSheet
 import io.github.lenticualrstone.civilight.navigation.RouteCodec
@@ -36,6 +45,13 @@ class SheetKeysTest {
             RelinkSheet(p, K.PAGE_LOWER_LIGHT, K.link(7)),
             ImagePickSheet(p, ImageOwnerKind.PAGE, K.PAGE_LOWER_LIGHT, ImageSlot.PAGE_HEADER),
             ImagePickSheet(p, ImageOwnerKind.CHARACTER, K.RIEN, ImageSlot.CHARACTER_PORTRAIT),
+            GallerySortSheet(p, K.RIEN),
+            GalleryCopySheet(p, listOf(ExampleGallery.ITEM_1, ExampleGallery.ITEM_2)),
+            GallerySceneSheet(p, ExampleGallery.ITEM_3),
+            GalleryTagsSheet(p, listOf(ExampleGallery.ITEM_3)),
+            GalleryAddSheet(p, GalleryOwnerKind.CHARACTER, K.RIEN),
+            GalleryInfoSheet(p, ExampleGallery.ITEM_3, focusDescription = true),
+            GalleryMenuSheet(p, ExampleGallery.ITEM_3),
         )
         for (key in keys) assertEquals(key, RouteCodec.decode(RouteCodec.encode(key)))
         assertEquals(keys, RouteCodec.decodeAll(RouteCodec.encodeAll(keys)))

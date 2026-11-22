@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.script.panel
 
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.layout.Column
@@ -37,11 +38,15 @@ import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
 /** The shown tab of the panel (side panel and cover sheet alike). */
 @Composable
 fun PanelTabBody(content: PanelContent, wide: Boolean, actions: PanelActions) {
-    when (content.tab) {
-        PanelTab.TIME -> content.time?.let { TimeTabView(it, wide, actions) }
-        PanelTab.REF -> content.ref?.let { RefTabView(it) }
-        PanelTab.PROPS -> content.props?.let { PropsTab(it, actions, wide) }
-        PanelTab.MODS -> content.mods?.let { ModsTabView(it, actions) }
+    // Motion audit P4: another selected block crossfades the body (and its height follows); the same
+    // block's data refreshes in place, so typing never cross-fades the panel.
+    ContentSwap(content, Modifier.fillMaxWidth(), contentKey = { it.tab to it.selected }, label = "panelBody") { c ->
+        when (c.tab) {
+            PanelTab.TIME -> c.time?.let { TimeTabView(it, wide, actions) }
+            PanelTab.REF -> c.ref?.let { RefTabView(it) }
+            PanelTab.PROPS -> c.props?.let { PropsTab(it, actions, wide) }
+            PanelTab.MODS -> c.mods?.let { ModsTabView(it, actions) }
+        }
     }
 }
 

@@ -5,6 +5,7 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.project.Rating
 import kotlinx.serialization.Serializable
 
@@ -186,6 +187,42 @@ data class ImagePickSheet(
     val ownerKind: ImageOwnerKind,
     val ownerKey: Key,
     val slot: ImageSlot,
+) : ProjectSheet {
+    override val owner: FeatureModule get() = FeatureModule.CANVAS
+}
+
+/**
+ * 이미지 넣기 (GAL-11) into the gallery of [ownerKind] / [ownerKey]: the image picker with several
+ * choices, `사진` · `파일`, `이미 있음` marks. Opened from the gallery header `+`, the profile section
+ * `넣기` (GAL-01) and the empty gallery (GAL-25). Drawn by canvas.
+ */
+@Serializable
+data class GalleryAddSheet(
+    override val projectKey: Key,
+    val ownerKind: GalleryOwnerKind,
+    val ownerKey: Key,
+) : ProjectSheet {
+    override val owner: FeatureModule get() = FeatureModule.CANVAS
+}
+
+/**
+ * 이미지 정보 (GAL-13) of one gallery item: title, description, tags, scene link. [focusDescription]
+ * opens with the cursor in `설명` (`설명 쓰기`, GAL-08). Drawn by canvas.
+ */
+@Serializable
+data class GalleryInfoSheet(
+    override val projectKey: Key,
+    val itemKey: Key,
+    val focusDescription: Boolean = false,
+) : ProjectSheet {
+    override val owner: FeatureModule get() = FeatureModule.CANVAS
+}
+
+/** The `⋯` menu (GAL-14) of one gallery item: 초상으로 · 배경으로 · 표지로, order, holo, hide, delete. Drawn by canvas. */
+@Serializable
+data class GalleryMenuSheet(
+    override val projectKey: Key,
+    val itemKey: Key,
 ) : ProjectSheet {
     override val owner: FeatureModule get() = FeatureModule.CANVAS
 }

@@ -1,6 +1,10 @@
 package io.github.lenticualrstone.civilight.feature.map.gen
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.MotionToken
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -79,7 +83,9 @@ private fun GenerateFlow(projectKey: Key, parent: MapParent?, startFormat: MapFo
     fun start() {
         vm.start(state, parent) { key -> deps.navigator.replace(MapNav.routeOf(vm.doc.value, projectKey, key)) }
     }
-    Crossfade(state.page, label = "gen-page") { page ->
+    // The two pages push and pop like a route (S1 shape, in-route); only the page changes, the session carries over.
+    val motion = CivilightTheme.motion
+    AnimatedContent(state.page, transitionSpec = { motion.push(forward = targetState > initialState) }, label = "gen-page") { page ->
         if (page == 1) {
             FormatPage(
                 state = state,
@@ -105,12 +111,19 @@ private fun GenerateFlow(projectKey: Key, parent: MapParent?, startFormat: MapFo
 
 /** The generated world of [input] drawn as [format]'s preview (non-interactive). */
 @Composable
-internal fun WorldPreview(vm: MapGenerateViewModel, input: GenInput, format: MapFormat, modifier: Modifier = Modifier) {
+internal fun WorldPreview(
+    vm: MapGenerateViewModel,
+    input: GenInput,
+    format: MapFormat,
+    modifier: Modifier = Modifier,
+    /** How the preview changes when the world or the format does: `standard`; the steps page passes `mapReroll` (400 ms). */
+    token: MotionToken = CivilightMotion.standard,
+) {
     val world by produceState<GeneratedWorld?>(null, input) { value = vm.world(input) }
-    val w = world
+    val motion = CivilightTheme.motion
     Box(modifier.fillMaxSize()) {
-        Crossfade(w, label = "gen-preview") { current ->
-            val base: MapBase = if (current == null) MapBase.Blank else vm.base(current, format)
+        Crossfade(world to format, animationSpec = motion.spec(token), label = "gen-preview") { (current, shownFormat) ->
+            val base: MapBase = if (current == null) MapBase.Blank else vm.base(current, shownFormat)
             MapCanvas(base = base, scene = MapScene(), viewport = Viewport(), onViewportChange = {}, interactive = false, showRouteChips = false)
         }
     }

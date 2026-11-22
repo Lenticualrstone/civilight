@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -199,6 +200,6 @@ private fun SheetScope.StyleContent(style: MapStyle, contours: Boolean, canConto
         MapStyle.entries.forEach { s ->
             RadioRow(MapCopy.STYLE_NAMES[s.ordinal], s == style, { if (!readOnly) onSet(s, contours) }, enabled = !readOnly)
         }
-        if (canContour) SwitchRow(MapCopy.CONTOURS, contours, { onSet(style, it) }, enabled = !readOnly)
+        FoldReveal(canContour) { SwitchRow(MapCopy.CONTOURS, contours, { onSet(style, it) }, enabled = !readOnly) }
     }
 }

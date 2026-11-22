@@ -26,11 +26,13 @@ internal data class LiveRows(
     val canvasParts: Set<Key>,
     /** Link keys of `@` runs in live containers. */
     val links: Set<Key>,
+    /** Live gallery items (55 §12.2). */
+    val galleryItems: Set<Key> = emptySet(),
 ) {
     /** Every live key (used to drop acknowledgements whose subject stopped being live, STO-41). */
     val all: Set<Key> by lazy {
         items + units + blocks + relations + records + voiceLines + archiveDocs + imageUses + pins + overlays +
-            rejections + canvasParts + links
+            rejections + canvasParts + links + galleryItems
     }
 
     companion object {
@@ -83,6 +85,7 @@ internal data class LiveRows(
                 canvasParts = doc.canvases.values.filter { it.deletedAt == null }
                     .flatMap { c -> c.nodes.map { it.key } + c.edges.map { it.key } }.toSet(),
                 links = ReferenceScanner(doc).links.mapTo(HashSet()) { it.link.linkKey },
+                galleryItems = doc.galleryItems.filter(live::isLive).mapTo(HashSet()) { it.key },
             )
         }
     }
@@ -102,6 +105,7 @@ internal data class OwnedRows(
     val fieldValues: Set<String>,
     val rejections: Set<Key>,
     val canvasParts: Set<Key>,
+    val galleryItems: Set<Key> = emptySet(),
 ) {
     companion object {
         fun between(before: LiveRows, after: LiveRows) = OwnedRows(
@@ -117,6 +121,7 @@ internal data class OwnedRows(
             fieldValues = before.fieldValues - after.fieldValues,
             rejections = before.rejections - after.rejections,
             canvasParts = before.canvasParts - after.canvasParts,
+            galleryItems = before.galleryItems - after.galleryItems,
         )
     }
 }

@@ -1,5 +1,14 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import io.github.lenticualrstone.civilight.designsystem.foundation.animatedInsetOutline
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.animation.core.animateDpAsState
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,12 +56,15 @@ fun StepBars(count: Int, current: Int, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         repeat(count) { i ->
-            val c = when (stepState(i, current)) {
-                StepState.CURRENT -> colors.acc
-                StepState.DONE -> colors.ink2
-                StepState.UPCOMING -> colors.line
-            }
-            Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(c))
+            val c = animatedColor(
+                when (stepState(i, current)) {
+                    StepState.CURRENT -> colors.acc
+                    StepState.DONE -> colors.ink2
+                    StepState.UPCOMING -> colors.line
+                },
+                label = "stepBar",
+            )
+            Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(2.dp)).drawBehind { drawRect(c.value) })
         }
     }
 }
@@ -73,7 +85,8 @@ fun TourProgress(count: Int, current: Int, label: String?, modifier: Modifier = 
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             repeat(count) { i ->
-                Box(Modifier.size(16.dp, 3.dp).clip(RoundedCornerShape(2.dp)).background(if (i == current) colors.acc else colors.line))
+                val c = animatedColor(if (i == current) colors.acc else colors.line, label = "tourBar")
+                Box(Modifier.size(16.dp, 3.dp).clip(RoundedCornerShape(2.dp)).drawBehind { drawRect(c.value) })
             }
         }
         val text = if (label != null) "$label · ${current + 1}/$count" else "${current + 1}/$count"
@@ -81,14 +94,20 @@ fun TourProgress(count: Int, current: Int, label: String?, modifier: Modifier = 
     }
 }
 
-/** DS-48 pager marks (card rows): current `acc` 18 × 4, others `line` 6 × 4, gap 4, radius 2. */
+/**
+ * DS-48 pager marks (card rows): current `acc` 18 × 4, others `line` 6 × 4, gap 4, radius 2. The current
+ * mark's width moves on `standard` and the colours cross over (S6); reduced motion: widths snap.
+ */
 @Composable
 fun PagerMarks(count: Int, current: Int, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
+    val motion = LocalMotion.current
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         repeat(count) { i ->
             val on = i == current
-            Box(Modifier.size(if (on) 18.dp else 6.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(if (on) colors.acc else colors.line))
+            val width by animateDpAsState(if (on) 18.dp else 6.dp, motion.move(CivilightMotion.standard), label = "pagerWidth")
+            val c = animatedColor(if (on) colors.acc else colors.line, label = "pagerColor")
+            Box(Modifier.size(width, 4.dp).clip(RoundedCornerShape(2.dp)).drawBehind { drawRect(c.value) })
         }
     }
 }
@@ -106,7 +125,7 @@ fun ProgressBar(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val animated by animateFloatAsState(fraction.coerceIn(0f, 1f), CivilightMotion.spec(CivilightMotion.standard, CivilightTheme.reducedMotion), label = "progress")
+    val animated = animateFloatAsState(fraction.coerceIn(0f, 1f), LocalMotion.current.move(CivilightMotion.standard), label = "progress")
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(
             Modifier
@@ -116,7 +135,12 @@ fun ProgressBar(
                 .background(colors.line)
                 .semantics { progressBarRangeInfo = ProgressBarRangeInfo(fraction.coerceIn(0f, 1f), 0f..1f) },
         ) {
-            Box(Modifier.fillMaxWidth(animated).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(colors.acc))
+            Box(
+                Modifier.matchParentSize().drawBehind {
+                    val w = size.width * animated.value
+                    if (w > 0f) drawRoundRect(colors.acc, size = Size(w, size.height), cornerRadius = CornerRadius(size.height / 2))
+                },
+            )
         }
         if (valueText != null || estimateText != null) {
             Row(Modifier.fillMaxWidth()) {
@@ -141,13 +165,25 @@ fun StepList(steps: List<String>, current: Int, modifier: Modifier = Modifier) {
         steps.forEachIndexed { i, label ->
             val state = stepState(i, current)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                val marker = when (state) {
-                    StepState.DONE -> Modifier.clip(shape).background(colors.acc)
-                    StepState.CURRENT -> Modifier.insetOutline(colors.acc, 2.dp, shape)
-                    StepState.UPCOMING -> Modifier.insetOutline(colors.ink3, 1.5.dp, shape)
-                }
-                Box(Modifier.size(20.dp).then(marker))
-                CivilightText(label, type.command, color = if (state == StepState.UPCOMING) colors.ink3 else colors.ink)
+                val done = animatedFraction(state == StepState.DONE, label = "stepDone")
+                val ring = animatedColor(
+                    when (state) {
+                        StepState.DONE -> colors.acc.copy(alpha = 0f)
+                        StepState.CURRENT -> colors.acc
+                        StepState.UPCOMING -> colors.ink3
+                    },
+                    label = "stepRing",
+                )
+                val ringWidth = animatedAlpha(if (state == StepState.CURRENT) 2f else 1.5f, label = "stepRingWidth")
+                val text by animatedColor(if (state == StepState.UPCOMING) colors.ink3 else colors.ink, label = "stepText")
+                Box(
+                    Modifier
+                        .size(20.dp)
+                        .clip(shape)
+                        .drawBehind { val a = done.value; if (a > 0f) drawRect(colors.acc, alpha = a) }
+                        .animatedInsetOutline(ring, { ringWidth.value.dp }, shape),
+                )
+                CivilightText(label, type.command, color = text)
             }
         }
     }

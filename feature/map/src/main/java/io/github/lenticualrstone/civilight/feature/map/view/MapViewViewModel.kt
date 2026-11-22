@@ -37,7 +37,7 @@ class MapViewViewModel(projectKey: Key, val mapKey: Key, env: MapEnv) : MapScree
             null
         }
         if (blob == null || !blob.mime.startsWith("image/")) {
-            env.toasts.show(MapCopy.TODO_COPY_MAP_IMPORT_FAILED, actionLabel = null)
+            env.toasts.show(MapCopy.IMPORT_FAILED, actionLabel = null)
             return
         }
         val ctx = editContext()

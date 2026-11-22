@@ -96,6 +96,7 @@ class TrashRows(private val now: Timestamp, private val zone: ZoneId) {
             TrashKind.FACTION -> HideableKind.FACTION
             TrashKind.SCENE -> HideableKind.SCENE
             TrashKind.PAGE -> HideableKind.PAGE
+            TrashKind.GALLERY_ITEM -> HideableKind.GALLERY_IMAGE
             else -> null
         }
         val masked = (entry.hiddenAtDelete && itemsLocked && hiddenKind != null)
@@ -137,6 +138,11 @@ class TrashRows(private val now: Timestamp, private val zone: ZoneId) {
             }
             TrashKind.CHANGE -> TODO_COPY_LIB38_CHANGE to location
             TrashKind.FIELD_DEF -> (target?.let(index::fieldDef)?.name ?: TODO_COPY_LIB38_FIELD_DEF) to "인물 · $location"
+            TrashKind.GALLERY_ITEM -> {
+                val g = target?.let(index::galleryItem)
+                val owner = if (g?.ownerKind?.known == io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind.CHARACTER) index.character(g.ownerKey)?.name else doc.project.name
+                (g?.title?.takeIf { it.isNotBlank() } ?: "제목 없음") to listOfNotNull(owner, "갤러리").joinToString(" · ")
+            }
             else -> (target ?: "") to location
         }
         return TrashRow(entry.key, title, sub, days, needsAuth)

@@ -268,12 +268,27 @@ class ImageRulesTest {
     fun `tilt follows the device, the drag and sways back`() {
         assertEquals(Tilt(1f, -0.4f), HoloRules.fromDevice(pitchDeg = -10f, rollDeg = 40f, basePitchDeg = 0f, baseRollDeg = 0f))
         assertEquals(Tilt(0.5f, 0f), HoloRules.fromDrag(Tilt.ZERO, 75f, 0f, 300f, 430f))
-        val start = HoloRules.sway(Tilt(1f, 0f), 0)
-        assertEquals(1f, start.x, 0.001f)
-        assertTrue(kotlin.math.abs(HoloRules.sway(Tilt(1f, 0f), 2000).x) < 0.2f)
-        assertEquals(Tilt.ZERO, HoloRules.sway(Tilt(1f, 0f), HoloRules.SWAY_END_MS))
         assertEquals(Tilt(-1f, 0f), HoloRules.sweepTilt(0f))
         assertEquals(Tilt(1f, 0f), HoloRules.sweepTilt(1f))
+    }
+
+    @Test
+    fun `the sway is a damped spring and the sweep end settles into the live tilt`() {
+        // Under-damped (it swings past rest), and stiffness (2π / period)² for the 1.4 s period of the board.
+        assertTrue(HoloRules.SWAY_DAMPING in 0.1f..0.5f)
+        val omega = 2 * Math.PI / 1.4
+        assertEquals(omega * omega, HoloRules.SWAY_STIFFNESS.toDouble(), 1.0)
+        assertEquals(Tilt(1f, 0f), HoloRules.blend(Tilt(1f, 0f), Tilt(-1f, 0.5f), 0f))
+        assertEquals(Tilt(-1f, 0.5f), HoloRules.blend(Tilt(1f, 0f), Tilt(-1f, 0.5f), 1f))
+        assertEquals(Tilt(0f, 0.25f), HoloRules.blend(Tilt(1f, 0f), Tilt(-1f, 0.5f), 0.5f))
+    }
+
+    @Test
+    fun `the holo sweep fires on the toggle edge only`() {
+        assertTrue("toggle turned on", HoloRules.sweepEdge(previousTrigger = 0, trigger = 1, on = true))
+        assertFalse("restore: nothing moved", HoloRules.sweepEdge(previousTrigger = 1, trigger = 1, on = true))
+        assertFalse("another tile became the shown one: trigger unchanged", HoloRules.sweepEdge(previousTrigger = 1, trigger = 1, on = true))
+        assertFalse("a tile that is not holo-on does not sweep", HoloRules.sweepEdge(previousTrigger = 0, trigger = 1, on = false))
     }
 
     private fun exportedAssets(doc: ProjectDoc) =

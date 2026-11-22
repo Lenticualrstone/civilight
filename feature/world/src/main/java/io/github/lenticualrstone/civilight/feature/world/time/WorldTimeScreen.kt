@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.world.time
 
 import androidx.compose.foundation.layout.PaddingValues
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -75,9 +76,10 @@ fun WorldTimeScreen(route: WorldCalendar, deps: FeatureDeps) {
                     bottom = padding.calculateBottomPadding() + 24.dp,
                 ),
             ) {
-                item(key = "title") { SectionLabel(WorldCopy.WORLD_TIME, Modifier.padding(top = 12.dp, bottom = 4.dp)) }
+                item(key = "title") { SectionLabel(WorldCopy.WORLD_TIME, civilightItem().padding(top = 12.dp, bottom = 4.dp)) }
                 items(state.options, key = { it.mode.name }) { option ->
                     RadioRow(
+                        modifier = civilightItem(),
                         title = option.title,
                         subtitle = option.subtitle,
                         selected = option.selected,
@@ -86,17 +88,18 @@ fun WorldTimeScreen(route: WorldCalendar, deps: FeatureDeps) {
                     )
                 }
                 state.calendarLine?.let { line ->
-                    item(key = "calendar") { CivilightText(line, type.small, Modifier.padding(top = 8.dp), color = colors.ink3) }
+                    item(key = "calendar") { CivilightText(line, type.small, civilightItem().padding(top = 8.dp), color = colors.ink3) }
                 }
                 if (state.showCalendarEditor) {
                     item(key = "calendarEditor") {
                         CalendarEditor(
+                            modifier = civilightItem(),
                             draft = calendarDraft,
                             readOnly = state.readOnly,
                             onChange = { calendarDraft = it },
                             onSave = {
                                 scope.launch {
-                                    if (vm.saveCalendar(calendarDraft)) deps.toasts.show(WorldCopy.TODO_COPY_WORLD_CALENDAR_SAVED_TOAST) { vm.undoLast() }
+                                    if (vm.saveCalendar(calendarDraft)) deps.toasts.show(WorldCopy.CALENDAR_SAVED_TOAST) { vm.undoLast() }
                                 }
                             },
                         )
@@ -111,15 +114,15 @@ fun WorldTimeScreen(route: WorldCalendar, deps: FeatureDeps) {
                                 vm.setStartYear(text)
                             },
                             label = WorldCopy.STORY_START_YEAR,
-                            modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+                            modifier = civilightItem().fillMaxWidth().padding(top = 18.dp),
                             enabled = !state.readOnly,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
                     }
                 }
-                item(key = "note") { CivilightText(WorldCopy.AGES_NOTE, type.small, Modifier.padding(top = 10.dp), color = colors.ink3) }
+                item(key = "note") { CivilightText(WorldCopy.AGES_NOTE, type.small, civilightItem().padding(top = 10.dp), color = colors.ink3) }
                 if (state.readOnly) {
-                    item(key = "ro") { CivilightText(WorldCopy.READ_ONLY, type.small, Modifier.padding(top = 10.dp), color = colors.ink3) }
+                    item(key = "ro") { CivilightText(WorldCopy.READ_ONLY, type.small, civilightItem().padding(top = 10.dp), color = colors.ink3) }
                 }
             }
         }

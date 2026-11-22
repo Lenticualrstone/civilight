@@ -23,6 +23,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderEnv
 import io.github.lenticualrstone.civilight.domain.recorder.put.DestinationOption
 import io.github.lenticualrstone.civilight.domain.recorder.put.DestinationStep
@@ -77,7 +78,7 @@ fun insertAndToast(services: RecorderServices, deps: FeatureDeps, host: SheetHos
     deps.appScope.launch {
         val done = services.writer.put() ?: return@launch
         host.closeAll()
-        deps.toasts.show(done.toast.text, RecorderCopy.UNDO) { deps.appScope.launch { services.writer.undoPut(done) } }
+        deps.toasts.show(ShownCopy.of(done.toast), RecorderCopy.UNDO) { deps.appScope.launch { services.writer.undoPut(done) } }
     }
 }
 
@@ -110,7 +111,7 @@ internal fun rememberProjectStep(sheet: PutSheet, kind: PutKind, library: Record
     LaunchedEffect(current) {
         val awaiting = current as? DestinationStep.AwaitingAuth ?: return@LaunchedEffect
         val hiddenLocked = env.project(awaiting.projectKey)?.let(env::isLockedHidden) == true
-        val title = if (hiddenLocked) AuthCopy.HIDDEN_PROJECTS else RecorderUiCopy.TODO_R18_PROMPT
+        val title = if (hiddenLocked) AuthCopy.HIDDEN_PROJECTS else RecorderUiCopy.R18_PROMPT
         val ok = deps.biometric.authenticate(AuthRequest(title)) == AuthResult.SUCCESS
         // The destination's rows read its structure, so the hidden group opens with the prompt (Defaults used).
         if (ok && hiddenLocked) deps.unlock.unlockHiddenGroup()

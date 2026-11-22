@@ -1,6 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.world.time
 
 import androidx.compose.foundation.layout.Arrangement
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.feature.world.common.SheetSteps
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
@@ -75,132 +77,134 @@ fun SheetScope.EventChangeContent(eventKey: Key, onAdd: suspend (ChangeDraft) ->
     val type = CivilightTheme.type
     val eventName = doc.index.event(eventKey)?.title.orEmpty()
 
-    when (EventChanges.effectiveStep(doc, step, draft)) {
-        ChangeStep.ITEM -> {
-            var query by rememberSaveable { mutableStateOf("") }
-            val model = remember(doc, query, gate.open) { PickerModels.links(doc, query, gate.open, EventChanges.PICK_KINDS) }
-            ItemPickerSheet(
-                title = WorldCopy.CHANGE_TITLE,
-                model = model,
-                query = query,
-                onQueryChange = { query = it },
-                onPick = { item ->
-                    val kind = EventChanges.entityKindOf(item.kind) ?: return@ItemPickerSheet
-                    draft = ChangeDraft(kind = kind, entityKey = item.key)
-                    step = ChangeStep.FIELD
-                },
-                onClose = ::close,
-                onUnlockHidden = gate.unlock,
-            )
-        }
-        ChangeStep.FIELD -> {
-            val kind = draft.kind!!
-            val entityKey = draft.entityKey!!
-            val rows = remember(doc, kind, entityKey) { EventChanges.fieldRows(doc, kind, entityKey) }
-            SheetHeader(title = itemName(doc, kind, entityKey), onClose = { step = ChangeStep.ITEM }, subtitle = eventName, closeLabel = WorldCopy.BACK)
-            SheetScrollBody(Modifier.padding(top = 8.dp)) {
-                if (rows.isEmpty()) CivilightText(WorldCopy.TODO_COPY_WORLD_NO_FIELDS, type.small, Modifier.padding(top = 12.dp), color = colors.ink3)
-                rows.forEach { row ->
-                    ListRow(
-                        title = row.name,
-                        subtitle = row.current,
-                        compact = true,
-                        onClick = {
-                            draft = draft.copy(fieldDefKey = row.defKey, text = "", optionKeys = emptyList(), year = "", month = "", day = "", targetKeys = emptyList())
-                            step = ChangeStep.VALUE
-                        },
-                    )
+    SheetSteps(EventChanges.effectiveStep(doc, step, draft), forward = { from, to -> ChangeStep.isAhead(from, to) }) { shownStep ->
+        when (shownStep) {
+            ChangeStep.ITEM -> {
+                var query by rememberSaveable { mutableStateOf("") }
+                val model = remember(doc, query, gate.open) { PickerModels.links(doc, query, gate.open, EventChanges.PICK_KINDS) }
+                ItemPickerSheet(
+                    title = WorldCopy.CHANGE_TITLE,
+                    model = model,
+                    query = query,
+                    onQueryChange = { query = it },
+                    onPick = { item ->
+                        val kind = EventChanges.entityKindOf(item.kind) ?: return@ItemPickerSheet
+                        draft = ChangeDraft(kind = kind, entityKey = item.key)
+                        step = ChangeStep.FIELD
+                    },
+                    onClose = sheet::close,
+                    onUnlockHidden = gate.unlock,
+                )
+            }
+            ChangeStep.FIELD -> {
+                val kind = draft.kind ?: return@SheetSteps
+                val entityKey = draft.entityKey ?: return@SheetSteps
+                val rows = remember(doc, kind, entityKey) { EventChanges.fieldRows(doc, kind, entityKey) }
+                SheetHeader(title = itemName(doc, kind, entityKey), onClose = { step = ChangeStep.ITEM }, subtitle = eventName, closeLabel = WorldCopy.BACK)
+                SheetScrollBody(Modifier.padding(top = 8.dp)) {
+                    FoldReveal(rows.isEmpty()) { CivilightText(WorldCopy.NO_FIELDS, type.small, Modifier.padding(top = 12.dp), color = colors.ink3) }
+                    rows.forEach { row ->
+                        ListRow(
+                            title = row.name,
+                            subtitle = row.current,
+                            compact = true,
+                            onClick = {
+                                draft = draft.copy(fieldDefKey = row.defKey, text = "", optionKeys = emptyList(), year = "", month = "", day = "", targetKeys = emptyList())
+                                step = ChangeStep.VALUE
+                            },
+                        )
+                    }
                 }
             }
-        }
-        ChangeStep.TARGET -> {
-            val def = EventChanges.def(doc, draft)!!
-            val add: (Key) -> Unit = { key ->
-                draft = draft.copy(targetKeys = (draft.targetKeys + key).distinct())
-                step = ChangeStep.VALUE
+            ChangeStep.TARGET -> {
+                val def = EventChanges.def(doc, draft) ?: return@SheetSteps
+                val add: (Key) -> Unit = { key ->
+                    draft = draft.copy(targetKeys = (draft.targetKeys + key).distinct())
+                    step = ChangeStep.VALUE
+                }
+                val back = { step = ChangeStep.VALUE }
+                when (EventChanges.linkPick(def)) {
+                    PickKind.PLACE -> PlacePickerSheet(doc, gate, def.name, onPick = { add(it.key) }, onClose = back, includeRegions = false)
+                    PickKind.TERM -> TermPickerSheet(doc, gate, def.name, onPick = { key, _ -> add(key) }, onClose = back)
+                    else -> FactionPickerSheet(doc, gate, def.name, onPick = add, onClose = back)
+                }
             }
-            val back = { step = ChangeStep.VALUE }
-            when (EventChanges.linkPick(def)) {
-                PickKind.PLACE -> PlacePickerSheet(doc, gate, def.name, onPick = { add(it.key) }, onClose = back, includeRegions = false)
-                PickKind.TERM -> TermPickerSheet(doc, gate, def.name, onPick = { key, _ -> add(key) }, onClose = back)
-                else -> FactionPickerSheet(doc, gate, def.name, onPick = add, onClose = back)
-            }
-        }
-        ChangeStep.VALUE -> {
-            val def = EventChanges.def(doc, draft)!!
-            val kind = draft.kind!!
-            val entityKey = draft.entityKey!!
-            val input = EventChanges.input(doc, def, draft)
-            val valid = EventChanges.value(def, draft) { "" } != null
-            SheetHeader(
-                title = WorldCopy.changeTitle(itemName(doc, kind, entityKey), def.name),
-                onClose = { step = ChangeStep.FIELD },
-                subtitle = eventName,
-                closeLabel = WorldCopy.BACK,
-            )
-            SheetScrollBody(Modifier.padding(top = 12.dp)) {
-                when (input) {
-                    is ValueInput.Text -> CivilightTextField(
-                        value = draft.text,
-                        onValueChange = { draft = draft.copy(text = it) },
-                        label = def.name,
-                        unit = input.unit,
-                        singleLine = !input.multiline,
-                    )
-                    is ValueInput.Number -> CivilightTextField(
-                        value = draft.text,
-                        onValueChange = { draft = draft.copy(text = it) },
-                        label = def.name,
-                        unit = input.unit,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    )
-                    is ValueInput.Options -> ChipFlow {
-                        input.options.forEach { (key, label) ->
-                            FilterChip(
-                                label = label,
-                                selected = key in draft.optionKeys,
-                                onClick = {
-                                    draft = draft.copy(
-                                        optionKeys = when {
-                                            !input.multiple -> listOf(key)
-                                            key in draft.optionKeys -> draft.optionKeys - key
-                                            else -> draft.optionKeys + key
-                                        },
-                                    )
-                                },
-                            )
+            ChangeStep.VALUE -> {
+                val def = EventChanges.def(doc, draft) ?: return@SheetSteps
+                val kind = draft.kind ?: return@SheetSteps
+                val entityKey = draft.entityKey ?: return@SheetSteps
+                val input = EventChanges.input(doc, def, draft)
+                val valid = EventChanges.value(def, draft) { "" } != null
+                SheetHeader(
+                    title = WorldCopy.changeTitle(itemName(doc, kind, entityKey), def.name),
+                    onClose = { step = ChangeStep.FIELD },
+                    subtitle = eventName,
+                    closeLabel = WorldCopy.BACK,
+                )
+                SheetScrollBody(Modifier.padding(top = 12.dp)) {
+                    when (input) {
+                        is ValueInput.Text -> CivilightTextField(
+                            value = draft.text,
+                            onValueChange = { draft = draft.copy(text = it) },
+                            label = def.name,
+                            unit = input.unit,
+                            singleLine = !input.multiline,
+                        )
+                        is ValueInput.Number -> CivilightTextField(
+                            value = draft.text,
+                            onValueChange = { draft = draft.copy(text = it) },
+                            label = def.name,
+                            unit = input.unit,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        )
+                        is ValueInput.Options -> ChipFlow {
+                            input.options.forEach { (key, label) ->
+                                FilterChip(
+                                    label = label,
+                                    selected = key in draft.optionKeys,
+                                    onClick = {
+                                        draft = draft.copy(
+                                            optionKeys = when {
+                                                !input.multiple -> listOf(key)
+                                                key in draft.optionKeys -> draft.optionKeys - key
+                                                else -> draft.optionKeys + key
+                                            },
+                                        )
+                                    },
+                                )
+                            }
                         }
-                    }
-                    is ValueInput.Date -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NumberField(WorldCopy.EVENT_YEAR, draft.year, Modifier.weight(1.4f)) { draft = draft.copy(year = it) }
-                        if (input.withMonthDay) {
+                        is ValueInput.Date -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            NumberField(WorldCopy.EVENT_YEAR, draft.year, Modifier.weight(1.4f)) { draft = draft.copy(year = it) }
+                            if (input.withMonthDay) {
+                                NumberField(WorldCopy.EVENT_MONTH, draft.month, Modifier.weight(1f)) { draft = draft.copy(month = it) }
+                                NumberField(WorldCopy.EVENT_DAY, draft.day, Modifier.weight(1f)) { draft = draft.copy(day = it) }
+                            }
+                        }
+                        ValueInput.MonthDay -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             NumberField(WorldCopy.EVENT_MONTH, draft.month, Modifier.weight(1f)) { draft = draft.copy(month = it) }
                             NumberField(WorldCopy.EVENT_DAY, draft.day, Modifier.weight(1f)) { draft = draft.copy(day = it) }
                         }
-                    }
-                    ValueInput.MonthDay -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NumberField(WorldCopy.EVENT_MONTH, draft.month, Modifier.weight(1f)) { draft = draft.copy(month = it) }
-                        NumberField(WorldCopy.EVENT_DAY, draft.day, Modifier.weight(1f)) { draft = draft.copy(day = it) }
-                    }
-                    is ValueInput.Link -> {
-                        ChipFlow {
-                            draft.targetKeys.zip(input.names).forEach { (key, name) ->
-                                RemovableChip(name, onRemove = { draft = draft.copy(targetKeys = draft.targetKeys - key) }, removeLabel = WorldCopy.removeAlias(name))
+                        is ValueInput.Link -> {
+                            ChipFlow {
+                                draft.targetKeys.zip(input.names).forEach { (key, name) ->
+                                    RemovableChip(name, onRemove = { draft = draft.copy(targetKeys = draft.targetKeys - key) }, removeLabel = WorldCopy.removeAlias(name))
+                                }
                             }
+                            TextAction(WorldCopy.pickLabel(input.pick), { step = ChangeStep.TARGET }, Modifier.padding(top = 8.dp), color = colors.acc, style = type.small)
                         }
-                        TextAction(WorldCopy.pickLabel(input.pick), { step = ChangeStep.TARGET }, Modifier.padding(top = 8.dp), color = colors.acc, style = type.small)
                     }
                 }
-            }
-            SheetActions {
-                CivilightButton(
-                    text = WorldCopy.BTN_PUT,
-                    modifier = Modifier.weight(1f),
-                    enabled = valid && !store.readOnly,
-                    onClick = {
-                        scope.launch { if (onAdd(draft)) sheet.close() }
-                    },
-                )
+                SheetActions {
+                    CivilightButton(
+                        text = WorldCopy.BTN_PUT,
+                        modifier = Modifier.weight(1f),
+                        enabled = valid && !store.readOnly,
+                        onClick = {
+                            scope.launch { if (onAdd(draft)) sheet.close() }
+                        },
+                    )
+                }
             }
         }
     }

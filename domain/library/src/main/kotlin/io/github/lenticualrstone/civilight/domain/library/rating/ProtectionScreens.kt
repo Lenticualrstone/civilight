@@ -80,7 +80,7 @@ data class ProtectionSwitch(val protection: Protection, val before: Protections,
 data class R18DefaultsBlock(val header: String, val lines: List<String>, val warning: String?) {
     companion object {
         const val HEADER = "R-18 기본 동작 · 설정에서 바꾸기"
-        const val TODO_COPY_LIB09_RECORDER_LINE = "TODO_COPY_LIB09_RECORDER_LINE"
+        const val RECORDER_LINE = "라이프 레코더 연결에 등급만"
 
         /** One line per R-18 default that is on; ◇ `자동 백업에서 빠짐` when hiding is a default and no 복구 암호 exists. */
         fun of(defaults: RatingDefaults, recoverySet: Boolean): R18DefaultsBlock {
@@ -88,7 +88,7 @@ data class R18DefaultsBlock(val header: String, val lines: List<String>, val war
                 if (defaults.r18Hide) add("프로젝트 숨기기 켬")
                 if (defaults.r18Capture) add("화면 캡처 · 최근 앱 미리 보기 가림")
                 if (defaults.r18NameMask) add("위젯 · 알림에 이름 대신 ‘R-18 프로젝트’")
-                if (defaults.r18RecorderMask) add(TODO_COPY_LIB09_RECORDER_LINE)
+                if (defaults.r18RecorderMask) add(RECORDER_LINE)
             }
             return R18DefaultsBlock(HEADER, lines, if (defaults.r18Hide && !recoverySet) "자동 백업에서 빠짐" else null)
         }

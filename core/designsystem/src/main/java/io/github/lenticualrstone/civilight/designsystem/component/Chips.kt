@@ -1,5 +1,13 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.runtime.getValue
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,17 +61,27 @@ fun FilterChip(
 ) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(15.dp)
+    val on = animatedFraction(selected, label = "chip")
+    val text by animatedColor(if (selected) colors.onpri else colors.ink2, label = "chipText")
     Box(
         modifier = modifier
             .pressable(PressAction.Select(selected, onClick), enabled = enabled, role = Role.Button, hitTarget = HitTarget.CHIP, shape = shape)
             .heightIn(min = 30.dp)
             .clip(shape)
-            .background(if (selected) colors.pri else Color.Transparent)
-            .then(if (!selected) Modifier.insetOutline(colors.edge, 1.dp, shape) else Modifier)
+            .drawWithContent {
+                val a = on.value
+                if (a > 0f) drawRect(colors.pri, alpha = a)
+                drawContent()
+                if (a < 1f) {
+                    val w = 1.dp.toPx()
+                    val outline = shape.createOutline(Size(size.width - w, size.height - w), layoutDirection, this)
+                    translate(w / 2, w / 2) { drawOutline(outline, colors.edge, alpha = 1f - a, style = Stroke(w)) }
+                }
+            }
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        CivilightText(label, CivilightTheme.type.chip, color = if (selected) colors.onpri else colors.ink2, maxLines = 1)
+        CivilightText(label, CivilightTheme.type.chip, color = text, maxLines = 1)
     }
 }
 

@@ -124,7 +124,7 @@ internal class OpenFileViewModel(
                 if (!done.hidden) deps.navigator.openDetail(ProjectHome(done.projectKey))
                 done.failedMessage?.let { deps.toasts.show(it, actionLabel = null) }
             }.onFailure {
-                deps.toasts.show(OpenFileCopy.TODO_COPY_LIB52_IMPORT_FAILED, actionLabel = null)
+                deps.toasts.show(OpenFileCopy.IMPORT_FAILED, actionLabel = null)
             }
             _finished.value = true
         }
@@ -141,7 +141,7 @@ internal class OpenFileViewModel(
                     deps.navigator.resetTo(Library)
                     deps.navigator.push(RecorderInbox())
                 }
-                .onFailure { deps.toasts.show(OpenFileCopy.TODO_COPY_LIB52_IMPORT_FAILED, actionLabel = null) }
+                .onFailure { deps.toasts.show(OpenFileCopy.IMPORT_FAILED, actionLabel = null) }
             _finished.value = true
         }
     }

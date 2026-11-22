@@ -28,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.Breadcrumb
+import io.github.lenticualrstone.civilight.designsystem.component.DelayedProgress
+import io.github.lenticualrstone.civilight.designsystem.component.MapValueChip
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonRow
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
@@ -39,10 +41,15 @@ import io.github.lenticualrstone.civilight.feature.map.MapCopy
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapCanvas
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapHit
 import io.github.lenticualrstone.civilight.feature.map.canvas.Viewport
+import io.github.lenticualrstone.civilight.feature.map.canvas.rememberViewportMover
 import io.github.lenticualrstone.civilight.feature.map.common.CardHeader
 import io.github.lenticualrstone.civilight.feature.map.common.CardRow
 import io.github.lenticualrstone.civilight.feature.map.common.GlassCard
 import io.github.lenticualrstone.civilight.feature.map.common.TopBarTapGuard
+import io.github.lenticualrstone.civilight.feature.map.common.FoldSwitch
+import io.github.lenticualrstone.civilight.feature.map.common.MapBar
+import io.github.lenticualrstone.civilight.feature.map.common.MapBarSlot
+import io.github.lenticualrstone.civilight.feature.map.common.MapBars
 import io.github.lenticualrstone.civilight.feature.map.common.MapEnv
 import io.github.lenticualrstone.civilight.feature.map.common.MapNav
 import io.github.lenticualrstone.civilight.feature.map.export.rememberMapExporter
@@ -115,15 +122,21 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
             )
         }
     }
+    val mover = rememberViewportMover({ Viewport.fromArray(viewportArray) }) { viewportArray = it.toArray() }
     LaunchedEffect(ui != null) {
         val pin = route.focusPinKey?.let { ui?.scene?.pin(it) }
         if (!focused && pin != null) {
-            viewportArray = Viewport(zoom = 2f).centeredOn(pin.at).toArray()
+            // The first resolve is a cut (UNSET); a focus after that glides.
+            mover.moveTo(Viewport(zoom = 2f).centeredOn(pin.at))
             focused = true
         }
     }
+    var replacing by remember { mutableStateOf(false) }
     val replaceBase = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) scope.launch { vm.replaceBase(context.contentResolver, uri) }
+        if (uri != null) scope.launch {
+            replacing = true
+            try { vm.replaceBase(context.contentResolver, uri) } finally { replacing = false }
+        }
     }
 
     fun export(size: LargeMapExport) {
@@ -165,7 +178,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                 base = state.base,
                 scene = state.scene,
                 viewport = viewport,
-                onViewportChange = { viewportArray = it.toArray() },
+                onViewportChange = { mover.cancel(); viewportArray = it.toArray() },
                 onContentWidth = { contentWidth = it },
                 selectedKey = state.moving?.pinKey ?: state.place?.pinKey,
                 onTap = { p, hit ->
@@ -177,6 +190,11 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                 },
             )
             TopBarTapGuard(padding.calculateTopPadding())
+            // Work under a second shows nothing (DS-47); longer work names itself, fading in and out.
+            DelayedProgress(
+                exporter.exporting || replacing,
+                Modifier.align(Alignment.TopCenter).padding(top = padding.calculateTopPadding() + 48.dp),
+            ) { MapValueChip(if (replacing) MapCopy.BTN_REPLACE_BASE else MapCopy.EXPORT) }
             Row(
                 Modifier.fillMaxWidth().padding(top = padding.calculateTopPadding() + 4.dp, start = 20.dp, end = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -191,48 +209,62 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
             }
             val moving = state.moving
             val place = state.place
-            when {
-                moving != null -> MovePinBar(
-                    title = moving.title,
-                    canCommit = moving.to != null && !readOnly,
-                    onCancel = { movingPin = null; movingTo = null },
-                    onDone = {
-                        val to = moving.to ?: return@MovePinBar
-                        vm.movePin(moving.pinKey, to) { movingPin = null; movingTo = null }
-                    },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth(),
-                )
-                place != null && !inner -> PlacePanel(
-                    place = place, inner = false, readOnly = readOnly,
-                    onClose = { selectedPin = null },
-                    onMove = { movingPin = place.pinKey; movingTo = null },
-                    onOpenCard = { deps.navigator.push(PlaceCard(route.projectKey, place.placeKey)) },
-                    onChildMap = { MapNav.open(deps.navigator, d, route.projectKey, it) },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth(),
-                )
-                else -> BottomTools(
-                    state = state, readOnly = readOnly,
-                    scale = d?.maps?.get(route.mapKey)?.let { ScaleBars.label(d, it, contentWidth, barPx) } ?: state.scale,
-                    onChip = { layerFilter = it },
-                    onReplaceBase = { replaceBase.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                    onEdit = { deps.navigator.push(MapEditRoute(route.projectKey, route.mapKey)) },
-                    onStyle = { sheets.open(MapStyleSheet) },
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp),
-                )
-            }
-            if (place != null && inner && moving == null) {
-                PlacePanel(
-                    place = place, inner = true, readOnly = readOnly,
-                    onClose = { selectedPin = null },
-                    onMove = { movingPin = place.pinKey; movingTo = null },
-                    onOpenCard = { deps.navigator.push(PlaceCard(route.projectKey, place.placeKey)) },
-                    onChildMap = { MapNav.open(deps.navigator, d, route.projectKey, it) },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 40.dp, end = 16.dp).width(270.dp),
-                )
+            val scale = d?.maps?.get(route.mapKey)?.let { ScaleBars.label(d, it, contentWidth, barPx) } ?: state.scale
+            FoldSwitch(inner) { isInner ->
+                val kind = MapBars.view(moving != null, place != null, isInner)
+                val bar = ViewBar(state, readOnly, scale)
+                MapBar(MapBarSlot(kind, bar), Modifier.align(Alignment.BottomCenter).fillMaxWidth()) { k, b ->
+                    val mv = b.state.moving
+                    val pl = b.state.place
+                    when {
+                        mv != null && k == MapBars.MOVE -> MovePinBar(
+                            title = mv.title,
+                            canCommit = mv.to != null && !b.readOnly,
+                            onCancel = { movingPin = null; movingTo = null },
+                            onDone = {
+                                val to = mv.to ?: return@MovePinBar
+                                vm.movePin(mv.pinKey, to) { movingPin = null; movingTo = null }
+                            },
+                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        )
+                        pl != null && k == MapBars.PLACE -> PlacePanel(
+                            place = pl, inner = false, readOnly = b.readOnly,
+                            onClose = { selectedPin = null },
+                            onMove = { movingPin = pl.pinKey; movingTo = null },
+                            onOpenCard = { deps.navigator.push(PlaceCard(route.projectKey, pl.placeKey)) },
+                            onChildMap = { MapNav.open(deps.navigator, d, route.projectKey, it) },
+                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        )
+                        else -> BottomTools(
+                            state = b.state, readOnly = b.readOnly, scale = b.scale,
+                            onChip = { layerFilter = it },
+                            onReplaceBase = { replaceBase.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                            onEdit = { deps.navigator.push(MapEditRoute(route.projectKey, route.mapKey)) },
+                            onStyle = { sheets.open(MapStyleSheet) },
+                            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp),
+                        )
+                    }
+                }
+                if (isInner) {
+                    val side = place?.takeIf { moving == null }?.let { MapBarSlot(MapBars.PLACE, it) }
+                    MapBar(side, Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 40.dp, end = 16.dp).width(270.dp), alignment = Alignment.TopCenter) { _, pl ->
+                        PlacePanel(
+                            place = pl, inner = true, readOnly = readOnly,
+                            onClose = { selectedPin = null },
+                            onMove = { movingPin = pl.pinKey; movingTo = null },
+                            onOpenCard = { deps.navigator.push(PlaceCard(route.projectKey, pl.placeKey)) },
+                            onChildMap = { MapNav.open(deps.navigator, d, route.projectKey, it) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
         }
     }
 }
+
+/** What the bottom bar of 지도 보기 draws: everything it needs, so the bar that leaves keeps its own last content. */
+private data class ViewBar(val state: MapViewUi, val readOnly: Boolean, val scale: String?)
 
 /** Layer chips (`전체 핀 · 정치 …`), `지도 이미지 바꾸기`, `편집`, and the scale bar. */
 @Composable

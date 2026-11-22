@@ -1,10 +1,12 @@
 package io.github.lenticualrstone.civilight.feature.cast
 
 import io.github.lenticualrstone.civilight.designsystem.text.CopyLint
+import io.github.lenticualrstone.civilight.designsystem.theme.MotionLint
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.lang.reflect.Modifier
 
 /** DECISIONS §3: every value of the cast copy object passes the design-system copy lint. */
@@ -47,6 +49,8 @@ class CastCopyLintTest {
         add(CastUiCopy.keptColumn("노아"))
         add(CastUiCopy.mergedFootnote("시장 꼬마", "노아"))
         add(CastUiCopy.linkChange(3, "노아", "오웬"))
+        add(CastUiCopy.gallerySection(8))
+        add(CastUiCopy.galleryChip(8))
     }
 
     @Test
@@ -60,6 +64,17 @@ class CastCopyLintTest {
             }
         } + formatted().mapNotNull { text -> CopyLint.lint(text).takeIf { it.isNotEmpty() }?.let { "$text: $it" } }
         assertEquals(emptyList<String>(), failures)
+    }
+
+    @Test
+    fun `motion lint`() {
+        val issues = MotionLint.lintModule(File("."))
+        assertEquals(MotionLint.report(issues), 0, issues.size)
+    }
+
+    @Test
+    fun `no TODO copy can reach the screen`() {
+        assertTrue(values().keys.none { it.startsWith("TODO_COPY_") })
     }
 
     @Test

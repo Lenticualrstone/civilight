@@ -159,7 +159,7 @@ object ScriptRows {
         for (row in rows) {
             when (row) {
                 is Manuscript.Row.Head -> {
-                    out += HeadRow(row.sceneKey, row.text, row.transitionLine, row.hiddenTag, Labels.sceneOrdinal(doc, row.sceneKey) ?: 0)
+                    out += HeadRow(row.sceneKey, HeadTitles.of(doc, row.sceneKey, row.text), row.transitionLine, row.hiddenTag, Labels.sceneOrdinal(doc, row.sceneKey) ?: 0)
                     val empty = doc.manuscript.liveBlocksOf(row.sceneKey).isEmpty()
                     if (empty && !readOnly && preview == ScriptPreview.WRITE) {
                         out += EmptySceneRow(row.sceneKey, inheritedSpeaker(doc, row.sceneKey))

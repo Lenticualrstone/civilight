@@ -1,15 +1,17 @@
-package io.github.lenticualrstone.civilight.feature.canvas.card
+package io.github.lenticualrstone.civilight.designsystem.card
 
-import io.github.lenticualrstone.civilight.designsystem.component.avatarGlyph
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.MotionToken
-import io.github.lenticualrstone.civilight.model.app.ViewMode
 import kotlin.math.roundToInt
+
+/*
+ * Shared copy of feature:canvas `card/CardRules.kt` (motion audit §3.2 promotion; the gallery spec §3.5
+ * asks for one shared `SnapCardRow`). Model-free parts only: `ViewChoice` stays in the lanes because it
+ * needs core:model. Lanes switch to this package and delete their copies in wave 1.
+ */
 
 /**
  * Card kinds of the card views (CNV-23) and their reference sizes in dp (CNV-22 "card pitch").
- * Project-type-free: the 서재 (LIB-04), 인물 (CST-04) and page rows can share it once it moves to a
- * shared module (Requests).
  */
 enum class CardKind {
     /** `ProjectCard` 3:4: cover 222 × 296, inner 236 × 336. */
@@ -72,7 +74,7 @@ object CardSnap {
     fun indexAt(offset: Float, pitch: Float): Int = if (pitch <= 0f) 0 else (offset / pitch).roundToInt().coerceAtLeast(0)
 }
 
-/** One haptic tick per snap: a tick when a scroll in progress comes to rest (CNV-22). */
+/** One haptic tick per snap: a tick when a scroll in progress comes to rest (CNV-22). Kept under reduced motion. */
 class SnapTicker {
     private var moving = false
 
@@ -85,33 +87,18 @@ class SnapTicker {
 }
 
 /**
- * The image of a card moves less than the card (parallax 8 %, CNV-22, T-CNV-42); reduce motion: none.
+ * The image of a card moves less than the card (parallax 8 %, CNV-22, T-CNV-42), under a constant scale of
+ * 1.1 so the shifted image never shows its edge; reduce motion: no shift and scale 1.
  */
 object CardParallax {
-    const val FACTOR = 0.08f
+    const val FACTOR = CivilightMotion.cardParallax
 
-    /** The image's shift relative to its card when the card is displaced by [cardDisplacement] dp. */
+    /** The image's shift relative to its card when the card is displaced by [cardDisplacement] (any unit). */
     fun imageShift(cardDisplacement: Float, reduced: Boolean): Float = if (reduced) 0f else -cardDisplacement * FACTOR
 
     /** The image's displacement relative to the screen. */
     fun imageOnScreen(cardDisplacement: Float, reduced: Boolean): Float = cardDisplacement + imageShift(cardDisplacement, reduced)
-}
 
-/**
- * `목록 | 카드` (CNV-21): one choice per screen, kept in app preferences (`AppSettings.viewByScreen`),
- * never in `.civilight`. Default `목록` (Q-IM-02 [PROPOSED]: every list board shows the list first).
- */
-object ViewChoice {
-    /** Screen id of the page list. */
-    const val PAGES = "pages"
-
-    fun showCards(viewByScreen: Map<String, ViewMode>, screen: String): Boolean = viewByScreen[screen] == ViewMode.CARD
-
-    fun with(viewByScreen: Map<String, ViewMode>, screen: String, cards: Boolean): Map<String, ViewMode> =
-        viewByScreen + (screen to if (cards) ViewMode.CARD else ViewMode.LIST)
-}
-
-/** The initial-letter placeholder (CNV-24): the first grapheme of the owner's name, as the DS avatar reads it. */
-object CardInitial {
-    fun of(name: String): String = avatarGlyph(name)
+    /** The constant image scale: [CivilightMotion.cardImageScale], or 1 when reduced. */
+    fun imageScale(reduced: Boolean): Float = if (reduced) 1f else CivilightMotion.cardImageScale
 }

@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.library.trash
 
 import io.github.lenticualrstone.civilight.domain.actions.ActionContext
 import io.github.lenticualrstone.civilight.domain.actions.CharacterActions
+import io.github.lenticualrstone.civilight.domain.actions.GalleryActions
 import io.github.lenticualrstone.civilight.domain.actions.PurgeActions
 import io.github.lenticualrstone.civilight.domain.actions.SceneActions
 import io.github.lenticualrstone.civilight.domain.trash.Messages
@@ -33,7 +34,7 @@ data class ItemPurge(val doc: ProjectDoc, val result: PurgeResult?) {
 /**
  * The one dispatch from a trash row to its owner's write path (DECISIONS §1): scenes and block
  * groups through `domain:actions` [SceneActions] (때 rebase), characters through [CharacterActions]
- * (cast reference snapshot, CST-43 toast), every other item through `domain:trash` [RestoreOps].
+ * (cast reference snapshot, CST-43 toast), gallery images through [GalleryActions] (LIB-38, 55 GAL-20), every other item through `domain:trash` [RestoreOps].
  * Purges go through [PurgeOps] with the recorder links of purged things keeping their label
  * ([PurgeActions.applyProjectPurge]), as `CharacterActions.purge` does.
  */
@@ -57,6 +58,11 @@ object TrashDecisions {
                 val key = entry.targetKeys.singleOrNull() ?: return ItemRestore(RestoreOutcome.NotFound, null)
                 val result = CharacterActions.restore(doc, key, ctx, authenticated)
                 ItemRestore(result.outcome, result.toast?.message)
+            }
+            // A gallery image goes back through its own action (DECISIONS §1; hidden image or hidden owner needs auth).
+            TrashKind.GALLERY_ITEM -> {
+                val outcome = GalleryActions.restore(doc, entryKey, ctx, authenticated)
+                ItemRestore(outcome, (outcome as? RestoreOutcome.Restored)?.let { toastOf(it) })
             }
             else -> {
                 val outcome = RestoreOps.restore(doc, entryKey, ctx.trash, authenticated, sceneChoice)

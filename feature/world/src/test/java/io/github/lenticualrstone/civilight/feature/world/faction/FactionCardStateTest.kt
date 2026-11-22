@@ -31,7 +31,7 @@ class FactionCardStateTest {
     fun `WLD-10 map areas linked to the faction open their map`() {
         val ui = FactionCardState.build(WorldTestFixture.stateB(), PROJECT, K.FACTION_UPPER_GUARD, hiddenOpen = false)
         val areas = ui.sections.single { it.id == "areas" }
-        assertEquals(WorldCopy.TODO_COPY_WORLD_FACTION_AREAS, areas.title)
+        assertEquals(WorldCopy.FACTION_AREAS, areas.title)
         assertTrue(areas.rows.isNotEmpty())
         assertTrue(areas.rows.all { it.target is MapView && it.title.contains(" · ") })
     }

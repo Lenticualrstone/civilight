@@ -98,6 +98,12 @@ data class SearchResult(
     /** Final line `숨긴 항목 제외` (locked, the project has hidden items). */
     val hiddenExcluded: Boolean,
     val empty: EmptySearch?,
+    /**
+     * Gallery images whose title, description or a tag matched (55 §3.5), filled only when the search is
+     * asked for them (`includeGallery`), under `전체`. Not a [SearchSectionKind], so existing `when`s over
+     * the kinds keep compiling; the screen draws them as a `갤러리` section.
+     */
+    val gallery: List<GalleryHit> = emptyList(),
 ) {
     val footer: String? get() = if (hiddenExcluded && empty == null) "숨긴 항목 제외" else null
     fun section(kind: SearchSectionKind): SearchSection? = sections.firstOrNull { it.kind == kind }
@@ -143,9 +149,17 @@ class ProjectSearch(val doc: ProjectDoc, val context: SearchContext = SearchCont
     /** Live scenes that may be searched. */
     private val searchableScenes by lazy { doc.manuscript.liveScenes.filterNot { hiddenLocked(it.hidden) } }
 
-    fun search(raw: String, filter: SearchFilter = SearchFilter.ALL): SearchResult {
+    /**
+     * Results for [raw] under [filter]. An empty query finds nothing, except under `명령`, which then lists
+     * every command of this context (QA 2026-11-23 #11: the chip must show what it can run). With
+     * [includeGallery], `전체` also searches gallery titles, descriptions and tags ([SearchResult.gallery]).
+     */
+    fun search(raw: String, filter: SearchFilter = SearchFilter.ALL, includeGallery: Boolean = false): SearchResult {
         val q = TextQuery(raw)
-        if (q.isEmpty) return SearchResult(q.text, filter, emptyList(), hiddenExcluded, null)
+        if (q.isEmpty) {
+            val sections = if (filter == SearchFilter.COMMAND) listOf(SearchSection(SearchSectionKind.COMMAND, commandList())) else emptyList()
+            return SearchResult(q.text, filter, sections, hiddenExcluded, null)
+        }
         val kinds = when (filter) {
             SearchFilter.ALL -> SearchSectionKind.entries
             SearchFilter.CHARACTER -> listOf(SearchSectionKind.CHARACTER)
@@ -167,8 +181,9 @@ class ProjectSearch(val doc: ProjectDoc, val context: SearchContext = SearchCont
             }
             if (items.isEmpty()) null else SearchSection(kind, items)
         }
-        val empty = if (sections.isEmpty()) EmptySearch(q.text, hiddenExcluded, similar(q)) else null
-        return SearchResult(q.text, filter, sections, hiddenExcluded, empty)
+        val gallery = if (includeGallery && filter == SearchFilter.ALL) GallerySearch(doc, context.locked).search(q) else emptyList()
+        val empty = if (sections.isEmpty() && gallery.isEmpty()) EmptySearch(q.text, hiddenExcluded, similar(q)) else null
+        return SearchResult(q.text, filter, sections, hiddenExcluded, empty, gallery)
     }
 
     // --- Sections ----------------------------------------------------------------------------------
@@ -264,15 +279,19 @@ class ProjectSearch(val doc: ProjectDoc, val context: SearchContext = SearchCont
             .any { doc.isLinkBeforeReveal(it.target.key, block.key) }
     }
 
-    private fun commands(q: TextQuery): List<SearchItem> {
-        val all = buildList {
-            if (!context.inScript) add(Triple(SearchCommand.CHANGE_LENS, "시점 바꾸기", "지금: ${lens.chip(context.lens).label}"))
-            if (context.inScript && context.currentSceneKey != null) add(Triple(SearchCommand.LENS_TO_SCENE, "렌즈를 이 씬으로 맞추기", null))
-            add(Triple(SearchCommand.OPEN_CHECKS, "점검 센터 열기", "확인할 항목 ${context.openCheckCount}"))
-            context.currentEpisodeKey?.let { codes.unitLabel(it) }?.let { add(Triple(SearchCommand.RENUMBER, "번호 다시 매기기 · $it", null)) }
-        }
-        return all.mapNotNull { (cmd, label, sub) -> q.highlight(label)?.let { SearchItem.CommandItem(cmd, it, sub) } }
+    private fun commandTriples(): List<Triple<SearchCommand, String, String?>> = buildList {
+        if (!context.inScript) add(Triple(SearchCommand.CHANGE_LENS, "시점 바꾸기", "지금: ${lens.chip(context.lens).label}"))
+        if (context.inScript && context.currentSceneKey != null) add(Triple(SearchCommand.LENS_TO_SCENE, "렌즈를 이 씬으로 맞추기", null))
+        add(Triple(SearchCommand.OPEN_CHECKS, "점검 센터 열기", "확인할 항목 ${context.openCheckCount}"))
+        context.currentEpisodeKey?.let { codes.unitLabel(it) }?.let { add(Triple(SearchCommand.RENUMBER, "번호 다시 매기기 · $it", null)) }
     }
+
+    private fun commands(q: TextQuery): List<SearchItem> =
+        commandTriples().mapNotNull { (cmd, label, sub) -> q.highlight(label)?.let { SearchItem.CommandItem(cmd, it, sub) } }
+
+    /** Every command of this context, nothing boxed (the `명령` chip with an empty query). */
+    fun commandList(): List<SearchItem> =
+        commandTriples().map { (cmd, label, sub) -> SearchItem.CommandItem(cmd, Highlight(label, emptyList()), sub) }
 
     private fun places(q: TextQuery): List<SearchItem> = doc.world.places
         .filter { it.deletedAt == null && !hiddenLocked(it.hidden) }

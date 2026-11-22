@@ -13,6 +13,9 @@ object ExportCopy {
     /** The `.civilight` `암호` field (LIB-41). */
     const val PASSWORD = "암호"
     const val CANCEL = "취소"
+
+    /** While the file is built (DS-47 `DelayedProgress`: shown only after a second). */
+    const val WORKING = "만드는 중"
     const val SEP = " · "
 
     /** Second password field (`RHRecoveryPw` `한 번 더`, reused per LIB-41). */
@@ -22,11 +25,11 @@ object ExportCopy {
     const val RANGE_ALL = "전체"
 
     /** After the file was saved (LIB-41: "a done notification or toast (copy: not in sources)"). */
-    const val TODO_COPY_LIB41_DONE = "TODO_COPY_LIB41_DONE"
+    const val DONE = "파일 저장함"
 
     /** The chosen place could not be written (no source copy). */
-    const val TODO_COPY_LIB41_SAVE_FAILED = "TODO_COPY_LIB41_SAVE_FAILED"
+    const val SAVE_FAILED = "저장하지 못함"
 
     /** `한 번 더` differs from `암호` (no source copy). */
-    const val TODO_COPY_LIB41_PASSWORD_MISMATCH = "TODO_COPY_LIB41_PASSWORD_MISMATCH"
+    const val PASSWORD_MISMATCH = "암호가 서로 다름"
 }

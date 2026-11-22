@@ -50,6 +50,9 @@ data class TrashEntry(
 enum class TrashKind {
     PROJECT, SCENE, BLOCK_GROUP, CHARACTER, PLACE, TERM, FACTION, CHANGE, RECORDER, FIELD_DEF,
     PAGE, MAP, CANVAS, EVENT,
+
+    /** One gallery image (55 GAL-20, serial `galleryItem`). */
+    GALLERY_ITEM,
 }
 
 enum class TrashReason { DELETED, MERGED, REPLACED_BY_OVERWRITE }

@@ -44,10 +44,10 @@ object RecoveryPasswordState {
         }
         if (kinds <= 1 && bars > 1) bars--
         val word = when (bars) {
-            1 -> RecoveryCopy.TODO_COPY_LIB58_STRENGTH_WEAK
-            2 -> RecoveryCopy.TODO_COPY_LIB58_STRENGTH_FAIR
+            1 -> RecoveryCopy.STRENGTH_WEAK
+            2 -> RecoveryCopy.STRENGTH_FAIR
             3 -> RecoveryCopy.STRENGTH_GOOD
-            else -> RecoveryCopy.TODO_COPY_LIB58_STRENGTH_STRONG
+            else -> RecoveryCopy.STRENGTH_STRONG
         }
         return StrengthUi(bars, "${RecoveryCopy.STRENGTH} · $word · $length${RecoveryCopy.CHARS}")
     }
@@ -67,7 +67,7 @@ object RecoveryPasswordState {
         return RecoveryPasswordUi(
             cardTitle = "${RecoveryCopy.HIDDEN_PROJECTS} $hiddenProjects",
             strength = strength(password),
-            mismatch = if (repeat.isNotEmpty() && !password.contentEquals(repeat)) RecoveryCopy.TODO_COPY_LIB58_MISMATCH else null,
+            mismatch = if (repeat.isNotEmpty() && !password.contentEquals(repeat)) RecoveryCopy.MISMATCH else null,
             rows = rows,
             canSet = RecoveryKeys.canSet(password, repeat),
         )

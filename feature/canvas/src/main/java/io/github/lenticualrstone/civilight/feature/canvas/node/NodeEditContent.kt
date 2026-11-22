@@ -15,6 +15,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightTextField
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.navigation.SheetKey
@@ -56,29 +57,17 @@ fun ColumnScope.NodeEditRows(
             enabled = !view.readOnly,
         )
     }
-    if (view.readOnly) CivilightText(CanvasCopy.READ_ONLY, CivilightTheme.type.small, Modifier.padding(top = 10.dp), color = colors.ink3)
+    FoldReveal(view.readOnly) { CivilightText(CanvasCopy.READ_ONLY, CivilightTheme.type.small, Modifier.padding(top = 10.dp), color = colors.ink3) }
     val variant = if (compact) ButtonVariant.COMPACT_GHOST else ButtonVariant.GHOST
+    // The buttons stay plain rows of equal weight: a weight does not combine with a fold (an exited button would
+    // keep its share). The sheet closes after each of these actions, so there is no state change to animate.
     SheetActions {
         view.unlockLabel?.let { CivilightButton(text = it, onClick = onUnlock, modifier = Modifier.weight(1f), variant = variant) }
         if (!view.readOnly) {
             view.restoreLabel?.let { CivilightButton(text = it, onClick = onRestore, modifier = Modifier.weight(1f), variant = variant) }
             view.keepLabel?.let { CivilightButton(text = it, onClick = onKeep, modifier = Modifier.weight(1f), variant = variant) }
         }
-        view.openLabel?.let { label ->
-            CivilightButton(
-                text = label,
-                onClick = onOpen,
-                modifier = Modifier.weight(1f),
-                variant = if (compact) ButtonVariant.COMPACT_GHOST else ButtonVariant.GHOST,
-            )
-        }
-        if (!view.readOnly) {
-            CivilightButton(
-                text = view.removeLabel,
-                onClick = onRemove,
-                modifier = Modifier.weight(1f),
-                variant = if (compact) ButtonVariant.COMPACT_GHOST else ButtonVariant.GHOST,
-            )
-        }
+        view.openLabel?.let { label -> CivilightButton(text = label, onClick = onOpen, modifier = Modifier.weight(1f), variant = variant) }
+        if (!view.readOnly) CivilightButton(text = view.removeLabel, onClick = onRemove, modifier = Modifier.weight(1f), variant = variant)
     }
 }

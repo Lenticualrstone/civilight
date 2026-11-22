@@ -5,12 +5,9 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -18,13 +15,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -34,7 +34,11 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
 import io.github.lenticualrstone.civilight.ServiceLocator
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.Motion
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
 import io.github.lenticualrstone.civilight.navigation.BackStackNavigator
 import io.github.lenticualrstone.civilight.navigation.HiddenProjectLock
 import io.github.lenticualrstone.civilight.navigation.ProjectRoute
@@ -44,7 +48,9 @@ import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps
 import io.github.lenticualrstone.civilight.ui.lens.ScriptLensEffect
 import io.github.lenticualrstone.civilight.ui.nav.ListDetailSceneStrategy
+import io.github.lenticualrstone.civilight.ui.nav.OverlayBackdrop
 import io.github.lenticualrstone.civilight.ui.nav.OverlaySceneStrategy
+import io.github.lenticualrstone.civilight.ui.nav.overlayBackdrop
 import io.github.lenticualrstone.civilight.ui.nav.RouteMetadata
 import io.github.lenticualrstone.civilight.ui.nav.rememberEntryViewModelDecorator
 import io.github.lenticualrstone.civilight.ui.project.ProjectEntryFrame
@@ -64,7 +70,9 @@ import io.github.lenticualrstone.civilight.ui.security.ScreenExposure
 import io.github.lenticualrstone.civilight.ui.security.lockBlurAvailable
 import io.github.lenticualrstone.civilight.ui.security.lockedContent
 import io.github.lenticualrstone.civilight.ui.theme.ThemeBridge
+import io.github.lenticualrstone.civilight.ui.window.LocalPaneSplits
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
+import io.github.lenticualrstone.civilight.ui.window.PaneSplitSource
 import io.github.lenticualrstone.civilight.ui.window.rememberWindowLayout
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -83,22 +91,32 @@ fun CivilightRoot(
     capture: CaptureGuard,
     pendingRoute: Route?,
     onPendingRouteHandled: () -> Unit,
+    splashDone: State<Boolean>? = null,
 ) {
     val settings by locator.settings.collectAsState()
-    val context = LocalContext.current
-    val reduced = ThemeBridge.reducedMotion(settings.animation, ThemeBridge.systemAnimationsOff(context))
+    // S16: the theme reads the system animator scale live (ContentObserver) and folds scale 0 into
+    // reduced motion; the app passes only the user's own choice.
     CivilightTheme(
         themeMode = ThemeBridge.themeMode(settings.theme),
         textScale = ThemeBridge.textScale(settings),
         glassMode = ThemeBridge.glassMode(settings),
-        reducedMotion = reduced,
+        reducedMotion = ThemeBridge.reducedMotion(settings.animation, systemAnimationsOff = false),
     ) {
+        val motion = LocalMotion.current
+        val motionState = rememberUpdatedState(motion)
         val backStack = rememberNavBackStack(*startRoutes.toTypedArray())
         val navigator = remember(backStack) { BackStackNavigator(backStack) { activity.finish() } }
         val layout = rememberWindowLayout(settings.unfoldedLayout)
         val layoutState = rememberUpdatedState(layout)
         val deps = remember(navigator, biometric, capture) { ShellDeps(locator, navigator, biometric, capture, layoutState) }
         val provider = remember(deps) { shellEntryProvider(deps) }
+        val backdrop = remember { OverlayBackdrop() }
+        val overlays = remember(backdrop) { OverlaySceneStrategy(backdrop) { motionState.value } }
+        // A new strategy when the pane mode changes, so Nav3 recomputes the scenes on fold / unfold.
+        val listDetail = remember(layout.twoPanes) { ListDetailSceneStrategy { layoutState.value.twoPanes } }
+        val paneSplits = remember(locator) {
+            PaneSplitSource(locator.settings) { module, split -> locator.appScope.launch { locator.stores.settings.setPaneSplit(module, split) } }
+        }
 
         CompositionLocalProvider(
             LocalFeatureDeps provides deps,
@@ -107,6 +125,7 @@ fun CivilightRoot(
             LocalToasts provides deps.toasts,
             LocalSheetRegistry provides deps.sheets,
             LocalBackHandler provides { enabled, onBack -> BackHandler(enabled, onBack) },
+            LocalPaneSplits provides paneSplits,
         ) {
             // A file opened from outside waits until the app lock is passed (LIB-08).
             val unlock by deps.unlock.state.collectAsState()
@@ -137,25 +156,47 @@ fun CivilightRoot(
             } else {
                 null
             }
+            // S9 / D5: the lock appears at once (protected content never lingers in a fade); only unlocking
+            // animates: the lock fades out on `exit` while the content's blur and dim ramp back.
+            val lockAmount = remember { Animatable(if (lockMode != null) 1f else 0f) }
+            LaunchedEffect(lockMode != null) {
+                if (lockMode != null) lockAmount.snapTo(1f) else lockAmount.animateTo(0f, motion.spec(CivilightMotion.exit))
+            }
+            val shownLock = rememberLastNonNull(lockMode)
+            val lockLevel = { if (lockMode != null) 1f else lockAmount.value }
             val showContent = lockMode == null || (lockMode == LockScreenMode.BLURRED_CONTENT && lockBlurAvailable())
             val entryViewModels = rememberEntryViewModelDecorator<NavKey>()
             val saveable = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
+            val rise = rememberSplashRise(splashDone, motion)
             Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg)) {
                 if (showContent) {
-                    Box(Modifier.fillMaxSize().then(if (lockMode != null) Modifier.lockedContent() else Modifier)) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .then(rise)
+                            .lockedContent(lockLevel, locked = lockMode != null),
+                    ) {
                         NavDisplay(
                             backStack = backStack,
+                            modifier = Modifier.overlayBackdrop(backdrop) { motionState.value.reduced },
                             onBack = { navigator.pop() },
                             entryDecorators = listOf(saveable, entryViewModels),
-                            sceneStrategies = listOf(OverlaySceneStrategy(), ListDetailSceneStrategy { layoutState.value.twoPanes }),
-                            transitionSpec = { pushTransition(reduced) },
-                            popTransitionSpec = { popTransition(reduced) },
-                            predictivePopTransitionSpec = { popTransition(reduced) },
+                            sceneStrategies = listOf(overlays, listDetail),
+                            transitionSpec = { sceneTransition(motion, forward = true) },
+                            popTransitionSpec = { sceneTransition(motion, forward = false) },
+                            predictivePopTransitionSpec = { sceneTransition(motion, forward = false) },
                             entryProvider = provider,
                         )
                     }
                 }
-                if (lockMode != null) AppLock(lockMode, deps, onBack = { activity.moveTaskToBack(true) })
+                if (lockMode != null) {
+                    AppLock(lockMode, deps, onBack = { activity.moveTaskToBack(true) })
+                } else if (shownLock != null && lockAmount.value > 0f) {
+                    // The unlock fade: the same lock screen, no longer taking back or touches.
+                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = lockAmount.value }) {
+                        AppLockScreen(shownLock, onBiometric = {}, onDevicePin = {}, interactive = false)
+                    }
+                }
             }
         }
     }
@@ -225,25 +266,37 @@ private fun placeholderEntry(key: NavKey, deps: FeatureDeps): NavEntry<NavKey> =
 
 private const val RELOCK_TICK_MS = 30_000L
 
-/** Emphasized decelerate (`cubic-bezier(.05,.7,.1,1)`, CNV-37). */
-private val Decelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
-
-private fun AnimatedContentTransitionScope<Scene<NavKey>>.pushTransition(reduced: Boolean): ContentTransform =
-    if (reduced) {
-        fadeIn(tween(REDUCED_MS)) togetherWith fadeOut(tween(REDUCED_MS))
-    } else {
-        (slideInHorizontally(tween(ENTER_MS, easing = Decelerate)) { it / 8 } + fadeIn(tween(ENTER_MS, easing = Decelerate))) togetherWith
-            fadeOut(tween(EXIT_MS))
+/**
+ * Scene transitions (S1, CNV-37) from the shared helpers: push slides an eighth in on `enter` with a fade
+ * while the old screen fades on `exit`; pop reverses. Reduced: fades only. A fold or unfold (the same top
+ * entry in a different scene) is not navigation: the new scene fades in on `foldOpen` over the old one.
+ */
+private fun AnimatedContentTransitionScope<Scene<NavKey>>.sceneTransition(motion: Motion, forward: Boolean): ContentTransform {
+    val sameTop = initialState.entries.lastOrNull()?.contentKey == targetState.entries.lastOrNull()?.contentKey
+    if (sameTop && initialState::class != targetState::class) {
+        return fadeIn(motion.spec(CivilightMotion.foldOpen)) togetherWith ExitTransition.KeepUntilTransitionsFinished
     }
+    return motion.push(forward)
+}
 
-private fun AnimatedContentTransitionScope<Scene<NavKey>>.popTransition(reduced: Boolean): ContentTransform =
-    if (reduced) {
-        fadeIn(tween(REDUCED_MS)) togetherWith fadeOut(tween(REDUCED_MS))
-    } else {
-        fadeIn(tween(ENTER_MS, easing = Decelerate)) togetherWith
-            (slideOutHorizontally(tween(EXIT_MS)) { it / 8 } + fadeOut(tween(EXIT_MS)))
+/**
+ * CNV-38 app phase, the destination half: while the system splash is up the content waits, then it rises
+ * 14 dp and fades in on `enter` as the splash mark leaves (`splashDone`). Reduced: a fade.
+ */
+@Composable
+private fun rememberSplashRise(splashDone: State<Boolean>?, motion: Motion): Modifier {
+    val progress = remember { Animatable(if (splashDone == null || splashDone.value) 1f else 0f) }
+    val done = splashDone?.value ?: true
+    LaunchedEffect(done) {
+        if (done && progress.value < 1f) progress.animateTo(1f, motion.spec(CivilightMotion.enter))
     }
+    val risePx = with(LocalDensity.current) { SPLASH_RISE.toPx() }
+    val reduced = motion.reduced
+    return Modifier.graphicsLayer {
+        val p = progress.value
+        alpha = p
+        translationY = if (reduced) 0f else (1f - CivilightMotion.enter.easing.transform(p)) * risePx
+    }
+}
 
-private const val ENTER_MS = 320
-private const val EXIT_MS = 160
-private const val REDUCED_MS = 120
+private val SPLASH_RISE = 14.dp

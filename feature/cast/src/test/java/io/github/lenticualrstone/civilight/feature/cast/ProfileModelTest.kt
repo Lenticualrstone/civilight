@@ -164,4 +164,33 @@ class ProfileModelTest {
         assertEquals(setOf(K.NOAH), after.keptPartners)
         assertEquals(listOf(K.NOAH), after.relations.deletedRows.map { it.partnerKey })
     }
+
+    /** `sub` keeps its elements in the order of `all`, and holds nothing else. */
+    private fun <T> assertSubsequence(message: String, sub: List<T>, all: List<T>) {
+        val it = all.iterator()
+        for (item in sub) {
+            var found = false
+            while (it.hasNext()) if (it.next() == item) { found = true; break }
+            assertTrue("$message: $item is not in $all in the same order", found)
+        }
+    }
+
+    @Test
+    fun `row 6 every row the record shows is also in the expanded record, in the same order`() {
+        // The record folds rows in and out by drawing the expanded record's rows: a base row it lacks would vanish.
+        val unlockedDoc = doc
+        val characters = unlockedDoc.cast.characters.filter { it.deletedAt == null }.map { it.key }
+        for (key in characters) for (cover in listOf(true, false)) for (unlocked in listOf(false, true)) {
+            val full = build(key = key, ui = ProfileUi(showEmpty = true, headerExpanded = true), cover = cover, unlocked = unlocked) ?: continue
+            for (showEmpty in listOf(false, true)) for (expanded in listOf(false, true)) {
+                val base = build(key = key, ui = ProfileUi(showEmpty = showEmpty, headerExpanded = expanded), cover = cover, unlocked = unlocked)!!
+                val at = "$key cover=$cover unlocked=$unlocked showEmpty=$showEmpty expanded=$expanded"
+                assertSubsequence("$at header", base.header.rows.map { it.label }, full.header.rows.map { it.label })
+                assertSubsequence("$at items", base.overview.items.map { it.defKey }, full.overview.items.map { it.defKey })
+                assertSubsequence("$at fixed", base.fixedRows.map { it.field }, full.fixedRows.map { it.field })
+                // The empty long rows only exist with `보기`, and then they are the expanded record's too.
+                assertSubsequence("$at empty long", base.emptyLongRows.map { it.defKey }, full.emptyLongRows.map { it.defKey })
+            }
+        }
+    }
 }

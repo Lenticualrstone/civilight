@@ -19,7 +19,7 @@ sealed interface AliasChange {
     /** Saved; [newlyFound] = `후보 N 새로 찾음` (null while the first scan has not finished). */
     data class Saved(val doc: ProjectDoc, val newlyFound: Int?) : AliasChange
 
-    /** Refused with the field's error line (`TODO_COPY_*` until copy exists). */
+    /** Refused with the field's error line (the name of the field to fix). */
     data class Refused(val message: String) : AliasChange
 }
 
@@ -30,12 +30,12 @@ sealed interface AliasChange {
  */
 object AliasEditor {
     fun add(doc: ProjectDoc, termKey: Key, alias: String, index: CandidateIndex, access: TermAccess, ctx: EditContext): AliasChange {
-        val term = doc.index.term(termKey) ?: return AliasChange.Refused(WorldCopy.TODO_COPY_WORLD_ALIAS_EMPTY)
+        val term = doc.index.term(termKey) ?: return AliasChange.Refused(WorldCopy.ALIAS_EMPTY)
         return set(doc, termKey, term.aliases + alias, index, access, ctx)
     }
 
     fun remove(doc: ProjectDoc, termKey: Key, alias: String, index: CandidateIndex, access: TermAccess, ctx: EditContext): AliasChange {
-        val term = doc.index.term(termKey) ?: return AliasChange.Refused(WorldCopy.TODO_COPY_WORLD_ALIAS_EMPTY)
+        val term = doc.index.term(termKey) ?: return AliasChange.Refused(WorldCopy.ALIAS_EMPTY)
         return set(doc, termKey, term.aliases - alias, index, access, ctx)
     }
 
@@ -59,9 +59,9 @@ object AliasEditor {
         }
 
     fun message(problem: AliasProblem): String = when (problem) {
-        AliasProblem.EMPTY -> WorldCopy.TODO_COPY_WORLD_ALIAS_EMPTY
-        AliasProblem.SAME_AS_NAME -> WorldCopy.TODO_COPY_WORLD_ALIAS_SAME_AS_NAME
-        AliasProblem.DUPLICATE -> WorldCopy.TODO_COPY_WORLD_ALIAS_DUPLICATE
+        AliasProblem.EMPTY -> WorldCopy.ALIAS_EMPTY
+        AliasProblem.SAME_AS_NAME -> WorldCopy.ALIAS_SAME_AS_NAME
+        AliasProblem.DUPLICATE -> WorldCopy.ALIAS_DUPLICATE
     }
 }
 

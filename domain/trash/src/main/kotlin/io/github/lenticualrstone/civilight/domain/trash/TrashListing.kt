@@ -7,6 +7,7 @@ import io.github.lenticualrstone.civilight.model.app.LibraryIndexFile
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.change.RelationSlotName
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.recorder.RecordKind
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.model.trash.TrashEntry
@@ -35,6 +36,12 @@ enum class TrashFilter(val label: String) {
         CHANGE -> kind.known == TrashKind.CHANGE
         RECORDER -> kind.known == TrashKind.RECORDER
     }
+
+    /**
+     * [matches] by kind, or one of the row's [TrashRow.extraFilters]: a character's gallery image
+     * shows under `전체` and `인물` (55 Q12), the project's only under `전체`.
+     */
+    fun matches(row: TrashRow): Boolean = matches(row.kind) || this in row.extraFilters
 }
 
 /** One line of an expanded block group (`#043` + first line, its own `되살리기`). */
@@ -54,6 +61,8 @@ data class TrashRow(
     /** Hidden things ask for authentication before `되살리기` (LIB-38). */
     val restoreNeedsAuth: Boolean,
     val lines: List<TrashBlockLine> = emptyList(),
+    /** Filters this row shows under besides those of its kind (`인물` for a character's gallery image). */
+    val extraFilters: Set<TrashFilter> = emptySet(),
 ) {
     val daysLeftLabel: String get() = TrashCopy.daysLeft(daysLeft)
     val actions: List<String> get() = listOf(TrashCopy.RESTORE, TrashCopy.PURGE)
@@ -67,7 +76,7 @@ object TrashListing {
 
     /** Rows of [filter], newest deletion first (`ED`). */
     fun list(rows: List<TrashRow>, filter: TrashFilter): List<TrashRow> =
-        rows.filter { filter.matches(it.kind) }.sortedWith(compareByDescending<TrashRow> { it.deletedAt }.thenBy { it.entryKey })
+        rows.filter { filter.matches(it) }.sortedWith(compareByDescending<TrashRow> { it.deletedAt }.thenBy { it.entryKey })
 
     /** Rows of one project's entries. [recorder] adds `레코더` reference counts where rows show counts. */
     fun projectItemRows(
@@ -97,6 +106,11 @@ object TrashListing {
                 title = title, sub = sub, daysLeft = ctx.daysLeft(entry.deletedAt), deletedAt = entry.deletedAt,
                 masked = masked, restoreNeedsAuth = TrashGates.needsAuth(doc, entry),
                 lines = if (kind == ItemKind.BLOCK && !masked) blockLines(doc, entry) else emptyList(),
+                extraFilters = if (kind == ItemKind.GALLERY_ITEM && key != null && doc.index.galleryItem(key)?.ownerKind?.known == GalleryOwnerKind.CHARACTER) {
+                    setOf(TrashFilter.CHARACTER)
+                } else {
+                    emptySet()
+                },
             )
         }
     }
@@ -182,6 +196,15 @@ object TrashListing {
                 doc.itemName(item).orEmpty() to TrashCopy.join(listOf(TrashCopy.kindWord(item.kind), location) + counts)
             }
             ItemKind.CHANGE -> changeTitle(doc, item.key) to TrashCopy.join(TrashCopy.kindWord(ItemKind.CHANGE), location)
+            // `등불 고리` · `리엔 · 갤러리` (55 T-GAL-35).
+            ItemKind.GALLERY_ITEM -> {
+                val g = doc.index.galleryItem(item.key)
+                val owner = when (g?.ownerKind?.known) {
+                    GalleryOwnerKind.CHARACTER -> doc.index.character(g.ownerKey)?.name
+                    else -> doc.project.name
+                }
+                (g?.title?.takeIf { it.isNotBlank() } ?: TrashCopy.UNTITLED_IMAGE) to TrashCopy.join(owner, TrashCopy.GALLERY)
+            }
             else -> doc.itemName(item).orEmpty() to TrashCopy.join(TrashCopy.kindWord(item.kind), location)
         }
     }

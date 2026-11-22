@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.recorder.inbox
 
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderEnv
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.inbox.Inbox
 import io.github.lenticualrstone.civilight.domain.recorder.inbox.InboxRow
 import io.github.lenticualrstone.civilight.domain.recorder.inbox.InboxScreen
@@ -61,7 +62,10 @@ object InboxViews {
         relockPolicy: RelockPolicy = RelockPolicy.ON_LEAVE,
         query: String = "",
     ): InboxView {
-        val screen = Inbox.screen(library, filter, env, now, relockPolicy)
+        val screen = Inbox.screen(library, filter, env, now, relockPolicy).let { s ->
+            // The open group's note for the policies the board does not draw (`TODO_COPY_LRC_18`), in the library's own words.
+            s.openGroup?.let { g -> s.copy(openGroup = g.copy(relockNote = ShownCopy.relockNote(relockPolicy.name))) } ?: s
+        }
         val hits: Set<Key>? = query.takeIf { it.isNotBlank() }?.let { q -> RecordSearch.search(library, q, env).map { it.key }.toSet() }
         val offered = PutAvailability.offered(env)
         fun view(row: InboxRow): RowView {
@@ -78,5 +82,16 @@ object InboxViews {
             query = query,
             captureEntry = EntryContext(surface = EntrySurface.INBOX, projectKey = (filter.project as? ProjectFilter.Project)?.projectKey),
         )
+    }
+}
+
+/** What the inbox body is: nothing yet, `EmptyLr` (no record at all), or the rows. The swap key of the body. */
+enum class InboxKind { LOADING, EMPTY, ROWS }
+
+object InboxKinds {
+    fun of(view: InboxView?): InboxKind = when {
+        view == null -> InboxKind.LOADING
+        view.empty -> InboxKind.EMPTY
+        else -> InboxKind.ROWS
     }
 }

@@ -66,11 +66,45 @@ class ViewportMathTest {
     }
 
     @Test
-    fun `a screen starts at the fill zoom`() {
+    fun `a screen opens fitted, not at the fill zoom (QA 9)`() {
         val v = cover.resolve(Viewport.UNSET)
-        assertEquals(844f / 292.5f, v.zoom, 1e-3f)
+        assertEquals(1f, v.zoom, 0f)
+        assertEquals(Viewport(0.5f, 0.5f, 1f), v)
+        assertEquals(Viewport(), v)
         assertEquals(Viewport(0.2f, 0.3f, 2f), cover.resolve(Viewport(0.2f, 0.3f, 2f)))
+        // the fill zoom is still there for callers that want it: 296 % on a tall phone view, the QA figure
+        assertEquals(844f / 292.5f, cover.fillZoom(), 1e-3f)
         assertEquals(1f, ViewportMath(400f, 300f, 4f / 3f).fillZoom(), 1e-4f)
+    }
+
+    @Test
+    fun `lerp moves the centre linearly and the zoom geometrically`() {
+        val a = Viewport(0.2f, 0.4f, 1f)
+        val b = Viewport(0.6f, 0.8f, 4f)
+        assertEquals(a, Viewport.lerp(a, b, 0f))
+        assertEquals(b, Viewport.lerp(a, b, 1f))
+        val mid = Viewport.lerp(a, b, 0.5f)
+        assertEquals(0.4f, mid.cx, 1e-5f)
+        assertEquals(0.6f, mid.cy, 1e-5f)
+        assertEquals(2f, mid.zoom, 1e-4f)
+        assertEquals(b, Viewport.lerp(Viewport.UNSET, b, 0.3f))
+    }
+
+    @Test
+    fun `a soft pinch may pass the limits and settles back on release`() {
+        val v = Viewport(0.5f, 0.5f, 1f)
+        val c = ScreenPoint(195f, 422f)
+        val hard = cover.transform(v, c, 0f, 0f, 0.5f)
+        assertEquals(Viewport.MIN_ZOOM, hard.zoom, 0f)
+        val soft = cover.transform(v, c, 0f, 0f, 0.5f, soft = true)
+        assertEquals(Viewport.SOFT_MIN_ZOOM, soft.zoom, 1e-5f)
+        assertTrue(cover.overshoots(soft))
+        assertEquals(Viewport.MIN_ZOOM, cover.clamp(soft).zoom, 0f)
+        val high = cover.transform(Viewport(0.5f, 0.5f, 7f), c, 0f, 0f, 3f, soft = true)
+        assertEquals(Viewport.SOFT_MAX_ZOOM, high.zoom, 1e-5f)
+        assertEquals(Viewport.MAX_ZOOM, cover.clamp(high).zoom, 0f)
+        assertFalse(cover.overshoots(Viewport(zoom = 8f)))
+        assertEquals(cover.transform(v, c, 12f, -7f, 1.3f), cover.transform(v, c, 12f, -7f, 1.3f, soft = true))
     }
 
     @Test

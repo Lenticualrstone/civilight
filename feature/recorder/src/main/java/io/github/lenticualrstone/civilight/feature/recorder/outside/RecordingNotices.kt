@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.recorder.outside
 
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureStage
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureState
 
@@ -16,5 +17,5 @@ object RecordingNotices {
     fun keepsAlive(state: CaptureState): Boolean = state.stage == CaptureStage.RECORDING && state.session != null
 
     fun of(state: CaptureState): RecordingNotice? =
-        if (keepsAlive(state)) RecordingNotice(RecorderCopy.APP_NAME, RecorderCopy.TODO_NOTIFICATION, RecorderCopy.APP_NAME) else null
+        if (keepsAlive(state)) RecordingNotice(RecorderCopy.APP_NAME, ShownCopy.RECORDING, RecorderCopy.APP_NAME) else null
 }

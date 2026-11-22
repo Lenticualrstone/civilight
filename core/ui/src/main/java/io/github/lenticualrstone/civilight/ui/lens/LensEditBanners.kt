@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.ui.lens
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import io.github.lenticualrstone.civilight.designsystem.component.LensEditBanner
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.position.LensPoint
 import io.github.lenticualrstone.civilight.ui.labels.UnitLabels
@@ -35,9 +36,13 @@ object LensEditBanners {
     }
 }
 
-/** The DS-28 banner for [doc]'s lens, or nothing; [onLatest] = `최신으로` (e.g. `LensController.backToLatest`). */
+/**
+ * The DS-28 banner for [doc]'s lens, or nothing; [onLatest] = `최신으로` (e.g. `LensController.backToLatest`).
+ * It folds in and out (S8), keeping its last text while it leaves.
+ */
 @Composable
 fun ProjectLensEditBanner(doc: ProjectDoc, readOnly: Boolean, onLatest: () -> Unit, modifier: Modifier = Modifier) {
-    val ui = LensEditBanners.of(doc, readOnly) ?: return
-    LensEditBanner(title = ui.title, actionLabel = ui.action, onAction = onLatest, modifier = modifier, subtitle = ui.subtitle)
+    FoldRevealValue(LensEditBanners.of(doc, readOnly), modifier) { ui ->
+        LensEditBanner(title = ui.title, actionLabel = ui.action, onAction = onLatest, subtitle = ui.subtitle)
+    }
 }

@@ -25,7 +25,21 @@ import kotlinx.serialization.Serializable
  * The steps of `+ 변화` on the event detail (WLD-33): the item, then one of its fields, then the
  * new value. Each step replaces the one before inside the sheet (WLD-32 convention).
  */
-enum class ChangeStep { ITEM, FIELD, VALUE, TARGET }
+enum class ChangeStep {
+    ITEM, FIELD, VALUE, TARGET,
+    ;
+
+    /** How deep the step is: item, field, value, then the target picker over the value. */
+    private val depth: Int get() = when (this) { ITEM -> 0; FIELD -> 1; VALUE -> 2; TARGET -> 3 }
+
+    /** True when going from [from] to this step moves forward (the sheet pushes in), false going back. */
+    fun isAhead(from: ChangeStep): Boolean = depth >= from.depth
+
+    companion object {
+        /** `forward` of a sheet step swap. */
+        fun isAhead(from: ChangeStep, to: ChangeStep): Boolean = to.isAhead(from)
+    }
+}
 
 /**
  * The form of `+ 변화`, saveable as JSON. [kind] / [entityKey] = the item, [fieldDefKey] = its

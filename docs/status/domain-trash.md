@@ -8,6 +8,7 @@ Feature status in `docs/FEATURES.md` terms: the domain slice of CST-40 … CST-4
 
 ## Done
 
+- **Integration check (2026-11-23):** `Messages.impactSheet` `stayingTitle` now picks `로` / `으로` by the last syllable (`지운 세력으로 보임`, `지운 용어로 보임`, `지운 인물로 보임`), as feature:cast asked; test `EntityKindTrashTest.staying title takes the right particle for each kind`. feature:world's merge sheet reads this title, so it is fixed there too; feature:cast may drop its local title.
 Sources: `domain/trash/src/main/kotlin/io/github/lenticualrstone/civilight/domain/trash/`. Tests: `domain/trash/src/test/kotlin/io/github/lenticualrstone/civilight/domain/trash/`.
 
 | Feature / section | What | Files | Tests |
@@ -33,6 +34,8 @@ Sources: `domain/trash/src/main/kotlin/io/github/lenticualrstone/civilight/domai
 | Toast copy (LIB-40 messages) | delete, restore, merge, block (`블록 #043 지움 · ◆ 3개는 #044 자리로`), scene (`씬 3 지움 · ◆ 3 · ◇ 1은 …`) | `Messages.kt` | TC-20-01 … -05, -17, T-12-01, T-12-07, `BlockRestoreTest` |
 
 Spec cases covered: 30-cast TC-20-01 … TC-20-28 (all 28); 60-library T-01 … T-15, F-12, I-14, S-08 (trash location only); 00 §5.4 every row; 10-script T-12-01 (fixture variant), -03, -04, -05, -07 (fixture variant), -24 (they exercise this module). LIB P-07 (example project purged with no trash entry) is domain:library's onboarding flow.
+
+- **Gallery (core agent B, 2026-11-23; 55 §3.4)**: `ItemKind.GALLERY_ITEM` (trash kind `galleryItem`, `ItemId.galleryItem`), so `TrashOps.delete` · `undo`, `RestoreOps.restore` (hidden image or hidden owner needs auth) and `PurgeOps.purge` carry one image. Row access (`rowOf`, `isItemLive`, `itemName` = title, `itemHidden` = own flag or hidden owner character, `setMark`, `updateGalleryItem`, `removeGalleryItems`). `LiveRows` / `OwnedRows.galleryItems`; `Impact`: `OwnedKind.GALLERY_ITEM` and `DeleteImpact.hiddenGalleryItems`; `Messages.impactSheet(impact, hiddenLocked)` row `이미지 10` / locked `이미지 8 · 숨김 2` (`galleryRow`), `Messages.galleryDeleteToast(titles)` `이미지 지움 · <title>` (untitled `이미지 지움`). `DocChange.revert` reverts gallery items row by row across owners (merge moves) and refiles them. `PurgeOps`: purging a character removes its images (`removeImages`), `referencedBlobs` is public and delegates to `core:model` `BlobRefs`. `TrashListing`: row `<title or 제목 없음>` · `<owner> · 갤러리`, masked `숨긴 이미지`; `TrashRow.extraFilters` and `TrashFilter.matches(row)` put a character's image under `인물` too (55 Q12); `list` uses it. `MergeOps.merge` (characters) moves the merged character's images (live and trashed) after the target's own in their order, keeping one whose source the target holds; each is a `MovedRef("galleryItem", key, "ownerKey")` (`MergeOps.GALLERY_ITEM_REF`). Gallery descriptions are a link surface: `LinkSurface.GALLERY` in `ReferenceScanner` (live items) and `rewriteLinks` (all items, `RunOwner("galleryItem", key, "caption")`). `ProjectTrash.rekey` moves the project gallery. Tests `GalleryTrashTest` (12: T-GAL-14, restore toast names, project trash re-key, restore and auth, T-GAL-15, T-GAL-28, T-GAL-21, T-GAL-35, project image filter, T-GAL-29, revert keeps a sibling edit, caption links). `:domain:trash:test` 116 passing.
 
 ## Partial
 
@@ -72,6 +75,8 @@ Spec cases covered: 30-cast TC-20-01 … TC-20-28 (all 28); 60-library T-01 … 
 - `덮어쓰기`: the existing project is re-keyed to K′ and trashed; already-trashed rows are only re-keyed (§6 `ED`).
 - Trash list order: deletion time, newest first (LIB-38 `ED`).
 
+- Gallery (2026-11-23): an untitled image is named `이미지` by `itemName` (restore toast `이미지 되살림`, `ED`); its trash row title is `제목 없음` (GAL-20). Several images deleted at once read `이미지 <k>장 지움` (GAL-18 gives no copy). Restoring an image whose owner character is still in the trash clears its mark; it stays not live until the owner comes back. A merge moves trashed images too (their entries keep working). `PurgeActions` / store blob GC see gallery originals through `BlobRefs`.
+
 ## Spec conflicts
 
 | Case | Conflict | Test |
@@ -89,3 +94,4 @@ Spec cases covered: 30-cast TC-20-01 … TC-20-28 (all 28); 60-library T-01 … 
 - **core:store:** (the pure part is `domain:actions` `PurgeActions.runDue`, 2026-11-22; the store writes its result) run `PurgeOps.purgeDue`, `ProjectTrash.purgeDue` and `RecorderTrash.purgeDue` daily and on app start; after each project purge apply `RecorderTrash.applyProjectPurge` to the recorder library; delete blob files listed in `PurgeResult.unreferencedBlobs` when no other project references them; after `ProjectTrash.replaceByOverwrite`, store the old project under `ProjectTrash.rekey(doc, K′)`.
 - **core:model:** consider real fields for what this module keeps in `ext`: `TrashEntry.ext["refSites"]` (reference sites at delete time, for the restore toast) and `MergeRecord.ext["summary"]` (`옮긴 참조 · 관계 · 칸` counts). Until then they round-trip as extension data.
 - **domain:checks:** the `지운 항목` filter rows are `DeletedItems.rows(doc, ctx, recorder, locks)`; `deleted.item` acks use subjects `[itemKey]` or `[itemKey, referencingKey]` and fingerprint `Fixes.deletedItemFingerprint`.
+- **Gallery scene links after a purge (55 GAL-08, §12.1)**: a purged scene leaves no `NameTag` of kind `unit` (only the exporter writes `notExported` unit tags), so `지운 씬 · <code>` has no stored code after a purge. Either `PurgeOps.purgeUnit` leaves a unit tag when anything still references the scene, or canvas shows the dotted state without a code. Not changed here (2026-11-23).

@@ -56,7 +56,7 @@ fun PutCharacterContent(sheet: PutSheet, scope: SheetScope, services: RecorderSe
                 )
                 SheetActions(Modifier.padding(top = 16.dp)) {
                     CivilightButton(
-                        RecorderUiCopy.TODO_CHARACTER_BUTTON,
+                        RecorderUiCopy.CHARACTER_BUTTON,
                         { insertAndToast(services, deps, host) { makeCharacter(sheet.recordKey, current.projectKey, name) } },
                         Modifier.weight(1f),
                         enabled = view.canMake(name),

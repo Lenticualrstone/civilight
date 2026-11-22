@@ -71,8 +71,14 @@ object OnboardingFlow {
 
     fun isReplay(state: OnboardingState): Boolean = state.firstRunCompleted
 
+    /**
+     * The example is there to browse (LIB-17) while its entry is live and onboarding is not over. It does not
+     * wait for the `INSTALLED` flag: an example whose entry exists but whose state write was cut short
+     * (QA 2026-11-23 #12) must still be shown, never deleted unseen by `Finish`. After `온보딩 끝내기`
+     * (`DELETED`, `firstRunCompleted`) it is gone for good (LIB-18, §6 Q9).
+     */
     fun exampleInstalled(state: OnboardingState, exampleKey: Key?): Boolean =
-        exampleKey != null && state.exampleState == ExampleState.INSTALLED
+        exampleKey != null && !state.firstRunCompleted && state.exampleState != ExampleState.DELETED
 
     /** `다음` / `예시 둘러보기` / `마치기` of walkthrough [page]. */
     fun walkNext(page: Int, replay: Boolean, exampleKey: Key?): OnbTarget = when {

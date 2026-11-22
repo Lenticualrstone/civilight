@@ -1,8 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.library.onboarding
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -10,11 +9,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +47,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.startHairline
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import kotlinx.coroutines.delay
 
@@ -83,43 +78,57 @@ internal fun WalkDemo(page: Int, modifier: Modifier = Modifier) {
 }
 
 private val DEMO_HEIGHT = 420.dp
-private val SWIPE_EASE = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-private val TAB_EASE = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
-private const val SWIPE_MS = 4400
 
-/** `Walk1`: 하르트's block slides left and `◆ 시간` · `참고` · `속성` come in behind it. */
+/** One round of the swipe demo: hold, slide out on `swipe`, hold, slide back; the loop length is the demo's own. */
+private const val SWIPE_LOOP_MS = 4400
+private const val SWIPE_HOLD_MS = 900
+private const val SWIPE_OPEN_MS = 2900
+private const val REVEAL_DP = 192f
+
+/**
+ * `Walk1`: 하르트's block slides left and `◆ 시간` · `참고` · `속성` come in behind it. The slide takes `swipeMs`
+ * on the `standard` curve and each tab follows [CivilightMotion.swipeStaggerMs] after the one before (CNV-37).
+ * Without loops (reduced motion, animator scale 0) it is the still end state: no clock runs.
+ */
 @Composable
 private fun BoxScope.SwipeDemo() {
+    if (CivilightTheme.motion.loops) {
+        val transition = rememberInfiniteTransition(label = "walk1")
+        val standard = CivilightMotion.standard.easing
+        val shift by transition.animateFloat(
+            0f, 0f,
+            infiniteRepeatable(
+                keyframes {
+                    durationMillis = SWIPE_LOOP_MS
+                    0f at SWIPE_HOLD_MS using standard
+                    -REVEAL_DP at SWIPE_HOLD_MS + CivilightMotion.swipeMs
+                    -REVEAL_DP at SWIPE_OPEN_MS using standard
+                    0f at SWIPE_OPEN_MS + CivilightMotion.swipeMs
+                },
+            ),
+            label = "swipe",
+        )
+        val tabs = List(3) { i -> tabProgress(transition, i * CivilightMotion.swipeStaggerMs) }
+        SwipeFrame(shift = { shift }, tab = { tabs[it] })
+    } else {
+        SwipeFrame(shift = { -REVEAL_DP }, tab = { 1f })
+    }
+}
+
+@Composable
+private fun BoxScope.SwipeFrame(shift: () -> Float, tab: (Int) -> Float) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val reduced = CivilightTheme.reducedMotion
     val density = LocalDensity.current
-    val transition = rememberInfiniteTransition(label = "walk1")
-    val shift by transition.animateFloat(
-        0f, 0f,
-        infiniteRepeatable(
-            keyframes {
-                durationMillis = SWIPE_MS
-                0f at (SWIPE_MS * 0.18f).toInt() using SWIPE_EASE
-                -200f at (SWIPE_MS * 0.34f).toInt() using SWIPE_EASE
-                -192f at (SWIPE_MS * 0.38f).toInt()
-                -192f at (SWIPE_MS * 0.74f).toInt() using SWIPE_EASE
-                0f at (SWIPE_MS * 0.88f).toInt()
-            },
-        ),
-        label = "swipe",
-    )
-    val tabs = List(3) { i -> tabProgress(transition, i * 60) }
-    val blockShift = if (reduced) -192f else shift
     Box(Modifier.align(Alignment.TopStart).padding(top = 150.dp).fillMaxWidth().height(92.dp)) {
         Row(Modifier.align(Alignment.CenterEnd).width(192.dp).fillMaxHeight().background(colors.bg)) {
             listOf("◆ " + OnboardingCopy.TAB_TIME, OnboardingCopy.TAB_REFERENCE, OnboardingCopy.TAB_PROPERTIES).forEachIndexed { i, label ->
-                val p = if (reduced) 1f else tabs[i]
                 Box(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
                         .graphicsLayer {
+                            val p = tab(i)
                             alpha = p
                             translationX = (1f - p) * with(density) { 16.dp.toPx() }
                         }
@@ -134,7 +143,7 @@ private fun BoxScope.SwipeDemo() {
             Modifier
                 .width(350.dp)
                 .fillMaxHeight()
-                .graphicsLayer { translationX = with(density) { blockShift.dp.toPx() } }
+                .graphicsLayer { translationX = with(density) { shift().dp.toPx() } }
                 .background(colors.raise)
                 .padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -148,17 +157,18 @@ private fun BoxScope.SwipeDemo() {
     }
 }
 
-/** One tab's appearance (0 hidden … 1 shown) on the `mTab` keyframes, [delayMs] after the first. */
+/** One tab's appearance (0 hidden … 1 shown), [delayMs] after the first tab: in on `enter`, out on `standard`. */
 @Composable
 private fun tabProgress(transition: androidx.compose.animation.core.InfiniteTransition, delayMs: Int): Float {
+    val enter = CivilightMotion.enter.easing
+    val standard = CivilightMotion.standard.easing
     val spec: InfiniteRepeatableSpec<Float> = infiniteRepeatable(
         keyframes {
-            durationMillis = SWIPE_MS
-            delayMillis = 0
-            0f at ((SWIPE_MS * 0.24f).toInt() + delayMs).coerceAtMost(SWIPE_MS) using TAB_EASE
-            1f at ((SWIPE_MS * 0.38f).toInt() + delayMs).coerceAtMost(SWIPE_MS)
-            1f at ((SWIPE_MS * 0.74f).toInt() + delayMs).coerceAtMost(SWIPE_MS) using TAB_EASE
-            0f at ((SWIPE_MS * 0.86f).toInt() + delayMs).coerceAtMost(SWIPE_MS)
+            durationMillis = SWIPE_LOOP_MS
+            0f at SWIPE_HOLD_MS + delayMs using enter
+            1f at SWIPE_HOLD_MS + CivilightMotion.swipeMs + delayMs
+            1f at SWIPE_OPEN_MS + delayMs using standard
+            0f at SWIPE_OPEN_MS + CivilightMotion.swipeMs + delayMs
         },
         RepeatMode.Restart,
     )
@@ -171,15 +181,16 @@ private fun tabProgress(transition: androidx.compose.animation.core.InfiniteTran
 private fun BoxScope.LensDemo() {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val reduced = CivilightTheme.reducedMotion
-    var earlier by remember { mutableStateOf(reduced) }
-    LaunchedEffect(reduced) {
-        if (reduced) {
+    val motion = CivilightTheme.motion
+    // Without loops the chip rests on the earlier point (`ED`: the still end state); with them it flips every 2.5 s.
+    var earlier by remember { mutableStateOf(!motion.loops) }
+    LaunchedEffect(motion.loops) {
+        if (!motion.loops) {
             earlier = true
             return@LaunchedEffect
         }
         while (true) {
-            delay(LENS_HOLD_MS)
+            delay(motion.delayMs(LENS_HOLD_MS.toInt()))
             earlier = !earlier
         }
     }
@@ -213,16 +224,14 @@ private fun LensRow(label: String, earlier: Boolean, later: String, before: Stri
     }
 }
 
-/** The value swap of `mValA` / `mValB`: the old text leaves up 8 dp, the new one comes from below. */
+/** The value swap of `mValA` / `mValB` is the shared one (CNV-42): the old text leaves up 8 dp, the new one comes from below. */
 @Composable
 private fun Swap(earlier: Boolean, later: String, before: String, content: @Composable (String) -> Unit) {
     val text = if (earlier) before else later
+    val motion = CivilightTheme.motion
     AnimatedContent(
         targetState = text,
-        transitionSpec = {
-            (slideInVertically(tween(400, easing = TAB_EASE)) { it / 3 } + fadeIn(tween(400))) togetherWith
-                (slideOutVertically(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(320)))
-        },
+        transitionSpec = { motion.valueSwap() },
         label = "lensValue",
     ) { content(it) }
 }
@@ -232,13 +241,20 @@ private fun Swap(earlier: Boolean, later: String, before: String, content: @Comp
 private fun BoxScope.VoiceDemo() {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val reduced = CivilightTheme.reducedMotion
-    RecorderGlowBand(if (reduced) GlowMode.STILL else GlowMode.RECORDING, Modifier.align(Alignment.BottomCenter).fillMaxWidth(), height = 260.dp)
+    val motion = CivilightTheme.motion
+    RecorderGlowBand(if (motion.loops) GlowMode.RECORDING else GlowMode.STILL, Modifier.align(Alignment.BottomCenter).fillMaxWidth(), height = 260.dp)
     Column(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 60.dp)) {
         CivilightText(OnboardingCopy.LISTENING, type.sec, color = colors.ink3)
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Bottom) {
             CivilightText(OnboardingSample.SPOKEN, type.recorderLive, Modifier.weight(1f, fill = false), color = colors.ink)
-            Box(Modifier.padding(start = 2.dp, bottom = 6.dp).size(2.dp, 20.dp).background(colors.acc))
+            // The caret blinks as the script's does (linear alpha, `caretPeriodMs`); solid without loops.
+            val blink = if (motion.loops) {
+                val caret by rememberInfiniteTransition(label = "caret").animateFloat(1f, 0f, infiniteRepeatable(tween(CivilightMotion.caretPeriodMs, easing = LinearEasing), RepeatMode.Reverse), label = "caretAlpha")
+                caret
+            } else {
+                1f
+            }
+            Box(Modifier.padding(start = 2.dp, bottom = 6.dp).size(2.dp, 20.dp).graphicsLayer { alpha = blink }.background(colors.acc))
         }
     }
     Box(

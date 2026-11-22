@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.rating
 
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -144,7 +145,10 @@ internal fun SheetScope.RatingChangeContent(sheet: RatingChangeSheet, services: 
                 note = row.rightLabel,
             )
         }
-        model.extraRows(checked).forEach { extra ->
+        // Each extra (◇ rows that depend on the checks) folds in and out as its condition changes (audit row 5, P2).
+        val extras = model.extraRows(checked)
+        RatingSheetExtra.entries.forEach { kind ->
+          FoldRevealValue(extras.firstOrNull { it.kind == kind }) { extra ->
             Row(
                 Modifier.fillMaxWidth().topHairline(colors.line).heightIn(min = 44.dp).padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -163,8 +167,9 @@ internal fun SheetScope.RatingChangeContent(sheet: RatingChangeSheet, services: 
                         TextAction(extra.action, onClick = { deps.appScope.launch { services.backups.deleteUnencrypted(sheet.projectKey) } }, style = type.small)
                 }
             }
+          }
         }
-        model.note(checked)?.let { CivilightText(it, type.small, Modifier.padding(top = 10.dp), color = colors.ink3) }
+        FoldRevealValue(model.note(checked)) { CivilightText(it, type.small, Modifier.padding(top = 10.dp), color = colors.ink3) }
     }
     SheetActions {
         CivilightButton(RatingCopy.CANCEL, closer::close, Modifier.weight(1f), variant = ButtonVariant.GHOST)

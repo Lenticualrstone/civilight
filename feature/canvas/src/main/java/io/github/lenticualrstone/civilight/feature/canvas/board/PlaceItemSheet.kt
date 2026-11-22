@@ -1,6 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.canvas.board
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -10,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.SegmentedControl
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.canvas.CanvasNodeKind
@@ -22,7 +25,7 @@ import io.github.lenticualrstone.civilight.ui.picker.HiddenGate
 import io.github.lenticualrstone.civilight.ui.picker.TermPickerSheet
 import kotlinx.serialization.Serializable
 
-/** The item picker of `노드` or `인물` (CNV-04), placing the picked item at ([x], [y]) content dp. */
+/** The item picker of `노드` or `인물` (CNV-04): the picked item is centred near ([x], [y]) content dp (the middle of the view when it opened). */
 @Serializable
 data class PlaceItemSheet(val projectKey: Key, val canvasKey: Key, val tool: CanvasTool, val x: Float, val y: Float) : SheetKey
 
@@ -54,10 +57,15 @@ fun ColumnScope.PlaceItemContent(
     }
     var index by rememberSaveable { mutableIntStateOf(0) }
     SegmentedControl(CanvasCopy.NODE_TOOL_KINDS, index, { index = it }, Modifier.padding(bottom = 12.dp))
-    val title = CanvasCopy.pickTitle(CanvasCopy.NODE_TOOL_KINDS[index])
-    when (NodeToolKinds[index]) {
-        CanvasNodeKind.FACTION -> FactionPickerSheet(doc, gate, title, { onPick(CanvasNodeKind.FACTION, it) }, onClose)
-        CanvasNodeKind.TERM -> TermPickerSheet(doc, gate, title, { key, _ -> onPick(CanvasNodeKind.TERM, key) }, onClose)
-        else -> EventPickerSheet(doc, title, { onPick(CanvasNodeKind.EVENT, it) }, onClose)
+    // The pickers crossfade when the kind changes (audit §4 canvas 9, P3).
+    ContentSwap(index, label = "placeKind") { shown ->
+        Column(Modifier.fillMaxWidth()) {
+            val title = CanvasCopy.pickTitle(CanvasCopy.NODE_TOOL_KINDS[shown])
+            when (NodeToolKinds[shown]) {
+                CanvasNodeKind.FACTION -> FactionPickerSheet(doc, gate, title, { onPick(CanvasNodeKind.FACTION, it) }, onClose)
+                CanvasNodeKind.TERM -> TermPickerSheet(doc, gate, title, { key, _ -> onPick(CanvasNodeKind.TERM, key) }, onClose)
+                else -> EventPickerSheet(doc, title, { onPick(CanvasNodeKind.EVENT, it) }, onClose)
+            }
+        }
     }
 }

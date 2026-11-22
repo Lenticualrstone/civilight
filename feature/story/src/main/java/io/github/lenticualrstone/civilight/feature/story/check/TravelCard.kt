@@ -1,7 +1,11 @@
 package io.github.lenticualrstone.civilight.feature.story.check
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,10 +25,13 @@ import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
-import io.github.lenticualrstone.civilight.designsystem.component.TravelBar
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
+import io.github.lenticualrstone.civilight.designsystem.component.travelBarFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import io.github.lenticualrstone.civilight.domain.checks.FixAction
 import io.github.lenticualrstone.civilight.domain.story.checks.Marker
 import io.github.lenticualrstone.civilight.domain.story.travel.TravelWarning
@@ -71,7 +78,7 @@ fun TravelCard(
         }
         routeLine?.let { CivilightText(it, type.body, color = colors.ink) }
         map?.let { MiniMapView(it, Modifier.padding(top = 6.dp).fillMaxWidth().height(150.dp)) }
-        TravelBar(
+        AnimatedTravelBar(
             requiredValue = warning.needText,
             availableValue = warning.haveText,
             requiredMinutes = warning.requiredMinutes.toLong(),
@@ -82,6 +89,42 @@ fun TravelCard(
         if (chips.isNotEmpty()) {
             ChipFlow(Modifier.padding(top = 8.dp)) {
                 chips.forEachIndexed { i, label -> CivilightButton(label, { onChip(i) }, variant = ButtonVariant.COMPACT_GHOST) }
+            }
+        }
+    }
+}
+
+/**
+ * DS `TravelBar` (rows `필요` · `있음` on one scale) with the `있음` fill animated on `standard` when the figures
+ * change (motion audit, feature:story 11). The DS bar draws its fill at once; this copy goes when the DS bar
+ * animates (Request in `docs/status/feature-story.md`). Reduced: the fill snaps (`motion.move`).
+ */
+@Composable
+private fun AnimatedTravelBar(
+    requiredValue: String,
+    availableValue: String,
+    requiredMinutes: Long,
+    availableMinutes: Long,
+    modifier: Modifier = Modifier,
+) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val fraction by animateFloatAsState(
+        travelBarFraction(availableMinutes, requiredMinutes).coerceIn(0f, 1f),
+        LocalMotion.current.move(CivilightMotion.standard),
+        label = "travelFill",
+    )
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(
+            Triple(TravelCopy.REQUIRED, requiredValue, 1f to colors.warn),
+            Triple(TravelCopy.AVAILABLE, availableValue, fraction to colors.acc),
+        ).forEach { (label, value, bar) ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CivilightText(label, type.small, Modifier.width(44.dp), color = colors.ink3, maxLines = 1)
+                Box(Modifier.weight(1f).height(8.dp)) {
+                    Box(Modifier.fillMaxWidth(bar.first).height(8.dp).clip(RoundedCornerShape(4.dp)).background(bar.second))
+                }
+                ValueSwap(value, type.small, Modifier.widthIn(min = 64.dp), color = colors.ink)
             }
         }
     }
@@ -100,13 +143,14 @@ fun TravelCompactRow(
     selected: Boolean = false,
     location: String? = null,
     onLocation: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val trailing = if (look.trailingAction) buttons.firstOrNull() else null
     val below = if (trailing != null) buttons.drop(1) else buttons
     Column(
-        Modifier.fillMaxWidth().topHairline(colors.line).selectedRow(selected).padding(top = 12.dp, bottom = 6.dp),
+        modifier.fillMaxWidth().topHairline(colors.line).selectedRow(selected).padding(top = 12.dp, bottom = 6.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {

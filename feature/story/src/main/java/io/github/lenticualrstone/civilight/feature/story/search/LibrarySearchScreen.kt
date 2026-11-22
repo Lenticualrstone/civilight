@@ -38,6 +38,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.NoResults
 import io.github.lenticualrstone.civilight.designsystem.component.SearchField
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.story.search.SearchFilter
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.AppSettings
@@ -158,22 +159,20 @@ fun LibrarySearchScreen(route: LibrarySearch, deps: FeatureDeps) {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
                         u.sections.forEach { section ->
                             item(key = "p:${section.projectKey}") {
-                                CivilightText(section.title, CivilightTheme.type.itemTitle, Modifier.padding(top = 18.dp), color = CivilightTheme.colors.ink)
+                                CivilightText(section.title, CivilightTheme.type.itemTitle, civilightItem().padding(top = 18.dp), color = CivilightTheme.colors.ink)
                             }
                             section.result.sections.forEach { s ->
-                                item(key = "h:${section.projectKey}:${s.kind}") { SectionLabel(s.header, Modifier.padding(top = 10.dp)) }
-                                s.items.forEachIndexed { i, item ->
-                                    row("${section.projectKey}:${s.kind.name}", i, item) { picked ->
-                                        when (val tap = SearchModel.tap(section.projectKey, picked, section.context)) {
-                                            is SearchTap.Open -> open(section.projectKey, tap.route)
-                                            else -> Unit
-                                        }
+                                item(key = "h:${section.projectKey}:${s.kind}") { SectionLabel(s.header, civilightItem().padding(top = 10.dp)) }
+                                rows("${section.projectKey}:${s.kind.name}", s.items) { picked ->
+                                    when (val tap = SearchModel.tap(section.projectKey, picked, section.context)) {
+                                        is SearchTap.Open -> open(section.projectKey, tap.route)
+                                        else -> Unit
                                     }
                                 }
                             }
                         }
                         u.footer?.let { footer ->
-                            item(key = "footer") { CivilightText(footer, CivilightTheme.type.small, Modifier.padding(top = 14.dp), color = CivilightTheme.colors.ink3) }
+                            item(key = "footer") { CivilightText(footer, CivilightTheme.type.small, civilightItem().padding(top = 14.dp), color = CivilightTheme.colors.ink3) }
                         }
                     }
                 }

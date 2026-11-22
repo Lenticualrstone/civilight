@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.map.view
 
 import io.github.lenticualrstone.civilight.domain.world.gen.StampCheck
+import io.github.lenticualrstone.civilight.feature.map.MapCopy
 import io.github.lenticualrstone.civilight.feature.map.MapFx
 import io.github.lenticualrstone.civilight.feature.map.MapFx.K
 import io.github.lenticualrstone.civilight.feature.map.common.StampCheckRow
@@ -34,7 +35,7 @@ class MapMenuTest {
         val old = world.copy(generation = world.generation!!.copy(generatorVersion = "gen-0"))
         val row = MapMenu.rows(old, MapMenuScreen.VIEW).first { it.action == MapMenuAction.REROLL }
         assertFalse(row.enabled)
-        assertEquals("TODO_COPY_MAP_REROLL_OTHER_VERSION", row.subtitle)
+        assertEquals(MapCopy.REROLL_OTHER_VERSION, row.subtitle)
     }
 
     @Test

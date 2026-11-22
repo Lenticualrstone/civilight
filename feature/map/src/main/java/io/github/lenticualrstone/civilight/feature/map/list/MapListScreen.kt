@@ -1,15 +1,11 @@
 package io.github.lenticualrstone.civilight.feature.map.list
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -21,7 +17,10 @@ import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock
-import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
+import io.github.lenticualrstone.civilight.designsystem.card.CardKind
+import io.github.lenticualrstone.civilight.designsystem.card.SnapCardRow
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
@@ -66,23 +65,29 @@ fun MapListScreen(route: MapList, deps: FeatureDeps) {
             }
         },
     ) { padding ->
+        val inner = LocalWindowLayout.current.isInner
         Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())) {
-            val list = ui ?: return@Column
-            SectionLabel(list.section, Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp))
-            if (list.cards.isEmpty()) {
-                EmptyBlock(
-                    title = list.section,
-                    modifier = Modifier.padding(top = 48.dp),
-                    primaryLabel = if (readOnly) null else MapCopy.NEW_MAP,
-                    onPrimary = if (readOnly) null else { { newMap.open() } },
-                )
-            } else {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    items(list.cards, key = { it.key }) { card ->
-                        MapCard(card) { MapNav.open(deps.navigator, doc, route.projectKey, card.key) }
+            // Loading, empty and filled swap with a crossfade; only a change of kind animates, so adding a map does not.
+            ContentSwap(ui, contentKey = { list -> if (list == null) "loading" else if (list.cards.isEmpty()) "empty" else "cards" }) { list ->
+                when {
+                    list == null -> Unit
+                    list.cards.isEmpty() -> EmptyBlock(
+                        // The block shows the heading (`지도 · 0`) once; a second section label above it repeated it (QA 8).
+                        title = list.section,
+                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 48.dp),
+                        primaryLabel = if (readOnly) null else MapCopy.NEW_MAP,
+                        onPrimary = if (readOnly) null else { { newMap.open() } },
+                    )
+                    else -> SnapCardRow(
+                        items = list.cards,
+                        key = { it.key },
+                        kind = CardKind.RECENT,
+                        inner = inner,
+                        title = list.section,
+                        showPager = false,
+                        modifier = Modifier.padding(top = 4.dp),
+                    ) { card, imageModifier ->
+                        MapCard(card, imageModifier) { MapNav.open(deps.navigator, doc, route.projectKey, card.key) }
                     }
                 }
             }
@@ -91,11 +96,11 @@ fun MapListScreen(route: MapList, deps: FeatureDeps) {
 }
 
 @Composable
-private fun MapCard(card: MapCardUi, onOpen: () -> Unit) {
+private fun MapCard(card: MapCardUi, imageModifier: Modifier, onOpen: () -> Unit) {
     val type = CivilightTheme.type
     Column(Modifier.width(200.dp).pressable(onClick = onOpen, role = Role.Button)) {
         Box(Modifier.size(200.dp, 150.dp).clip(RoundedCornerShape(16.dp))) {
-            MapCanvas(base = card.base, scene = card.scene, viewport = Viewport(), onViewportChange = {}, interactive = false, showRouteChips = false)
+            MapCanvas(base = card.base, scene = card.scene, viewport = Viewport(), onViewportChange = {}, modifier = imageModifier, interactive = false, showRouteChips = false)
         }
         CivilightText(card.name, type.itemTitle, Modifier.padding(top = 8.dp), maxLines = 1)
         CivilightText(card.line, type.small, color = CivilightTheme.colors.ink3, maxLines = 1)

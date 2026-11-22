@@ -109,4 +109,22 @@ class FieldSettingsTest {
         assertTrue(AddFieldModel.toNewField(AddFieldDraft(name = "x", secret = true), EntityKind.CHARACTER, null).isSecret)
         assertFalse(AddFieldModel.toNewField(AddFieldDraft(name = "x", secret = true), EntityKind.PLACE, null).isSecret)
     }
+
+    @Test
+    fun `CST-19 a live drag reorders as the row crosses a slot and keeps it under the finger`() {
+        val keys = listOf("a", "b", "c", "d")
+        // Within its own slot nothing moves.
+        assertEquals(FieldSettingsModel.DragStep(keys, 20f), FieldSettingsModel.dragStep(keys, "b", 20f, 100f))
+        // 130 px down from slot 1 crosses one row: `b` is third, 30 px still to go.
+        val down = FieldSettingsModel.dragStep(keys, "b", 130f, 100f)
+        assertEquals(listOf("a", "c", "b", "d"), down.order)
+        assertEquals(30f, down.offsetPx, 0.001f)
+        // Dragging up past the first row clamps at the top.
+        val up = FieldSettingsModel.dragStep(keys, "b", -460f, 100f)
+        assertEquals(listOf("b", "a", "c", "d"), up.order)
+        assertEquals(-360f, up.offsetPx, 0.001f)
+        // An unknown key or an unmeasured row changes nothing.
+        assertEquals(keys, FieldSettingsModel.dragStep(keys, "x", 300f, 100f).order)
+        assertEquals(keys, FieldSettingsModel.dragStep(keys, "b", 300f, 0f).order)
+    }
 }

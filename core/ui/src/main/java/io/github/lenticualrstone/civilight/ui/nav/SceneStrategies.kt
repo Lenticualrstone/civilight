@@ -1,19 +1,41 @@
 package io.github.lenticualrstone.civilight.ui.nav
 
 import android.os.Build
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.scene.OverlayScene
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.Motion
 import io.github.lenticualrstone.civilight.navigation.OverlayRoute
 import io.github.lenticualrstone.civilight.ui.window.ListDetailPanes
 
@@ -24,8 +46,13 @@ val LocalPaneRole = androidx.compose.runtime.staticCompositionLocalOf { PaneRole
 
 /**
  * `목록 + 상세` on inner screens (CNV-33): when the top two routes are a [ListDetailPairs] pair, or
- * the top route is a list module alone, both panes share the screen. The scene key is the list
- * entry's, so choosing another item only swaps the right pane (no screen transition).
+ * the top route is a list module alone, both panes share the screen.
+ *
+ * The scene key stays the list entry's, on purpose: choosing another item keeps the same scene, so the
+ * list pane never takes part in a transition, and only the detail pane swaps inside the scene (motion
+ * audit S3, [DetailSwap]). Keying the scene on the detail would make NavDisplay crossfade two scenes that
+ * share the list entry, and Nav3 draws a shared entry only in the top scene, so the list would fade too.
+ * The panes split by the module's CNV-47 ratio ([ListDetailPairs.moduleOf]).
  */
 class ListDetailSceneStrategy(private val enabled: () -> Boolean) : SceneStrategy<NavKey> {
     override fun SceneStrategyScope<NavKey>.calculateScene(entries: List<NavEntry<NavKey>>): Scene<NavKey>? {
@@ -52,7 +79,8 @@ private class ListDetailScene(
     override val content: @Composable () -> Unit = {
         ListDetailPanes(
             list = { CompositionLocalProvider(LocalPaneRole provides PaneRole.LIST) { list.Content() } },
-            detail = detail?.let { d -> { CompositionLocalProvider(LocalPaneRole provides PaneRole.DETAIL) { d.Content() } } },
+            detail = { DetailSwap(detail) },
+            module = ListDetailPairs.moduleOf(list.route),
         )
     }
 
@@ -63,39 +91,129 @@ private class ListDetailScene(
 }
 
 /**
- * Full-window glass routes ([OverlayRoute]: search, recording) drawn over the previous screen, which
- * stays composed underneath, blurred (API 31+) and dimmed.
+ * The detail pane's swap (S3): another item crossfades in place (`standard` in, `exit` out); the first
+ * detail beside a list slides in 48 dp from the right on `foldOpen` and a closed detail fades on
+ * `foldClose` (CNV-34). Reduced motion: fades only (inside the helpers). The outgoing entry stays composed
+ * while it fades, so Nav3 pops it (view model, saved state) only after it has left.
  */
-class OverlaySceneStrategy : SceneStrategy<NavKey> {
+@Composable
+private fun DetailSwap(detail: NavEntry<NavKey>?) {
+    val motion = LocalMotion.current
+    AnimatedContent(
+        targetState = detail,
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopStart,
+        contentKey = { it?.contentKey },
+        transitionSpec = {
+            when {
+                initialState == null -> ContentTransform(motion.panelEnter(), ExitTransition.None, sizeTransform = null)
+                targetState == null -> ContentTransform(EnterTransition.None, motion.panelExit(), sizeTransform = null)
+                else -> ContentTransform(
+                    fadeIn(motion.spec(CivilightMotion.standard)),
+                    fadeOut(motion.spec(CivilightMotion.exit)),
+                    sizeTransform = null,
+                )
+            }
+        },
+        label = "detailSwap",
+    ) { entry ->
+        if (entry != null) {
+            CompositionLocalProvider(LocalPaneRole provides PaneRole.DETAIL) { entry.Content() }
+        }
+    }
+}
+
+/**
+ * How strongly the screens under glass overlays are blurred and dimmed (0 none … 1 full): the largest
+ * progress of the overlays on screen. The shell passes it to NavDisplay's modifier with
+ * [overlayBackdrop], which wraps only the base scenes, never the overlays themselves.
+ */
+@Stable
+class OverlayBackdrop {
+    private val layers = mutableStateListOf<Animatable<Float, AnimationVector1D>>()
+
+    /** Current amount; read it in a draw or layer block. */
+    val amount: Float get() = layers.maxOfOrNull { it.value } ?: 0f
+
+    /** Whether the full glass look is on (used for reduced motion, which does not ramp the blur). */
+    val active: Boolean get() = layers.isNotEmpty()
+
+    internal fun add(layer: Animatable<Float, AnimationVector1D>) {
+        if (layer !in layers) layers.add(layer)
+    }
+
+    internal fun remove(layer: Animatable<Float, AnimationVector1D>) {
+        layers.remove(layer)
+    }
+}
+
+/**
+ * Blurs (API 31+, 14 dp) and dims (to 60 %) the base screen under glass overlays by [backdrop]'s amount
+ * (S2). Reduced motion: the blur does not ramp, only the dim fades.
+ */
+fun Modifier.overlayBackdrop(backdrop: OverlayBackdrop, reduced: () -> Boolean): Modifier = graphicsLayer {
+    val p = backdrop.amount.coerceIn(0f, 1f)
+    alpha = 1f - (1f - OVERLAY_DIM) * p
+    val blurP = if (reduced()) (if (p > 0f) 1f else 0f) else p
+    val r = OVERLAY_BLUR.toPx() * blurP
+    renderEffect = if (Build.VERSION.SDK_INT >= 31 && r > 0f) BlurEffect(r, r, TileMode.Clamp) else null
+}
+
+/**
+ * Full-window glass routes ([OverlayRoute]: search, recording) as Nav3 overlay scenes (S2): the screens
+ * below stay composed in their own scene (no blank frame during the fade), the overlay fades in on `enter`
+ * and out on `exit` before it leaves composition, and the base blur and dim follow the same progress
+ * through [OverlayBackdrop]. Back inside the overlay pops only the overlay (NavDisplay's own handler counts
+ * from the base scene).
+ */
+class OverlaySceneStrategy(
+    private val backdrop: OverlayBackdrop = OverlayBackdrop(),
+    private val motion: () -> Motion = { Motion(reduced = false) },
+) : SceneStrategy<NavKey> {
     override fun SceneStrategyScope<NavKey>.calculateScene(entries: List<NavEntry<NavKey>>): Scene<NavKey>? {
         val last = entries.lastOrNull() ?: return null
         if (last.route !is OverlayRoute) return null
-        val below = entries.getOrNull(entries.lastIndex - 1) ?: return null
-        return GlassOverlayScene(below, last, entries.dropLast(1))
+        if (entries.size < 2) return null
+        return GlassOverlayScene(last, entries.dropLast(1), backdrop, motion, onBack)
     }
 }
 
 private class GlassOverlayScene(
-    private val below: NavEntry<NavKey>,
     private val top: NavEntry<NavKey>,
-    override val previousEntries: List<NavEntry<NavKey>>,
-) : Scene<NavKey> {
+    override val overlaidEntries: List<NavEntry<NavKey>>,
+    private val backdrop: OverlayBackdrop,
+    private val motion: () -> Motion,
+    private val onBack: () -> Unit,
+) : OverlayScene<NavKey> {
     override val key: Any = top.contentKey
-    override val entries: List<NavEntry<NavKey>> = listOf(below, top)
+    override val entries: List<NavEntry<NavKey>> = listOf(top)
+    override val previousEntries: List<NavEntry<NavKey>> = overlaidEntries
+
+    private val progress = Animatable(0f)
+    private var removing by mutableStateOf(false)
+
     override val content: @Composable () -> Unit = {
-        Box(Modifier.fillMaxSize()) {
-            val behind = if (Build.VERSION.SDK_INT >= 31) Modifier.blur(OVERLAY_BLUR) else Modifier
-            Box(Modifier.fillMaxSize().then(behind).graphicsLayer { alpha = 0.6f }) { below.Content() }
-            top.Content()
+        DisposableEffect(Unit) {
+            backdrop.add(progress)
+            onDispose { backdrop.remove(progress) }
         }
+        LaunchedEffect(Unit) {
+            if (!removing) progress.animateTo(1f, motion().spec(CivilightMotion.enter))
+        }
+        LocalBackHandler.current(!removing, onBack)
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = progress.value }) { top.Content() }
+    }
+
+    override suspend fun onRemove() {
+        removing = true
+        progress.animateTo(0f, motion().spec(CivilightMotion.exit))
     }
 
     override fun equals(other: Any?): Boolean =
-        other is GlassOverlayScene && other.below == below && other.top == top && other.previousEntries == previousEntries
+        other is GlassOverlayScene && other.top == top && other.overlaidEntries == overlaidEntries
 
-    override fun hashCode(): Int = (below.hashCode() * 31 + top.hashCode()) * 31 + previousEntries.hashCode()
-
-    private companion object {
-        val OVERLAY_BLUR = 14.dp
-    }
+    override fun hashCode(): Int = top.hashCode() * 31 + overlaidEntries.hashCode()
 }
+
+private const val OVERLAY_DIM = 0.6f
+private val OVERLAY_BLUR = 14.dp

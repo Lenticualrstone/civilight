@@ -9,6 +9,7 @@ import io.github.lenticualrstone.civilight.model.app.AnimationPref
 import io.github.lenticualrstone.civilight.model.app.AppSettings
 import io.github.lenticualrstone.civilight.model.app.LargeMapExport
 import io.github.lenticualrstone.civilight.model.app.MapStylePref
+import io.github.lenticualrstone.civilight.model.app.PaneSplit
 import io.github.lenticualrstone.civilight.model.app.RatingDefaults
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
 import io.github.lenticualrstone.civilight.model.app.SceneNotationPref
@@ -75,6 +76,12 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setLargeMapExport(value: LargeMapExport) = update { it.copy(largeMapExport = value) }
     suspend fun updateRecorder(transform: (RecorderSettings) -> RecorderSettings) = update { it.copy(recorder = transform(it.recorder)) }
     suspend fun updateRatingDefaults(transform: (RatingDefaults) -> RatingDefaults) = update { it.copy(ratingDefaults = transform(it.ratingDefaults)) }
+
+    /** Gallery viewer `설명` toggle (55 GAL-09). */
+    suspend fun setGalleryTextOn(value: Boolean) = update { it.copy(galleryTextOn = value) }
+
+    /** CNV-47: the inner-screen pane ratio of [module] ([PaneSplit.Modules]); [PaneSplit.DEFAULT] clears it. */
+    suspend fun setPaneSplit(module: String, value: PaneSplit) = update { it.withPaneSplit(module, value) }
 
     companion object {
         val KEY = stringPreferencesKey("appSettings")

@@ -21,6 +21,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassBudget
@@ -39,7 +40,10 @@ val LocalTextScale = staticCompositionLocalOf { TextScale.Default }
 /** Resolved glass mode (CNV-46 decides it; the app passes it to [CivilightTheme]). */
 val LocalGlassMode = staticCompositionLocalOf { GlassMode.BLUR }
 
-/** Whether motion is reduced (CNV-46 decides it). Components then fade 120 ms instead of moving. */
+/**
+ * Whether motion is reduced (CNV-46 decides it, or the system animator scale is 0). Components then fade
+ * 120 ms instead of moving. Prefer [LocalMotion] / `CivilightTheme.motion`, which carries the same flag.
+ */
 val LocalReducedMotion = staticCompositionLocalOf { false }
 
 /**
@@ -68,6 +72,10 @@ fun CivilightTheme(
     val colors = colorsFor(resolved)
     val type = remember(textScale) { CivilightType.create(textScale) }
     val budget = remember { GlassBudget() }
+    val animatorScale = rememberAnimatorScale()
+    val reduced = MotionRules.effectiveReduced(reducedMotion, animatorScale)
+    val density = LocalDensity.current
+    val motion = remember(reduced, animatorScale, density) { Motion(reduced, animatorScale, density) }
     if (applyToWindow) SystemBarsAppearance(colors)
     CompositionLocalProvider(
         LocalCivilightColors provides colors,
@@ -75,7 +83,8 @@ fun CivilightTheme(
         LocalTextScale provides textScale,
         LocalGlassMode provides glassMode,
         LocalGlassBudget provides budget,
-        LocalReducedMotion provides reducedMotion,
+        LocalReducedMotion provides reduced,
+        LocalMotion provides motion,
     ) {
         MaterialTheme(colorScheme = materialBridge(colors), typography = materialTypography(type)) {
             CompositionLocalProvider(
@@ -99,7 +108,8 @@ object CivilightTheme {
     val sizes: CivilightSizes @Composable @ReadOnlyComposable get() = LocalCivilightSizes.current
     val blur: CivilightBlur @Composable @ReadOnlyComposable get() = LocalCivilightBlur.current
     val elevation: CivilightElevation @Composable @ReadOnlyComposable get() = LocalCivilightElevation.current
-    val motion: CivilightMotion get() = CivilightMotion
+    /** Motion settings and the shared transition builders ([Motion]); tokens stay in [CivilightMotion]. */
+    val motion: Motion @Composable @ReadOnlyComposable get() = LocalMotion.current
     val glassMode: GlassMode @Composable @ReadOnlyComposable get() = LocalGlassMode.current
     val reducedMotion: Boolean @Composable @ReadOnlyComposable get() = LocalReducedMotion.current
     val textScale: TextScale @Composable @ReadOnlyComposable get() = LocalTextScale.current

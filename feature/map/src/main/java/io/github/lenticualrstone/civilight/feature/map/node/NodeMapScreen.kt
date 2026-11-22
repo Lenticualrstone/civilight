@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.designsystem.component.DelayedProgress
+import io.github.lenticualrstone.civilight.designsystem.component.MapValueChip
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +33,16 @@ import io.github.lenticualrstone.civilight.feature.map.MapCopy
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapCanvas
 import io.github.lenticualrstone.civilight.feature.map.canvas.Viewport
 import io.github.lenticualrstone.civilight.feature.map.common.GlassCard
+import io.github.lenticualrstone.civilight.feature.map.common.FoldSwitch
+import io.github.lenticualrstone.civilight.feature.map.common.MapBar
+import io.github.lenticualrstone.civilight.feature.map.common.MapBarSlot
+import io.github.lenticualrstone.civilight.feature.map.common.MapBars
+import io.github.lenticualrstone.civilight.feature.map.canvas.rememberViewportMover
+import androidx.compose.animation.animateContentSize
+import io.github.lenticualrstone.civilight.designsystem.component.SidePanelHost
+import io.github.lenticualrstone.civilight.designsystem.component.TabContent
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.feature.map.common.MapEnv
 import io.github.lenticualrstone.civilight.feature.map.common.MapScreenViewModel
 import io.github.lenticualrstone.civilight.feature.map.common.TopBarTapGuard
@@ -87,6 +99,7 @@ fun NodeMapScreen(route: NodeMap, deps: FeatureDeps) {
 
     var editorText by rememberSaveable(route.mapKey) { mutableStateOf(NodeEditorState().encode()) }
     var viewportArray by rememberSaveable(route.mapKey) { mutableStateOf(Viewport.UNSET.toArray()) }
+    val mover = rememberViewportMover({ Viewport.fromArray(viewportArray) }) { viewportArray = it.toArray() }
     val editor = remember(editorText) { NodeEditorState.decode(editorText) }
     fun set(s: NodeEditorState) { editorText = s.encode() }
     fun current() = NodeEditorState.decode(editorText)
@@ -174,7 +187,7 @@ fun NodeMapScreen(route: NodeMap, deps: FeatureDeps) {
                                 set(NodeEditor.select(current(), nodeKey))
                                 scene?.nodes?.firstOrNull { it.key == nodeKey }?.let { n ->
                                     val now = Viewport.fromArray(viewportArray)
-                                    viewportArray = Viewport(zoom = now.zoom.coerceAtLeast(Viewport.MIN_ZOOM)).centeredOn(n.at).toArray()
+                                    mover.moveTo(Viewport(zoom = now.zoom.coerceAtLeast(Viewport.MIN_ZOOM)).centeredOn(n.at))
                                 }
                             },
                             onClose = ::close,
@@ -250,7 +263,7 @@ fun NodeMapScreen(route: NodeMap, deps: FeatureDeps) {
                 base = state.base,
                 scene = state.scene,
                 viewport = Viewport.fromArray(viewportArray),
-                onViewportChange = { viewportArray = it.toArray() },
+                onViewportChange = { mover.cancel(); viewportArray = it.toArray() },
                 selectedKey = editor.movingNode ?: editor.linkFrom ?: editor.selected,
                 onTap = { p, hit ->
                     val linkKey = if (hit == null) NodeEditor.linkAt(state.scene, p) else null
@@ -275,59 +288,78 @@ fun NodeMapScreen(route: NodeMap, deps: FeatureDeps) {
                 },
             )
             TopBarTapGuard(padding.calculateTopPadding())
+            DelayedProgress(exporter.exporting, Modifier.align(Alignment.TopCenter).padding(top = padding.calculateTopPadding() + 12.dp)) { MapValueChip(MapCopy.EXPORT) }
             val tools = remember { NodeTool.entries.map { MapTool(it.label, it.icon) } }
+            val motion = CivilightTheme.motion
             val toolbar: @Composable (Modifier) -> Unit = { mod ->
-                MapToolbar(editor.tool.ordinal, { set(NodeEditor.chooseTool(editor, NodeTool.entries[it])) }, mod, tools = tools, label = MapCopy.TOOLBAR)
+                MapToolbar(editor.tool.ordinal, { set(NodeEditor.chooseTool(editor, NodeTool.entries[it])) }, mod.animateContentSize(motion.move(CivilightMotion.standard)), tools = tools, label = MapCopy.TOOLBAR)
             }
-            val step: @Composable (Modifier) -> Unit = { mod ->
-                when {
-                    state.moving != null -> GlassCard(mod) { NodeStepBar(state.moving, { set(NodeEditor.cancelMove(editor)) }) }
-                    state.linking != null -> GlassCard(mod) { NodeStepBar(state.linking, { set(NodeEditor.cancelLink(editor)) }) }
+            // The bar above the tool bar: the `이동` / `연결` step, and on the cover the layer card or the property card.
+            val barContent: @Composable (NodeBar, String, Boolean) -> Unit = { b, kind, isInner ->
+                val mod = Modifier.padding(bottom = 10.dp)
+                when (kind) {
+                    MapBars.STEP -> {
+                        val text = b.state.moving ?: b.state.linking
+                        if (text != null) {
+                            GlassCard(if (isInner) mod.widthIn(max = 360.dp) else mod.fillMaxWidth()) {
+                                NodeStepBar(text, { set(if (b.state.moving != null) NodeEditor.cancelMove(b.editor) else NodeEditor.cancelLink(b.editor)) })
+                            }
+                        }
+                    }
+                    MapBars.LAYERS -> GlassCard(mod.fillMaxWidth().heightIn(max = 320.dp)) {
+                        Column(Modifier.verticalScroll(rememberScrollState())) { LayersPanel(b.state.layers, readOnly, layerActions) }
+                    }
+                    MapBars.PROPS -> b.state.props?.let { props ->
+                        GlassCard(mod.fillMaxWidth().heightIn(max = 340.dp)) {
+                            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                NodePropsPanel(props, readOnly, actions)
+                            }
+                        }
+                    }
                 }
             }
-            if (inner) {
-                Column(
-                    Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    step(Modifier.widthIn(max = 360.dp))
-                    toolbar(Modifier)
-                }
+            SidePanelHost(
+                inner,
+                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp),
+            ) {
                 SidePanel(
                     onClose = actions::deselect,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp),
                     tabs = listOf(MapCopy.TAB_PROPS, MapCopy.TAB_LAYERS, MapCopy.TAB_LIST),
                     selectedTab = editor.panelTab,
                     onSelectTab = { set(editor.copy(panelTab = it)) },
                 ) {
-                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        when (editor.panelTab) {
-                            1 -> LayersPanel(state.layers, readOnly, layerActions)
-                            2 -> ItemsPanel(state.items) { set(NodeEditor.select(editor, it)) }
-                            else -> state.props?.let { NodePropsPanel(it, readOnly, actions) }
-                        }
-                    }
-                }
-            } else {
-                Column(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    when {
-                        state.moving != null || state.linking != null -> step(Modifier.fillMaxWidth())
-                        editor.tool == NodeTool.LAYER -> GlassCard(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
-                            Column(Modifier.verticalScroll(rememberScrollState())) { LayersPanel(state.layers, readOnly, layerActions) }
-                        }
-                        state.props != null -> GlassCard(Modifier.fillMaxWidth().heightIn(max = 340.dp)) {
-                            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                NodePropsPanel(state.props, readOnly, actions)
+                    TabContent(editor.panelTab) { tab ->
+                        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            when (tab) {
+                                1 -> LayersPanel(state.layers, readOnly, layerActions)
+                                2 -> ItemsPanel(state.items) { set(NodeEditor.select(editor, it)) }
+                                else -> state.props?.let { NodePropsPanel(it, readOnly, actions) }
                             }
                         }
                     }
-                    toolbar(Modifier)
+                }
+            }
+            FoldSwitch(inner) { isInner ->
+                val kind = MapBars.node(state.moving != null || state.linking != null, editor.tool == NodeTool.LAYER, state.props != null, isInner)
+                val slot = kind?.let { MapBarSlot(it, NodeBar(state, editor)) }
+                if (isInner) {
+                    Column(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp)) {
+                        MapBar(slot) { k, b -> barContent(b, k, true) }
+                        toolbar(Modifier)
+                    }
+                } else {
+                    Column(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        MapBar(slot, Modifier.fillMaxWidth()) { k, b -> barContent(b, k, false) }
+                        toolbar(Modifier)
+                    }
                 }
             }
         }
     }
 }
+
+/** What the bar above the tool bar draws: a snapshot, so the bar that leaves keeps its last content. */
+private data class NodeBar(val state: NodeMapUi, val editor: NodeEditorState)

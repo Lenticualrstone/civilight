@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.cast.map
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,6 +20,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,7 +42,11 @@ import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import kotlinx.coroutines.launch
 import io.github.lenticualrstone.civilight.domain.cast.EditContext
 import io.github.lenticualrstone.civilight.domain.cast.map.MapPositions
 import io.github.lenticualrstone.civilight.domain.cast.map.SelectedRelationCard
@@ -105,6 +114,8 @@ fun RelationMapScreen(route: RelationMap, deps: FeatureDeps) {
     var latestFit by remember { mutableStateOf(GraphViewport()) }
     val sheets = rememberSheetHost()
     val editable = !ready.readOnly
+    val scope = rememberCoroutineScope()
+    val motion = CivilightTheme.motion
 
     fun openRelationEdit(relationKey: Key) {
         val (viewer, partner) = RelationMapModel.viewerOf(doc, relationKey, route.focusKey) ?: return
@@ -148,9 +159,18 @@ fun RelationMapScreen(route: RelationMap, deps: FeatureDeps) {
         override fun onDragEnd(nodeKey: String) {
             val at = moved[nodeKey] ?: return
             if (!editable) return
-            val all = RelationMapModel.positionsToSave(state.scene, moved.toMap())
-            vm.act(CastUiCopy.UNDO_MOVE, then = { moved.remove(nodeKey) }) { d, ctx ->
-                all.entries.fold(d) { acc, (key, point) -> MapPositions.place(acc, key, point, ctx) }
+            // A node let go outside the area settles back in (Animatable<Offset>, a snap when reduced), then it is saved once.
+            scope.launch {
+                val rest = RelationMapModel.settled(at)
+                if (rest != at) {
+                    Animatable(Offset(at.x, at.y), Offset.VectorConverter).animateTo(Offset(rest.x, rest.y), motion.move(CivilightMotion.standard)) {
+                        moved[nodeKey] = Pt(value.x, value.y)
+                    }
+                }
+                val all = RelationMapModel.positionsToSave(state.scene, moved.toMap())
+                vm.act(CastUiCopy.UNDO_MOVE, then = { moved.remove(nodeKey) }) { d, ctx ->
+                    all.entries.fold(d) { acc, (key, point) -> MapPositions.place(acc, key, point, ctx) }
+                }
             }
         }
 
@@ -174,16 +194,13 @@ fun RelationMapScreen(route: RelationMap, deps: FeatureDeps) {
         lens = lensChipLabel(doc),
         onLens = { sheets.open(LensSheet(p)) },
         actions = {
+            val colors = CivilightTheme.colors
+            val toolTint by animatedColor(if (ui.lineTool) colors.acc else colors.ink2, label = "lineTool")
+            val filterTint by animatedColor(if (state.filtered) colors.acc else colors.ink2, label = "mapFilter")
             if (editable) {
-                CivilightIconButton(
-                    IconId.Line, CastUiCopy.LINE_TOOL, { setUi(RelationMapModel.toggleLineTool(ui)) },
-                    tint = if (ui.lineTool) CivilightTheme.colors.acc else CivilightTheme.colors.ink2,
-                )
+                CivilightIconButton(IconId.Line, CastUiCopy.LINE_TOOL, { setUi(RelationMapModel.toggleLineTool(ui)) }, tint = toolTint)
             }
-            CivilightIconButton(
-                IconId.Filter, CastUiCopy.PLACE_FILTER, { sheets.open(MapFilterSheet(p)) },
-                tint = if (state.filtered) CivilightTheme.colors.acc else CivilightTheme.colors.ink2,
-            )
+            CivilightIconButton(IconId.Filter, CastUiCopy.PLACE_FILTER, { sheets.open(MapFilterSheet(p)) }, tint = filterTint)
         },
         sheets = sheets,
         localSheets = { key ->
@@ -239,22 +256,31 @@ fun RelationMapScreen(route: RelationMap, deps: FeatureDeps) {
             ) {
                 for (chip in state.tags) FilterChip(chip.label, chip.selected, { setUi(ui.copy(tagKey = chip.tagKey)) })
             }
+            // The inner aside rises in and out (P2); it keeps the last card and relation while it leaves.
             val card = state.selected
-            if (inner && card != null && ui.selectedRelation != null) {
-                val relationKey = ui.selectedRelation
-                Box(
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = padding.calculateBottomPadding() + 16.dp)
-                        .width(260.dp),
-                ) {
-                    GlassAside {
-                        SelectedRelationBody(
-                            card,
-                            onRecord = { openRecord(relationKey) },
-                            onEdit = if (editable) ({ openRelationEdit(relationKey) }) else null,
-                            cover = false,
-                        )
+            val showAside = inner && card != null && ui.selectedRelation != null
+            val lastCard = rememberLastNonNull(card)
+            val lastRelation = rememberLastNonNull(ui.selectedRelation)
+            AnimatedVisibility(
+                visible = showAside,
+                modifier = Modifier.align(Alignment.BottomEnd),
+                enter = motion.enter(rise = 8.dp),
+                exit = motion.exit(rise = 8.dp),
+            ) {
+                if (lastCard != null && lastRelation != null) {
+                    Box(
+                        Modifier
+                            .padding(end = 16.dp, bottom = padding.calculateBottomPadding() + 16.dp)
+                            .width(260.dp),
+                    ) {
+                        GlassAside {
+                            SelectedRelationBody(
+                                lastCard,
+                                onRecord = { openRecord(lastRelation) },
+                                onEdit = if (editable) ({ openRelationEdit(lastRelation) }) else null,
+                                cover = false,
+                            )
+                        }
                     }
                 }
             }

@@ -2,6 +2,8 @@ package io.github.lenticualrstone.civilight.feature.map.hex
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import io.github.lenticualrstone.civilight.designsystem.component.SidePanelHost
+import io.github.lenticualrstone.civilight.feature.map.common.FoldSwitch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -166,16 +169,19 @@ fun HexPaintScreen(route: HexPaintRoute, deps: FeatureDeps) {
                     onCellKm = { sheets.open(HexCellKmSheet) }, onCoords = { sheets.open(HexCoordsSheet) },
                     onOrientation = { vm.setOrientation(HexOrientation.entries[it]) })
             }
-            if (inner) {
-                SidePanel(
-                    onClose = { deps.navigator.pop() },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
-                ) {
+            SidePanelHost(
+                inner,
+                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
+            ) {
+                SidePanel(onClose = { deps.navigator.pop() }) {
                     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp), content = panel)
                 }
-            } else {
-                GlassCard(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp).heightIn(max = 420.dp)) {
-                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp), content = panel)
+            }
+            FoldSwitch(inner) { isInner ->
+                if (!isInner) {
+                    GlassCard(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp).heightIn(max = 420.dp)) {
+                        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp), content = panel)
+                    }
                 }
             }
         }
@@ -206,9 +212,12 @@ private fun ColumnScope.HexPanel(
         }
     }
     CivilightText(MapCopy.HEX_HINT, type.small, color = colors.ink3)
-    u.cell?.let { c ->
-        CivilightText(c.text, type.label, maxLines = 2)
-        if (c.canCreatePlace) CivilightButton(MapCopy.BTN_CREATE_PLACE, { onCreatePlace(c.cell) }, Modifier.fillMaxWidth(), variant = ButtonVariant.GHOST, enabled = !readOnly)
+    // The chosen cell's line folds open and away with the selection (motion audit row 1).
+    FoldRevealValue(u.cell) { c ->
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            CivilightText(c.text, type.label, maxLines = 2)
+            if (c.canCreatePlace) CivilightButton(MapCopy.BTN_CREATE_PLACE, { onCreatePlace(c.cell) }, Modifier.fillMaxWidth(), variant = ButtonVariant.GHOST, enabled = !readOnly)
+        }
     }
     CardRow(MapCopy.CELL_SIZE, u.cellSize, onClick = if (readOnly) null else onCellKm)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

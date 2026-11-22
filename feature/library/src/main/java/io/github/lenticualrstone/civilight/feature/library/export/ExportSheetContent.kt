@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.library.export
 
+import io.github.lenticualrstone.civilight.designsystem.component.DelayedProgress
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import androidx.compose.runtime.SideEffect
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -38,7 +42,9 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBod
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.domain.library.export.ExportDefaults
+import io.github.lenticualrstone.civilight.model.app.ExportFormat
 import io.github.lenticualrstone.civilight.domain.library.export.ExportLayer
 import io.github.lenticualrstone.civilight.domain.library.export.ExportRow
 import io.github.lenticualrstone.civilight.domain.library.export.HiddenSceneChoice
@@ -101,6 +107,8 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
     }
 
     val model = remember(current, form, recorder.library) { ExportFormRules.sheet(current, form, recorder.library) }
+    val lastModels = remember { mutableMapOf<ExportFormat, io.github.lenticualrstone.civilight.domain.library.export.ExportSheet>() }
+    SideEffect { lastModels[form.format] = model }
     var working by remember { mutableStateOf(false) }
     // The gate and the build belong to this sheet: leaving it cancels them, so no dialog opens for
     // an export the author dismissed. Only the write after the dialog's answer outlives it.
@@ -128,7 +136,7 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
             } finally {
                 working = false
             }
-            if (build == ExportBuild.Unavailable) deps.toasts.show(ExportCopy.TODO_COPY_LIB41_SAVE_FAILED, actionLabel = null)
+            if (build == ExportBuild.Unavailable) deps.toasts.show(ExportCopy.SAVE_FAILED, actionLabel = null)
             val ready = (build as? ExportBuild.Ready)?.file ?: return@launch
             // The sheet steps aside for the system dialog; its draft stays until the file is saved.
             scope.close()
@@ -136,7 +144,7 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
                 if (uri == null) return@open
                 deps.appScope.launch {
                     if (!SaveDialog.write(context, uri, ready.bytes)) {
-                        deps.toasts.show(ExportCopy.TODO_COPY_LIB41_SAVE_FAILED, actionLabel = null)
+                        deps.toasts.show(ExportCopy.SAVE_FAILED, actionLabel = null)
                         return@launch
                     }
                     ready.plan?.let { plan ->
@@ -144,7 +152,7 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
                         services.writer.edit(key, model.header) { doc, _ -> ExportRunner.fixVoiceIds(doc, plan, at) }
                     }
                     services.exports.clear(key)
-                    deps.toasts.show(ExportCopy.TODO_COPY_LIB41_DONE, actionLabel = null)
+                    deps.toasts.show(ExportCopy.DONE, actionLabel = null)
                 }
             }
         }
@@ -165,12 +173,25 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
                 )
             }
         }
+        // The option rows follow the chosen format: switching formats swaps them in place (audit row 5,
+        // P3). The leaving format keeps the rows it last had, so they fade out instead of changing.
         Column(Modifier.padding(top = 6.dp)) {
-            model.rows.forEach { row -> OptionRow(row, form, current, ::update) }
-            model.warnings.forEach { warning ->
-                CivilightText(warning.text, CivilightTheme.type.small, Modifier.padding(top = 10.dp), color = CivilightTheme.colors.warn)
+            ContentSwap(form.format, Modifier.fillMaxWidth(), label = "exportOptions") { format ->
+                val shown = if (format == form.format) model else lastModels[format] ?: model
+                Column {
+                    shown.rows.forEach { row -> OptionRow(row, form, current, ::update) }
+                    // `갤러리 이미지 <n> · <MB>` (55 Q13): the originals a `.civilight` carries; hidden ones count only while open.
+                    val galleryLine = if (format == ExportFormat.PROJECT_FILE) ExportGalleryLine.of(current, locked = !unlock.itemsOpen(key)) else null
+                    FoldRevealValue(galleryLine) { line -> RowFrame(line.label) { CivilightText(line.value, CivilightTheme.type.small, color = CivilightTheme.colors.ink2, maxLines = 1) } }
+                    shown.warnings.forEach { warning ->
+                        CivilightText(warning.text, CivilightTheme.type.small, Modifier.padding(top = 10.dp), color = CivilightTheme.colors.warn)
+                    }
+                }
             }
         }
+    }
+    DelayedProgress(working, Modifier.padding(top = 10.dp)) {
+        CivilightText(ExportCopy.WORKING, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
     }
     SheetActions {
         CivilightButton(
@@ -226,7 +247,8 @@ private fun OptionRow(row: ExportRow, form: ExportForm, doc: ProjectDoc, update:
             RowFrame(row.label) {
                 TextAction(row.value + " ›", { open = !open }, color = colors.ink)
             }
-            if (open) {
+            FoldReveal(open) {
+              Column {
                 CheckboxRow(ExportCopy.RANGE_ALL, form.options.rangeKeys.isEmpty(), { if (it) update { f -> ExportFormRules.setRange(f, emptyList()) } }, dense = true)
                 choices.forEach { choice ->
                     val checked = choice.key in form.options.rangeKeys
@@ -240,6 +262,7 @@ private fun OptionRow(row: ExportRow, form: ExportForm, doc: ProjectDoc, update:
                         dense = true,
                     )
                 }
+              }
             }
         }
         is ExportRow.HiddenScenes -> RowFrame(row.label) {
@@ -258,9 +281,11 @@ private fun OptionRow(row: ExportRow, form: ExportForm, doc: ProjectDoc, update:
             RowFrame(row.label) {
                 TextAction(row.value + " ›", { open = !open }, color = colors.ink)
             }
-            if (open) {
-                ExportLayer.entries.forEach { layer ->
-                    CheckboxRow(layer.label, layer.id in form.options.layers, { on -> update { ExportFormRules.toggleLayer(it, layer, on) } }, dense = true)
+            FoldReveal(open) {
+                Column {
+                    ExportLayer.entries.forEach { layer ->
+                        CheckboxRow(layer.label, layer.id in form.options.layers, { on -> update { ExportFormRules.toggleLayer(it, layer, on) } }, dense = true)
+                    }
                 }
             }
         }
@@ -276,20 +301,22 @@ private fun OptionRow(row: ExportRow, form: ExportForm, doc: ProjectDoc, update:
         }
         is ExportRow.PdfPassword -> {
             RowFrame(row.label) { CivilightSwitch(row.on, { on -> update { ExportFormRules.setPdfPasswordOn(it, on) } }) }
-            if (row.on) {
+            FoldReveal(row.on) {
                 PasswordField(form.pdfPassword, null) { text -> update { ExportFormRules.setPdfPassword(it, text) } }
             }
         }
         is ExportRow.Password -> {
             RowFrame(row.label) { CivilightSwitch(row.on, { on -> update { ExportFormRules.setEncrypt(it, on) } }) }
-            if (row.on) {
-                PasswordField(form.password, null) { text -> update { ExportFormRules.setPassword(it, text) } }
-                PasswordField(
-                    form.passwordRepeat,
-                    ExportCopy.PASSWORD_REPEAT,
-                    error = ExportCopy.TODO_COPY_LIB41_PASSWORD_MISMATCH.takeIf { form.passwordRepeat.isNotEmpty() && !ExportFormRules.passwordsMatch(form) },
-                ) { text -> update { ExportFormRules.setPasswordRepeat(it, text) } }
-                CivilightText(row.warning, type.small, Modifier.padding(top = 6.dp, bottom = 4.dp), color = colors.ink3)
+            FoldReveal(row.on) {
+                Column {
+                    PasswordField(form.password, null) { text -> update { ExportFormRules.setPassword(it, text) } }
+                    PasswordField(
+                        form.passwordRepeat,
+                        ExportCopy.PASSWORD_REPEAT,
+                        error = ExportCopy.PASSWORD_MISMATCH.takeIf { form.passwordRepeat.isNotEmpty() && !ExportFormRules.passwordsMatch(form) },
+                    ) { text -> update { ExportFormRules.setPasswordRepeat(it, text) } }
+                    CivilightText(row.warning, type.small, Modifier.padding(top = 6.dp, bottom = 4.dp), color = colors.ink3)
+                }
             }
         }
         is ExportRow.RecorderRecords -> RowFrame(row.label) {

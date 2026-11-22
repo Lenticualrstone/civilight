@@ -28,7 +28,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -141,13 +140,20 @@ fun ScriptBottomBar(
     BottomGlassBar(
         extraRow = if (row.visible) {
             {
+                // Motion audit P2: each item of the row grows in when its condition turns on (it leaves at once: the row spaces its children).
                 if (row.speaker) {
-                    SpeakerPill(name = speakerName ?: ScriptCopy.NO_SPEAKER, label = speakerName ?: ScriptCopy.NO_SPEAKER, onClick = onSpeaker)
+                    AppearOnJoin(horizontal = true) {
+                        SpeakerPill(name = speakerName ?: ScriptCopy.NO_SPEAKER, label = speakerName ?: ScriptCopy.NO_SPEAKER, onClick = onSpeaker)
+                    }
                 }
-                if (row.layers) LayersButton(onLayers)
-                if (row.panelTabs) PanelTabButtons(timeHasChange, onPanelTab)
+                if (row.layers) AppearOnJoin(horizontal = true) { LayersButton(onLayers) }
+                if (row.panelTabs) {
+                    AppearOnJoin(horizontal = true) { Row(verticalAlignment = Alignment.CenterVertically) { PanelTabButtons(timeHasChange, onPanelTab) } }
+                }
                 Spacer(Modifier.weight(1f))
-                if (row.lineBreak) Pill(ScriptCopy.LINE_BREAK, onLineBreak, Modifier.alpha(if (lineBreakEnabled) 1f else 0.38f), primary = true)
+                if (row.lineBreak) {
+                    AppearOnJoin(horizontal = true) { Pill(ScriptCopy.LINE_BREAK, onLineBreak, Modifier.dimmedWhen(!lineBreakEnabled), primary = true) }
+                }
             }
         } else null,
         commandBar = command,
@@ -283,7 +289,7 @@ fun KeyboardToolbar(
                         KeyboardTool(onClick = onParen, text = ScriptCopy.PAREN_TOOL, on = parenOn, contentDescription = ScriptCopy.PAREN_LABEL)
                     }
                     KeyboardTool(onClick = onLink, text = ScriptCopy.LINK_TOOL)
-                    Box(Modifier.alpha(if (onChange != null) 1f else 0.38f)) {
+                    Box(Modifier.dimmedWhen(onChange == null)) {
                         KeyboardTool(onClick = { onChange?.invoke() }, text = ScriptCopy.CHANGE_TOOL, contentDescription = ScriptCopy.CHANGE_LABEL)
                     }
                     CivilightIconButton(IconId.Undo, ScriptCopy.UNDO_LABEL, onUndo, enabled = canUndo)

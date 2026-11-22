@@ -9,6 +9,8 @@ import io.github.lenticualrstone.civilight.model.cast.Relation
 import io.github.lenticualrstone.civilight.model.cast.RelationEndKind
 import io.github.lenticualrstone.civilight.model.change.ChangeRecord
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
+import io.github.lenticualrstone.civilight.model.gallery.GalleryItem
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.map.MapOverlay
 import io.github.lenticualrstone.civilight.model.map.Pin
 import io.github.lenticualrstone.civilight.model.script.Block
@@ -105,6 +107,21 @@ class Liveness internal constructor(private val doc: ProjectDoc) {
         ImageOwnerKind.TERM -> isTermLive(use.ownerKey)
         ImageOwnerKind.FACTION -> isFactionLive(use.ownerKey)
         ImageOwnerKind.PAGE -> isPageLive(use.ownerKey)
+        null -> true
+    }
+
+    /**
+     * A gallery item (55 §12.2): not marked and its owner live (the project is always live here). An
+     * item of an unknown owner kind counts as live (it is kept, never shown).
+     */
+    fun isLive(item: GalleryItem): Boolean = item.deletedAt == null && isGalleryOwnerLive(item.ownerKind.known, item.ownerKey)
+
+    fun isGalleryItemLive(key: Key): Boolean = index.galleryItem(key)?.let(::isLive) ?: false
+
+    /** The owner of a gallery: the project, or a live character. */
+    fun isGalleryOwnerLive(kind: GalleryOwnerKind?, key: Key): Boolean = when (kind) {
+        GalleryOwnerKind.PROJECT -> true
+        GalleryOwnerKind.CHARACTER -> isCharacterLive(key)
         null -> true
     }
 

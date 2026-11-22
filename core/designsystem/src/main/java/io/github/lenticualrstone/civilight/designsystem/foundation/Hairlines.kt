@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.designsystem.foundation
 
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -57,6 +58,16 @@ fun Modifier.insetOutline(
     drawContent()
     if (overContent) drawInset(color, width, shape, dashed, dotted)
 }
+
+/**
+ * [insetOutline] whose colour and width are read in the draw phase (animated selection outlines, S6), so the
+ * owner does not recompose per frame.
+ */
+fun Modifier.animatedInsetOutline(color: State<Color>, width: () -> Dp, shape: Shape, dashed: Boolean = false, dotted: Boolean = false): Modifier =
+    drawWithContent {
+        drawContent()
+        drawInset(color.value, width(), shape, dashed, dotted)
+    }
 
 private fun DrawScope.drawInset(color: Color, width: Dp, shape: Shape, dashed: Boolean, dotted: Boolean = false) {
     val w = width.toPx()

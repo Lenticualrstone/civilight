@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.image.pick
 
+import io.github.lenticualrstone.civilight.feature.canvas.gallery.MyImages
 import io.github.lenticualrstone.civilight.feature.canvas.image.HoloRules
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageCopy
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageEdits
@@ -45,14 +46,21 @@ object ImagePickModel {
     const val TAB_MINE = 1
 
     /**
-     * [fileExists] hides `내 이미지` rows whose file is no longer on this device (the blob store's garbage
+     * [locked] = the project's hidden items are locked: `내 이미지` then leaves out originals only hidden things use
+     * (55 GAL-19). [fileExists] hides `내 이미지` rows whose file is no longer on this device (the blob store's garbage
      * collection removes originals no image use refers to, see Requests).
      */
-    fun build(doc: ProjectDoc, owner: ImageOwner, holoDefaultForNewImages: Boolean, fileExists: (String) -> Boolean = { true }): ImagePickView {
+    fun build(
+        doc: ProjectDoc,
+        owner: ImageOwner,
+        holoDefaultForNewImages: Boolean,
+        fileExists: (String) -> Boolean = { true },
+        locked: Boolean = false,
+    ): ImagePickView {
         val spec = ImageSlots.spec(owner.slot)
         val current = ImageEdits.use(doc, owner)
         val presets = PresetImages.all.map { PickTile(it.source, it.name, it, null) }
-        val mine = ImageOwners.myImages(doc).filter { fileExists(it.hash) }.map { b ->
+        val mine = MyImages.visible(doc, locked).filter { fileExists(it.hash) }.map { b ->
             PickTile(b.hash, if (b.width != null && b.height != null) "${b.width} × ${b.height}" else "", null, b)
         }
         val currentSource = current?.source?.takeIf { s -> presets.any { it.source == s } || mine.any { it.source == s } }

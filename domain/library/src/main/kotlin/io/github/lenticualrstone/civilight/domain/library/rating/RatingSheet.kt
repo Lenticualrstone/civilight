@@ -152,9 +152,8 @@ object RatingSheets {
         Protection.RECORDER_LINK_MASK -> "연결에 등급만"
     }
 
-    /** `R-15 기본 · 끔`; the "on" wording is not in the sources. */
+    /** `R-15 기본 · 끔` / `R-15 기본 · 켬` (the on wording follows the drawn one). */
     private fun defaultLabel(to: Rating, on: Boolean) =
-        if (on) TODO_COPY_LIB24_DEFAULT_ON else "${RatingLabels.badge(to)} 기본 · 끔"
+        if (on) "${RatingLabels.badge(to)} 기본 · 켬" else "${RatingLabels.badge(to)} 기본 · 끔"
 
-    const val TODO_COPY_LIB24_DEFAULT_ON = "TODO_COPY_LIB24_DEFAULT_ON"
 }

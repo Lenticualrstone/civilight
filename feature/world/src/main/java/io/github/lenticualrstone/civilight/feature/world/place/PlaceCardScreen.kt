@@ -1,6 +1,12 @@
 package io.github.lenticualrstone.civilight.feature.world.place
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.feature.world.common.CardBodySwap
+import io.github.lenticualrstone.civilight.feature.world.common.dimmed
+import io.github.lenticualrstone.civilight.feature.world.common.stageOf
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +27,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
@@ -133,31 +138,34 @@ fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
         },
     ) { padding ->
         CenterColumn {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
-                if (card == null) return@LazyColumn
-                when (val access = card.access) {
-                    is CardAccess.Locked -> item(key = "locked") { LockedCard(access.text, gate.unlock) }
-                    is CardAccess.Gone -> item(key = "gone") { WorldGoneCard(access, doc, vm, WorldKind.PLACE, route.placeKey, readOnly, gate) }
-                    CardAccess.Open -> placeBody(
-                        card = card,
-                        tab = tab,
-                        onTab = { tab = it },
-                        readOnly = readOnly,
-                        showEmpty = showEmpty,
-                        onShowEmpty = { showEmpty = true },
-                        onParent = { sheets.open(ParentPlaceSheet(route.placeKey)) },
-                        onField = { def -> sheets.open(FieldValueEditSheet(route.projectKey, EntityKind.PLACE, route.placeKey, def)) },
-                        onAddField = { sheets.open(AddFieldSheet(route.projectKey, EntityKind.PLACE, route.placeKey)) },
-                        onOpen = { deps.navigator.openFromWorld(it) },
-                        art = { name ->
-                            doc?.let { d ->
-                                CardImageSlot(d, WorldKind.PLACE, route.placeKey, name, label = null, readOnly = readOnly) {
-                                    sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.PLACE, route.placeKey))
+            CardBodySwap(card, { stageOf(it?.access) }) { shown ->
+                val card = shown
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
+                    if (card == null) return@LazyColumn
+                    when (val access = card.access) {
+                        is CardAccess.Locked -> item(key = "locked") { Box(civilightItem()) { LockedCard(access.text, gate.unlock) } }
+                        is CardAccess.Gone -> item(key = "gone") { Box(civilightItem()) { WorldGoneCard(access, doc, vm, WorldKind.PLACE, route.placeKey, readOnly, gate) } }
+                        CardAccess.Open -> placeBody(
+                            card = card,
+                            tab = tab,
+                            onTab = { tab = it },
+                            readOnly = readOnly,
+                            showEmpty = showEmpty,
+                            onShowEmpty = { showEmpty = true },
+                            onParent = { sheets.open(ParentPlaceSheet(route.placeKey)) },
+                            onField = { def -> sheets.open(FieldValueEditSheet(route.projectKey, EntityKind.PLACE, route.placeKey, def)) },
+                            onAddField = { sheets.open(AddFieldSheet(route.projectKey, EntityKind.PLACE, route.placeKey)) },
+                            onOpen = { deps.navigator.openFromWorld(it) },
+                            art = { name ->
+                                doc?.let { d ->
+                                    CardImageSlot(d, WorldKind.PLACE, route.placeKey, name, label = null, readOnly = readOnly) {
+                                        sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.PLACE, route.placeKey))
+                                    }
                                 }
-                            }
-                        },
-                        sameName = { SameNameLine(doc, WorldKind.PLACE, route.placeKey, readOnly) { sheets.open(MergePickSheet(WorldKind.PLACE.name, route.placeKey)) } },
-                    )
+                            },
+                            sameName = { SameNameLine(doc, WorldKind.PLACE, route.placeKey, readOnly) { sheets.open(MergePickSheet(WorldKind.PLACE.name, route.placeKey)) } },
+                        )
+                    }
                 }
             }
         }
@@ -179,45 +187,52 @@ private fun LazyListScope.placeBody(
     sameName: @Composable () -> Unit,
 ) {
     val head = card.head ?: return
-    item(key = "art") { art(head.name) }
+    item(key = "art") { Box(civilightItem()) { art(head.name) } }
     item(key = "head") {
-        Column {
+        Column(civilightItem()) {
             CardHead(head.copy(description = emptyList()))
             sameName()
             CivilightTabs(tabs = card.tabs, selectedIndex = tab, onSelect = onTab, modifier = Modifier.padding(top = 12.dp))
         }
     }
-    when (PlaceCardUi.tabOf(tab)) {
-        io.github.lenticualrstone.civilight.navigation.PlaceTab.OVERVIEW -> item(key = "overview") {
-            Column(Modifier.fillMaxWidth()) {
-                CardDescription(head.description, Modifier.padding(top = 6.dp))
-                Column(Modifier.padding(top = 14.dp)) {
-                    card.appearance?.let { FixedRow(it) {} }
-                    card.parent?.let { FixedRow(it, onParent) }
-                    card.assets?.let { FixedRow(it) {} }
-                    FieldSection(
-                        section = card.fields,
-                        showEmpty = showEmpty,
-                        readOnly = readOnly,
-                        onShowEmpty = onShowEmpty,
-                        onEdit = { onField(it.fieldDefKey) },
-                        onAdd = onAddField,
-                    )
+    // One swap for the three tabs (the lists are short): the body crossfades and its size follows.
+    item(key = "tabBody") {
+        ContentSwap(tab, civilightItem().fillMaxWidth(), label = "placeTab") { shownTab ->
+            when (PlaceCardUi.tabOf(shownTab)) {
+                io.github.lenticualrstone.civilight.navigation.PlaceTab.OVERVIEW -> Column(Modifier.fillMaxWidth()) {
+                    CardDescription(head.description, Modifier.padding(top = 6.dp))
+                    Column(Modifier.padding(top = 14.dp)) {
+                        card.appearance?.let { FixedRow(it) {} }
+                        card.parent?.let { FixedRow(it, onParent) }
+                        card.assets?.let { FixedRow(it) {} }
+                        FieldSection(
+                            section = card.fields,
+                            showEmpty = showEmpty,
+                            readOnly = readOnly,
+                            onShowEmpty = onShowEmpty,
+                            onEdit = { onField(it.fieldDefKey) },
+                            onAdd = onAddField,
+                        )
+                    }
+                }
+                io.github.lenticualrstone.civilight.navigation.PlaceTab.TIME_HERE -> Column(Modifier.fillMaxWidth()) {
+                    card.timeRows.forEach { row ->
+                        when (row) {
+                            is PlaceTimeItemUi.Row -> PlaceTimeRowView(row, row.target?.let { { onOpen(it) } })
+                            is PlaceTimeItemUi.Divider -> PlaceTimeDivider(row.text)
+                        }
+                    }
+                }
+                io.github.lenticualrstone.civilight.navigation.PlaceTab.MAP -> Column(Modifier.fillMaxWidth()) {
+                    card.maps.forEach { row ->
+                        ListRow(
+                            title = row.title,
+                            subtitle = row.sub,
+                            onClick = row.target?.let { { onOpen(it) } },
+                        )
+                    }
                 }
             }
-        }
-        io.github.lenticualrstone.civilight.navigation.PlaceTab.TIME_HERE -> items(card.timeRows, key = { it.id }) { row ->
-            when (row) {
-                is PlaceTimeItemUi.Row -> PlaceTimeRowView(row, row.target?.let { { onOpen(it) } })
-                is PlaceTimeItemUi.Divider -> PlaceTimeDivider(row.text)
-            }
-        }
-        io.github.lenticualrstone.civilight.navigation.PlaceTab.MAP -> items(card.maps, key = { it.id }) { row ->
-            ListRow(
-                title = row.title,
-                subtitle = row.sub,
-                onClick = row.target?.let { { onOpen(it) } },
-            )
         }
     }
 }
@@ -233,7 +248,7 @@ private fun PlaceTimeRowView(row: PlaceTimeItemUi.Row, onOpen: (() -> Unit)?) {
             .topHairline(colors.line)
             .then(if (onOpen != null) Modifier.pressable(PressAction.Click(onOpen), role = Role.Button, scaleOnPress = false) else Modifier)
             .heightIn(min = 44.dp)
-            .alpha(if (row.dimmed) 0.5f else 1f)
+            .dimmed(row.dimmed)
             .padding(vertical = 11.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {

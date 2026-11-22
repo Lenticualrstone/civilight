@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.onboarding
 
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -99,7 +100,10 @@ internal fun ExampleTourScreen(route: ExampleTour, services: LibraryServices) {
         },
         overlay = { padding -> ToastOverlay(bottom = padding.calculateBottomPadding()) },
     ) { padding ->
-        val current = ui ?: return@GlassScaffold
+      // Loading → content (audit row 7).
+      ContentSwap(ui != null, Modifier.fillMaxSize(), label = "exampleTour") { ready ->
+        val current = ui
+        if (!ready || current == null) return@ContentSwap
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
                 Modifier
@@ -130,6 +134,7 @@ internal fun ExampleTourScreen(route: ExampleTour, services: LibraryServices) {
                 }
             }
         }
+      }
     }
 }
 

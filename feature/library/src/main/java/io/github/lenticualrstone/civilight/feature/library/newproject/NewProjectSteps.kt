@@ -35,6 +35,8 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldBundles
 import io.github.lenticualrstone.civilight.domain.recorder.hooks.RecorderHooks
 import io.github.lenticualrstone.civilight.feature.library.rating.RatingCells
@@ -84,7 +86,7 @@ internal fun ColumnScope.NameStep(form: NewProjectForm, defaults: RatingDefaults
     }
     FieldCaption(NewProjectCopy.RATING, trailing = NewProjectCopy.RATING_NOTE)
     RatingCells(form.rating, onSelect = { r -> update { it.copy(rating = r) } })
-    NewProjectRules.r18Block(form, defaults, recoverySet)?.let { block ->
+    FoldRevealValue(NewProjectRules.r18Block(form, defaults, recoverySet)) { block ->
         val colors = CivilightTheme.colors
         val type = CivilightTheme.type
         Column(
@@ -159,10 +161,12 @@ internal fun ColumnScope.StructureStep(form: NewProjectForm, wide: Boolean, show
             ChoiceCard(title, selected = form.structurePreset == preset, onClick = { update { NewProjectRules.withPreset(it, preset) } }, subtitle = sub)
         }
     }
-    if (form.structurePreset == StructurePreset.CUSTOM) LevelEditor(form, update)
-    if (showPreview) {
-        SectionLabel(NewProjectCopy.PREVIEW, Modifier.padding(top = 8.dp))
-        PreviewTree(NewProjectRules.preview(form))
+    FoldReveal(form.structurePreset == StructurePreset.CUSTOM) { LevelEditor(form, update) }
+    FoldReveal(showPreview) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            SectionLabel(NewProjectCopy.PREVIEW, Modifier.padding(top = 8.dp))
+            PreviewTree(NewProjectRules.preview(form))
+        }
     }
 }
 
@@ -179,14 +183,14 @@ private fun LevelEditor(form: NewProjectForm, update: FormUpdate) {
                 )
                 CivilightIconButton(
                     IconId.X,
-                    NewProjectCopy.TODO_COPY_LIB10_REMOVE_LEVEL,
+                    NewProjectCopy.REMOVE_LEVEL,
                     onClick = { update { NewProjectRules.removeLevel(it, index) } },
                     enabled = NewProjectRules.canRemoveLevel(form),
                 )
             }
         }
-        if (NewProjectRules.canAddLevel(form)) {
-            CivilightIconButton(IconId.Plus, NewProjectCopy.TODO_COPY_LIB10_ADD_LEVEL, onClick = { update(NewProjectRules::addLevel) })
+        FoldReveal(NewProjectRules.canAddLevel(form)) {
+            CivilightIconButton(IconId.Plus, NewProjectCopy.ADD_LEVEL, onClick = { update(NewProjectRules::addLevel) })
         }
     }
 }
@@ -203,7 +207,7 @@ internal fun ColumnScope.TimeStep(form: NewProjectForm, update: FormUpdate) {
             ChoiceCard(title, selected = form.timeMode == mode, onClick = { update { it.copy(timeMode = mode) } }, subtitle = sub)
         }
     }
-    if (form.timeMode != WorldTimeMode.NONE) {
+    FoldReveal(form.timeMode != WorldTimeMode.NONE) {
         CivilightTextField(
             value = form.startYear,
             onValueChange = { v -> update { NewProjectRules.withYear(it, v) } },
@@ -227,7 +231,7 @@ internal fun ColumnScope.StartStep(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     CivilightTextField(value = form.protagonist, onValueChange = { v -> update { it.copy(protagonist = v) } }, label = NewProjectCopy.PROTAGONIST)
-    if (form.format != ProjectFormat.SETTING_ONLY) {
+    FoldReveal(form.format != ProjectFormat.SETTING_ONLY) {
         CivilightTextField(
             value = form.firstSceneTitle,
             onValueChange = { v -> update { it.copy(firstSceneTitle = v) } },
@@ -235,11 +239,12 @@ internal fun ColumnScope.StartStep(
             placeholder = NewProjectCopy.FIRST_SCENE_PLACEHOLDER,
         )
     }
-    if (inputs.records.isNotEmpty()) {
-        val chosen = form.linkedRecordKeys.count { key -> inputs.records.any { it.recordKey == key } }
-        FieldCaption(RecorderHooks.startMaterialHeader(inputs.records.size, chosen))
+    FoldRevealValue(inputs.records.takeIf { it.isNotEmpty() }) { records ->
+      Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        val chosen = form.linkedRecordKeys.count { key -> records.any { it.recordKey == key } }
+        FieldCaption(RecorderHooks.startMaterialHeader(records.size, chosen))
         Column {
-            inputs.records.forEach { record ->
+            records.forEach { record ->
                 val checked = record.recordKey in form.linkedRecordKeys
                 Row(
                     Modifier
@@ -258,6 +263,7 @@ internal fun ColumnScope.StartStep(
                 }
             }
         }
+      }
     }
     val (title, sub, value) = FieldBundles.newProjectRow(form.bundle)
     val sourceName = form.bundleSourceKey?.let { key -> inputs.bundleSources.firstOrNull { it.key == key }?.name }

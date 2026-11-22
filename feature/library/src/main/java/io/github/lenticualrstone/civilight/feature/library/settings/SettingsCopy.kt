@@ -81,5 +81,5 @@ object SettingsCopy {
     const val PREVIEW_LINE = "“멈추지 마. 저건 등불이 아니야.”"
 
     /** Toast when 앱 잠금 is turned on without a device lock (§6 Q19; copy not in sources). */
-    const val TODO_COPY_LIB35_NO_DEVICE_LOCK = "TODO_COPY_LIB35_NO_DEVICE_LOCK"
+    const val NO_DEVICE_LOCK = "기기 잠금 필요"
 }

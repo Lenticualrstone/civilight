@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.backup
 
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -86,7 +87,7 @@ internal class BackupSettingsViewModel(private val services: LibraryServices) : 
             if (account != null) {
                 settings.setDriveBackup(true, account)
             } else if (backups.connect() == DriveConnect.Unavailable) {
-                deps.toasts.show(BackupCopy.TODO_COPY_LIB57_DRIVE_NOT_READY, actionLabel = null)
+                deps.toasts.show(BackupCopy.DRIVE_NOT_READY, actionLabel = null)
             }
         }
     }
@@ -100,7 +101,7 @@ internal class BackupSettingsViewModel(private val services: LibraryServices) : 
         deps.appScope.launch {
             when (backups.connect()) {
                 is DriveConnect.Connected -> report(backups.runNow(services.writtenBy()))
-                DriveConnect.Unavailable -> deps.toasts.show(BackupCopy.TODO_COPY_LIB57_DRIVE_NOT_READY, actionLabel = null)
+                DriveConnect.Unavailable -> deps.toasts.show(BackupCopy.DRIVE_NOT_READY, actionLabel = null)
                 else -> Unit // cancelled sign-in: nothing changes, silently (LIB-37)
             }
         }
@@ -113,7 +114,7 @@ internal class BackupSettingsViewModel(private val services: LibraryServices) : 
     }
 
     private fun report(outcome: BackupOutcome) {
-        if (outcome == BackupOutcome.NotRunning) deps.toasts.show(BackupCopy.TODO_COPY_LIB57_DRIVE_NOT_READY, actionLabel = null)
+        if (outcome == BackupOutcome.NotRunning) deps.toasts.show(BackupCopy.DRIVE_NOT_READY, actionLabel = null)
     }
 }
 
@@ -129,7 +130,7 @@ internal fun BackupSettingsScreen(services: LibraryServices) {
     val ui by vm.ui.collectAsState()
     val running by vm.running.collectAsState()
     SettingsFrame(title = BackupCopy.TITLE, smallLine = BackupCopy.SMALL, onBack = { navigator.pop() }) {
-        ui.banner?.let { banner ->
+        FoldRevealValue(ui.banner) { banner ->
             FailureBanner(banner, enabled = !running, onRelogin = vm::relogin, onRetry = vm::retry)
         }
         SettingsSection(BackupCopy.SECTION, first = ui.banner == null)

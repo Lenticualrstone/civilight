@@ -43,6 +43,8 @@ data class ProjectRowUi(
     val writing: Boolean,
     val protections: Protections,
     val readOnly: Boolean,
+    /** The 48 dp list thumbnail (D6): the cover's 1:1 crop, a preset, or the initial letter. */
+    val thumb: CoverUi = CoverUi(null, null, null, "", holo = false),
 )
 
 /** The open hidden group (`LibUnlocked`): `숨긴 프로젝트 <M> · 열림`, the re-lock note, its rows. */
@@ -63,9 +65,9 @@ data class ShelfUi(
     val showCards: Boolean = false,
     /** Card view: `프로젝트 · N · 숨김 M`. */
     val cardSectionLabel: String = "",
-    /** Card view: visible projects, then the open group's (the lock card is [lockedGroup]). */
+    /** Visible projects, then the open group's (the lock card is [lockedGroup]); drawn in card view. */
     val cards: List<ProjectCardUi> = emptyList(),
-    /** 최근 연 파일 (LIB-05), newest first, at most the wide count; the cover row shows 3. */
+    /** 최근 연 파일 (LIB-05), newest first, at most the wide count; the cover row shows 3 (card view). */
     val recents: List<RecentCardUi> = emptyList(),
 ) {
     /**
@@ -126,10 +128,9 @@ object ShelfState {
             )
         }
         val rows = listing.rows.map(::row)
-        val cards = if (!showCards) emptyList() else {
-            rows.map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = false) } +
-                openGroup?.rows.orEmpty().map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = true) }
-        }
+        // Both views carry their data, so a `목록 ↔ 카드` switch can animate (CNV-45); [showCards] only says which is on.
+        val cards = rows.map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = false) } +
+            openGroup?.rows.orEmpty().map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = true) }
         return ShelfUi(
             loaded = loaded,
             sectionLabel = listing.sectionLabel,
@@ -142,7 +143,7 @@ object ShelfState {
             showCards = showCards,
             cardSectionLabel = listing.cardSectionLabel,
             cards = cards,
-            recents = if (showCards) RecentsModel.cards(recentItems, live, now, zone, RecentsModel.WIDE_COUNT) else emptyList(),
+            recents = RecentsModel.cards(recentItems, live, now, zone, RecentsModel.WIDE_COUNT),
         )
     }
 
@@ -184,6 +185,7 @@ object ShelfState {
             writing = doc?.let(::isWriting) ?: false,
             protections = doc?.project?.protections ?: Protections(hidden = p.entry.hidden),
             readOnly = p.entry.readOnly || p.entry.isExample,
+            thumb = ShelfCards.thumb(doc, doc?.project?.name ?: p.entry.name),
         )
     }
 }

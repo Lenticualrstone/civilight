@@ -10,11 +10,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -45,7 +54,9 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
 import io.github.lenticualrstone.civilight.domain.cast.EditContext
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldSettings
@@ -106,97 +117,169 @@ fun FieldSettingsScreen(route: FieldSettingsRoute, deps: FeatureDeps) {
                 }
             },
         ) { padding ->
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+            val listState = rememberLazyListState()
+            val reorder = rememberFieldReorder(screen.rows.map { it.key }, listState) { key, from, to -> vm.move(kind, key, from, to) }
+            val shownRows = remember(screen.rows, reorder.order) {
+                val byKey = screen.rows.associateBy { it.key }
+                (reorder.order ?: screen.rows.map { it.key }).mapNotNull { byKey[it] }
+            }
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                state = listState,
+                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
-                CivilightTabs(screen.tabs, kindIndex, { kindIndex = it })
-                SectionLabel(screen.fixedTitle, Modifier.padding(top = 16.dp))
-                CivilightText(
-                    CastCopy.joinAll(screen.fixedFields),
-                    CivilightTheme.type.small,
-                    Modifier
-                        .padding(top = 6.dp)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(CivilightTheme.colors.tint)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    color = CivilightTheme.colors.ink3,
-                )
+                item(key = "tabs") { CivilightTabs(screen.tabs, kindIndex, { kindIndex = it }, civilightItem()) }
+                item(key = "fixed-head") { SectionLabel(screen.fixedTitle, civilightItem().padding(top = 16.dp)) }
+                item(key = "fixed") {
+                    CivilightText(
+                        CastCopy.joinAll(screen.fixedFields),
+                        CivilightTheme.type.small,
+                        civilightItem()
+                            .padding(top = 6.dp)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CivilightTheme.colors.tint)
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        color = CivilightTheme.colors.ink3,
+                    )
+                }
                 if (kind == EntityKind.CHARACTER) {
-                    for (which in HeaderFixed.entries) {
+                    items(HeaderFixed.entries, key = { "switch-${it.name}" }) { which ->
                         SwitchRow(
                             which.label,
                             FieldSettingsModel.showsInHeader(ready.doc, which),
                             { vm.showInHeader(which, it) },
+                            modifier = civilightItem(),
                             subtitle = CastUiCopy.PLACE_HEADER,
                             enabled = editable,
                         )
                     }
                 }
-                SectionLabel(screen.projectTitle, Modifier.padding(top = 20.dp, bottom = 6.dp), trailing = screen.reorderNote, trailingAccent = false)
-                ReorderableRows(
-                    rows = screen.rows,
-                    editable = editable,
-                    onOpen = { deps.navigator.push(FieldDefEdit(route.projectKey, it)) },
-                    onMove = { key, from, to -> vm.move(kind, key, from, to) },
-                )
-                if (editable) AddRow { sheets.open(AddFieldSheet(route.projectKey, kind)) }
-                ListRow(
-                    screen.bundleTitle,
-                    Modifier.padding(top = 4.dp),
-                    subtitle = screen.bundleSub,
-                    compact = true,
-                    trailing = { CivilightText(screen.bundleAction, CivilightTheme.type.small, color = CivilightTheme.colors.ink2, maxLines = 1) },
-                    onClick = { sheets.open(BundleSheet(route.projectKey, kind)) },
-                )
+                item(key = "project-head") {
+                    SectionLabel(screen.projectTitle, civilightItem().padding(top = 20.dp, bottom = 6.dp), trailing = screen.reorderNote, trailingAccent = false)
+                }
+                items(shownRows, key = { it.key }) { row ->
+                    val dragged = reorder.dragKey == row.key
+                    FieldSettingRowView(
+                        row = row,
+                        modifier = Modifier
+                            // The dragged row is placed by the finger; its neighbours glide aside (P1).
+                            .then(civilightItem(placement = if (dragged) null else CivilightMotion.standard))
+                            .onSizeChanged { reorder.rowHeight = it.height.toFloat() }
+                            .zIndex(if (dragged) 1f else 0f)
+                            .graphicsLayer { translationY = if (dragged) reorder.offset else 0f },
+                        grip = if (!editable) Modifier else Modifier.pointerInput(row.key) {
+                            detectVerticalDragGestures(
+                                onDragStart = { reorder.start(row.key) },
+                                onDragEnd = { reorder.release() },
+                                onDragCancel = { reorder.cancel() },
+                                onVerticalDrag = { change, delta ->
+                                    change.consume()
+                                    reorder.drag(delta)
+                                },
+                            )
+                        },
+                        onClick = { deps.navigator.push(FieldDefEdit(route.projectKey, row.key)) },
+                    )
+                }
+                if (editable) item(key = "add") { AddRow(civilightItem()) { sheets.open(AddFieldSheet(route.projectKey, kind)) } }
+                item(key = "bundle") {
+                    ListRow(
+                        screen.bundleTitle,
+                        civilightItem().padding(top = 4.dp),
+                        subtitle = screen.bundleSub,
+                        compact = true,
+                        trailing = { CivilightText(screen.bundleAction, CivilightTheme.type.small, color = CivilightTheme.colors.ink2, maxLines = 1) },
+                        onClick = { sheets.open(BundleSheet(route.projectKey, kind)) },
+                    )
+                }
             }
         }
     }
 }
 
-/** Project field rows with a visible grip (`순서 바꾸기`): dragging the grip moves the row (CST-19). */
-@Composable
-private fun ReorderableRows(rows: List<FieldSettingRow>, editable: Boolean, onOpen: (Key) -> Unit, onMove: (Key, Int, Int) -> Unit) {
-    var dragging by remember { mutableStateOf<Int?>(null) }
-    var offset by remember { mutableFloatStateOf(0f) }
-    var rowHeight by remember { mutableFloatStateOf(0f) }
-    Column {
-        rows.forEachIndexed { index, row ->
-            val isDragged = dragging == index
-            FieldSettingRowView(
-                row = row,
-                modifier = Modifier
-                    .onSizeChanged { rowHeight = it.height.toFloat() }
-                    .graphicsLayer { translationY = if (isDragged) offset else 0f },
-                grip = if (!editable) Modifier else Modifier.pointerInput(row.key, index) {
-                    detectVerticalDragGestures(
-                        onDragStart = {
-                            dragging = index
-                            offset = 0f
-                        },
-                        onDragEnd = {
-                            val to = FieldSettingsModel.dropIndex(index, offset, rowHeight, rows.size)
-                            dragging = null
-                            offset = 0f
-                            onMove(row.key, index, to)
-                        },
-                        onDragCancel = {
-                            dragging = null
-                            offset = 0f
-                        },
-                        onVerticalDrag = { change, delta ->
-                            change.consume()
-                            offset += delta
-                        },
-                    )
-                },
-                onClick = { onOpen(row.key) },
-            )
+/**
+ * The live reorder of the project field rows (CST-19): while a grip is dragged the rows reorder in a local
+ * list at once (the lazy list animates the neighbours aside), the dragged row stays under the finger, and on
+ * release it settles into its slot before the move is written once. [order] is null while the list follows
+ * the document; after a drop it stays until the document shows the same order (or a second passes).
+ */
+@Stable
+internal class FieldReorder(
+    private val keys: () -> List<Key>,
+    private val scope: kotlinx.coroutines.CoroutineScope,
+    private val list: LazyListState,
+    private val motion: () -> io.github.lenticualrstone.civilight.designsystem.theme.Motion,
+    private val onMove: (Key, Int, Int) -> Unit,
+) {
+    var order: List<Key>? by mutableStateOf(null)
+    var dragKey: Key? by mutableStateOf(null)
+    var offset: Float by mutableFloatStateOf(0f)
+    var rowHeight: Float = 0f
+    private var startIndex = 0
+    private var job: kotlinx.coroutines.Job? = null
+
+    fun start(key: Key) {
+        job?.cancel()
+        val now = order ?: keys()
+        dragKey = key
+        startIndex = now.indexOf(key)
+        order = now
+        offset = 0f
+    }
+
+    fun drag(delta: Float) {
+        val key = dragKey ?: return
+        val now = order ?: keys()
+        val step = FieldSettingsModel.dragStep(now, key, offset + delta, rowHeight)
+        // The lazy list keeps its first visible item by key; a swap of that very row must not scroll the list.
+        if (step.order != now) list.requestScrollToItem(list.firstVisibleItemIndex, list.firstVisibleItemScrollOffset)
+        order = step.order
+        offset = step.offsetPx
+    }
+
+    fun release() {
+        val key = dragKey ?: return
+        job = scope.launch {
+            androidx.compose.animation.core.animate(offset, 0f, animationSpec = motion().move(CivilightMotion.standard)) { value, _ -> offset = value }
+            val to = order?.indexOf(key) ?: startIndex
+            dragKey = null
+            if (to != startIndex) {
+                onMove(key, startIndex, to)
+                // Keep the local order until the document shows it, so nothing flashes back.
+                motion().delayMs(SETTLE_WAIT_MS)
+            }
+            order = null
         }
     }
+
+    fun cancel() {
+        job?.cancel()
+        dragKey = null
+        offset = 0f
+        order = null
+    }
+
+    /** The document now shows the dropped order: follow it again. */
+    fun documentCaughtUp() {
+        if (dragKey == null && order != null && order == keys()) order = null
+    }
+
+    private companion object {
+        const val SETTLE_WAIT_MS = 1000
+    }
+}
+
+@Composable
+internal fun rememberFieldReorder(documentKeys: List<Key>, list: LazyListState, onMove: (Key, Int, Int) -> Unit): FieldReorder {
+    val scope = rememberCoroutineScope()
+    // Read through states, so a reduce-motion change or a new document is honoured by a state that lives on.
+    val motion by rememberUpdatedState(CivilightTheme.motion)
+    val keys by rememberUpdatedState(documentKeys)
+    val move by rememberUpdatedState(onMove)
+    val state = remember(scope, list) { FieldReorder({ keys }, scope, list, { motion }) { k, f, t -> move(k, f, t) } }
+    LaunchedEffect(documentKeys) { state.documentCaughtUp() }
+    return state
 }
 
 /** `출생 · 날짜 · 연도 · 머리`: grip, name 15 bold, sub with the type in `ink2`, chevron. */
@@ -241,10 +324,10 @@ private fun FieldSettingRowView(row: FieldSettingRow, modifier: Modifier, grip: 
 
 /** `+ 항목` (plus icon, `항목` 600 14). */
 @Composable
-private fun AddRow(onClick: () -> Unit) {
+private fun AddRow(modifier: Modifier, onClick: () -> Unit) {
     val colors = CivilightTheme.colors
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .topHairline(colors.line)
             .pressable(onClick = onClick, scaleOnPress = false, onClickLabel = CastUiCopy.ADD_FIELD_TITLE)

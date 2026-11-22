@@ -17,7 +17,10 @@ data class AppSettings(
     val reduceTransparency: Boolean = false,
     val recorderGlow: Boolean = true,
     val holoDefaultForNewImages: Boolean = false,
-    /** Screen id → list or card (`library` → list). */
+    /**
+     * Screen id → list, grid or card (`library` → list). Gallery screens use the ids
+     * [GALLERY_CHARACTER] and [GALLERY_PROJECT] (55 GAL-04); only they ever store [ViewMode.GRID].
+     */
     val viewByScreen: Map<String, ViewMode> = mapOf("library" to ViewMode.LIST),
     val appLock: Boolean = false,
     val relockPolicy: RelockPolicy = RelockPolicy.ON_LEAVE,
@@ -35,7 +38,71 @@ data class AppSettings(
     val largeMapExport: LargeMapExport = LargeMapExport.K4,
     val recorder: RecorderSettings = RecorderSettings(),
     val ratingDefaults: RatingDefaults = RatingDefaults(),
-)
+    /** Gallery viewer `설명` toggle (55 GAL-09), remembered app-wide. */
+    val galleryTextOn: Boolean = true,
+    /**
+     * Inner-screen two-pane ratio per module (CNV-47 `펼친 화면 비율`): module id (see [PaneSplit])
+     * → chosen ratio. Absent = [PaneSplit.DEFAULT] (today's layout); not written while empty.
+     */
+    val paneSplit: Map<String, PaneSplit> = emptyMap(),
+) {
+    /** The remembered pane ratio of [module] (CNV-47); [PaneSplit.DEFAULT] when none was chosen. */
+    fun paneSplitOf(module: String): PaneSplit = paneSplit[module] ?: PaneSplit.DEFAULT
+
+    /** [module] set to [split]; choosing [PaneSplit.DEFAULT] removes the entry. */
+    fun withPaneSplit(module: String, split: PaneSplit): AppSettings =
+        copy(paneSplit = if (split == PaneSplit.DEFAULT) paneSplit - module else paneSplit + (module to split))
+
+    companion object {
+        /** [viewByScreen] id of every character gallery (not per character, 55 GAL-04). */
+        const val GALLERY_CHARACTER = "characterGallery"
+
+        /** [viewByScreen] id of the project gallery. */
+        const val GALLERY_PROJECT = "projectGallery"
+    }
+}
+
+/**
+ * CNV-47: the left : right width ratio of a two-pane layout on the inner screen (list : detail, or
+ * manuscript : side panel). [DEFAULT] is the layout the module draws without a choice (the `기본`
+ * button). Module ids are the keys of [AppSettings.paneSplit]; every lane uses [Modules].
+ */
+@Serializable(with = PaneSplit.Codec::class)
+enum class PaneSplit(
+    /** Left pane share of the two panes' width, or null for [DEFAULT]. */
+    val listFraction: Float?,
+) {
+    ONE_TWO(1f / 3f), ONE_ONE(0.5f), TWO_ONE(2f / 3f), DEFAULT(null);
+
+    object Codec : LowerCamelEnumSerializer<PaneSplit>("PaneSplit", entries, DEFAULT)
+
+    /**
+     * Module ids of [AppSettings.paneSplit]: the two-pane layouts of CNV-47, one per `ListDetailPairs`
+     * list module (서재, 홈, 인물, 세계, 연표, 레코더 기록함, 점검 센터), the gallery (GAL-23) and the
+     * script's side panel.
+     */
+    object Modules {
+        const val LIBRARY = "library"
+        const val HOME = "home"
+        const val CAST = "cast"
+        const val WORLD = "world"
+        const val TIMELINE = "timeline"
+        const val RECORDER = "recorder"
+        const val CHECKS = "checks"
+        const val GALLERY = "gallery"
+        const val SCRIPT_PANEL = "scriptPanel"
+
+        val ALL: List<String> = listOf(LIBRARY, HOME, CAST, WORLD, TIMELINE, RECORDER, CHECKS, GALLERY, SCRIPT_PANEL)
+    }
+
+    companion object {
+        /** The three ratios a released drag settles to, in on-screen order (`1:2 · 1:1 · 2:1`). */
+        val SNAP: List<PaneSplit> = listOf(ONE_TWO, ONE_ONE, TWO_ONE)
+
+        /** The ratio of [SNAP] nearest to a dragged list share [fraction] (0…1). */
+        fun nearest(fraction: Float): PaneSplit = SNAP.minBy { kotlin.math.abs(it.listFraction!! - fraction) }
+    }
+}
 
 /** Rating protection defaults (LIB-23). Fixed: R-15 hide/name/recorder off; ALL all off. */
 @Serializable
@@ -75,7 +142,14 @@ enum class AnimationPref {
 
 @Serializable(with = ViewMode.Codec::class)
 enum class ViewMode {
-    LIST, CARD;
+    /** List rows. */
+    LIST,
+
+    /** Card shelf. */
+    CARD,
+
+    /** Three-column tile grid; gallery screens only (55 GAL-06). */
+    GRID;
 
     object Codec : LowerCamelEnumSerializer<ViewMode>("ViewMode", entries, LIST)
 }

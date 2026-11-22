@@ -11,7 +11,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -24,6 +25,7 @@ import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderEnv
 import io.github.lenticualrstone.civilight.domain.recorder.inbox.MenuAction
 import io.github.lenticualrstone.civilight.feature.recorder.record.RecordMenuSource
@@ -90,10 +92,11 @@ fun RecordMenuContent(sheet: RecordMenuSheet, scope: SheetScope, source: RecordM
         SheetScrollBody(Modifier.padding(top = 10.dp)) {
             for (item in menu.options) {
                 val action = item.option.action
+                val enabledAlpha = animatedAlpha(if (item.enabled) 1f else DISABLED_ALPHA, label = "menuRow")
                 ListRow(
                     title = item.option.title,
                     subtitle = item.option.sub,
-                    modifier = if (item.enabled) Modifier else Modifier.alpha(DISABLED_ALPHA),
+                    modifier = Modifier.graphicsLayer { this.alpha = enabledAlpha.value },
                     leading = { CivilightIcon(iconOf(action), contentDescription = null, size = 20.dp, tint = colors.ink2) },
                     onClick = if (!item.enabled) null else ({
                         val put = RecordMenus.putKindOf(action)
@@ -103,7 +106,7 @@ fun RecordMenuContent(sheet: RecordMenuSheet, scope: SheetScope, source: RecordM
                             scope.close()
                             deps.appScope.launch {
                                 when (val outcome = source.onMenu(sheet.recordKey, action)) {
-                                    is MenuOutcome.ShowToast -> deps.toasts.show(outcome.toast.text, RecorderCopy.UNDO) {
+                                    is MenuOutcome.ShowToast -> deps.toasts.show(ShownCopy.of(outcome.toast), RecorderCopy.UNDO) {
                                         deps.appScope.launch { outcome.undo() }
                                     }
                                     is MenuOutcome.OpenPut, MenuOutcome.Done -> Unit

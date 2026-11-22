@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Column
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -81,27 +84,33 @@ fun ColumnScope.PinPlaceContent(
     var creating by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }
     SheetHeader(MapCopy.PIN_PICK_TITLE, onClose = onClose)
-    if (creating) {
-        SheetScrollBody {
-            CivilightTextField(name, { name = it }, Modifier.padding(top = 12.dp), label = MapCopy.PLACE_NAME)
+    // The place list and the new-place form swap with a crossfade; the sheet follows the height (motion audit row 13).
+    ContentSwap(creating) { isCreating ->
+        Column {
+            if (isCreating) {
+                SheetScrollBody {
+                    CivilightTextField(name, { name = it }, Modifier.padding(top = 12.dp), label = MapCopy.PLACE_NAME)
+                }
+                SheetActions {
+                    CivilightButton(MapCopy.BTN_CANCEL, { creating = false }, Modifier.weight(1f), variant = ButtonVariant.GHOST)
+                    CivilightButton(MapCopy.BTN_CREATE, { onCreate(name) }, Modifier.weight(1f), enabled = name.isNotBlank())
+                }
+            } else {
+                SearchField(field, { field = it; onQuery(it.text) }, Modifier.padding(top = 12.dp), placeholder = io.github.lenticualrstone.civilight.ui.picker.PickerCopy.SEARCH_PLACEHOLDER)
+                LazyColumn(Modifier.weight(1f, fill = false).padding(top = 8.dp)) {
+                    item(key = "new") { ListRow(MapCopy.NEW_PLACE, onClick = { creating = true; name = field.text }) }
+                    items(model.rows, key = { it.placeKey }) { row ->
+                        ListRow(
+                            title = row.name,
+                            subtitle = row.sub,
+                            onClick = if (row.pinned) null else ({ onPick(row.placeKey) }),
+                            modifier = civilightItem(),
+                        )
+                    }
+                    model.lockRow?.let { text -> item(key = "lock") { LockRow(text, MapCopy.UNLOCK, gate.unlock, Modifier.padding(top = 8.dp)) } }
+                }
+            }
         }
-        SheetActions {
-            CivilightButton(MapCopy.BTN_CANCEL, { creating = false }, Modifier.weight(1f), variant = ButtonVariant.GHOST)
-            CivilightButton(MapCopy.BTN_CREATE, { onCreate(name) }, Modifier.weight(1f), enabled = name.isNotBlank())
-        }
-        return
-    }
-    SearchField(field, { field = it; onQuery(it.text) }, Modifier.padding(top = 12.dp), placeholder = io.github.lenticualrstone.civilight.ui.picker.PickerCopy.SEARCH_PLACEHOLDER)
-    LazyColumn(Modifier.weight(1f, fill = false).padding(top = 8.dp)) {
-        item(key = "new") { ListRow(MapCopy.NEW_PLACE, onClick = { creating = true; name = field.text }) }
-        items(model.rows, key = { it.placeKey }) { row ->
-            ListRow(
-                title = row.name,
-                subtitle = row.sub,
-                onClick = if (row.pinned) null else ({ onPick(row.placeKey) }),
-            )
-        }
-        model.lockRow?.let { text -> item(key = "lock") { LockRow(text, MapCopy.UNLOCK, gate.unlock, Modifier.padding(top = 8.dp)) } }
     }
 }
 

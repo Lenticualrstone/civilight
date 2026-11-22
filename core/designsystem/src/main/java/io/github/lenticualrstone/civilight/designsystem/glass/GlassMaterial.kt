@@ -36,6 +36,8 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalGlassMode
 
 /**
@@ -122,6 +124,16 @@ fun GlassBackground(
         else -> mode
     }
     val style = glassStyle(effectiveMode, surface, colors, blurTokens)
+    // S18e: a mode change (glass ↔ scrim ↔ opaque, or the costly-blur budget) crossfades on `standard`:
+    // the blurred backdrop fades, the fill and the opaque borders cross over (120 ms when reduced).
+    val blurAmount = animatedFraction(style.blur > 0.dp, label = "glassBlur")
+    val lastBlur = remember { BlurHolder(style.blur) }
+    if (style.blur > 0.dp) lastBlur.radius = style.blur
+    val fillColor = animatedColor(fill ?: style.fill, label = "glassFill")
+    val noBorder = colors.line.copy(alpha = 0f)
+    val bottomBorder = animatedColor(style.bottomBorder ?: noBorder, label = "glassBottomBorder")
+    val topBorder = animatedColor(style.topBorder ?: noBorder, label = "glassTopBorder")
+    val saturation = style.saturation.takeIf { style.blur > 0.dp } ?: blurTokens.glassSaturation
     val blurLayer = rememberGraphicsLayer()
     var selfPosition by remember { mutableStateOf(Offset.Zero) }
     Box(
@@ -134,18 +146,20 @@ fun GlassBackground(
                 compositingStrategy = if (style.mask != null) CompositingStrategy.Offscreen else CompositingStrategy.Auto
             }
             .drawBehind {
-                if (style.blur > 0.dp && source != null && Build.VERSION.SDK_INT >= 31) {
-                    val radius = style.blur.toPx()
+                val amount = blurAmount.value
+                if (amount > 0f && lastBlur.radius > 0.dp && source != null && Build.VERSION.SDK_INT >= 31) {
+                    val radius = lastBlur.radius.toPx()
                     blurLayer.renderEffect = BlurEffect(radius, radius, TileMode.Clamp)
+                    blurLayer.alpha = amount
                     blurLayer.colorFilter = ColorFilter.colorMatrix(
-                        ColorMatrix().apply { setToSaturation(style.saturation) },
+                        ColorMatrix().apply { setToSaturation(saturation) },
                     )
                     val dx = source.positionInRoot.x - selfPosition.x
                     val dy = source.positionInRoot.y - selfPosition.y
                     blurLayer.record { translate(dx, dy) { drawLayer(source.layer) } }
                     drawLayer(blurLayer)
                 }
-                drawRect(fill ?: style.fill)
+                drawRect(fillColor.value)
                 style.mask?.let { m ->
                     val brush = if (m.anchoredAtTop) {
                         Brush.verticalGradient(0f to Color.Black, m.opaqueFraction to Color.Black, 1f to Color.Transparent)
@@ -159,11 +173,14 @@ fun GlassBackground(
                     drawRect(brush, blendMode = BlendMode.DstIn)
                 }
                 val hair = 1.dp.toPx()
-                style.bottomBorder?.let { drawRect(it, Offset(0f, size.height - hair), size.copy(height = hair)) }
-                style.topBorder?.let { drawRect(it, Offset.Zero, size.copy(height = hair)) }
+                bottomBorder.value.takeIf { it.alpha > 0f }?.let { drawRect(it, Offset(0f, size.height - hair), size.copy(height = hair)) }
+                topBorder.value.takeIf { it.alpha > 0f }?.let { drawRect(it, Offset.Zero, size.copy(height = hair)) }
             },
     )
 }
+
+/** The last non-zero blur radius, so the backdrop keeps its blur while it fades out. */
+private class BlurHolder(var radius: androidx.compose.ui.unit.Dp)
 
 /**
  * Content drawn on a glass surface. Nested glass surfaces inside it read no source and fall back to the

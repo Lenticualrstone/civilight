@@ -54,11 +54,20 @@ class ScriptCopyLintTest {
     }
 
     @Test
-    fun `missing copy is a TODO_COPY constant, never invented prose`() {
-        val every = ScriptCopy.all + ChangeCopy.all + MoveCopy.all + TransitionCopy.all + batch5 + AssetsCopy.all + AssetsCopy.buttons
-        val todos = every.filter { it.startsWith(TODO) }
-        assertTrue(todos.all { it.matches(Regex("TODO_COPY_SCRIPT_[A-Z_]+")) })
+    fun `no TODO_COPY string is left where it can reach the screen, and no sentence ends in 요`() {
+        val every = ScriptCopy.all + ChangeCopy.all + MoveCopy.all + TransitionCopy.all + batch5 + AssetsCopy.all + AssetsCopy.buttons +
+            ScriptCopy.LINK_PICKER_TITLE + ScriptCopy.UNDO_TYPING + ScriptCopy.NO_ASSETS + ScriptCopy.REF_NOT_DIALOGUE +
+            ScriptCopy.MODS_NO_CHECKS + ScriptCopy.MODS_SCENE_EMPTY + MoveCopy.PASTE + AssetsCopy.NO_ASSETS
+        assertTrue(every.none { it.startsWith(TODO) })
         assertTrue(every.none { it.endsWith("요") || it.endsWith("요.") })
+        assertEquals(emptyMap<String, Any>(), lintAll(every.distinct()))
+    }
+
+    @Test
+    fun `no TODO_COPY constant stays in the module's sources`() {
+        val left = java.io.File("src/main").walkTopDown().filter { it.isFile && it.extension == "kt" }
+            .filter { it.readText().contains(TODO) }.map { it.name }.toList()
+        assertEquals(emptyList<String>(), left)
     }
 
     private companion object {

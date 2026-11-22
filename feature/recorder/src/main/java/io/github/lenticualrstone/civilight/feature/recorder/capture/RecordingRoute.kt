@@ -9,7 +9,11 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -26,7 +30,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightSheetLayout
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.feature.recorder.link.LinkPickerContent
 import io.github.lenticualrstone.civilight.feature.recorder.memo.MemoActions
 import io.github.lenticualrstone.civilight.feature.recorder.memo.TextMemoSheetContent
@@ -114,38 +120,57 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
 
     val inner = LocalWindowLayout.current.isInner
     val reduced = CivilightTheme.reducedMotion
+    val motion = CivilightTheme.motion
     val glowOn = deps.settings.collectAsState().value.recorderGlow
 
+    // One sheet for the picker, the memo and the mic reason, swapped inside it (row 13): two stacked
+    // layouts scaled the screen behind them twice (0.965 squared) when the picker opened over the memo.
+    val sheetKind = CaptureSheets.of(state)
+    val shownKind = rememberLastNonNull(sheetKind)
+    val shownPicker = rememberLastNonNull(state.picker)
     CivilightSheetLayout(
-        sheetVisible = state.picker != null,
-        onDismissRequest = hub::closePicker,
+        sheetVisible = sheetKind != null,
+        onDismissRequest = { if (state.picker != null) hub.closePicker() else hub.launch { back() } },
         centered = inner,
-        sheet = { LinkPickerContent(hub, onClose = hub::closePicker) },
-    ) {
-        CivilightSheetLayout(
-            sheetVisible = state.stage == CaptureStage.TYPING || state.stage == CaptureStage.MIC_REASON,
-            onDismissRequest = { hub.launch { back() } },
-            centered = inner,
-            sheet = {
-                if (state.stage == CaptureStage.MIC_REASON) {
-                    MicReasonContent(onAllow = { permission.launch(Manifest.permission.RECORD_AUDIO) }, onClose = hub::dismissMic)
-                } else {
-                    TextMemoSheetContent(state, memoActions(hub, context, onOpenPicker = hub::openPicker))
+        sheet = {
+            AnimatedContent(
+                targetState = shownKind,
+                transitionSpec = { motion.swap() },
+                label = "captureSheet",
+            ) { kind ->
+                Column {
+                    when (kind) {
+                        CaptureSheetKind.PICKER -> LinkPickerContent(hub, onClose = hub::closePicker, request = shownPicker)
+                        CaptureSheetKind.MIC_REASON -> MicReasonContent(onAllow = { permission.launch(Manifest.permission.RECORD_AUDIO) }, onClose = hub::dismissMic)
+                        CaptureSheetKind.MEMO -> TextMemoSheetContent(state, memoActions(hub, context, onOpenPicker = hub::openPicker))
+                        null -> Unit
+                    }
                 }
-            },
-        ) {
-            val glow = GlowModes.of(state, glowOn, reduced)
-            val glass = state.stage == CaptureStage.RECORDING || state.stage == CaptureStage.PROCESSING || state.stage == CaptureStage.MIC_OFF
-            CaptureFrame(glow = glow, level = { hub.level.value }, glass = glass) {
-                when (state.stage) {
-                    CaptureStage.RECORDING -> CaptureViews.recording(state)?.let { view ->
-                        RecordingPane(
-                            view = view,
+            }
+        },
+    ) {
+        val glow = GlowModes.of(state, glowOn, reduced)
+        val glass = state.stage == CaptureStage.RECORDING || state.stage == CaptureStage.PROCESSING || state.stage == CaptureStage.MIC_OFF
+        CaptureFrame(glow = glow, level = { hub.level.value }, glass = glass) {
+            // The typed line never moves, so the stages swap by opacity only; each slot keeps its own view
+            // so the pane that leaves still shows what it showed (the live state has moved on).
+            val slot = CaptureSlot.of(state)
+            AnimatedContent(
+                targetState = slot,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = { motion.swap() },
+                contentKey = { it.kind },
+                label = "captureStage",
+            ) { shown ->
+                Column(Modifier.fillMaxSize()) {
+                    when (shown) {
+                        is CaptureSlot.Recording -> RecordingPane(
+                            view = shown.view,
                             onCancel = {
                                 hub.launch {
                                     val outcome = cancel()
                                     if (outcome is CancelOutcome.Discarded) {
-                                        deps.toasts.show(outcome.cancelled.toast.text, RecorderCopy.UNDO) {
+                                        deps.toasts.show(ShownCopy.of(outcome.cancelled.toast), RecorderCopy.UNDO) {
                                             hub.launch {
                                                 undoCancel(outcome.cancelled)
                                                 deps.navigator.push(EntryRoutes.routeOf(outcome.cancelled.session.entry))
@@ -161,10 +186,8 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
                             onStop = { hub.launch { stopAndSave() } },
                             onPause = hub::togglePause,
                         )
-                    }
-                    CaptureStage.PROCESSING -> CaptureViews.processing(state)?.let { view ->
-                        ProcessingPane(
-                            view = view,
+                        is CaptureSlot.Processing -> ProcessingPane(
+                            view = shown.view,
                             onAddLink = { hub.openPicker(PickerRequest(PickerTarget.SESSION)) },
                             onReplaceLink = { chip -> hub.openPicker(PickerRequest(PickerTarget.SESSION, chip.links.map { it.key })) },
                             onRemoveLink = { chip -> hub.removeLinks(PickerTarget.SESSION, chip.links.map { it.key }) },
@@ -172,24 +195,24 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
                             onPutHere = {
                                 hub.launch {
                                     val done = putHere() ?: return@launch
-                                    deps.toasts.show(done.insertion.toast.text, RecorderCopy.UNDO) { hub.launch { undoPut(done) } }
+                                    deps.toasts.show(ShownCopy.of(done.insertion.toast), RecorderCopy.UNDO) { hub.launch { undoPut(done) } }
                                 }
                             },
                             onContinue = hub::continueSpeaking,
                             onKeep = { hub.launch { keepInInbox() } },
                         )
+                        CaptureSlot.MicOff -> MicOffPane(
+                            onClose = hub::dismissMic,
+                            onOpenSettings = {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            },
+                            onToText = { hub.launch { micOffToText() } },
+                        )
+                        CaptureSlot.None -> Unit
                     }
-                    CaptureStage.MIC_OFF -> MicOffPane(
-                        onClose = hub::dismissMic,
-                        onOpenSettings = {
-                            context.startActivity(
-                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        },
-                        onToText = { hub.launch { micOffToText() } },
-                    )
-                    CaptureStage.TYPING, CaptureStage.MIC_REASON, CaptureStage.IDLE -> Unit
                 }
             }
         }

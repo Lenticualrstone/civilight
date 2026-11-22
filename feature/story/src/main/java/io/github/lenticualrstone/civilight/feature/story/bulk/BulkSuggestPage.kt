@@ -32,6 +32,7 @@ import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.text.DecoratedText
 import io.github.lenticualrstone.civilight.designsystem.text.searchHitDecorations
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.story.bulk.SuggestSheet
 import io.github.lenticualrstone.civilight.domain.story.bulk.SuggestionCard
 import io.github.lenticualrstone.civilight.domain.story.bulk.Suggestions
@@ -103,20 +104,20 @@ fun BulkSuggestPage(
             Modifier.fillMaxSize().background(colors.bg),
             contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
         ) {
-            item(key = "line") { CivilightText(sheet.line, type.small, Modifier.padding(bottom = 8.dp), color = colors.ink3) }
+            item(key = "line") { CivilightText(sheet.line, type.small, civilightItem().padding(bottom = 8.dp), color = colors.ink3) }
             items(sheet.cards, key = { it.sceneKey }) { card ->
-                SuggestCard(card, readOnly, { onPut(card.sceneKey) }, { onFix(card.sceneKey) }, { onSkip(card.sceneKey) })
+                SuggestCard(card, readOnly, { onPut(card.sceneKey) }, { onFix(card.sceneKey) }, { onSkip(card.sceneKey) }, civilightItem())
             }
         }
     }
 }
 
 @Composable
-private fun SuggestCard(card: SuggestionCard, readOnly: Boolean, onPut: () -> Unit, onFix: () -> Unit, onSkip: () -> Unit) {
+private fun SuggestCard(card: SuggestionCard, readOnly: Boolean, onPut: () -> Unit, onFix: () -> Unit, onSkip: () -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val (title, source) = card.header.split(" | ", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
-    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             CivilightText(title, type.itemTitleCompact.merge(TextStyle(fontWeight = FontWeight.Bold)), Modifier.weight(1f), color = colors.ink)
             CivilightText(source, type.small, color = colors.ink3)

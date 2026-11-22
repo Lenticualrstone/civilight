@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -14,6 +16,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -24,6 +27,16 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.feature.cast.gallery.CastGallery
+import io.github.lenticualrstone.civilight.feature.cast.gallery.GallerySection
+import io.github.lenticualrstone.civilight.navigation.Gallery
+import io.github.lenticualrstone.civilight.navigation.GalleryAddSheet
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
@@ -115,17 +128,27 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     val wide = LocalWindowLayout.current.isInner
     val cover = !wide
     val ui = ProfileUi(ProfileTab.entries[tab], showEmpty, headerExpanded)
-    val state = remember(doc, ui, cover, gate.open, ready.readOnly) { ProfileModel.build(doc, c, ui, cover, gate.open, ready.readOnly) }
+    val built = remember(doc, ui, cover, gate.open, ready.readOnly) { ProfileModel.build(doc, c, ui, cover, gate.open, ready.readOnly) }
+    // Every row `보기` or `항목 더 보기` can bring in, so those rows fold in and out instead of jumping (P2).
+    val full = remember(doc, ui, cover, gate.open, ready.readOnly) { ProfileModel.build(doc, c, ui.copy(showEmpty = true, headerExpanded = true), cover, gate.open, ready.readOnly) }
+    // A record that leaves because it was trashed or merged stays drawn while the screen pops (row 13); one that
+    // is hidden and locked again goes at once, so protected content never lingers (D5).
+    val lastState = rememberLastNonNull(built)
+    val relocked = built == null && !gate.open && doc.index.character(c)?.let { it.hidden && it.deletedAt == null } == true
+    val state = if (relocked) null else lastState
     if (state == null) {
-        // Trashed, gone or locked while open: leave the record.
         LaunchedEffect(c) { deps.navigator.pop() }
         return
     }
+    val fullState = rememberLastNonNull(full) ?: state
+    val leaving = built == null
+    if (leaving) LaunchedEffect(c) { deps.navigator.pop() }
+    val motion = CivilightTheme.motion
     val sheets = rememberSheetHost()
     val list = rememberLazyListState()
     val collapsed by remember { derivedStateOf { list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 160 } }
     val inDetailPane = LocalPaneRole.current == PaneRole.DETAIL
-    val editable = !state.readOnly
+    val editable = !state.readOnly && !leaving
     val trash = rememberItemTrash(p)
     val writes = remember(deps, p) { CastWrites(deps, p) }
     val recorderLink = rememberRecorderLink(p, c, doc)
@@ -164,6 +187,10 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
         onDeletedPartner = { partner -> sheets.open(DeleteImpactSheet(p, EntityKind.CHARACTER, partner)) },
         onRecorder = { deps.navigator.push(RecorderInbox(projectKey = p, targetKind = RecorderLinkModel.TARGET_KIND, targetKey = c)) },
         onSameNameMerge = { sheets.open(MergeItemsSheet(p, EntityKind.CHARACTER, c, c)) },
+        onGalleryAdd = { sheets.open(GalleryAddSheet(p, GalleryOwnerKind.CHARACTER, c)) },
+        onGalleryAll = { deps.navigator.push(Gallery.ofCharacter(p, c)) },
+        // The gallery screen opens in its remembered view (card, grid or list) with this item picked (GAL-08).
+        onGalleryCard = { item -> deps.navigator.push(Gallery.ofCharacter(p, c, pickKey = item)) },
     )
     CenterColumn {
         RecordFrame(
@@ -216,15 +243,24 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
             },
         ) { padding ->
             val art = remember(doc, c, wide) { CharacterImages.background(doc, c, inner = wide) }
+            val gallery = remember(doc, c, gate.open) { CastGallery.section(doc, c, gate.open) }
+            // The art's top edge: the content starts under the floating buttons, or at the art (no inset).
+            val topPad by animateDpAsState(if (art == null) recordTopInset() else 0.dp, motion.move(CivilightMotion.standard), label = "recordTop")
             LazyColumn(
                 state = list,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = if (art == null) recordTopInset() else 0.dp, bottom = padding.calculateBottomPadding() + 24.dp),
+                contentPadding = PaddingValues(start = PROFILE_SIDE, end = PROFILE_SIDE, top = topPad, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
-                art?.let { image -> item(key = "art") { RecordArt(image, inner = wide, sidePadding = 24.dp) } }
+                item(key = "art") { FoldRevealValue(art) { image -> RecordArt(image, inner = wide, sidePadding = PROFILE_SIDE) } }
                 item(key = "head") { RecordHead(state, editable, actions) }
-                item(key = "table") { HeaderTable(doc, state, actions) { headerExpanded = true } }
-                item(key = "tab-${ui.tab}") { TabBody(doc, c, state, ui, gate.open, actions, recorderLink) }
+                item(key = "table") { HeaderTable(doc, state, fullState, ui.headerExpanded, actions) { headerExpanded = true } }
+                // One item for the tab body: the tabs swap their content in place (row 3).
+                item(key = "tab") {
+                    // No clip: the gallery row runs past the list's side padding and must not be cut while the tabs swap.
+                    AnimatedContent(ui.tab, transitionSpec = { motion.swap(clip = false) }, label = "recordTab") { shown ->
+                        TabBody(doc, c, state, fullState, ui.copy(tab = shown), gate.open, gallery, wide, actions, recorderLink)
+                    }
+                }
             }
         }
     }
@@ -238,7 +274,7 @@ private fun RecordHead(state: ProfileState, editable: Boolean, actions: RecordAc
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel(state.header.title, Modifier.weight(1f, fill = false))
-            if (state.hidden) HiddenMark()
+            FoldReveal(state.hidden, horizontal = true) { HiddenMark() }
         }
         CivilightText(
             state.name,
@@ -261,21 +297,38 @@ private fun RecordHead(state: ProfileState, editable: Boolean, actions: RecordAc
     }
 }
 
-/** The field table (CST-07): `머리` fields, `첫 등장`, `보이스`; `항목 더 보기` on the cover; `예정` footnote. */
+/**
+ * The field table (CST-07): `머리` fields, `첫 등장`, `보이스`; `항목 더 보기` on the cover; `예정` footnote. [full] has
+ * every header row, so `항목 더 보기` folds the rest in instead of jumping (P2).
+ */
 @Composable
-private fun HeaderTable(doc: ProjectDoc, state: ProfileState, actions: RecordActions, onMore: () -> Unit) {
+private fun HeaderTable(doc: ProjectDoc, state: ProfileState, full: ProfileState, expanded: Boolean, actions: RecordActions, onMore: () -> Unit) {
     val colors = CivilightTheme.colors
+    val shown = remember(state) { state.header.rows.mapTo(HashSet()) { it.label } }
     Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
-        for (row in state.header.rows) FieldRowItem(doc, row, actions)
-        state.header.moreLabel?.let { TextAction(it, onMore, color = colors.ink2, style = CivilightTheme.type.small) }
-        state.header.plannedFootnote?.let { CivilightText(it, CivilightTheme.type.small, Modifier.padding(top = 14.dp), color = colors.ink3) }
+        for (row in full.header.rows) {
+            key(row.label) { FoldReveal(expanded || row.label in shown) { FieldRowItem(doc, row, actions) } }
+        }
+        FoldRevealValue(state.header.moreLabel) { label -> TextAction(label, onMore, color = colors.ink2, style = CivilightTheme.type.small) }
+        FoldRevealValue(state.header.plannedFootnote) { note -> CivilightText(note, CivilightTheme.type.small, Modifier.padding(top = 14.dp), color = colors.ink3) }
     }
 }
 
 @Composable
-private fun TabBody(doc: ProjectDoc, characterKey: Key, state: ProfileState, ui: ProfileUi, hiddenUnlocked: Boolean, actions: RecordActions, recorderLink: String?) {
+private fun TabBody(
+    doc: ProjectDoc,
+    characterKey: Key,
+    state: ProfileState,
+    full: ProfileState,
+    ui: ProfileUi,
+    hiddenUnlocked: Boolean,
+    gallery: GallerySection,
+    inner: Boolean,
+    actions: RecordActions,
+    recorderLink: String?,
+) {
     when (ui.tab) {
-        ProfileTab.OVERVIEW -> OverviewTab(doc, state, ui.showEmpty, actions, recorderLink)
+        ProfileTab.OVERVIEW -> OverviewTab(doc, state, full, ui.showEmpty, gallery, inner, actions, recorderLink)
         ProfileTab.RELATIONS -> RelationsTab(state, actions)
         ProfileTab.SPEECH -> {
             val c = doc.index.character(characterKey) ?: return

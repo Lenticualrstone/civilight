@@ -1,8 +1,18 @@
 package io.github.lenticualrstone.civilight.feature.map.gen
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
+import io.github.lenticualrstone.civilight.feature.map.common.FoldSwitch
+import io.github.lenticualrstone.civilight.feature.map.common.MapMotion
+import io.github.lenticualrstone.civilight.feature.map.common.appear
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -105,9 +115,10 @@ internal fun StepsPage(
             }
         },
     ) { padding ->
-        if (inner) {
+        FoldSwitch(inner) { isInner ->
+        if (isInner) {
             Box(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxSize().padding(end = 260.dp)) { WorldPreview(vm, state.input(), state.format) }
+                Box(Modifier.fillMaxSize().padding(end = 260.dp)) { WorldPreview(vm, state.input(), state.format, token = CivilightMotion.mapReroll) }
                 CandidateStrip(
                     state, vm, onChoose = { set(GenFlow.chooseCandidate(state, it)) }, onNew = newCandidates,
                     modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = padding.calculateBottomPadding() + 16.dp),
@@ -132,12 +143,13 @@ internal fun StepsPage(
                                 selected = row.focused,
                                 onClick = { set(GenFlow.focus(state, row.kind)) },
                             )
-                            if (row.focused && ui.questions.isNotEmpty()) {
+                            // The focused step's chips fold open under it and fold away when focus moves on.
+                            FoldRevealValue(ui.questions.takeIf { row.focused && it.isNotEmpty() }) { questions ->
                                 Column(
                                     Modifier.fillMaxWidth().clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
                                         .background(CivilightTheme.colors.sel).padding(10.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
-                                ) { Questions(ui, state, set, stacked = true) }
+                                ) { Questions(questions, state, set, stacked = true) }
                             }
                         }
                         StyleSection(ui, state, set)
@@ -146,7 +158,7 @@ internal fun StepsPage(
             }
         } else {
             Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding() - 10.dp)) {
-                Box(Modifier.fillMaxWidth().height(380.dp)) { WorldPreview(vm, state.input(), state.format) }
+                Box(Modifier.fillMaxWidth().height(380.dp)) { WorldPreview(vm, state.input(), state.format, token = CivilightMotion.mapReroll) }
                 Column(
                     Modifier.fillMaxWidth().weight(1f).background(CivilightTheme.colors.bg).verticalScroll(rememberScrollState())
                         .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = padding.calculateBottomPadding() + 12.dp),
@@ -164,7 +176,7 @@ internal fun StepsPage(
                         CivilightText(ui.cardName, CivilightTheme.type.itemTitle, Modifier.weight(1f))
                         CivilightText(MapCopy.seed(ui.cardSeed), CivilightTheme.type.number, color = CivilightTheme.colors.ink3)
                     }
-                    Questions(ui, state, set, stacked = false)
+                    Questions(ui.questions, state, set, stacked = false)
                     ButtonRow(Modifier.fillMaxWidth()) {
                         CivilightButton(ui.rerollLabel, { set(GenFlow.reroll(state, state.focus, nextSeed())) }, Modifier.weight(1f), variant = ButtonVariant.GHOST, icon = IconId.Dice, enabled = !ui.focusedLocked)
                         CivilightButton(ui.lockLabel, { set(GenFlow.lock(state, state.focus, !ui.focusedLocked)) }, Modifier.weight(1f), variant = ButtonVariant.GHOST, icon = if (ui.focusedLocked) IconId.StepLock else IconId.StepOpen)
@@ -173,6 +185,7 @@ internal fun StepsPage(
                     StyleSection(ui, state, set)
                 }
             }
+        }
         }
     }
 }
@@ -199,8 +212,8 @@ private fun StyleSection(ui: GenUi, state: GenFlowState, set: (GenFlowState) -> 
 /** The chips of the focused step (`개수 · 적게 · 보통 · 많이`); `호수` is a switch `막힌 곳에 호수`. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Questions(ui: GenUi, state: GenFlowState, set: (GenFlowState) -> Unit, stacked: Boolean) {
-    ui.questions.forEach { q ->
+private fun Questions(questions: List<QuestionUi>, state: GenFlowState, set: (GenFlowState) -> Unit, stacked: Boolean) {
+    questions.forEach { q ->
         val content: @Composable () -> Unit = {
             if (q.toggle) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -229,7 +242,8 @@ private fun Questions(ui: GenUi, state: GenFlowState, set: (GenFlowState) -> Uni
 @Composable
 private fun CandidateStrip(state: GenFlowState, vm: MapGenerateViewModel, onChoose: (Int) -> Unit, onNew: () -> Unit, modifier: Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        state.batch.forEach { i -> Candidate(state, vm, i, Modifier.size(92.dp, 64.dp), onChoose) }
+        // A new batch appears one tile after another (the keys are the history indices, so a new tile is a new element).
+        state.batch.forEachIndexed { n, i -> key(i) { Candidate(state, vm, i, Modifier.size(92.dp, 64.dp).appear(delayMs = MapMotion.stagger(n)), onChoose) } }
         CivilightButton(MapCopy.BTN_NEW_CANDIDATES, onNew, variant = ButtonVariant.COMPACT_GHOST, icon = IconId.Dice)
     }
 }
@@ -239,12 +253,15 @@ private fun Candidate(state: GenFlowState, vm: MapGenerateViewModel, index: Int,
     val input = GenFlow.candidateInput(state, index) ?: return
     val shape = RoundedCornerShape(10.dp)
     val colors = CivilightTheme.colors
+    // The ring colour crosses over when the chosen candidate changes; its width follows.
+    val ring by animatedColor(if (state.chosen == index) colors.acc else colors.line, label = "candidateRing")
+    val ringWidth by animateDpAsState(if (state.chosen == index) 2.dp else 1.dp, CivilightTheme.motion.move(CivilightMotion.standard), label = "candidateRingWidth")
     Box(
         modifier
             .pressable(onClick = { onChoose(index) }, role = Role.RadioButton, onClickLabel = "${index + 1}")
             .clip(shape)
-            .insetOutline(if (state.chosen == index) colors.acc else colors.line, if (state.chosen == index) 2.dp else 1.dp, shape),
-    ) { WorldPreview(vm, input, state.format) }
+            .insetOutline(ring, ringWidth, shape),
+    ) { WorldPreview(vm, input, state.format, token = CivilightMotion.mapReroll) }
 }
 
 /** `후보 기록 N`: all candidates in a grid, newest last, and `새 후보`. */
@@ -254,8 +271,17 @@ private fun ColumnScope.HistoryContent(state: GenFlowState, vm: MapGenerateViewM
     SheetHeader(GenFlow.ui(state).historyLabel, onClose = onClose)
     SheetScrollBody {
         CivilightButton(MapCopy.BTN_NEW_CANDIDATES, onNew, Modifier.padding(vertical = 10.dp), variant = ButtonVariant.COMPACT_GHOST, icon = IconId.Dice)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            state.history.indices.forEach { i -> Candidate(state, vm, i, Modifier.size(150.dp, 104.dp), onChoose) }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // The tiles span the sheet width to both margins (QA 7), the leftover going between the columns.
+            val columns = GridFill.columns(maxWidth.value, 150f)
+            val gap = GridFill.gap(maxWidth.value, 150f, columns).dp
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                GridFill.rows(state.history.indices.toList(), columns).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                        row.forEach { i -> Candidate(state, vm, i, Modifier.size(150.dp, 104.dp), onChoose) }
+                    }
+                }
+            }
         }
     }
 }

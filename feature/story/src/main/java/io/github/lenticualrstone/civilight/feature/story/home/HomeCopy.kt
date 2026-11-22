@@ -17,6 +17,9 @@ object HomeCopy {
     const val SHORTCUT_WORLD = "세계"
     const val SHORTCUT_TIMELINE = "연표"
     const val SHORTCUT_CANVAS = "캔버스"
+    const val SHORTCUT_GALLERY = "갤러리"
+    const val SHORTCUT_PAGES = "페이지"
+    const val SHORTCUT_CHECKS = "점검 센터"
     const val SHORTCUT_SETTINGS = "설정"
 
     /** 만든 직후 (board `NewReady`, LIB-13 block): head `‹ 서재 · 새 프로젝트`, `바로 쓰기` + `쓰기`, `목록 닫기`. */

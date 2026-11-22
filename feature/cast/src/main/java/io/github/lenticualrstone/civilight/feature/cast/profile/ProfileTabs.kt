@@ -1,6 +1,25 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import io.github.lenticualrstone.civilight.designsystem.card.CardKind
+import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
+import io.github.lenticualrstone.civilight.designsystem.card.SnapCardRow
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.feature.cast.common.bleed
+import io.github.lenticualrstone.civilight.feature.cast.gallery.GallerySection
+import io.github.lenticualrstone.civilight.feature.cast.image.rememberSlotPainter
+import io.github.lenticualrstone.civilight.ui.gallery.GalleryCard
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +35,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.AddChip
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import io.github.lenticualrstone.civilight.designsystem.component.Avatar
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationDrafts
 import io.github.lenticualrstone.civilight.designsystem.component.AvatarSize
@@ -87,6 +110,12 @@ class RecordActions(
     val onRecorder: () -> Unit = {},
     /** `합치기` on the `◇ 같은 이름` row (CST-46): the merge sheet's picker. */
     val onSameNameMerge: () -> Unit = {},
+    /** `넣기` of the `갤러리 · N` section (GAL-01): the add sheet for this character. */
+    val onGalleryAdd: () -> Unit = {},
+    /** `전체 보기 ›` (GAL-01): the character's gallery screen. */
+    val onGalleryAll: () -> Unit = {},
+    /** A small gallery card (GAL-01): the gallery screen, in its remembered view, with that item picked. */
+    val onGalleryCard: (itemKey: Key) -> Unit = {},
 )
 
 /** A field row of the header table or the `항목` list with its planned row. */
@@ -108,14 +137,29 @@ fun FieldRowItem(doc: ProjectDoc, row: FieldRow, actions: RecordActions) {
     row.planned?.let { (point, value) -> PlannedRow(point, value) }
 }
 
-/** `개요` (CST-08): fixed rows and the `항목` list, `빈 항목 N · 보기 | + 항목`, then the `긴 글` sections. */
+/**
+ * `개요` (CST-08): fixed rows and the `항목` list, `빈 항목 N · 보기 | + 항목`, the gallery section (GAL-01),
+ * then the `긴 글` sections. [full] is the same record with every row `보기` can bring in, so a row that
+ * `보기` adds or removes folds in and out instead of jumping (P2); [state] says which rows show now.
+ */
 @Composable
-fun OverviewTab(doc: ProjectDoc, state: ProfileState, showEmpty: Boolean, actions: RecordActions, recorderLink: String? = null) {
+fun OverviewTab(
+    doc: ProjectDoc,
+    state: ProfileState,
+    full: ProfileState,
+    showEmpty: Boolean,
+    gallery: GallerySection,
+    inner: Boolean,
+    actions: RecordActions,
+    recorderLink: String? = null,
+) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    val shownFixed = remember(state) { state.fixedRows.mapTo(HashSet()) { it.field } }
+    val shownItems = remember(state) { state.overview.items.mapTo(HashSet()) { it.defKey } }
     Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
         // CST-46: `◇ 같은 이름 2 · 노아` with `합치기` (exact same name only).
-        state.sameName?.let { notice ->
+        FoldRevealValue(state.sameName) { notice ->
             ListRow(
                 notice,
                 compact = true,
@@ -123,28 +167,39 @@ fun OverviewTab(doc: ProjectDoc, state: ProfileState, showEmpty: Boolean, action
                 trailing = if (actions.editable) ({ TextAction(CastUiCopy.BTN_MERGE, actions.onSameNameMerge, color = colors.acc, style = type.label) }) else null,
             )
         }
-        for (row in state.fixedRows) {
-            RecordFieldRow(
-                label = row.label,
-                value = row.value,
-                since = row.since,
-                hasHistory = row.hasHistory,
-                onClick = { actions.onFixed(row.field) },
-                onHistory = if (row.field == FixedField.DISPLAY_NAME) actions.onDisplayNameHistory else null,
-            )
-            row.planned?.let { (point, value) -> PlannedRow(point, value) }
+        for (row in full.fixedRows) {
+            key(row.field) {
+                FoldReveal(showEmpty || row.field in shownFixed) {
+                    Column {
+                        RecordFieldRow(
+                            label = row.label,
+                            value = row.value,
+                            since = row.since,
+                            hasHistory = row.hasHistory,
+                            onClick = { actions.onFixed(row.field) },
+                            onHistory = if (row.field == FixedField.DISPLAY_NAME) actions.onDisplayNameHistory else null,
+                        )
+                        row.planned?.let { (point, value) -> PlannedRow(point, value) }
+                    }
+                }
+            }
         }
-        for (row in state.overview.items) FieldRowItem(doc, row, actions)
-        for (row in state.emptyLongRows) FieldRowItem(doc, row, actions)
+        for (row in full.overview.items) {
+            key(row.defKey) { FoldReveal(showEmpty || row.defKey in shownItems) { FieldRowItem(doc, row, actions) } }
+        }
+        for (row in full.emptyLongRows) {
+            key(row.defKey) { FoldReveal(showEmpty) { FieldRowItem(doc, row, actions) } }
+        }
         Row(Modifier.fillMaxWidth().topHairline(colors.line), verticalAlignment = Alignment.CenterVertically) {
             TextAction(state.emptyLabel, actions.onToggleEmpty, color = if (showEmpty) colors.acc else colors.ink3, style = type.small, modifier = Modifier.padding(start = 0.dp))
             Spacer(Modifier.weight(1f))
             if (actions.editable) TextAction(state.overview.addLabel, actions.onAddField, color = colors.ink2, style = type.label)
         }
+        GallerySectionView(gallery, inner, actions)
         // CST-49: `레코더 · 정리 안 됨 1 ›` right of the first section header (or on its own line without one).
-        if (recorderLink != null && state.overview.sections.isEmpty()) {
+        FoldRevealValue(recorderLink.takeIf { state.overview.sections.isEmpty() }) { link ->
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End) {
-                TextAction(recorderLink, actions.onRecorder, color = colors.acc, style = type.small)
+                TextAction(link, actions.onRecorder, color = colors.acc, style = type.small)
             }
         }
         state.overview.sections.forEachIndexed { index, section ->
@@ -160,6 +215,91 @@ fun OverviewTab(doc: ProjectDoc, state: ProfileState, showEmpty: Boolean, action
                 color = colors.ink,
             )
         }
+    }
+}
+
+/**
+ * `갤러리 · 8` (GAL-01; board `GalProfile`): `넣기` and `전체 보기 ›` in the header, then one snapping row of small
+ * gallery cards (132 × 176, pitch 146, at most 12; the shared `GalleryCard` without `⋯`). The row runs to the
+ * screen edge so the third card peeks. An empty gallery shows one outlined card instead and no `전체 보기 ›`.
+ * Tapping a card opens the gallery screen with that item picked; the screen reads its own remembered view.
+ */
+@Composable
+private fun GallerySectionView(section: GallerySection, inner: Boolean, actions: RecordActions) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    Column(Modifier.fillMaxWidth().padding(top = 22.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel(section.header, Modifier.weight(1f))
+            if (actions.editable) {
+                Row(
+                    Modifier.pressable(onClick = actions.onGalleryAdd, scaleOnPress = false, hitTarget = HitTarget.BUTTON, onClickLabel = CastUiCopy.BTN_INSERT).heightIn(min = 44.dp).padding(horizontal = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CivilightIcon(IconId.Plus, contentDescription = null, size = 16.dp, tint = colors.ink2)
+                    CivilightText(CastUiCopy.BTN_INSERT, type.label, color = colors.ink2, maxLines = 1)
+                }
+            }
+            if (section.showAll) TextAction(CastUiCopy.BTN_GALLERY_ALL, actions.onGalleryAll, color = colors.acc, style = type.label)
+        }
+        if (section.empty) {
+            if (actions.editable) EmptyGalleryCard(actions.onGalleryAdd)
+        } else {
+            val inset = CardMetrics.inset(inner)
+            Box(Modifier.fillMaxWidth().bleed(PROFILE_SIDE).padding(start = (PROFILE_SIDE.value - inset).coerceAtLeast(0f).dp)) {
+                SnapCardRow(
+                    items = section.cards,
+                    key = { it.itemKey },
+                    kind = CardKind.PORTRAIT_SMALL,
+                    inner = inner,
+                    showPager = false,
+                ) { card, imageModifier ->
+                    val painter = rememberSlotPainter(card.image)
+                    GalleryCard(
+                        title = card.title,
+                        meta = card.meta,
+                        chip = card.chip,
+                        inner = inner,
+                        onClick = { actions.onGalleryCard(card.itemKey) },
+                        modifier = Modifier.size(GALLERY_CARD_W, GALLERY_CARD_H),
+                    ) {
+                        if (painter != null) {
+                            Image(painter, contentDescription = null, modifier = imageModifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        } else {
+                            Box(Modifier.fillMaxSize().background(colors.tint))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The small cards of the section: 132 × 176 (3:4), pitch 146 on the cover. */
+private val GALLERY_CARD_W = 132.dp
+private val GALLERY_CARD_H = 176.dp
+
+/** The profile list's side padding; the gallery row runs past it. */
+internal val PROFILE_SIDE = 24.dp
+
+/** One outlined card (1.5 dp `edge`, `+` and `이미지 넣기`) for an empty gallery (GAL-25 look). */
+@Composable
+private fun EmptyGalleryCard(onAdd: () -> Unit) {
+    val colors = CivilightTheme.colors
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        Modifier
+            .padding(top = 6.dp)
+            .size(GALLERY_CARD_W, GALLERY_CARD_H)
+            .clip(shape)
+            .insetOutline(colors.edge, 1.5.dp, shape)
+            .pressable(onClick = onAdd, scaleOnPress = false, shape = shape, onClickLabel = CastUiCopy.GALLERY_EMPTY_ADD),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CivilightIcon(IconId.Plus, contentDescription = null, size = 28.dp, tint = colors.ink2)
+        CivilightText(CastUiCopy.GALLERY_EMPTY_ADD, CivilightTheme.type.small, Modifier.padding(top = 8.dp), color = colors.ink2, maxLines = 1)
     }
 }
 
@@ -209,7 +349,7 @@ private fun RelationBlockView(block: RelationBlock, onClick: (() -> Unit)?) {
             Avatar(block.partnerName, size = AvatarSize.List)
             Column(Modifier.weight(1f)) {
                 CivilightText(block.title, type.itemTitle, color = colors.ink, maxLines = 1)
-                CivilightText(block.sub, type.small, color = colors.ink3, maxLines = 2)
+                ValueSwap(block.sub, type.small, color = colors.ink3, maxLines = 2)
             }
             if (block.hasRecords) CivilightText(io.github.lenticualrstone.civilight.domain.cast.CastCopy.CHANGE_MARK, type.label, color = colors.acc)
         }
@@ -219,10 +359,10 @@ private fun RelationBlockView(block: RelationBlock, onClick: (() -> Unit)?) {
                 for (step in block.steps) {
                     val ink = if (step.status == StepStatus.IN_EFFECT) colors.ink else colors.ink3
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        CivilightText(step.point, type.number.merge(TextStyle(fontSize = 11.sp)), Modifier.width(36.dp), color = ink, maxLines = 1)
+                        ValueSwap(step.point, type.number.merge(TextStyle(fontSize = 11.sp)), Modifier.width(36.dp), color = ink, maxLines = 1)
                         val body = step.text.removePrefix("${step.point} · ").removePrefix(step.point)
                         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            CivilightText(body, stepStyle, Modifier.weight(1f, fill = false), color = ink)
+                            ValueSwap(body, stepStyle, Modifier.weight(1f, fill = false), color = ink, maxLines = Int.MAX_VALUE)
                             step.statusLabel?.let { CivilightText(CastUiCopy.stepStatus(it), stepStyle, color = colors.acc, maxLines = 1) }
                         }
                     }
@@ -338,38 +478,7 @@ fun GameTextTab(
     Column(Modifier.fillMaxWidth().padding(top = 22.dp)) {
         SectionLabel(progressTitle, trailing = orderLabel, trailingAccent = false)
         ProgressBar(progress, Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp))
-        for (line in lines) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .topHairline(colors.line)
-                    .then(if (actions.editable) Modifier.pressable(onClick = { actions.onVoiceLine(line.key) }, scaleOnPress = false, onClickLabel = line.title) else Modifier)
-                    .padding(vertical = 12.dp),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    CivilightText(line.number, type.number.merge(TextStyle(fontSize = 11.sp)), color = colors.ink3)
-                    CivilightText(line.title, type.label, Modifier.weight(1f), color = colors.ink, maxLines = 1)
-                    val stateColor = when (line.state) {
-                        VoiceLineState.DONE -> colors.ink2
-                        VoiceLineState.WRITING -> colors.acc
-                        VoiceLineState.EMPTY -> colors.ink3
-                    }
-                    val toggles = actions.editable && line.state != VoiceLineState.EMPTY
-                    CivilightText(
-                        line.state.label,
-                        type.small,
-                        if (toggles) {
-                            Modifier.pressable(onClick = { actions.onToggleVoice(line.key, line.state.label) }, role = Role.Button, hitTarget = HitTarget.CHIP, scaleOnPress = false, onClickLabel = line.state.label)
-                        } else {
-                            Modifier
-                        },
-                        color = stateColor,
-                        maxLines = 1,
-                    )
-                }
-                CivilightText(line.text, type.body, Modifier.padding(top = 4.dp), color = if (line.state == VoiceLineState.EMPTY) colors.ink3 else colors.ink)
-            }
-        }
+        for (line in lines) key(line.key) { VoiceLineRowView(line, actions) }
         SectionLabel(
             archiveTitle,
             Modifier.padding(top = 22.dp, bottom = 6.dp),
@@ -399,5 +508,45 @@ fun SecretTab(doc: ProjectDoc, rows: List<FieldRow>, body: String, actions: Reco
         } else if (actions.editable) {
             CivilightText(CastUiCopy.EMPTY_VALUE, type.body, Modifier.fillMaxWidth().heightIn(min = 44.dp).then(edit), color = colors.ink3)
         }
+    }
+}
+
+/** One voice line: number, title, its state word (tap to switch) and the text. The state colour fades (P4). */
+@Composable
+private fun VoiceLineRowView(line: VoiceLineRow, actions: RecordActions) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val target = when (line.state) {
+        VoiceLineState.DONE -> colors.ink2
+        VoiceLineState.WRITING -> colors.acc
+        VoiceLineState.EMPTY -> colors.ink3
+    }
+    val stateColor by animatedColor(target, label = "voiceState")
+    val textColor by animatedColor(if (line.state == VoiceLineState.EMPTY) colors.ink3 else colors.ink, label = "voiceText")
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .topHairline(colors.line)
+            .then(if (actions.editable) Modifier.pressable(onClick = { actions.onVoiceLine(line.key) }, scaleOnPress = false, onClickLabel = line.title) else Modifier)
+            .padding(vertical = 12.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            CivilightText(line.number, type.number.merge(TextStyle(fontSize = 11.sp)), color = colors.ink3)
+            CivilightText(line.title, type.label, Modifier.weight(1f), color = colors.ink, maxLines = 1)
+            val toggles = actions.editable && line.state != VoiceLineState.EMPTY
+            ValueSwap(
+                line.state.label,
+                type.small,
+                if (toggles) {
+                    Modifier.pressable(onClick = { actions.onToggleVoice(line.key, line.state.label) }, role = Role.Button, hitTarget = HitTarget.CHIP, scaleOnPress = false, onClickLabel = line.state.label)
+                } else {
+                    Modifier
+                },
+                color = stateColor,
+                maxLines = 1,
+                contentAlignment = Alignment.CenterEnd,
+            )
+        }
+        CivilightText(line.text, type.body, Modifier.padding(top = 4.dp), color = textColor)
     }
 }

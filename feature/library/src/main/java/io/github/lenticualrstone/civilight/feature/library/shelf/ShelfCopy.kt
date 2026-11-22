@@ -31,6 +31,6 @@ object ShelfCopy {
     const val NAME_LABEL = "이름"
     const val RENAME_CONFIRM = "바꾸기"
 
-    /** Accessible label of a row's ⋯ button; the boards draw only the icon. */
-    const val TODO_COPY_LIB02_MORE_LABEL = "TODO_COPY_LIB02_MORE_LABEL"
+    /** Accessible label of a row's or card's ⋯ button (the boards draw only the icon); the word the gallery card uses (55 GAL-07). */
+    const val MORE_LABEL = "메뉴"
 }

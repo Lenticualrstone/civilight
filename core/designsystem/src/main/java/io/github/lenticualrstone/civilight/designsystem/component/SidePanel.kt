@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.animation.AnimatedVisibility
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,6 +70,36 @@ fun SidePanel(
             }
         }
     }
+}
+
+/**
+ * Shows a [SidePanel] (or any second pane) while [visible]: it comes in 48 dp from the right on `foldOpen`
+ * and fades out on `foldClose` (CNV-34, S8); reduced motion: fades. The content stays composed while it
+ * leaves; keep nullable data with `rememberLastNonNull`.
+ */
+@Composable
+fun SidePanelHost(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val motion = LocalMotion.current
+    AnimatedVisibility(visible, modifier, enter = motion.panelEnter(), exit = motion.panelExit(), label = "sidePanel") {
+        content()
+    }
+}
+
+/**
+ * The body of a tab set (sheet tabs, side panel tabs, S18c): a change of [selectedIndex] crossfades the body
+ * and its height follows on `standard`; reduced: crossfade, height snaps.
+ */
+@Composable
+fun TabContent(
+    selectedIndex: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable (index: Int) -> Unit,
+) {
+    ContentSwap(selectedIndex, modifier, label = "tabContent") { i -> content(i) }
 }
 
 /** A card inside a panel: `tint` fill, radius 14, padding 14. */

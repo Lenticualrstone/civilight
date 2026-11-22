@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.world.common
 
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -175,7 +176,7 @@ fun SheetScope.MergeSheetContent(key: MergeSheet, doc: ProjectDoc, vm: WorldView
     SheetHeader(title = ui.title, onClose = ::close, subtitle = ui.sub, closeLabel = WorldCopy.BTN_CANCEL)
     SheetScrollBody {
         SectionLabel(ui.refsLine, Modifier.padding(top = 14.dp))
-        if (ui.refsParts.isNotEmpty()) CivilightText(ui.refsParts, type.small, Modifier.padding(top = 2.dp), color = colors.ink3)
+        FoldRevealValue(ui.refsParts.takeIf { it.isNotEmpty() }) { parts -> CivilightText(parts, type.small, Modifier.padding(top = 2.dp), color = colors.ink3) }
         ui.conflictsLine?.let { line ->
             SectionLabel(line, Modifier.padding(top = 16.dp, bottom = 2.dp))
             (ui.conflicts + listOfNotNull(ui.reveal)).forEach { row ->
@@ -204,8 +205,8 @@ fun SheetScope.MergeSheetContent(key: MergeSheet, doc: ProjectDoc, vm: WorldView
                 }
             }
         }
-        ui.routeEnds?.let { CivilightText(it, type.small, Modifier.padding(top = 12.dp), color = colors.ink2) }
-        ui.filledLine?.let { CivilightText(it, type.small, Modifier.padding(top = 8.dp), color = colors.ink2) }
+        FoldRevealValue(ui.routeEnds) { line -> CivilightText(line, type.small, Modifier.padding(top = 12.dp), color = colors.ink2) }
+        FoldRevealValue(ui.filledLine) { line -> CivilightText(line, type.small, Modifier.padding(top = 8.dp), color = colors.ink2) }
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.Start) {
             CivilightText(ui.footer, type.small, color = colors.ink3)
         }

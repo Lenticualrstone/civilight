@@ -8,6 +8,7 @@ package io.github.lenticualrstone.civilight.domain.library.format
 object FeatureNames {
     private val names: Map<String, String> = mapOf(
         "maps.gen.v2" to "지도 생성 2판",
+        "gallery" to "갤러리",
     )
 
     fun korean(id: String): String = names[id] ?: id

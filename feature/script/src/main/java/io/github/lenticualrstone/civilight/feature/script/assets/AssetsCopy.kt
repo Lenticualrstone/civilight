@@ -48,7 +48,7 @@ object AssetsCopy {
     const val NOTHING_FOUND = "결과 없음"
 
     /** The list of a project without assets (SCR-61 gives no copy). */
-    const val NO_ASSETS = "TODO_COPY_SCRIPT_ASSETS_EMPTY"
+    const val NO_ASSETS = "비어 있음"
 
     val all: List<String> = listOf(
         TITLE, SEARCH_HINT, ADD_TITLE, ADD_FOR_CUE, FIELD_KIND, FIELD_NAME, FIELD_FILE, FIELD_IMAGE, FIELD_LENGTH,

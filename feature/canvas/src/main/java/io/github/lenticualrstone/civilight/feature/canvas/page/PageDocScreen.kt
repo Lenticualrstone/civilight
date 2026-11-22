@@ -36,6 +36,12 @@ import io.github.lenticualrstone.civilight.designsystem.component.LockRow
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberUnhide
+import io.github.lenticualrstone.civilight.designsystem.theme.unhide
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.domain.recorder.put.SourceMarkTarget
 import io.github.lenticualrstone.civilight.domain.trash.ItemKind
@@ -132,7 +138,7 @@ fun PageDocScreen(route: PageDoc, deps: FeatureDeps) {
         smallLine = PageCopy.SMALL_LINE,
         back = IconAction(PageCopy.BACK) { if (editing) stopEditing() else deps.navigator.pop() },
         actions = {
-            if (view != null && view.access == PageAccess.OPEN) {
+            FoldReveal(view != null && view.access == PageAccess.OPEN, horizontal = true) {
                 CivilightIconButton(IconId.More, PageCopy.MENU, { sheets.open(PageMenuSheet(route.projectKey, route.pageKey)) })
             }
         },
@@ -165,9 +171,11 @@ fun PageDocScreen(route: PageDoc, deps: FeatureDeps) {
         localSheets = { key -> ready?.let { pageSheet(key, it.doc, view, vm, deps, gate, sheets, caret, readOnlyToast, startEditing) { bodyVersion++ } } },
     ) { padding ->
         CenterColumn {
-            when {
-                ready == null || view == null -> Unit
-                else -> PageContent(route, deps, vm, ready.doc, view, gate, padding, editing, bodyVersion, startEditing, sheets, caret)
+            // Loading and the page crossfade (audit §4 canvas 8, P3).
+            ContentSwap(ready != null && view != null, Modifier.fillMaxSize(), label = "pageDocBody") { loaded ->
+                if (loaded && ready != null && view != null) {
+                    PageContent(route, deps, vm, ready.doc, view, gate, padding, editing, bodyVersion, startEditing, sheets, caret)
+                }
             }
         }
     }
@@ -190,6 +198,8 @@ private fun PageContent(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    // A hidden page that was just unlocked comes in through the unhide (CNV-43, P5); an open page starts clear.
+    val unhide = rememberUnhide(view.access == PageAccess.OPEN)
     val onLink: (PageLink) -> Unit = { link ->
         when (link.state) {
             LinkState.LIVE -> link.route?.let(deps.navigator::push)
@@ -207,34 +217,37 @@ private fun PageContent(
     LazyColumn(Modifier.fillMaxSize(), contentPadding = content) {
         view.headerImage?.let { use ->
             item(key = "header") {
-                Box(Modifier.fillMaxWidth().aspectRatio(21f / 9f).clip(RoundedCornerShape(14.dp))) {
+                Box(civilightItem().unhide(unhide).fillMaxWidth().aspectRatio(21f / 9f).clip(RoundedCornerShape(14.dp))) {
                     SlotImage(use, Ratio.R21X9, view.shownName, onPick = null, contentDescription = PageCopy.BTN_HEADER_IMAGE)
                 }
             }
         }
         when (view.access) {
             PageAccess.HIDDEN_LOCKED -> item(key = "lock") {
-                LockRow(title = PageCopy.HIDDEN_ITEM, actionLabel = PageCopy.BTN_UNLOCK, onAction = gate.unlock)
+                LockRow(title = PageCopy.HIDDEN_ITEM, actionLabel = PageCopy.BTN_UNLOCK, onAction = gate.unlock, modifier = civilightItem())
             }
             PageAccess.GONE -> item(key = "gone") {
                 val name = doc.pages[route.pageKey]?.name?.ifBlank { PageCopy.UNNAMED } ?: PageCopy.UNNAMED
-                EmptyBlock(title = TrashCopy.deletedLabel(ItemKind.PAGE, name))
+                EmptyBlock(title = TrashCopy.deletedLabel(ItemKind.PAGE, name), modifier = civilightItem())
             }
             PageAccess.OPEN -> {
                 item(key = "head") {
-                    Column(Modifier.padding(top = if (view.headerImage != null) 18.dp else 0.dp)) {
+                    Column(civilightItem().unhide(unhide).padding(top = if (view.headerImage != null) 18.dp else 0.dp)) {
                         CivilightText(view.sectionLine, type.sec, color = colors.ink3)
-                        if (editing) NameField(route.pageKey, view.name, vm, bodyVersion)
-                        else CivilightText(view.shownName, type.pageTitle.merge(NameStyle), Modifier.padding(top = 8.dp), color = colors.ink)
+                        // Name: shown ↔ field crossfade in place; the typed line itself never moves.
+                        ContentSwap(editing, Modifier.fillMaxWidth(), label = "pageName") { e ->
+                            if (e) NameField(route.pageKey, view.name, vm, bodyVersion)
+                            else CivilightText(view.shownName, type.pageTitle.merge(NameStyle), Modifier.padding(top = 8.dp), color = colors.ink)
+                        }
                         CivilightText(view.meta, type.small, Modifier.padding(top = 6.dp), color = colors.ink3)
-                        view.sourceMark?.let { mark -> SourceMarkLine(mark, deps) }
+                        FoldRevealValue(view.sourceMark) { mark -> SourceMarkLine(mark, deps) }
                     }
                 }
                 if (editing) {
-                    item(key = "editor-$bodyVersion") { PageEditor(route, doc, vm, gate, sheets, bodyVersion, caret) }
+                    item(key = "editor-$bodyVersion") { Box(civilightItem()) { PageEditor(route, doc, vm, gate, sheets, bodyVersion, caret) } }
                 } else {
                     itemsIndexed(view.paragraphs, key = { _, p -> p.key }) { i, p ->
-                        PageBlockText(p, first = i == 0, onLink = onLink, onText = startEditing)
+                        PageBlockText(p, first = i == 0, onLink = onLink, onText = startEditing, modifier = civilightItem().unhide(unhide))
                     }
                 }
             }
@@ -270,7 +283,7 @@ private fun NameField(pageKey: Key, initial: String, vm: PageDocViewModel, sessi
         modifier = Modifier.padding(top = 8.dp).fillMaxWidth(),
         decorationBox = { inner ->
             Box {
-                if (name.isEmpty()) CivilightText(PageCopy.TODO_COPY_CANVAS_PAGE_NAME_PLACEHOLDER, style, color = colors.ink3, maxLines = 1)
+                if (name.isEmpty()) CivilightText(PageCopy.UNNAMED, style, color = colors.ink3, maxLines = 1)
                 inner()
             }
         },
@@ -297,7 +310,7 @@ private fun PageEditor(route: PageDoc, doc: ProjectDoc, vm: PageDocViewModel, ga
     RichTextEditor(
         state = state,
         projectKey = route.projectKey,
-        linkPickerTitle = PageCopy.TODO_COPY_CANVAS_LINK_PICKER_TITLE,
+        linkPickerTitle = PageCopy.LINK_PICKER_TITLE,
         openSheet = sheets::open,
         modifier = Modifier.padding(top = 18.dp),
         minHeight = 240.dp,
@@ -424,7 +437,7 @@ private fun pageSheet(
                 LinkPickerSheet(
                     doc = doc,
                     gate = gate,
-                    title = PageCopy.TODO_COPY_CANVAS_LINK_PICKER_TITLE,
+                    title = PageCopy.LINK_PICKER_TITLE,
                     onPick = { kind, target, text ->
                         val targetKind = LinkPick(kind, target, text).targetKind
                         if (targetKind != null) vm.relink(key.pageKey, key.linkKey, targetKind, target, text, done)

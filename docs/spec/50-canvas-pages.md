@@ -524,6 +524,18 @@ Rule: `만지던 것은 제자리, 나머지가 비켜 선다`.
 
 *Sources:* main tab 접기 · 펼치기, 범위 table; `FoldSpec`; research §4 (자세 판단).
 
+#### CNV-47 · 펼친 화면 비율 (two-pane ratio handle) — P1 · needsExternal: no
+User request 2026-11-23. Inner screen only (Medium/Expanded); the cover screen and `가운데 한 칸` have no handle.
+- **Where**: every two-pane layout: the `목록 + 상세` frames of CNV-33 (서재 · 홈 · 인물 · 세계 · 연표 · 레코더 기록함 · 점검 센터), the gallery's list + detail (GAL-23) and the script's manuscript + side panel (SCR-03). Ratios read left : right (`1:2` = left pane one third).
+- **Handle**: a visible grip centred on the 1 dp `line` divider `[PROPOSED]` look: pill 4 × 32 dp in `ink3`, 44 dp hit target, pressed `acc`. Content description `화면 비율` `[PROPOSED]`. Nothing else on the divider reacts to touch, and no other gesture changes the ratio (no hidden gestures).
+- **Drag**: dragging the handle resizes both panes live (the drag shows the finger position directly, as `StepSlider` does); on release the split settles to the nearest of `1:2` · `1:1` · `2:1` with `motion.move(standard)` from the shared motion helpers (`docs/status/motion-audit.md`), and the haptic tick on settle (as `SnapCardRow`). Reduce motion (CNV-46) or animator scale 0: it snaps at once; the tick stays.
+- **Tap**: opens a small popover anchored to the handle with four real buttons `1:2` · `1:1` · `2:1` · `기본` (the current one shown selected, accessibility selected state). A button applies at once (same settle motion) and closes the popover. `기본` returns to the module's own layout (CNV-33 390 | 409, script 488 | 288).
+- **Minimum width**: each pane keeps at least 280 dp. When the window cannot fit two minimums, the module keeps today's layout and shows no handle. `[PROPOSED]`: a chosen ratio that would push a pane below 280 dp is clamped to 280 dp for the current window while the stored choice is kept.
+- **Remembered** per module in app settings (`AppSettings.paneSplit`: module id → `oneTwo` · `oneOne` · `twoOne`; `기본` removes the entry), so it survives restarts and fold/unfold (CNV-34, CNV-35). Never in `.civilight`. Module ids: `PaneSplit.Modules` (`library`, `home`, `cast`, `world`, `timeline`, `recorder`, `checks`, `gallery`, `scriptPanel`), one per `ListDetailPairs` list module plus the gallery and the script panel.
+- **Owners**: the shared frames in `core:ui` (`window/AdaptiveFrames.kt`, `nav/SceneStrategies.kt`) draw the handle and popover for every list module (`window/PaneSplitFrame.kt` `SplitPanes`, rules in `PaneSplitRules`); `feature:script` uses the same part (`rememberPaneSplitState` + `PaneSplitHandle`) for its side panel, and the gallery's list + detail uses `SplitPanes`. Data and setter: `core:model` `PaneSplit`, `core:store` `SettingsStore.setPaneSplit` (done 2026-11-23).
+
+*Sources:* user request 2026-11-23; CNV-32, CNV-33, CNV-37, CNV-46; Q-LY-01 (the default stays each module's own split); memory (no guessing, no hidden gestures).
+
 ### F. Motion (모션)
 
 #### CNV-37 · 모션 토큰 · 등록표 · 줄이기 (motion tokens, registry, reduce) — P1 · needsExternal: no

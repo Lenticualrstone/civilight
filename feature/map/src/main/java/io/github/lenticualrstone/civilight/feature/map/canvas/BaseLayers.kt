@@ -4,7 +4,14 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
 import android.graphics.Rect
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberCoroutineScope
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -85,6 +93,11 @@ private fun ImageBase(base: MapBase.Image, math: ViewportMath, viewport: Viewpor
         overview = withContext(Dispatchers.IO) { decodeOverview(blobs, base.hash) }
     }
     val ov = overview
+    // The picture fades in over the placeholder when it is decoded; each sharper tile fades in over what is under it (row 9).
+    val motion = CivilightTheme.motion
+    val overviewAlpha by animatedFraction(ov != null, label = "baseImage")
+    val fades = remember(base.hash) { mutableStateMapOf<Tile, Animatable<Float, AnimationVector1D>>() }
+    val fadeScope = rememberCoroutineScope()
     val plan = ov?.takeIf { TilePlan.needsTiling(it.width, it.height) }?.let { o ->
         val r = math.visibleRect(viewport)
         val screenPerImagePx = math.contentW(viewport) / o.width
@@ -112,6 +125,12 @@ private fun ImageBase(base: MapBase.Image, math: ViewportMath, viewport: Viewpor
                 decoder.recycle()
             }
         }
+        for (t in missing) {
+            if (tiles[t] == null || fades.containsKey(t)) continue
+            val a = Animatable(0f)
+            fades[t] = a
+            fadeScope.launch { a.animateTo(1f, motion.spec(CivilightMotion.standard)) }
+        }
         tick++
     }
     val fallback = CivilightTheme.colors.tint
@@ -124,10 +143,12 @@ private fun ImageBase(base: MapBase.Image, math: ViewportMath, viewport: Viewpor
             drawRect(fallback, Offset(tl.x, tl.y), Size(w, h))
             return@Canvas
         }
+        drawRect(fallback, Offset(tl.x, tl.y), Size(w, h), alpha = 1f - overviewAlpha)
         drawImage(
             ov.bitmap,
             dstOffset = IntOffset(tl.x.roundToInt(), tl.y.roundToInt()),
             dstSize = IntSize(w.roundToInt().coerceAtLeast(1), h.roundToInt().coerceAtLeast(1)),
+            alpha = overviewAlpha,
             filterQuality = FilterQuality.Medium,
         )
         for (t in plan) {
@@ -138,6 +159,7 @@ private fun ImageBase(base: MapBase.Image, math: ViewportMath, viewport: Viewpor
                 bmp,
                 dstOffset = IntOffset(a.x.roundToInt(), a.y.roundToInt()),
                 dstSize = IntSize((b.x - a.x).roundToInt().coerceAtLeast(1), (b.y - a.y).roundToInt().coerceAtLeast(1)),
+                alpha = (fades[t]?.value ?: 1f) * overviewAlpha,
                 filterQuality = FilterQuality.Medium,
             )
         }
@@ -173,6 +195,14 @@ private class TileCache(private val max: Int = 48) {
 }
 
 // --- Generated bases (WLD-53 results, WLD-57 styles, WLD-58 hex, WLD-59 polygons) ---
+
+/** The running colour spread of painted hex cells: what each changed cell was, when it starts, and the run's progress. */
+private class HexSpreadState {
+    var previous: List<io.github.lenticualrstone.civilight.model.map.Terrain?>? = null
+    var from: List<io.github.lenticualrstone.civilight.model.map.Terrain?>? = null
+    var starts: Map<Int, Float> by mutableStateOf(emptyMap())
+    val progress = Animatable(1f)
+}
 
 /** The theme colours of a generated base. */
 @Composable
@@ -217,6 +247,29 @@ private fun GeneratedBase(base: MapBase.Generated, math: ViewportMath, viewport:
         }
     }
     val lines = remember(base, palette) { baseLines(base, palette) }
+    // The picture of a generated base fades in over the placeholder when it is ready.
+    val rasterAlpha by animatedFraction(raster != null, label = "baseRaster")
+    // Painted hex cells change colour together within one run, a cell starting later the further it is from the change.
+    val hexGrid = base.hex?.takeIf { it.cells.isNotEmpty() }
+    val terrains = remember(hexGrid) { hexGrid?.let { g -> List(g.rows * g.cols) { i -> HexMaps.terrainAt(g, i) } } }
+    val spread = remember { HexSpreadState() }
+    val spreadMotion = CivilightTheme.motion
+    LaunchedEffect(terrains) {
+        val grid = hexGrid
+        val now = terrains
+        val before = spread.previous
+        spread.previous = now
+        if (grid != null && now != null && before != null) {
+            val changed = HexSpread.changed(before, now)
+            if (changed.isNotEmpty()) {
+                spread.from = before
+                spread.starts = HexSpread.starts(changed, changed.map { HexMaps.center(grid, HexMaps.cellOf(grid, it)) })
+                spread.progress.snapTo(0f)
+                spread.progress.animateTo(1f, spreadMotion.move(CivilightMotion.standard))
+                spread.starts = emptyMap()
+            }
+        }
+    }
     val colors = CivilightTheme.colors
     val measurer = rememberTextMeasurer()
     val coordStyle = CivilightTheme.type.number.merge(TextStyle(fontSize = 9.sp, color = colors.ink.copy(alpha = 0.7f)))
@@ -227,13 +280,17 @@ private fun GeneratedBase(base: MapBase.Generated, math: ViewportMath, viewport:
         val hex = base.hex
         val bmp = raster
         when {
-            hex != null && hex.cells.isNotEmpty() -> drawHexCells(hex, math, viewport, measurer, coordStyle)
-            bmp != null -> drawImage(
-                bmp,
-                dstOffset = IntOffset(tl.x.roundToInt(), tl.y.roundToInt()),
-                dstSize = IntSize(w.roundToInt().coerceAtLeast(1), h.roundToInt().coerceAtLeast(1)),
-                filterQuality = FilterQuality.Medium,
-            )
+            hex != null && hex.cells.isNotEmpty() -> drawHexCells(hex, math, viewport, measurer, coordStyle, spread)
+            bmp != null -> {
+                if (rasterAlpha < 1f) drawRect(colors.tint, Offset(tl.x, tl.y), Size(w, h), alpha = 1f - rasterAlpha)
+                drawImage(
+                    bmp,
+                    dstOffset = IntOffset(tl.x.roundToInt(), tl.y.roundToInt()),
+                    dstSize = IntSize(w.roundToInt().coerceAtLeast(1), h.roundToInt().coerceAtLeast(1)),
+                    alpha = rasterAlpha,
+                    filterQuality = FilterQuality.Medium,
+                )
+            }
             else -> drawRect(colors.tint, Offset(tl.x, tl.y), Size(w, h))
         }
         val dash = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx()))
@@ -259,7 +316,7 @@ private fun DrawScope.drawGenLine(points: List<GenPoint>, math: ViewportMath, vi
  * a peak for 산 · 봉우리, a hump for 언덕, a dot cluster for 숲) and the coordinates every
  * `좌표 표시` cells (WLD-58).
  */
-private fun DrawScope.drawHexCells(grid: HexGrid, math: ViewportMath, viewport: Viewport, measurer: TextMeasurer, coordStyle: TextStyle) {
+private fun DrawScope.drawHexCells(grid: HexGrid, math: ViewportMath, viewport: Viewport, measurer: TextMeasurer, coordStyle: TextStyle, spread: HexSpreadState) {
     val (rx, ry) = MapBases.hexRadius(grid)
     val flat = grid.orientation.known == HexOrientation.FLAT
     val start = if (flat) 0.0 else Math.PI / 6
@@ -277,7 +334,10 @@ private fun DrawScope.drawHexCells(grid: HexGrid, math: ViewportMath, viewport: 
             if (k == 0) path.moveTo(s.x, s.y) else path.lineTo(s.x, s.y)
         }
         path.close()
-        drawPath(path, FixedColors.terrain.getValue(MapColors.dsTerrain(terrain)))
+        val fill = FixedColors.terrain.getValue(MapColors.dsTerrain(terrain))
+        val start = spread.starts[i]
+        val old = if (start == null) null else spread.from?.getOrNull(i)
+        drawPath(path, if (start == null || old == null) fill else lerp(FixedColors.terrain.getValue(MapColors.dsTerrain(old)), fill, HexSpread.local(spread.progress.value, start)))
         drawPath(path, edge, style = Stroke(0.75.dp.toPx()))
         val sc = math.toScreen(viewport, c)
         if (cellPx >= 10.dp.toPx()) {

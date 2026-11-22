@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.cast.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,26 +10,31 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.BottomGlassBar
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
-import io.github.lenticualrstone.civilight.designsystem.component.GlassPill
 import io.github.lenticualrstone.civilight.designsystem.component.GlassRoundButton
 import io.github.lenticualrstone.civilight.designsystem.component.GlassScaffold
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.LensChip
-import io.github.lenticualrstone.civilight.designsystem.component.LensChipState
 import io.github.lenticualrstone.civilight.designsystem.component.ToastHost
 import io.github.lenticualrstone.civilight.designsystem.component.TopGlassBar
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
+import io.github.lenticualrstone.civilight.designsystem.glass.SCRIM_ALPHA
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.ui.lens.LensChipLabel
 import io.github.lenticualrstone.civilight.ui.scaffold.LocalSheets
@@ -74,30 +80,45 @@ fun RecordFrame(
         val wide = LocalWindowLayout.current.isInner
         GlassScaffold(
             topBar = {
-                if (collapsed) {
-                    TopGlassBar(collapsedTitle, smallLine = collapsedSmallLine, back = back, wide = wide) {
-                        LensChip(lens.text, lens.state, onLens)
-                        if (add != null) CivilightIconButton(IconId.Plus, add.label, add.onClick, tint = CivilightTheme.colors.ink)
-                        if (menu != null) CivilightIconButton(IconId.More, menu.label, menu.onClick, tint = CivilightTheme.colors.ink)
-                    }
-                } else {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(WindowInsets.statusBars.asPaddingValues())
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (back != null) GlassRoundButton(IconId.Back, back.label, back.onClick)
-                        Spacer(Modifier.weight(1f))
-                        val colors = CivilightTheme.colors
-                        GlassPill(lens.text, onLens, textColor = if (lens.state == LensChipState.PAST) colors.acc else colors.ink)
-                        if (add != null) GlassRoundButton(IconId.Plus, add.label, add.onClick, Modifier.padding(start = 8.dp))
-                        if (menu != null) GlassRoundButton(IconId.More, menu.label, menu.onClick, Modifier.padding(start = 8.dp))
+                // The floating buttons and the glass top bar swap in place (P3); both draw the lens as the shared `LensChip`.
+                ContentSwap(collapsed, label = "recordHeader") { bar ->
+                    if (bar) {
+                        TopGlassBar(collapsedTitle, smallLine = collapsedSmallLine, back = back, wide = wide) {
+                            LensChip(lens.text, lens.state, onLens)
+                            if (add != null) CivilightIconButton(IconId.Plus, add.label, add.onClick, tint = CivilightTheme.colors.ink)
+                            if (menu != null) CivilightIconButton(IconId.More, menu.label, menu.onClick, tint = CivilightTheme.colors.ink)
+                        }
+                    } else {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(WindowInsets.statusBars.asPaddingValues())
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (back != null) GlassRoundButton(IconId.Back, back.label, back.onClick)
+                            Spacer(Modifier.weight(1f))
+                            GlassLens(lens, onLens)
+                            if (add != null) GlassRoundButton(IconId.Plus, add.label, add.onClick, Modifier.padding(start = 8.dp))
+                            if (menu != null) GlassRoundButton(IconId.More, menu.label, menu.onClick, Modifier.padding(start = 8.dp))
+                        }
                     }
                 }
             },
-            bottomBar = { BottomGlassBar(extraRow = tabs) { commandBar() } },
+            // QA 13: the tabs sit in the see-through top of the bar's glass (the bar is opaque only over its lower
+            // 70 %), so page text scrolling under them showed through as a faint ghost behind a label. The tab row
+            // gets its own scrim until the bar's opaque part covers an extra row (see Requests).
+            bottomBar = {
+                BottomGlassBar(
+                    extraRow = {
+                        Row(
+                            Modifier.weight(1f).clip(RoundedCornerShape(22.dp)).background(CivilightTheme.colors.raise.copy(alpha = SCRIM_ALPHA)),
+                            verticalAlignment = Alignment.CenterVertically,
+                            content = tabs,
+                        )
+                    },
+                ) { commandBar() }
+            },
             overlay = { padding ->
                 Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding() + 6.dp), contentAlignment = Alignment.BottomCenter) {
                     ToastHost(message = toast?.text, actionLabel = toast?.actionLabel, onAction = toast?.onAction?.let { { toasts.act() } })
@@ -105,5 +126,18 @@ fun RecordFrame(
             },
             content = { padding -> content(PaddingValues(bottom = padding.calculateBottomPadding())) },
         )
+    }
+}
+
+/**
+ * The lens in the expanded header: the shared [LensChip] (value swap, sweep and outline, CNV-42) on a glass
+ * pill, so the glass top bar and the floating header animate the lens the same way.
+ */
+@Composable
+private fun GlassLens(lens: LensChipLabel, onLens: () -> Unit) {
+    val shape = RoundedCornerShape(22.dp)
+    Box(Modifier.heightIn(min = 44.dp), contentAlignment = Alignment.Center) {
+        GlassBackground(GlassSurface.CHIP, Modifier.matchParentSize(), shape = shape)
+        LensChip(lens.text, lens.state, onLens, Modifier.padding(horizontal = 6.dp))
     }
 }

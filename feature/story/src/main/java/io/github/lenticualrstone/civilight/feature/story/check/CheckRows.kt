@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.story.check
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,7 +25,9 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.domain.checks.CheckResult
 import io.github.lenticualrstone.civilight.domain.checks.FixAction
 import io.github.lenticualrstone.civilight.domain.checks.Highlight
@@ -44,12 +47,13 @@ fun CheckItemRow(
     onButton: (FixAction) -> Unit,
     nested: Boolean = false,
     selected: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val markerColor = if (result.marker == Marker.WARNING) colors.warn else colors.ink3
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .topHairline(colors.line, dashed = nested)
             .selectedRow(selected)
@@ -99,7 +103,11 @@ fun CheckGroupRow(title: String, warning: Boolean, expanded: Boolean, onToggle: 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CivilightText(title, CivilightTheme.type.label, Modifier.weight(1f), color = if (warning) colors.warn else colors.ink3, maxLines = 1)
-        CivilightIcon(if (expanded) IconId.Minus else IconId.Plus, contentDescription = null, size = 16.dp, tint = colors.ink3)
+        // Plus <-> Minus cross-fade on `standard` (motion audit, feature:story 2).
+        val spec = LocalMotion.current.spec<Float>(CivilightMotion.standard)
+        Crossfade(expanded, animationSpec = spec, label = "groupMark") { open ->
+            CivilightIcon(if (open) IconId.Minus else IconId.Plus, contentDescription = null, size = 16.dp, tint = colors.ink3)
+        }
     }
 }
 

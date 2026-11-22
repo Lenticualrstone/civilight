@@ -57,7 +57,7 @@ fun SheetScope.VoiceLineContent(sheet: VoiceLineSheet) {
         RichTextEditor(
             state = text,
             projectKey = sheet.projectKey,
-            linkPickerTitle = CastUiCopy.TODO_COPY_CAST_LINK_PICKER_TITLE,
+            linkPickerTitle = CastUiCopy.LINK_PICKER_TITLE,
             openSheet = host::open,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             enabled = !store.readOnly,

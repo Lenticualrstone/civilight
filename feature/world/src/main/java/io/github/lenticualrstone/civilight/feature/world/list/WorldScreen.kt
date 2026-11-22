@@ -1,5 +1,17 @@
 package io.github.lenticualrstone.civilight.feature.world.list
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import io.github.lenticualrstone.civilight.designsystem.card.CardViewMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -152,6 +164,9 @@ fun WorldScreen(route: World, deps: FeatureDeps) {
     }
 }
 
+/** One body of the list: the data of a [WorldView], kept per view so a leaving body keeps drawing its own tab. */
+private data class WorldBody(val view: WorldView, val items: List<WorldListItem>, val cardRows: List<WorldCardRowUi>, val pending: Boolean)
+
 @Composable
 private fun WorldList(
     ui: WorldListUi?,
@@ -171,48 +186,32 @@ private fun WorldList(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val reduced = CivilightTheme.reducedMotion
-    // WLD-68: cards grow in place only right after `목록 → 카드` on the same tab, for one motion.
-    val previousView = remember { mutableStateOf(tab to showCards) }
-    var switched by remember { mutableStateOf(false) }
-    LaunchedEffect(tab, showCards) {
-        val (lastTab, lastCards) = previousView.value
-        switched = lastTab == tab && !lastCards && showCards
-        previousView.value = tab to showCards
-        if (switched) {
-            kotlinx.coroutines.delay((ListCardMotion.ENTER_MS + ListCardMotion.EXIT_MS).toLong())
-            switched = false
-        }
+    val motion = CivilightTheme.motion
+    val inner = LocalWindowLayout.current.isInner
+    val view = WorldView(tab, showCards)
+    // Card view: the list's own lock and empty lines stay, the rows become horizontal card rows.
+    val body = remember(ui, cardRows, view) {
+        val all = ui?.items.orEmpty()
+        WorldBody(view, if (showCards) all.filter { it is WorldListItem.Lock || it is WorldListItem.Empty } else all, cardRows, ui?.candidatesPending == true)
     }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 24.dp,
-            end = 24.dp,
-            top = padding.calculateTopPadding(),
-            bottom = padding.calculateBottomPadding() + 24.dp,
-        ),
-    ) {
-        item(key = "segments") {
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding())) {
             SegmentedControl(
                 options = WorldSegment.labels,
                 selectedIndex = WorldSegment.of(tab).ordinal,
                 onSelect = { onSegment(WorldSegment.entries[it]) },
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
-        item(key = "hint") {
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (tab == io.github.lenticualrstone.civilight.navigation.WorldTab.TERMS) {
-                    TextAction(
-                        text = WorldCopy.TERM_HINT,
-                        onClick = onHint,
-                        modifier = Modifier.weight(1f),
-                        color = colors.ink3,
-                        style = type.small,
-                    )
-                } else {
-                    Box(Modifier.weight(1f))
+                Box(Modifier.weight(1f)) {
+                    FoldReveal(visible = tab == io.github.lenticualrstone.civilight.navigation.WorldTab.TERMS) {
+                        TextAction(
+                            text = WorldCopy.TERM_HINT,
+                            onClick = onHint,
+                            color = colors.ink3,
+                            style = type.small,
+                        )
+                    }
                 }
                 ViewToggle(
                     showCards = showCards,
@@ -223,40 +222,138 @@ private fun WorldList(
                 )
             }
         }
-        val items = ui?.items.orEmpty().let { all -> if (showCards) all.filter { it is WorldListItem.Lock || it is WorldListItem.Empty } else all }
-        if (showCards) {
-            items(cardRows, key = { it.id }) { row ->
-                Box(Modifier.animateItem(fadeInSpec = ListCardMotion.cardIn(reduced), placementSpec = null, fadeOutSpec = ListCardMotion.out(reduced))) {
-                    GrowIn(reduced, switched) { WorldCardRow(row, selectedKey, onCard) }
+        // WLD-05 / WLD-68: `목록 ↔ 카드` is the shared card-view motion, a change of tab a crossfade.
+        val bodyTransition = updateTransition(body, label = "worldBody")
+        bodyTransition.AnimatedContent(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            transitionSpec = { WorldViewSwitch.transition(initialState.view, targetState.view, motion) },
+            contentKey = { it.view },
+        ) { shown ->
+            // The cards grow in place only in the composition that brings them in (the `목록 → 카드` flip), and
+            // stop being "new" once the transition has settled, so a card scrolled in later does not grow.
+            val growStart = remember { WorldViewSwitch.growsIn(bodyTransition.currentState.view, bodyTransition.targetState.view, motion.reduced) }
+            var grows by remember { mutableStateOf(growStart) }
+            LaunchedEffect(Unit) {
+                if (growStart) {
+                    snapshotFlow { bodyTransition.currentState.view == shown.view }.first { it }
+                    grows = false
                 }
             }
-        }
-        itemsIndexed(items, key = { i, item -> if (item is WorldListItem.Row) item.id else "${item.id}@$i" }) { _, item ->
-            Box(Modifier.animateItem(fadeInSpec = ListCardMotion.listIn(reduced), placementSpec = null, fadeOutSpec = ListCardMotion.out(reduced))) {
-            when (item) {
-                is WorldListItem.Section -> SectionLabel(item.title, Modifier.padding(top = 18.dp, bottom = 6.dp))
-                is WorldListItem.Lock -> LockRow(
-                    title = item.text,
-                    actionLabel = WorldCopy.UNLOCK,
-                    onAction = onUnlock,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-                is WorldListItem.Empty -> EmptyBlock(
-                    title = item.line,
-                    modifier = Modifier.padding(top = 48.dp),
-                    primaryLabel = if (readOnly) null else item.button,
-                    onPrimary = if (readOnly) null else onCreate,
-                )
-                is WorldListItem.Row -> ListRow(
-                    title = item.title,
-                    subtitle = item.fragment.ifBlank { null },
-                    onClick = { onRow(item) },
-                    selected = item.key == selectedKey,
-                    trailing = { RightColumn(item, pending = ui?.candidatesPending == true) },
-                )
-            }
+            val bottom = padding.calculateBottomPadding() + 24.dp
+            if (shown.view.cards) {
+                CardRowsBody(shown, grows, bottom, selectedKey, inner, readOnly, onCard, onUnlock, onCreate)
+            } else {
+                RowsBody(shown, bottom, selectedKey, readOnly, onRow, onUnlock, onCreate)
             }
         }
+    }
+}
+
+@Composable
+private fun RowsBody(
+    body: WorldBody,
+    bottom: androidx.compose.ui.unit.Dp,
+    selectedKey: String?,
+    readOnly: Boolean,
+    onRow: (WorldListItem.Row) -> Unit,
+    onUnlock: () -> Unit,
+    onCreate: () -> Unit,
+) {
+    val keys = remember(body.items) { WorldViewSwitch.uniqueKeys(body.items.map { it.id }) }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = bottom),
+    ) {
+        itemsIndexed(body.items, key = { i, _ -> keys[i] }) { _, item ->
+            Box(civilightItem()) {
+                ListItemView(item, selectedKey, readOnly, body.pending, onRow, onUnlock, onCreate)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardRowsBody(
+    body: WorldBody,
+    grows: Boolean,
+    bottom: androidx.compose.ui.unit.Dp,
+    selectedKey: String?,
+    inner: Boolean,
+    readOnly: Boolean,
+    onCard: (WorldCardUi) -> Unit,
+    onUnlock: () -> Unit,
+    onCreate: () -> Unit,
+) {
+    val keys = remember(body.items) { WorldViewSwitch.uniqueKeys(body.items.map { it.id }) }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = bottom),
+    ) {
+        // Card rows keep the content inset of the shared row; the other lines get the list's 24 dp.
+        items(body.cardRows, key = { it.id }) { row ->
+            Box(civilightItem()) {
+                Box(Modifier.growIn(grows)) { WorldCardRow(row, selectedKey, inner, onCard) }
+            }
+        }
+        itemsIndexed(body.items, key = { i, _ -> keys[i] }) { _, item ->
+            Box(civilightItem().padding(horizontal = 24.dp)) {
+                ListItemView(item, selectedKey, readOnly, body.pending, onRow = {}, onUnlock, onCreate)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ListItemView(
+    item: WorldListItem,
+    selectedKey: String?,
+    readOnly: Boolean,
+    pending: Boolean,
+    onRow: (WorldListItem.Row) -> Unit,
+    onUnlock: () -> Unit,
+    onCreate: () -> Unit,
+) {
+    when (item) {
+        is WorldListItem.Section -> SectionLabel(item.title, Modifier.padding(top = 18.dp, bottom = 6.dp))
+        is WorldListItem.Lock -> LockRow(
+            title = item.text,
+            actionLabel = WorldCopy.UNLOCK,
+            onAction = onUnlock,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        is WorldListItem.Empty -> EmptyBlock(
+            title = item.line,
+            modifier = Modifier.padding(top = 48.dp),
+            primaryLabel = if (readOnly) null else item.button,
+            onPrimary = if (readOnly) null else onCreate,
+        )
+        is WorldListItem.Row -> ListRow(
+            title = item.title,
+            subtitle = item.fragment.ifBlank { null },
+            onClick = { onRow(item) },
+            selected = item.key == selectedKey,
+            trailing = { RightColumn(item, pending = pending) },
+        )
+    }
+}
+
+/**
+ * A card row that grows in place from its top-left corner (WLD-68, `CardViewMotion`): [grows] is true only for
+ * the rows composed by the `목록 → 카드` flip, so the start scale is set in the composition that brings the card
+ * in (never one frame later), and the grow waits for the list text to leave (the plan's text-in delay).
+ * Reduced motion and every other change: drawn at rest.
+ */
+@Composable
+private fun Modifier.growIn(grows: Boolean): Modifier {
+    val motion = CivilightTheme.motion
+    val scale = remember { Animatable(if (grows) WorldViewSwitch.GROW_FROM else 1f) }
+    LaunchedEffect(Unit) {
+        if (grows) scale.animateTo(1f, motion.move(CivilightMotion.enterLong, delayMs = CardViewMotion.plan(motion.reduced).textInDelayMs))
+    }
+    return graphicsLayer {
+        scaleX = scale.value
+        scaleY = scale.value
+        transformOrigin = TransformOrigin(0f, 0f)
     }
 }
 

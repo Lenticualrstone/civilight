@@ -5,6 +5,7 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.json.LowerCamelEnumSerializer
 import io.github.lenticualrstone.civilight.model.position.LensPoint
+import io.github.lenticualrstone.civilight.model.gallery.GalleryViewState
 import io.github.lenticualrstone.civilight.model.script.ScriptViewState
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -40,7 +41,19 @@ data class ProjectViewFile(
     val worldTab: String? = null,
     /** The canvas opened most recently (CNV-02 opens it); null = none yet or it is gone. Not written when null. */
     val lastCanvasKey: Key? = null,
-)
+    /**
+     * Gallery screen state by owner key (the project key for the project gallery): pick, panel
+     * expanded, row scroll (55 GAL-08, CNV-35). Not written while empty.
+     */
+    val galleries: Map<Key, GalleryViewState> = emptyMap(),
+) {
+    /** The saved state of the gallery of [ownerKey] (empty state when none). */
+    fun galleryOf(ownerKey: Key): GalleryViewState = galleries[ownerKey] ?: GalleryViewState()
+
+    /** [ownerKey]'s gallery state set to [state]; the empty state removes the entry. */
+    fun withGallery(ownerKey: Key, state: GalleryViewState): ProjectViewFile =
+        copy(galleries = if (state == GalleryViewState()) galleries - ownerKey else galleries + (ownerKey to state))
+}
 
 @Serializable
 data class Viewport(val x: Float = 0f, val y: Float = 0f, val zoom: Float = 1f)

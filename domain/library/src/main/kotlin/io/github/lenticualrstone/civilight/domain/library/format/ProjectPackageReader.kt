@@ -12,6 +12,7 @@ import io.github.lenticualrstone.civilight.model.file.ManifestProject
 import io.github.lenticualrstone.civilight.model.file.PackageLockType
 import io.github.lenticualrstone.civilight.model.file.PackagePaths
 import io.github.lenticualrstone.civilight.model.file.RecorderFile
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonElement
@@ -27,7 +28,7 @@ class ImportedPackage(
     val doc: ProjectDoc,
     /** `recorder.json`, or null when absent or unreadable. */
     val recorder: RecorderFile?,
-    /** Blob bytes by hash (`assets/<hash>.<ext>`). */
+    /** Blob bytes by hash (`assets/<hash>.<ext>` and gallery originals `gallery/files/<hash>.<ext>`). */
     val blobs: Map<String, ByteArray>,
     val preview: ByteArray?,
     val failed: List<FailedPart>,
@@ -136,7 +137,7 @@ object ProjectPackageReader {
         for (item in zip.items) {
             val path = item.path
             if (path == PackagePaths.MIMETYPE || path == PackagePaths.MANIFEST || path in failedPaths) continue
-            if (!path.endsWith(".json") || isBlobPath(path)) continue
+            if (!path.endsWith(".json") || isBlobPath(path) || isGalleryOriginalPath(path)) continue
             val element = try {
                 CivilightJson.json.parseToJsonElement(item.bytes.toString(Charsets.UTF_8))
             } catch (e: SerializationException) {
@@ -181,6 +182,12 @@ object ProjectPackageReader {
                     val hash = path.removePrefix("assets/").substringBefore('.')
                     if (Sha256.hex(item.bytes) == hash) blobs[hash] = item.bytes else failedPaths += path
                 }
+                // Gallery originals join the one blob store, read by path whether or not the manifest
+                // lists `gallery` (55 §3.3); the same bytes under `assets/` are stored once.
+                isGalleryOriginalPath(path) -> {
+                    val hash = path.removePrefix(PackagePaths.GALLERY_FILES_DIR).substringBefore('.')
+                    if (Sha256.hex(item.bytes) == hash) blobs.getOrPut(hash) { item.bytes } else failedPaths += path
+                }
                 path == PackagePaths.PREVIEW || path == PackagePaths.RECORDER -> Unit
                 path in decodedUnknown || !path.endsWith(".json") -> unknown[path] = UnknownFile(
                     path = path,
@@ -190,7 +197,7 @@ object ProjectPackageReader {
             }
         }
 
-        val doc = decoded.files.toDoc(unknownFiles = unknown)
+        val doc = withoutOrphanGallery(decoded.files.toDoc(unknownFiles = unknown))
         val codes = UnitCodes(doc)
         val failed = failedPaths.map { path -> FailedPart(path, labelOf(path, codes)) }
         return PackageOpen.Ready(
@@ -218,6 +225,29 @@ object ProjectPackageReader {
         val described = manifest.project
         if (described != null && described.key == p.key && described.title == p.name && described.rating == p.rating) return manifest
         return manifest.copy(project = ManifestProject(p.key, p.name, p.rating, described?.ext))
+    }
+
+    /**
+     * [doc] without gallery files whose owner is not in the package (a character purged elsewhere):
+     * a character owner must be a character row, a project owner the project itself (55 §3.3).
+     */
+    internal fun withoutOrphanGallery(doc: ProjectDoc): ProjectDoc {
+        val characters = doc.cast.characters.mapTo(HashSet()) { it.key }
+        fun ownerExists(kind: GalleryOwnerKind?, key: String): Boolean = when (kind) {
+            GalleryOwnerKind.PROJECT -> key == doc.key
+            GalleryOwnerKind.CHARACTER -> key in characters
+            null -> true
+        }
+        val kept = doc.gallery.filterValues { ownerExists(it.ownerKind.known, it.ownerKey) }
+        return if (kept.size == doc.gallery.size) doc else doc.copy(gallery = kept)
+    }
+
+    /** `gallery/files/<64 hex>.<ext>`. */
+    internal fun isGalleryOriginalPath(path: String): Boolean {
+        if (!path.startsWith(PackagePaths.GALLERY_FILES_DIR) || path.count { it == '/' } != 2) return false
+        val name = path.removePrefix(PackagePaths.GALLERY_FILES_DIR)
+        val hash = name.substringBefore('.')
+        return name.contains('.') && hash.length == 64 && hash.all { it in '0'..'9' || it in 'a'..'f' }
     }
 
     /** `assets/<64 hex>.<ext>`. */

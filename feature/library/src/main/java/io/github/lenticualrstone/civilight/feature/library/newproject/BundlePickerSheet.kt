@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.newproject
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -11,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.RadioRow
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldBundles
 import io.github.lenticualrstone.civilight.domain.library.masking.ProjectProfile
 import io.github.lenticualrstone.civilight.model.Key
@@ -57,7 +59,8 @@ internal fun SheetScope.BundlePickerContent(
                 enabled = bundle != FieldBundle.FROM_PROJECT || sources.isNotEmpty(),
             )
         }
-        if (showSources) {
+        FoldReveal(showSources) {
+          Column {
             sources.forEach { project ->
                 if (project.hidden) ProtectWindow(WindowProtection.forProject(project.protections))
                 RadioRow(
@@ -70,6 +73,7 @@ internal fun SheetScope.BundlePickerContent(
                     modifier = Modifier.padding(start = 16.dp),
                 )
             }
+          }
         }
     }
 }

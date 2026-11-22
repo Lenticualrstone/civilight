@@ -33,6 +33,9 @@ import io.github.lenticualrstone.civilight.designsystem.text.DecoratedText
 import io.github.lenticualrstone.civilight.designsystem.text.DecorationRange
 import io.github.lenticualrstone.civilight.designsystem.text.InlineDecoration
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.project.TransitionMode
 
@@ -65,9 +68,10 @@ fun WherePlaceSection(ui: WhereUi, onPickList: (regions: Boolean) -> Unit, onPic
             .padding(vertical = 8.dp)
         if (dotted) DottedText(name, type.sceneHead, nameModifier, color) else CivilightText(name, type.sceneHead, nameModifier, color = color, maxLines = 1)
         ChipFlow {
-            if (dotted && enabled) TextAction(WhereCopy.PICK_PLACE, { onPickList(false) })
-            if (dotted && enabled && state.restorable) TextAction(WhereCopy.RESTORE, onRestore, color = colors.acc)
-            if (dotted && enabled && state.keepable) TextAction(WhereCopy.KEEP, onKeep)
+            // The deleted-place actions fold in and out when the place goes or comes back (P2).
+            FoldReveal(dotted && enabled, horizontal = true) { TextAction(WhereCopy.PICK_PLACE, { onPickList(false) }) }
+            FoldReveal(dotted && enabled && state.restorable, horizontal = true) { TextAction(WhereCopy.RESTORE, onRestore, color = colors.acc) }
+            FoldReveal(dotted && enabled && state.keepable, horizontal = true) { TextAction(WhereCopy.KEEP, onKeep) }
             if (enabled) TextAction(WhereCopy.PICK_ON_MAP, onPickMap)
         }
     }
@@ -97,7 +101,8 @@ fun WhereCastRow(ui: WhereUi, onAdd: () -> Unit, onRemove: (Key) -> Unit, onRest
     val type = CivilightTheme.type
     val enabled = !ui.readOnly
     val row = ui.cast
-    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // No `spacedBy`: a folded-away block would still add its gap, so each folding block carries its own 6 dp.
+    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 10.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CivilightText(WhereCopy.CAST, type.small, color = colors.ink3, maxLines = 1)
             if (row.speakers.isNotEmpty()) {
@@ -112,9 +117,9 @@ fun WhereCastRow(ui: WhereUi, onAdd: () -> Unit, onRemove: (Key) -> Unit, onRest
             Spacer(Modifier.weight(1f))
             if (enabled) CivilightIconButton(IconId.Plus, WhereCopy.CAST, onAdd)
         }
-        val live = row.silent.filter { !it.dotted }
-        if (live.isNotEmpty()) {
-            ChipFlow {
+        // The silent members and the deleted ones fold in and out as a block, keeping the last list while they leave.
+        FoldRevealValue(row.silent.filter { !it.dotted }.takeIf { it.isNotEmpty() }) { live ->
+            ChipFlow(Modifier.padding(top = 6.dp)) {
                 live.forEach { m ->
                     if (enabled && m.look == MemberLook.LIVE) {
                         RemovableChip(label = m.name, onRemove = { onRemove(m.key) }, removeLabel = "${m.name} ${WhereCopy.REMOVE}")
@@ -124,18 +129,22 @@ fun WhereCastRow(ui: WhereUi, onAdd: () -> Unit, onRemove: (Key) -> Unit, onRest
                 }
             }
         }
-        row.silent.filter { it.dotted }.forEach { m ->
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    CivilightText(WhereCopy.DELETED_MARK, type.small, color = colors.ink3)
-                    MemberName(m, type.command)
-                }
-                if (enabled) {
-                    ChipFlow {
-                        TextAction(WhereCopy.REMOVE, { onRemove(m.key) })
-                        if (m.look == MemberLook.DELETED) {
-                            TextAction(WhereCopy.RESTORE, { onRestore(m.key) }, color = colors.acc)
-                            TextAction(WhereCopy.KEEP, { onKeep(m.key) })
+        FoldRevealValue(row.silent.filter { it.dotted }.takeIf { it.isNotEmpty() }) { gone ->
+            Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                gone.forEach { m ->
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            CivilightText(WhereCopy.DELETED_MARK, type.small, color = colors.ink3)
+                            MemberName(m, type.command)
+                        }
+                        if (enabled) {
+                            ChipFlow {
+                                TextAction(WhereCopy.REMOVE, { onRemove(m.key) })
+                                if (m.look == MemberLook.DELETED) {
+                                    TextAction(WhereCopy.RESTORE, { onRestore(m.key) }, color = colors.acc)
+                                    TextAction(WhereCopy.KEEP, { onKeep(m.key) })
+                                }
+                            }
                         }
                     }
                 }
@@ -177,15 +186,18 @@ fun WhereTransitionSection(ui: WhereUi, onMode: (TransitionMode) -> Unit, onDire
     val type = CivilightTheme.type
     val row = ui.sheet.transition
     val enabled = !ui.readOnly
-    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // No `spacedBy`: the swap below always emits a node (empty when there is no preview line), which
+    // would keep a gap. The chips and the swap carry their own 6 dp, the swap only when it has content.
+    Column(Modifier.fillMaxWidth().topHairline(colors.line).padding(vertical = 10.dp)) {
         CivilightText(WhereCopy.TRANSITION, type.small, color = colors.ink3, maxLines = 1)
-        ChipFlow {
+        ChipFlow(Modifier.padding(top = 6.dp)) {
             FilterChip(WhereCopy.MODE_AUTO, row.mode == TransitionMode.AUTO, { onMode(TransitionMode.AUTO) }, enabled = enabled && row.autoEnabled)
             FilterChip(WhereCopy.MODE_DIRECT, row.mode == TransitionMode.DIRECT, { onMode(TransitionMode.DIRECT) }, enabled = enabled)
             FilterChip(WhereCopy.MODE_NONE, row.mode == TransitionMode.NONE, { onMode(TransitionMode.NONE) }, enabled = enabled)
         }
-        when (row.mode) {
-            TransitionMode.DIRECT -> {
+        // The field and the preview line swap on the mode kind only, never while typing (P3).
+        ContentSwap(row.mode == TransitionMode.DIRECT, Modifier.fillMaxWidth().padding(top = if (row.mode == TransitionMode.DIRECT || row.preview != null) 6.dp else 0.dp)) { direct ->
+            if (direct) {
                 // Seeded once per scene: the field is the source of truth while typing (Hangul composition).
                 var draft by rememberSaveable(ui.sheet.sceneKey) { mutableStateOf(row.directText.orEmpty()) }
                 CivilightTextField(
@@ -197,8 +209,9 @@ fun WhereTransitionSection(ui: WhereUi, onMode: (TransitionMode) -> Unit, onDire
                     modifier = Modifier.fillMaxWidth(),
                     enabled = enabled,
                 )
+            } else {
+                row.preview?.let { CivilightText(it, type.small, color = colors.ink2, maxLines = 2) }
             }
-            else -> row.preview?.let { CivilightText(it, type.small, color = colors.ink2, maxLines = 2) }
         }
     }
 }

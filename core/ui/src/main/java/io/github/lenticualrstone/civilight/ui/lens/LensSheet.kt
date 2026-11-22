@@ -32,6 +32,8 @@ import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.position.LensPoint
 import io.github.lenticualrstone.civilight.store.project.ProjectStore
@@ -82,23 +84,27 @@ fun ColumnScope.LensSheetContent(
                 highlightedKey = (row.point as? LensPoint.UnitEnd)?.unitKey.orEmpty()
             }
         }
-        if (highlightedEpisode != null) {
-            SectionLabel(LensCopy.MORE, Modifier.padding(top = 16.dp))
-            ChipFlow(Modifier.padding(top = 8.dp)) {
-                for (episode in rowsModel.neighbours(highlightedEpisode.key)) {
-                    FilterChip(
-                        label = labels.code(episode) ?: LensCopy.UNTITLED,
-                        selected = episode.key == highlightedKey,
-                        onClick = { highlightedKey = episode.key },
-                    )
+        // S18d: the neighbour chips and the scene rows fold open and closed; the episode shown while folding
+        // away is the last one highlighted.
+        FoldRevealValue(highlightedEpisode) { episode ->
+            Column {
+                SectionLabel(LensCopy.MORE, Modifier.padding(top = 16.dp))
+                ChipFlow(Modifier.padding(top = 8.dp)) {
+                    for (neighbour in rowsModel.neighbours(episode.key)) {
+                        FilterChip(
+                            label = labels.code(neighbour) ?: LensCopy.UNTITLED,
+                            selected = neighbour.key == highlightedKey,
+                            onClick = { highlightedKey = neighbour.key },
+                        )
+                    }
+                    FilterChip(label = LensCopy.BY_SCENE, selected = byScene, onClick = { byScene = !byScene })
                 }
-                FilterChip(label = LensCopy.BY_SCENE, selected = byScene, onClick = { byScene = !byScene })
-            }
-            if (byScene) {
-                Column(Modifier.padding(top = 8.dp)) {
-                    for (row in rowsModel.sceneRows(highlightedEpisode.key)) {
-                        LensRowItem(row, highlighted = row.point == highlighted, viewing = row.point == viewedEffective) {
-                            highlightedKey = (row.point as? LensPoint.UnitEnd)?.unitKey.orEmpty()
+                FoldReveal(byScene) {
+                    Column(Modifier.padding(top = 8.dp)) {
+                        for (row in rowsModel.sceneRows(episode.key)) {
+                            LensRowItem(row, highlighted = row.point == highlighted, viewing = row.point == viewedEffective) {
+                                highlightedKey = (row.point as? LensPoint.UnitEnd)?.unitKey.orEmpty()
+                            }
                         }
                     }
                 }

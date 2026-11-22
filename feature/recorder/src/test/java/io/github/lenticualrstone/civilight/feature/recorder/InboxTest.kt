@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.recorder
 
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.actions.ActionContext
 import io.github.lenticualrstone.civilight.domain.recorder.inbox.FilterAction
 import io.github.lenticualrstone.civilight.domain.recorder.inbox.InboxOpening
@@ -41,6 +42,7 @@ class InboxFixture(
     scope: TestScope,
     library: RecorderLibrary = ExampleRecorder.library(),
     preset: InboxFilterState = InboxFilterState(),
+    relock: RelockPolicy = RelockPolicy.ON_LEAVE,
 ) {
     val recorder = FakeRecorder(library, ExampleRecorder.trashEntries())
     val projects = FakeProjects(Fx.p1())
@@ -54,7 +56,7 @@ class InboxFixture(
         envSource = env,
         writer = writer,
         now = { Fx.NOW },
-        relockPolicy = { RelockPolicy.ON_LEAVE },
+        relockPolicy = { relock },
         unlockChanges = unlock,
         preset = preset,
     )
@@ -244,7 +246,7 @@ class InboxTest {
         val f = InboxFixture(this)
         f.view(this)
         val outcome = f.controller.onMenu(r2, MenuAction.DELETE) as MenuOutcome.ShowToast
-        assertEquals("TODO_COPY_LRC_19", outcome.toast.text)
+        assertEquals(ShownCopy.DELETED_TOAST, outcome.toast.text)
         val record = f.recorder.library.record(r2)!!
         assertNotNull(record.deletedAt)
         assertTrue(f.recorder.trash.any { r2 in it.targetKeys })

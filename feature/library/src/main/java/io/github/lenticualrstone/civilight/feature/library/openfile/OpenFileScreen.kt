@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.library.openfile
 
+import kotlinx.coroutines.delay
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -75,15 +78,20 @@ internal fun OpenFileScreen(route: OpenFile, services: LibraryServices) {
     var opened by rememberSaveable { mutableStateOf(false) }
     val navigator = services.deps.navigator
 
+    val motion = CivilightTheme.motion
+    // The sheet opens once the shell's push has settled (audit row 13), not over a screen still sliding in.
     LaunchedEffect(Unit) {
         if (!opened) {
+            delay(motion.delayMs(if (motion.reduced) CivilightMotion.reducedFadeMs else CivilightMotion.enter.durationMs))
             sheets.open(OpenFileSheetKey(route.uri))
             opened = true
         }
     }
-    // The sheet was closed (닫기, 취소, a drag) or the flow ended: leave the route once.
+    // The sheet was closed (닫기, 취소, a drag) or the flow ended: leave the route once, after the sheet's
+    // exit has played (the pop would otherwise cut it).
     LaunchedEffect(finished, sheets.sheets, opened) {
         if (finished) {
+            delay(motion.delayMs(if (motion.reduced) CivilightMotion.reducedFadeMs else CivilightMotion.exit.durationMs))
             if (navigator.current == route) navigator.pop()
         } else if (opened && sheets.sheets.isEmpty()) {
             vm.close()
@@ -111,13 +119,19 @@ private fun SheetScope.OpenFileSheetContent(vm: OpenFileViewModel) {
     LaunchedEffect(finished) { if (finished) scope.close() }
     val onClose = { vm.close() }
     SheetHead(onClose)
-    when (val s = stage) {
-        OpenStage.Reading -> Unit
-        is OpenStage.Failed -> FailedBody(s.message, onClose)
-        is OpenStage.Password -> PasswordBody(s, onClose, vm::unlock)
-        is OpenStage.Newer -> NewerBody(s.sheet, s.summary, onClose)
-        is OpenStage.Ask -> AskBody(s, onClose, vm::choose, vm::import)
-        is OpenStage.Recorder -> RecorderBody(s, onClose, vm::importRecorder)
+    // Reading → password → ask → failed: the stage body swaps in place (audit row 5, P3); the sheet's own
+    // height follows. A stage that only changes its data (busy, an error line) keeps its body.
+    ContentSwap(stage, Modifier.fillMaxWidth(), contentKey = { it::class }, label = "openFileStage") { s ->
+        Column {
+            when (s) {
+                OpenStage.Reading -> Unit
+                is OpenStage.Failed -> FailedBody(s.message, onClose)
+                is OpenStage.Password -> PasswordBody(s, onClose, vm::unlock)
+                is OpenStage.Newer -> NewerBody(s.sheet, s.summary, onClose)
+                is OpenStage.Ask -> AskBody(s, onClose, vm::choose, vm::import)
+                is OpenStage.Recorder -> RecorderBody(s, onClose, vm::importRecorder)
+            }
+        }
     }
 }
 

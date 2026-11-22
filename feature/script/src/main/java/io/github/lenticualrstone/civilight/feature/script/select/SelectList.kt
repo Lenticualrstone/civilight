@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.script.select
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,16 +17,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.script.BlockPosition
 import io.github.lenticualrstone.civilight.feature.script.layout.ScriptLayout
 import io.github.lenticualrstone.civilight.model.Key
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Select mode's list (SCR-36): heads as dividers, block rows with checkbox, text and grip. Dragging a
@@ -44,6 +50,11 @@ fun SelectList(
 ) {
     var dragKey by remember { mutableStateOf<String?>(null) }
     var offset by remember { mutableFloatStateOf(0f) }
+    // A dropped row glides from where the finger left it to its slot (motion audit, row 4).
+    val motion = CivilightTheme.motion
+    val scope = rememberCoroutineScope()
+    val settle = remember { Animatable(0f) }
+    var settleKey by remember { mutableStateOf<String?>(null) }
     val edge = with(LocalDensity.current) { 56.dp.toPx() }
     val step = with(LocalDensity.current) { 12.dp.toPx() }
 
@@ -79,6 +90,14 @@ fun SelectList(
         dragKey = null
         val shift = offset
         offset = 0f
+        if (dragged != null && shift != 0f) {
+            scope.launch {
+                settleKey = key
+                settle.snapTo(shift)
+                settle.animateTo(0f, motion.move(CivilightMotion.standard))
+                if (settleKey == key) settleKey = null
+            }
+        }
         if (info == null || dragged == null) return
         val center = info.offset + shift + info.size / 2f
         val target = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key != key && center >= it.offset && center < it.offset + it.size }
@@ -103,7 +122,10 @@ fun SelectList(
     ) {
         items(rows, key = { it.key }, contentType = { it::class }) { row ->
             val dragging = row.key == dragKey
-            val lift = if (dragging) Modifier.zIndex(1f).graphicsLayer { translationY = offset } else Modifier
+            val settling = row.key == settleKey
+            // The other rows make way for the dropped one on the standard curve; the held row follows the finger.
+            val lift = (if (dragging || settling) Modifier.zIndex(1f).graphicsLayer { translationY = if (dragging) offset else settle.value } else Modifier)
+                .then(if (dragging) Modifier else civilightItem())
             when (row) {
                 is SelectRowModel.Head -> SelectHeadView(row, lift)
                 is SelectRowModel.Block -> SelectBlockRowView(

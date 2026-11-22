@@ -1,6 +1,12 @@
 package io.github.lenticualrstone.civilight.feature.world.term
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.feature.world.common.CardBodySwap
+import io.github.lenticualrstone.civilight.feature.world.common.stageOf
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -124,55 +130,58 @@ fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
         },
     ) { padding ->
         CenterColumn {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
-                if (card == null) return@LazyColumn
-                when (val access = card.access) {
-                    is CardAccess.Locked -> item(key = "locked") { LockedCard(access.text, gate.unlock) }
-                    is CardAccess.Gone -> item(key = "gone") { WorldGoneCard(access, doc, vm, WorldKind.TERM, route.termKey, readOnly, gate) }
-                    CardAccess.Open -> termBody(
-                        card = card,
-                        readOnly = readOnly,
-                        showEmpty = showEmpty,
-                        onShowEmpty = { showEmpty = true },
-                        onReveal = { sheets.open(RevealSheet(route.termKey)) },
-                        onRelated = { sheets.open(RelatedSheet(route.termKey)) },
-                        onField = { def -> sheets.open(FieldValueEditSheet(route.projectKey, EntityKind.TERM, route.termKey, def)) },
-                        onAddField = { sheets.open(AddFieldSheet(route.projectKey, EntityKind.TERM, route.termKey)) },
-                        onChip = { chip ->
-                            when (chip) {
-                                is TermChip.SuggestReveal -> choose(chip.suggestion.target)
-                                is TermChip.TurnOffSearch -> vm.setTextSearch(false)
-                            }
-                        },
-                        onSearchOn = { vm.setTextSearch(true) },
-                        onOpen = { row -> row.target?.let { deps.navigator.openFromWorld(it) } },
-                        onLink = { candidate ->
-                            scope.launch {
-                                if (vm.linkCandidate(candidate)) deps.toasts.show(WorldCopy.TODO_COPY_WORLD_LINKED_TOAST) { vm.undoLast() }
-                            }
-                        },
-                        onReject = { candidate ->
-                            scope.launch {
-                                if (vm.rejectCandidate(candidate)) deps.toasts.show(WorldCopy.TODO_COPY_WORLD_REJECTED_TOAST) { vm.undoLast() }
-                            }
-                        },
-                        onWarning = { deps.navigator.push(CheckCenter(route.projectKey, CheckFilter.TERM.name)) },
-                        onIntended = { linkKey ->
-                            scope.launch {
-                                if (vm.markIntended(linkKey)) deps.toasts.show(WorldCopy.TODO_COPY_WORLD_INTENDED_TOAST) { vm.undoLast() }
-                            }
-                        },
-                        onBulk = { mode -> sheets.open(BulkCandidatesSheet(route.termKey, mode)) },
-                        onAliases = { sheets.open(AliasSheet(route.termKey)) },
-                        art = { name ->
-                            doc?.let { d ->
-                                CardImageSlot(d, WorldKind.TERM, route.termKey, name, WorldCopy.IMAGE_LABEL, readOnly) {
-                                    sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.TERM, route.termKey))
+            CardBodySwap(card, { stageOf(it?.access) }) { shown ->
+                val card = shown
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
+                    if (card == null) return@LazyColumn
+                    when (val access = card.access) {
+                        is CardAccess.Locked -> item(key = "locked") { Box(civilightItem()) { LockedCard(access.text, gate.unlock) } }
+                        is CardAccess.Gone -> item(key = "gone") { Box(civilightItem()) { WorldGoneCard(access, doc, vm, WorldKind.TERM, route.termKey, readOnly, gate) } }
+                        CardAccess.Open -> termBody(
+                            card = card,
+                            readOnly = readOnly,
+                            showEmpty = showEmpty,
+                            onShowEmpty = { showEmpty = true },
+                            onReveal = { sheets.open(RevealSheet(route.termKey)) },
+                            onRelated = { sheets.open(RelatedSheet(route.termKey)) },
+                            onField = { def -> sheets.open(FieldValueEditSheet(route.projectKey, EntityKind.TERM, route.termKey, def)) },
+                            onAddField = { sheets.open(AddFieldSheet(route.projectKey, EntityKind.TERM, route.termKey)) },
+                            onChip = { chip ->
+                                when (chip) {
+                                    is TermChip.SuggestReveal -> choose(chip.suggestion.target)
+                                    is TermChip.TurnOffSearch -> vm.setTextSearch(false)
                                 }
-                            }
-                        },
-                        onMerge = { sheets.open(MergePickSheet(WorldKind.TERM.name, route.termKey)) },
-                    )
+                            },
+                            onSearchOn = { vm.setTextSearch(true) },
+                            onOpen = { row -> row.target?.let { deps.navigator.openFromWorld(it) } },
+                            onLink = { candidate ->
+                                scope.launch {
+                                    if (vm.linkCandidate(candidate)) deps.toasts.show(WorldCopy.LINKED_TOAST) { vm.undoLast() }
+                                }
+                            },
+                            onReject = { candidate ->
+                                scope.launch {
+                                    if (vm.rejectCandidate(candidate)) deps.toasts.show(WorldCopy.REJECTED_TOAST) { vm.undoLast() }
+                                }
+                            },
+                            onWarning = { deps.navigator.push(CheckCenter(route.projectKey, CheckFilter.TERM.name)) },
+                            onIntended = { linkKey ->
+                                scope.launch {
+                                    if (vm.markIntended(linkKey)) deps.toasts.show(WorldCopy.INTENDED_TOAST) { vm.undoLast() }
+                                }
+                            },
+                            onBulk = { mode -> sheets.open(BulkCandidatesSheet(route.termKey, mode)) },
+                            onAliases = { sheets.open(AliasSheet(route.termKey)) },
+                            art = { name ->
+                                doc?.let { d ->
+                                    CardImageSlot(d, WorldKind.TERM, route.termKey, name, WorldCopy.IMAGE_LABEL, readOnly) {
+                                        sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.TERM, route.termKey))
+                                    }
+                                }
+                            },
+                            onMerge = { sheets.open(MergePickSheet(WorldKind.TERM.name, route.termKey)) },
+                        )
+                    }
                 }
             }
         }
@@ -201,11 +210,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.termBody(
     onMerge: () -> Unit,
 ) {
     val head = card.head ?: return
-    item(key = "art") { art(head.name) }
+    item(key = "art") { Box(civilightItem()) { art(head.name) } }
     item(key = "head") {
-        androidx.compose.foundation.layout.Column {
+        androidx.compose.foundation.layout.Column(civilightItem()) {
             CardHead(head)
-            card.sameName?.let { text ->
+            FoldRevealValue(card.sameName) { text ->
                 Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     CivilightText(text, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
                     if (!readOnly) TextAction(WorldCopy.MENU_MERGE, onMerge, color = CivilightTheme.colors.acc, style = CivilightTheme.type.small)
@@ -214,7 +223,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.termBody(
         }
     }
     item(key = "fixed") {
-        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+        androidx.compose.foundation.layout.Column(civilightItem().fillMaxWidth().padding(top = 14.dp)) {
             card.reveal?.let { FixedRow(it, onReveal) }
             card.aliases?.let { FixedRow(it, onAliases) }
             card.related?.let { FixedRow(it, onRelated) }
@@ -229,14 +238,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.termBody(
         }
     }
     if (card.notices.isNotEmpty() || card.searchOff || card.chips.isNotEmpty()) {
-        item(key = "notices") { TermNotices(card, readOnly, onChip, onSearchOn) }
+        item(key = "notices") { Box(civilightItem()) { TermNotices(card, readOnly, onChip, onSearchOn) } }
     }
-    item(key = "header") { SectionLabel(card.header, Modifier.padding(top = 22.dp, bottom = 2.dp)) }
+    item(key = "header") { SectionLabel(card.header, civilightItem().padding(top = 22.dp, bottom = 2.dp)) }
     card.groups.forEach { group ->
         // With one group the header already reads `쓰인 곳 · N`.
         if (card.groups.size > 1) {
             item(key = "group:${group.id}") {
-                Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(civilightItem().fillMaxWidth().padding(top = 14.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                     SectionLabel(group.title, Modifier.weight(1f))
                     // WLD-23: `모두 잇기 · 모두 아님` over the 후보 group; each word opens the sheet in its mode.
                     if (group.id == "candidates" && card.bulkActions.size == 2 && !readOnly) {
@@ -249,6 +258,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.termBody(
         }
         items(group.rows, key = { it.id }) { row ->
             UsageRowView(
+                modifier = civilightItem(),
                 row = row,
                 onOpen = row.target?.let { { onOpen(row) } },
                 readOnly = readOnly,
@@ -267,15 +277,15 @@ private fun TermNotices(card: TermCardUi, readOnly: Boolean, onChip: (TermChip) 
     val type = CivilightTheme.type
     androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         card.notices.forEach { NoticeLine(it) }
-        if (card.searchOff) {
+        FoldReveal(card.searchOff) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                 CivilightText("${WorldCopy.NOTICE_SEARCH_OFF}${WorldCopy.SEP}", type.small, color = colors.ink3)
                 TextAction(WorldCopy.BTN_SEARCH_ON, onSearchOn, color = colors.acc, style = type.small)
             }
         }
-        if (card.chips.isNotEmpty()) {
+        FoldRevealValue(card.chips.takeIf { it.isNotEmpty() }) { chips ->
             ChipFlow(Modifier.padding(top = 8.dp)) {
-                card.chips.forEach { chip ->
+                chips.forEach { chip ->
                     FilterChip(label = chip.label, selected = false, onClick = { onChip(chip) }, enabled = !readOnly)
                 }
             }

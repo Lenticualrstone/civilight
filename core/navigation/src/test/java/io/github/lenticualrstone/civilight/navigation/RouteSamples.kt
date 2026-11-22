@@ -3,7 +3,9 @@ package io.github.lenticualrstone.civilight.navigation
 import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.project.Rating
+import io.github.lenticualrstone.civilight.model.sample.ExampleGallery
 import io.github.lenticualrstone.civilight.model.sample.ExampleKeys
 
 /** One value of every route and shared sheet, with non-default arguments where there are any. */
@@ -86,6 +88,7 @@ object RouteSamples {
         ImageSpecs,
         PresetImages,
         HoloExperiment,
+        Gallery(P, GalleryOwnerKind.CHARACTER, K, pickKey = ExampleGallery.ITEM_3),
         RecorderInbox("unsorted", projectKey = P, targetKind = "character", targetKey = K),
         RecorderRecordDetail(K),
         Recording(surface = "script", projectKey = P, targetKind = "scene", targetKey = K, caretBlockKey = K, startTyped = true),
@@ -114,6 +117,9 @@ object RouteSamples {
         LineLabelSheet(P, K, K),
         LineLabelSheet.forCharacters(P, K, ExampleKeys.PROJECT),
         ImagePickSheet(P, ImageOwnerKind.PROJECT, P, ImageSlot.PROJECT_COVER),
+        GalleryAddSheet(P, GalleryOwnerKind.PROJECT, P),
+        GalleryInfoSheet(P, K, focusDescription = true),
+        GalleryMenuSheet(P, K),
         ExportSheet(P),
         RatingChangeSheet(P, Rating.R15),
         TextMemoSheet(P, targetKind = "scene", targetKey = K),

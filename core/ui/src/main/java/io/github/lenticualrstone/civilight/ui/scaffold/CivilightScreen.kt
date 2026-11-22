@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.ui.scaffold
 
+import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
@@ -22,6 +25,9 @@ import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.LensChip
 import io.github.lenticualrstone.civilight.designsystem.component.ToastHost
 import io.github.lenticualrstone.civilight.designsystem.component.TopGlassBar
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
 import io.github.lenticualrstone.civilight.ui.lens.LensChipLabel
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
 import kotlinx.coroutines.MainScope
@@ -83,7 +89,9 @@ private fun ScreenFrame(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val wide = LocalWindowLayout.current.isInner
-    val keyboard = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val keyboard = rememberKeyboardBottom()
+    val motion = LocalMotion.current
+    val shownBanner = rememberLastNonNull(banner)
     GlassScaffold(
         modifier = modifier,
         topBar = {
@@ -103,8 +111,16 @@ private fun ScreenFrame(
             }
         },
         overlay = { padding ->
-            if (banner != null) {
-                Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) { banner() }
+            // S8: the banner drops in 8 dp on `enter` and leaves on `exit`, drawn with its last content.
+            Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
+                AnimatedVisibility(
+                    visible = banner != null,
+                    enter = motion.enter(CivilightMotion.enter, rise = -BANNER_RISE),
+                    exit = motion.exit(CivilightMotion.exit, rise = -BANNER_RISE),
+                    label = "banner",
+                ) {
+                    shownBanner?.invoke()
+                }
             }
             ToastOverlay(bottom = maxOf(padding.calculateBottomPadding(), keyboard))
         },
@@ -124,9 +140,24 @@ fun ToastOverlay(bottom: Dp, modifier: Modifier = Modifier) {
     val toasts = LocalToasts.current
     val toast by toasts.current.collectAsState()
     Box(modifier.fillMaxSize().padding(bottom = bottom + TOAST_GAP), contentAlignment = Alignment.BottomCenter) {
-        ToastHost(message = toast?.text, actionLabel = toast?.actionLabel, onAction = toast?.onAction?.let { { toasts.act() } })
+        // S10: the id lets a new toast replace one with the same text (LIB-40).
+        ToastHost(message = toast?.text, actionLabel = toast?.actionLabel, onAction = toast?.onAction?.let { { toasts.act() } }, id = toast?.id)
     }
 }
+
+/**
+ * The keyboard's height under the content (S18). From API 30 the system animates the inset itself; on
+ * API 29 it arrives in one step, so it moves on `standard` there (a snap when motion is reduced).
+ */
+@Composable
+fun rememberKeyboardBottom(): Dp {
+    val raw = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    if (Build.VERSION.SDK_INT >= 30) return raw
+    val animated by animateDpAsState(raw, LocalMotion.current.move(CivilightMotion.standard), label = "keyboard")
+    return animated
+}
+
+private val BANNER_RISE = 8.dp
 
 /** A toast sits 6 dp above the bottom bar (DS-27). */
 private val TOAST_GAP = 6.dp

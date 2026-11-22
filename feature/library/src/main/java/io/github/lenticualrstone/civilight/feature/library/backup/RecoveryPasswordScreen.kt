@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.library.backup
 
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -85,7 +88,7 @@ internal class RecoveryPasswordViewModel(private val services: LibraryServices) 
                 throw e
             } catch (_: Exception) {
                 // The Keystore or the disk refused: nothing was stored; the page stays.
-                deps.toasts.show(RecoveryCopy.TODO_COPY_LIB58_SET_FAILED, actionLabel = null)
+                deps.toasts.show(RecoveryCopy.SET_FAILED, actionLabel = null)
             } finally {
                 password.fill('\u0000')
                 _busy.value = false
@@ -117,7 +120,7 @@ internal fun RecoveryPasswordScreen(services: LibraryServices) {
     ) {
         LockCard(ui.cardTitle)
         PasswordInput(RecoveryCopy.FIELD, password, { password = it }, Modifier.padding(top = 16.dp))
-        ui.strength?.let { StrengthMeter(it) }
+        FoldRevealValue(ui.strength) { StrengthMeter(it) }
         PasswordInput(RecoveryCopy.REPEAT, repeat, { repeat = it }, Modifier.padding(top = 16.dp), error = ui.mismatch)
         WarningBlock()
         SectionLabel(RecoveryCopy.LOCKED_TOGETHER, Modifier.padding(top = 24.dp, bottom = 8.dp))
@@ -150,6 +153,7 @@ private fun LockCard(title: String) {
 @Composable
 internal fun PasswordInput(label: String?, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, error: String? = null) {
     var shown by remember { mutableStateOf(false) }
+    val eye by animatedColor(if (shown) CivilightTheme.colors.acc else CivilightTheme.colors.ink2)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         CivilightTextField(
             value = value,
@@ -162,10 +166,10 @@ internal fun PasswordInput(label: String?, value: String, onChange: (String) -> 
         )
         CivilightIconButton(
             icon = IconId.EyeOff,
-            contentDescription = if (shown) RecoveryCopy.TODO_COPY_LIB58_HIDE else RecoveryCopy.SHOW,
+            contentDescription = if (shown) RecoveryCopy.HIDE else RecoveryCopy.SHOW,
             onClick = { shown = !shown },
             modifier = Modifier.padding(bottom = if (error != null) 24.dp else 3.dp),
-            tint = if (shown) CivilightTheme.colors.acc else CivilightTheme.colors.ink2,
+            tint = eye,
         )
     }
 }
@@ -177,10 +181,12 @@ private fun StrengthMeter(strength: StrengthUi) {
     Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             repeat(4) { i ->
-                Box(Modifier.width(28.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (i < strength.bars) colors.acc else colors.line))
+                // Lit bars and unlit bars trade colour on `standard` (S6), so a longer password fills the meter.
+                val bar by animatedColor(if (i < strength.bars) colors.acc else colors.line)
+                Box(Modifier.width(28.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(bar))
             }
         }
-        CivilightText(strength.line, CivilightTheme.type.small, color = colors.ink3)
+        ValueSwap(strength.line, CivilightTheme.type.small, color = colors.ink3)
     }
 }
 

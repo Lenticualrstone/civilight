@@ -88,7 +88,7 @@ You receive it as the entries function's parameter. In composition it is also `L
 | cast | `CastList(p)` · `CharacterProfile(p, characterKey, tab)` · `RelationMap(p, focusKey)` · `FieldSettings(p, kind)` · `FieldDefEdit(p, fieldDefKey)` · `RelationKindSettings(p)` · `TagSettings(p)` · `ArchiveDocEdit(p, characterKey, docKey)` |
 | world | `World(p, tab, createTerm)` · `TermCard(p, termKey)` · `PlaceCard(p, placeKey, tab)` · `FactionCard(p, factionKey)` · `Timeline(p)` · `EventDetail(p, eventKey)` · `TimelineMap(p)` · `WorldCalendar(p)` · `TravelModes(p)` |
 | map | `MapList(p)` · `MapView(p, mapKey, focusPinKey)` · `MapEdit` · `MapScale` · `MapReveal` · `NodeMap` · `MapFormatPicker(p, parentMapKey?, parentPinKey?)` · `MapGenerate(p, format)` · `HexPaint` · `PolygonRegions` · `DetailStamps` · `TextMap(p, mapKey?)` · `CharacterTrack(p, characterKey?, mapKey?)` · `PickOnMap(p, requestKey, sceneKey?, sceneCount)` · `SketchStraighten(p, photoHash, parentMapKey?, parentPinKey?)` |
-| canvas | `CanvasBoard(p, canvasKey?)` · `PageList(p)` · `PageDoc(p, pageKey)` · `ImageCrop(p, ownerKind, ownerKey, slot, blobHash)` · `ImageSpecs` · `PresetImages` · `HoloExperiment` |
+| canvas | `CanvasBoard(p, canvasKey?)` · `PageList(p)` · `PageDoc(p, pageKey)` · `ImageCrop(p, ownerKind, ownerKey, slot, blobHash)` · `ImageSpecs` · `PresetImages` · `HoloExperiment` · `Gallery(p, ownerKind, ownerKey, pickKey?)` (`Gallery.ofProject(p)`, `Gallery.ofCharacter(p, c)`) |
 | recorder | `RecorderInbox(filter, projectKey?, targetKind?, targetKey?)` · `RecorderRecordDetail(recordKey)` · `Recording(surface, projectKey, targetKind, targetKey, caretBlockKey, startTyped)` · `RecorderSettings` |
 | shell | `AppLock` · `HiddenProjectLock(p)`. These are overlay keys. They are never pushed. |
 
@@ -119,7 +119,7 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
    - SCRIPT: `SceneSplitSheet`, `SceneMergeSheet`, `RenumberSheet`
    - CAST: `FieldHistorySheet`, `FieldValueEditSheet`, `AddFieldSheet`, `RelationEditSheet`, `DeleteImpactSheet`, `MergeItemsSheet`
    - WORLD: `LinkCandidatesSheet`, `EventCreateSheet`
-   - CANVAS: `LineLabelSheet` (`LineLabelSheet.forCharacters(p, a, b)` for relationship-map lines), `ImagePickSheet`
+   - CANVAS: `LineLabelSheet` (`LineLabelSheet.forCharacters(p, a, b)` for relationship-map lines), `ImagePickSheet`, `GalleryAddSheet(p, ownerKind, ownerKey)` (GAL-11), `GalleryInfoSheet(p, itemKey, focusDescription)` (GAL-13), `GalleryMenuSheet(p, itemKey)` (GAL-14)
    - LIBRARY: `ExportSheet`, `RatingChangeSheet`
    - RECORDER: `TextMemoSheet(projectKey?, targetKind?, targetKey?)`, `RecorderLinkPickerSheet`
 2. In the screen: `val sheets = rememberSheetHost()`, then pass it to `CivilightScreen(…, sheets = sheets, localSheets = { key -> when (key) { is MySheet -> { { MySheetContent(key, this) } } else -> null } })`, or wrap content in `SheetHostLayout(sheets, localSheets = …) { … }`.
@@ -177,7 +177,7 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
 - **Per-entry view models**: `ui/nav/EntryViewModels.kt` (`rememberEntryViewModelDecorator`). Each entry gets its own `ViewModelStore`, kept across configuration changes and cleared on pop.
 - **CNV-32 window classes**: `ui/window/WindowLayout.kt` (window size, not screen, from `LocalWindowInfo`; Compact < 600, Medium 600–840, Expanded ≥ 840), `AdaptiveFrames.kt`. Test: `ShellRulesTest.window classes - CNV-32`.
 - **CNV-33 two panes and the centred column**: `ui/nav/SceneStrategies.kt` (`ListDetailSceneStrategy`, `LocalPaneRole`), `RouteMetadata.kt` (`ListDetailPairs`), `ListDetailNavigation.kt` (`openDetail`), and `CenterColumn`. Tests: `ShellRulesTest.list and detail pairs - CNV-33`, `choosing another row swaps the detail instead of stacking it`.
-- **Glass overlay routes**: `OverlaySceneStrategy` (search, recording over the blurred previous screen, fade transitions).
+- **Glass overlay routes**: `OverlaySceneStrategy` (search, recording over the blurred previous screen). Since the 0.1.0 wave a Nav3 `OverlayScene`; see the section at the end.
 - **STO-13 lens chip and sheet; STO-16 lens and script**:
   - `ui/lens/LensRules.kt` (`chipLabel`, `enterScript`, `leaveScript`, `setLensToScene`, `LensRows`), `LensController.kt` (writes through `updateApp`), `LensSheet.kt`, `ScriptLensEffect.kt`.
   - The shell registers `LensSheet` and wraps `Script` in the lens hook.
@@ -226,14 +226,14 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
 
 ## Partial
 
-- **CNV-34 fold transitions**: the activity handles size and fold changes itself (`configChanges`), so screens keep their state and scroll. The 360 / 240 ms pane-entry motion and "last-touched pane stays" are not built. Panes switch at once when the width class changes.
+- **CNV-34 fold transitions**: the activity handles size and fold changes itself (`configChanges`), so screens keep their state and scroll. Since the 0.1.0 wave a fold or unfold fades the new scene in on `foldOpen`, and a detail pane entering beside its list slides 48 dp on `foldOpen` (S3). "Last-touched pane stays" is not built.
 - **CNV-35 state restore**: the back stack, open sheets (`rememberSheetHost`) and entry `rememberSaveable` state are saved for process death. Restore through Android's SavedState encoder has not been run on a device; the JVM tests cover the same serializers through `Json` only. Selection, scroll, caret, map and canvas viewports are each feature's to save (route arguments, `rememberSaveable`, `_app/view.json`).
 - **CNV-36 postures**: `FoldPosture` is always `UNKNOWN`. Neither core:ui nor app depends on `androidx.window` (see Requests). Hinge avoidance is not possible yet.
-- **CNV-38 splash**: the system phase and the exit motion are done. The 250 ms "three bars draw left → right" phase is not, because the splash icon is the static mark drawable.
+- **CNV-38 splash**: the system phase and the exit motion are done; since the 0.1.0 wave the exit uses the `enterLong` token and `enter` curve, and the content rises 14 dp on `enter` (S15). The 250 ms "three bars draw left → right" phase is not, because the splash icon is the static mark drawable (an AVD is needed).
 - **LIB-29 on API 29–32**: hidden-project content uses FLAG_SECURE, because recents-only masking needs API 33. On those devices screenshots of hidden projects are blocked even with capture block off (library spec §6 Q6 `ED`).
 - **LIB-34 blurred lock below API 31**: no blur exists there, so the app lock is always mark-only.
 - **LIB-52 intent filter**: an `application/octet-stream` VIEW filter with `.civilight` path patterns. File apps that send another MIME type or no file name will not offer Civilight. This needs checking on devices.
-- **Overlay scene on inner screens**: an `OverlayRoute` draws only the single entry below it, blurred, not the two panes.
+- **Overlay scene on inner screens**: fixed in the 0.1.0 wave. The overlay is a Nav3 `OverlayScene` over the whole base scene, two panes included.
 - **WLD-52**: the list half of `장소 고르기` is in `PlacePickerSheet`. `지도에서 고르기 ›` is feature:map's `PickOnMap`.
 
 ## Defaults used
@@ -269,7 +269,8 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
 - **core/ui/build.gradle.kts and app/build.gradle.kts: add `libs.androidx.window`** (already in the catalog). It enables fold posture (`FoldingFeature`, CNV-36) and hinge-safe placement (CNV-32). `WindowLayout.posture` is ready for it.
 - **core/ui/build.gradle.kts, optional: `libs.compose.material3.adaptive`** (catalog 1.3.0). Only needed if `calculatePaneScaffoldDirectiveWithTwoPanesOnMediumWidth` is wanted (CNV-32). Classification currently uses the window width directly.
 - **app/build.gradle.kts: `testImplementation(libs.junit)`**, so `Startup.startRoutes` and the reflection lookup in `FeatureRegistry` can get JVM tests.
-- **Copy needed (TODO_COPY)**: `TODO_COPY_SHELL_PROJECT_OPEN_FAILED`, the title of the error shown when a project on the back stack can no longer be opened (deleted elsewhere, unreadable, newer store version). Its button reuses `서재로`.
+- **Copy to confirm**: the error title when a project on the back stack can no longer be opened is now `프로젝트 열 수 없음` (was `TODO_COPY_SHELL_PROJECT_OPEN_FAILED`). No source gives it; it follows the `… 열 수 없음` pattern of `RHRecoveryPw` (60 §5). Its button reuses `서재로`.
+- **CNV-47 copy to confirm**: the handle's content description `화면 비율` and the popover title reuse the spec's `[PROPOSED]` name.
 - **Feature agents**: new routes or shared sheets go in core:navigation. Ask here, do not declare them in your module.
 - **DS-62 repo-wide copy lint** (designsystem request): left for CI. A core:ui test that scans every module's `strings.xml` would tie this module's build to other agents' work in progress.
 - **FEATURES.md**: update the rows listed under Done and Partial (CNV-32 … CNV-36, CNV-38, CNV-46 effects, LIB-08, LIB-17 seed, LIB-26, LIB-29, LIB-32 … LIB-35, LIB-37, LIB-40, STO-13, STO-16, SCR-19 / SCR-55 picker parts). This module may not edit that file.
@@ -364,3 +365,85 @@ Core pass 2026-11-22, after the lanes' first batch. Every change is additive: ne
 - **Map `MapSketchFileProvider` merged-manifest check** (map): needs an APK build, which is on hold.
 - **Copy (`TODO_COPY_*`)**: these are for the spec owner, not core. The editor and picker take titles from the caller and invent none. `TODO_COPY_SHELL_PROJECT_OPEN_FAILED` is still open.
 - **Requests between lanes** (library `ProjectSettings` rows, script day baselines, world ↔ cast sheet registration, recorder `Recording` pushes): not core. They stay in the lanes' files.
+
+---
+
+## Changes for the feature lanes (0.1.0 wave)
+
+Core agent C, 2026-11-23: motion audit §3.3 rows for core:ui and app, CNV-47, gallery shell pieces, QA shell items. Build line: `tools/gw :core:ui:testDebugUnitTest :core:navigation:testDebugUnitTest :app:compileDebugKotlin :app:testDebugUnitTest compileDebugKotlin :domain:story:test :feature:story:testDebugUnitTest` exits 0 (core:ui 82 tests, core:navigation 13, domain:story 186, feature:story 140; app has no unit tests yet). Nothing was run on a device or emulator, so every motion row below stays **partial** until the orchestrator's emulator pass.
+
+### Motion rows done in core:ui and app (motion audit §3.3)
+
+| Row | What changed | Check on the emulator |
+| --- | --- | --- |
+| S1 push / pop / predictive | `CivilightRoot` uses `motion.push(forward)` from the DS helpers: push slides an eighth in on `enter` with a fade, the old screen fades on `exit`; pop reverses. Reduced: fades. `Decelerate`, `ENTER_MS`, `EXIT_MS`, `REDUCED_MS` are gone | predictive back, with and without `항상 줄이기` |
+| S2 overlay routes | `OverlaySceneStrategy` now makes a Nav3 `OverlayScene` over every entry below (two panes included). The base stays composed in its own scene (no blank frame). The overlay fades in on `enter` and out on `exit` in `onRemove`; the base blur (14 dp, API 31+) and dim (.6) follow the same progress through `OverlayBackdrop`, applied with NavDisplay's `modifier` (which wraps only the base). Back inside an overlay pops only the overlay (a `LocalBackHandler` in the scene; NavDisplay's own handler counts from the base scene). Reduced: the dim fades 120 ms, the blur does not ramp. `RouteMetadata` no longer adds overlay transitions | search and recording open and close; back during the exit fade |
+| S3 two-pane detail | The scene key stays the list's on purpose: Nav3 draws an entry shared by two scenes only in the top scene, so keying on the detail would fade the list pane too. Instead `ListDetailScene` swaps the detail inside the pane (`DetailSwap`: crossfade `standard` / `exit`; first detail beside a list slides 48 dp on `foldOpen`; closing fades on `foldClose`). The outgoing entry stays composed during its fade, so Nav3 pops its view model only afterwards. A fold or unfold (same top entry, other scene class) fades the new scene in on `foldOpen` over the old one instead of the push slide | detail swap, first open, fold / unfold dip |
+| S4 sheet to sheet | `SheetHostLayout` crossfades the shown sheet (`standard` in, `exit` out) with `AnimatedContent`; height is left to the DS sheet surface's `animateContentSize`. A sheet opened over an empty host starts fresh (no crossfade from the last closed sheet) | stacked sheets, IME height change |
+| S5 (core:ui side) | Nothing left here: the DS sheet does scrim, back scale and drag | – |
+| S8 banners | `CivilightScreen` banner drops in 8 dp on `enter` and leaves on `exit` with its last content (`rememberLastNonNull`). `ProjectLensEditBanner` folds in and out (`FoldRevealValue`). Popover, dialog, tour and side panel are DS (core agent A) | banner on lens change |
+| S9 locks and loading | App lock appears at once (D5); unlocking fades the lock on `exit` while the content's blur 14 → 0 and dim .6 → 1 ramp (`Modifier.lockedContent(level, locked)`). A re-lock during the fade snaps back to full. Hidden project: lock at once; unlock plays `rememberUnhide` on the content while the lock screen fades over it; locked content is never composed. `ProjectEntryFrame` Loading / Ready / Failed use `ContentSwap` (keyed by kind) | unlock with blurred content, mark-only unlock, hidden project unlock |
+| S10 toast | `ToastOverlay` passes the toast id to `ToastHost(id = …)`, so two toasts with the same text still replace | – |
+| S11 pickers | `ItemPickerSheet` rows, section labels, deleted row and hidden row use `civilightItem()`. The key keeps the title: a term's name and its aliases are rows with the same item key, so dropping it would crash | filter / query changes |
+| S14 graph | `GraphSurface` draws an animated viewport: a new `viewport` (buttons, fit, focus, wheel) moves on `standard`; pans and pinches snap (the gestures mark their own viewport). Nodes are keyed; new nodes and frames fade in with an 8 dp rise on `enter`, removed ones fade out on `exit` where they were, new lines fade in on `enter`. Frame outline and label text colours use `animatedColor`. Reduced: the viewport snaps, nodes and lines only fade. Not built: the line draw-progress and the fade of removed lines | canvas and 관계도: fit on open (it now animates if the screen sets the fit after the first frame), zoom buttons |
+| S15 splash | Exit on `enterLong` with the `enter` curve (was 450 ms literal), reduced 120 ms; the content rises 14 dp and fades in on `enter` when the exit starts (`MainActivity.splashDone`, with a 1 s fallback if the system skips the callback) | cold start, both motion settings |
+| S16 animator scale | `CivilightTheme` reads the system animator scale live (core agent A); `CivilightRoot` now passes only the user's own choice. `ThemeBridge.systemAnimationsOff` is still used by the splash exit | developer animator scale 0 |
+| S18 keyboard | `rememberKeyboardBottom()` (core:ui): from API 30 the system inset as is; on API 29 it moves on `standard` (snap when reduced). `CivilightScreen` uses it | API 29 emulator |
+| S18a, S18c, S18f | DS (core agent A). No core:ui call site needed a change | – |
+| S18d lens sheet | Neighbour chips and `씬 단위로 고르기` rows fold with `FoldRevealValue` / `FoldReveal`; row highlight is the DS `selectedRowBackground` fade | – |
+| S17 theme switch | Not built (low priority) | – |
+
+`PaneSplitAndMotionTest` runs `MotionLint.lintModule` over core:ui and passes. app has no unit tests to host the same check yet.
+
+### CNV-47 pane split (new)
+
+- **Data**: `AppSettings.paneSplit` and `SettingsStore.setPaneSplit` (core agent B). The shell provides `LocalPaneSplits` (`PaneSplitSource`): it reads `FeatureDeps.settings` and writes through `setPaneSplit` on the app scope.
+- **Rules** (`ui/window/PaneSplitRules.kt`, JVM-tested): minimum 280 dp per pane; `canResize(total, inner)`; `leftWidth(total, split, defaultLeft)` (`DEFAULT` and a window that cannot fit two minimums keep the module's own width; a ratio that would push a pane under 280 is clamped for this window, the stored choice is kept); `settle` = nearest of `1:2 · 1:1 · 2:1`; `listDetailDefaultLeft` (390, or half a narrow Medium window); copy `PaneSplitCopy` (`화면 비율`, `1:2`, `1:1`, `2:1`, `기본`).
+- **Parts** (`ui/window/PaneSplitFrame.kt`):
+  - `SplitPanes(module, left, right, modifier, defaultLeft)`: the whole two-pane frame with the 1 dp `line` divider and the handle. The left width is read in the layout phase, so dragging does not recompose the panes.
+  - `rememberPaneSplitState(module, totalDp, defaultLeftDp)` + `PaneSplitHandle(state, modifier)`: for a screen with its own layout. `state.leftDp` is the width to draw; place the 44 dp handle centred on the divider.
+  - Behaviour: drag follows the finger; release settles to the nearest ratio on `motion.move(standard)` (snap when reduced) with the `틱` haptic at the end; tap opens a popover with four `FilterChip` buttons (selected state on the current one) that apply at once and close it. The store is written once per release or button. Nothing shows on the cover screen or when two 280 dp panes do not fit.
+- **Wired**: every `목록 + 상세` frame (`ListDetailPanes(…, module = ListDetailPairs.moduleOf(list))` inside `ListDetailScene`): 서재, 홈, 인물, 세계, 연표, 레코더, 점검 센터.
+
+### Gallery shell pieces (55 §3.5)
+
+- **Route** `Gallery(projectKey, ownerKind: GalleryOwnerKind, ownerKey, pickKey?)` in `CanvasRoutes.kt`, with `Gallery.ofProject(p, pick?)` and `Gallery.ofCharacter(p, c, pick?)`. No lens chip (55 §6 Q10). Owner: canvas.
+- **Shared sheets** (owner CANVAS, `Sheets.kt`): `GalleryAddSheet(p, ownerKind, ownerKey)` (GAL-11), `GalleryInfoSheet(p, itemKey, focusDescription = false)` (GAL-13), `GalleryMenuSheet(p, itemKey)` (GAL-14). `RouteSamples` covers all four, so the serialization coverage test still holds.
+- **`GalleryCard`** (`ui/gallery/GalleryCard.kt`): GAL-07 card on the DS `ImageCard` (cover 222 × 296, inner 236 × 315, radius 20), `chip` top-left, `⋯` with accessibility `메뉴`, untitled = no shade and no text (accessibility `제목 없음`), `picked` lifts 10 dp with the selection ring on `standard`. `GalleryCardRules` (`size`, `pitch`, `chip(portrait, background, cover, holo)` → `초상 · 홀로`, `shownTitle`) is JVM-tested.
+- **`SnapCardRow`**: not copied again. Core agent A moved it to the DS (`designsystem.card.SnapCardRow`, with `CardRules`, `CardViewMotion`); that is the shared one. The DS row's card lambda takes `(item, imageModifier)` instead of canvas's `imageShiftDp: Float`.
+- **Search index**: `domain:story` (additive, tested): `GallerySearch` and `GalleryHit(itemKey, ownerKind, ownerKey, source, field, match, label)`. Titles, whole description sentences (hit boxed) and tag names of visible items; trashed items, trashed owners, and while locked hidden items and hidden characters are left out (T-GAL-19 passes). `ProjectSearch.search(raw, filter, includeGallery = false)`: with `includeGallery = true` under `전체`, `SearchResult.gallery` holds the hits and `empty` counts them. It is not a `SearchSectionKind`, so feature:story's `when`s still compile.
+
+### QA 2026-11-23 (shell parts)
+
+- **#11 `명령` chip with an empty query**: domain done. `ProjectSearch.search("", SearchFilter.COMMAND)` now returns the `명령` section with every command of the context (nothing boxed); `commandList()` gives the same list. The screen gate is still closed: see feature:story below.
+- **TODO_COPY in core:ui and app**: the only one, `TODO_COPY_SHELL_PROJECT_OPEN_FAILED`, is now `프로젝트 열 수 없음` (to confirm, see Requests). A test fails if a `"TODO_COPY` string comes back into core:ui sources.
+
+### What each lane must adopt or delete
+
+- **All lanes**
+  - Nothing to change for S1, S2, S3, S4, S8 banner, S10, S11: the shell draws them. Do not add your own screen transitions or overlay fades.
+  - Overlay routes (search, recording) are now overlay scenes. Back works as before; do not add a second back handler that pops the overlay.
+  - `CivilightScreen(banner = …)` animates the banner; pass `null` to hide it, do not remove the parameter conditionally inside your own `if`.
+  - `AppLockScreen` and `HiddenProjectLockScreen` gained `interactive: Boolean = true`; `Modifier.lockedContent(level, locked)` is new (the old `lockedContent()` stays).
+  - `ListDetailPanes` gained a last parameter `module: String? = null`.
+- **feature:script**: use `rememberPaneSplitState(PaneSplit.Modules.SCRIPT_PANEL, totalDp, defaultLeftDp = <manuscript width of today's 488 | 288 layout>)` and draw `state.leftDp` for the manuscript width (replacing the fixed `layout.areaWidth` while unfolded), with `PaneSplitHandle(state)` centred on the divider. Do not store the ratio yourself.
+- **feature:canvas**:
+  - Register `Gallery` and the three gallery sheets (`GalleryAddSheet`, `GalleryInfoSheet`, `GalleryMenuSheet`) in `canvasEntries`. Arriving with `pickKey` picks that item (GAL-08).
+  - Draw cards with core:ui `GalleryCard` and rows with DS `SnapCardRow`. Delete `feature/canvas/.../card/SnapCardRow.kt`, `CardViewMotion.kt` and `CardRules.kt` once the canvas screens use the DS ones (keep `CardParts.kt`).
+  - GAL-23 list + detail inside the gallery screen: `SplitPanes(PaneSplit.Modules.GALLERY, left, right)`.
+  - `GraphSurface` now animates the viewport itself; a screen that animates its own viewport should just set the target.
+- **feature:cast** (GAL-01) and **feature:story** (GAL-03): open `Gallery.ofCharacter(p, c)` / `Gallery.ofProject(p)` and `GalleryAddSheet`; draw cards with `GalleryCard`; do not copy canvas parts.
+- **feature:story** (search screen; the shell did not edit this module):
+  - QA #11: `search/SearchViewModel.kt:84` reads `val result = if (q.isBlank()) null else ProjectSearch(…).search(q, f)`. Change the gate to `if (q.isBlank() && f != SearchFilter.COMMAND) null`, so the `명령` chip lists the commands with no query.
+  - Gallery hits: call `search(q, f, includeGallery = true)` once the screen draws a `갤러리` section from `SearchResult.gallery` (44 thumbnail from `source`, `match` with the whole sentence boxed, `label`). Tap → `Gallery(p, hit.ownerKind, hit.ownerKey, pickKey = hit.itemKey)`. Until then leave `includeGallery` off, or a gallery-only match shows an empty screen instead of `결과 없음`.
+- **feature:library**: the 서재 `목록 + 상세` gets the handle from the shell; nothing to do.
+
+### Left (core:ui / app)
+
+- S17 theme or text-size crossfade (low).
+- S14: line draw-progress on `enter` and the fade of removed lines.
+- CNV-38 bars drawing left → right (needs an AVD splash icon).
+- `ThemeBridge.systemAnimationsOff` stays for the splash exit; it can go once the splash reads `LocalMotion`.
+- app has no unit tests, so app's MotionLint and the `Startup` tests still wait for test sources.
+- Emulator pass: everything in the motion table above, plus the CNV-47 handle (drag, settle tick, popover, restart keeps the ratio, cover screen shows no handle, 280 dp clamp on a narrow Medium window).
+

@@ -1,6 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.script.ui
 
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -116,7 +118,10 @@ fun SheetScope.DirectionSheet(key: DirectionSheetKey, doc: ProjectDoc, readOnly:
                 })
             }
         }
-        val kind = openKind ?: return@SheetScrollBody
+        // Motion audit P3: the open kind's picker folds in under the chips and swaps when another kind opens.
+        ContentSwap(openKind, label = "cuePicker") { kind ->
+        Column(Modifier.fillMaxWidth()) {
+        if (kind == null) return@Column
         fun pick(assetKey: Key?, effect: String?) {
             val cue = replacing
             if (cue != null) actions.replace(cue, assetKey, effect) else actions.add(kind, assetKey, effect)
@@ -131,7 +136,7 @@ fun SheetScope.DirectionSheet(key: DirectionSheetKey, doc: ProjectDoc, readOnly:
             if (rows.isEmpty()) CivilightText(ScriptCopy.NO_ASSETS, type.small, Modifier.padding(top = 12.dp), color = colors.ink3)
             rows.forEach { row -> AssetRowView(row) { pick(row.key, null) } }
             actions.addAsset?.let { add -> TextAction(AssetsCopy.ADD_FOR_CUE, onClick = { add(kind) }, modifier = Modifier.padding(top = 4.dp)) }
-            return@SheetScrollBody
+            return@Column
         }
         CueEditor.picks(doc, kind).forEach { effect ->
             ListRow(
@@ -141,6 +146,8 @@ fun SheetScope.DirectionSheet(key: DirectionSheetKey, doc: ProjectDoc, readOnly:
                 trailing = effect.trailing?.let { t -> { CivilightText(t, type.number, color = colors.ink3, maxLines = 1) } },
                 onClick = { pick(effect.assetKey, effect.effect) },
             )
+        }
+        }
         }
     }
 }

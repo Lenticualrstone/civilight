@@ -1,5 +1,21 @@
 package io.github.lenticualrstone.civilight.feature.world.time
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.runtime.key
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.util.lerp
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.model.app.PaneSplit
+import io.github.lenticualrstone.civilight.ui.window.SplitPanes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -111,6 +127,7 @@ fun TimelineMapScreen(route: TimelineMap, deps: FeatureDeps) {
     var modeName by rememberSaveable { mutableStateOf(CompareMode.NOW.name) }
     LaunchedEffect(selected, mapKey, modeName) { vm.set(selected, mapKey, CompareMode.valueOf(modeName)) }
     val wide = LocalWindowLayout.current.widthClass != WidthClass.COMPACT
+    val motion = CivilightTheme.motion
     val state = ui
 
     CivilightScreen(
@@ -138,16 +155,30 @@ fun TimelineMapScreen(route: TimelineMap, deps: FeatureDeps) {
                 onMode = { modeName = it.name },
             )
         }
-        if (wide) {
-            Row(Modifier.fillMaxSize()) {
-                EventList(state, Modifier.width(390.dp).fillMaxHeight(), padding, onSelect, onOpen)
-                mapPanel(
-                    Modifier.weight(1f).fillMaxHeight()
-                        .padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding(), end = 16.dp),
+        // A fold or unfold swaps the two layouts on the fold tokens (CNV-34): fade in on `foldOpen` / `foldClose`.
+        AnimatedContent(
+            targetState = wide,
+            transitionSpec = {
+                val t = if (targetState) CivilightMotion.foldOpen else CivilightMotion.foldClose
+                ContentTransform(fadeIn(motion.spec(t)), fadeOut(motion.spec(CivilightMotion.exit)), sizeTransform = null)
+            },
+            label = "timelineMapLayout",
+        ) { isWide ->
+            if (isWide) {
+                // The event list | map frame is the shared CNV-47 split (390 dp list by default; the 연표 ratio).
+                SplitPanes(
+                    module = PaneSplit.Modules.TIMELINE,
+                    left = { EventList(state, Modifier.fillMaxSize(), padding, onSelect, onOpen) },
+                    right = {
+                        mapPanel(
+                            Modifier.fillMaxSize()
+                                .padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding(), end = 16.dp),
+                        )
+                    },
                 )
+            } else {
+                EventList(state, Modifier.fillMaxSize(), padding, onSelect, onOpen, header = { mapPanel(Modifier.fillMaxWidth()) })
             }
-        } else {
-            EventList(state, Modifier.fillMaxSize(), padding, onSelect, onOpen, header = { mapPanel(Modifier.fillMaxWidth()) })
         }
     }
 }
@@ -170,27 +201,37 @@ private fun EventList(
         if (header != null) item(key = "map") { header() }
         item(key = "hint") { CivilightText(ui.hint, type.small, Modifier.padding(top = 8.dp, bottom = 6.dp), color = colors.ink3) }
         items(ui.rows, key = { it.eventKey }) { row ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .topHairline(colors.line)
-                    .then(if (row.selected) Modifier.background(colors.hl) else Modifier)
-                    .pressable(PressAction.Select(row.selected) { onSelect(row) }, role = Role.Button, scaleOnPress = false)
-                    .heightIn(min = 44.dp)
-                    .padding(vertical = 10.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                CivilightText(row.time, type.number, Modifier.width(72.dp), color = colors.ink3)
-                Column(Modifier.weight(1f)) {
-                    CivilightText(row.title, type.itemTitle, color = if (row.selected) colors.acc else colors.ink)
-                    if (row.sub.isNotEmpty()) CivilightText(row.sub, type.small, color = colors.ink3)
-                    row.regionChange?.let { CivilightText(it, type.small, color = colors.acc) }
-                }
-                row.place?.let { CivilightText(it, type.small, Modifier.padding(start = 8.dp, top = 2.dp), color = colors.ink2) }
-                if (!row.locked) {
-                    CivilightIconButton(icon = IconId.Next, contentDescription = row.title, onClick = { onOpen(row) })
-                }
-            }
+            EventRow(row, civilightItem(), onSelect, onOpen)
+        }
+    }
+}
+
+/** One event of the list; the selection fades its highlight in and the title to `acc` (`standard`). */
+@Composable
+private fun EventRow(row: TimelineMapRowUi, modifier: Modifier, onSelect: (TimelineMapRowUi) -> Unit, onOpen: (TimelineMapRowUi) -> Unit) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val hl by animatedFraction(row.selected)
+    val titleColor by animatedColor(if (row.selected) colors.acc else colors.ink)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .topHairline(colors.line)
+            .drawBehind { drawRect(colors.hl.copy(alpha = colors.hl.alpha * hl)) }
+            .pressable(PressAction.Select(row.selected) { onSelect(row) }, role = Role.Button, scaleOnPress = false)
+            .heightIn(min = 44.dp)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        CivilightText(row.time, type.number, Modifier.width(72.dp), color = colors.ink3)
+        Column(Modifier.weight(1f)) {
+            CivilightText(row.title, type.itemTitle, color = titleColor)
+            if (row.sub.isNotEmpty()) CivilightText(row.sub, type.small, color = colors.ink3)
+            row.regionChange?.let { CivilightText(it, type.small, color = colors.acc) }
+        }
+        row.place?.let { CivilightText(it, type.small, Modifier.padding(start = 8.dp, top = 2.dp), color = colors.ink2) }
+        if (!row.locked) {
+            CivilightIconButton(icon = IconId.Next, contentDescription = row.title, onClick = { onOpen(row) })
         }
     }
 }
@@ -209,8 +250,12 @@ private fun MapPanel(ui: TimelineMapUi, modifier: Modifier, onMap: (Key) -> Unit
             CivilightText(WorldCopy.NO_MAP, type.small, color = colors.ink3)
             return@Column
         }
-        SchematicMap(ui, Modifier.fillMaxWidth())
-        ui.compare?.let { compare ->
+        // Another map crossfades on `standard` (WLD-68, 200 ms); the same map only moves its highlight.
+        ContentSwap(ui, Modifier.fillMaxWidth(), contentKey = { it.mapKey }, label = "timelineMap") { shown ->
+            SchematicMap(shown, Modifier.fillMaxWidth())
+        }
+        FoldRevealValue(ui.compare) { compare ->
+          Column {
             ChipFlow(Modifier.padding(top = 10.dp)) {
                 compare.chips.forEachIndexed { i, label ->
                     val mode = CompareMode.entries[i]
@@ -221,7 +266,8 @@ private fun MapPanel(ui: TimelineMapUi, modifier: Modifier, onMap: (Key) -> Unit
                 CivilightText(compare.captionName, type.small, color = colors.ink)
                 CivilightText(compare.captionLine, type.small, color = colors.acc)
             }
-            compare.dottedNote?.let { CivilightText(it, type.small, Modifier.padding(top = 2.dp), color = colors.ink3) }
+            FoldRevealValue(compare.dottedNote) { note -> CivilightText(note, type.small, Modifier.padding(top = 2.dp), color = colors.ink3) }
+          }
         }
     }
 }
@@ -239,10 +285,13 @@ private fun SchematicMap(ui: TimelineMapUi, modifier: Modifier) {
     ) {
         val w = maxWidth
         val h = maxHeight
+        // Each region's highlight moves on `standard` (per-key fraction, read in the draw phase).
+        val fractions = ui.regions.map { r -> key(r.key) { animatedFraction(r.highlighted, label = "region") } }
         Canvas(Modifier.fillMaxSize()) {
             val dash = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))
-            ui.regions.forEach { region ->
-                if (region.vertices.size < 3) return@forEach
+            ui.regions.forEachIndexed { index, region ->
+                val f = fractions[index].value
+                if (region.vertices.size < 3) return@forEachIndexed
                 val path = Path().apply {
                     region.vertices.forEachIndexed { i, p ->
                         val o = Offset(p.x * size.width, p.y * size.height)
@@ -250,9 +299,9 @@ private fun SchematicMap(ui: TimelineMapUi, modifier: Modifier) {
                     }
                     close()
                 }
-                val tone = if (region.highlighted) colors.acc else colors.ink3
-                drawPath(path, tone.copy(alpha = if (region.highlighted) 0.22f else 0.08f))
-                drawPath(path, tone, style = Stroke(width = if (region.highlighted) 3f else 1.5f))
+                val tone = lerp(colors.ink3, colors.acc, f)
+                drawPath(path, tone.copy(alpha = lerp(0.08f, 0.22f, f)))
+                drawPath(path, tone, style = Stroke(width = lerp(1.5f, 3f, f)))
                 region.added?.takeIf { it.size >= 3 }?.let { added ->
                     val addedPath = Path().apply {
                         added.forEachIndexed { i, p ->
@@ -265,11 +314,11 @@ private fun SchematicMap(ui: TimelineMapUi, modifier: Modifier) {
                 }
             }
         }
-        ui.pins.forEach { pin ->
+        ui.pins.forEach { pin -> key(pin.key) {
             // The pin's tip sits on its point; the 24 dp icon is centred over x.
             Box(Modifier.offset(x = w * pin.x - 12.dp, y = h * pin.y - 24.dp)) {
                 MapPin(pin.name, selected = pin.highlighted, dim = !pin.highlighted && ui.pins.any { it.highlighted })
             }
-        }
+        } }
     }
 }

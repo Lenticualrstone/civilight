@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.recorder.capture
 
 import io.github.lenticualrstone.civilight.designsystem.component.GlowMode
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.capture.MemoSheetView
 import io.github.lenticualrstone.civilight.domain.recorder.capture.ProcessingScreen
 import io.github.lenticualrstone.civilight.domain.recorder.capture.Recording
@@ -51,7 +52,7 @@ object CaptureViews {
         if (state.stage != CaptureStage.RECORDING) return null
         return RecordingView(
             screen = Recording.recordingScreen(session, state.env),
-            engineNote = if (state.engineUnavailable) RecorderCopy.TODO_NO_ENGINE else null,
+            engineNote = if (state.engineUnavailable) ShownCopy.NO_ENGINE else null,
             paused = session.phase == RecordingPhase.PAUSED,
             canToText = !session.entry.onLockScreen,
         )
@@ -79,5 +80,53 @@ object CaptureViews {
             LinkPicker.search(state.env, it.query, memo.draft.pendingLinks, PickerMode.AT).take(AT_MAX)
         }.orEmpty()
         return MemoView(TextMemo.view(memo, state.env), candidates, query != null, AtMarks.of(memo.draft.runs))
+    }
+}
+
+/** What the capture sheet shows now (one sheet for the picker, the memo and the mic reason; they swap inside it). */
+enum class CaptureSheetKind { PICKER, MIC_REASON, MEMO }
+
+object CaptureSheets {
+    /** The picker wins over the memo it opened from; no sheet while a pane or nothing is up. */
+    fun of(state: CaptureState): CaptureSheetKind? = when {
+        state.picker != null -> CaptureSheetKind.PICKER
+        state.stage == CaptureStage.MIC_REASON -> CaptureSheetKind.MIC_REASON
+        state.stage == CaptureStage.TYPING -> CaptureSheetKind.MEMO
+        else -> null
+    }
+}
+
+/**
+ * The pane of the capture stage with the view it draws, so a pane that leaves keeps showing its own
+ * view while it fades (the live state has already moved on). [kind] is the swap key: a view changing
+ * inside one stage (every transcript update) is no swap.
+ */
+sealed interface CaptureSlot {
+    val kind: CaptureStage?
+
+    data class Recording(val view: RecordingView) : CaptureSlot {
+        override val kind get() = CaptureStage.RECORDING
+    }
+
+    data class Processing(val view: ProcessingView) : CaptureSlot {
+        override val kind get() = CaptureStage.PROCESSING
+    }
+
+    data object MicOff : CaptureSlot {
+        override val kind get() = CaptureStage.MIC_OFF
+    }
+
+    /** Sheet stages and idle: the frame shows nothing of its own. */
+    data object None : CaptureSlot {
+        override val kind: CaptureStage? get() = null
+    }
+
+    companion object {
+        fun of(state: CaptureState): CaptureSlot = when (state.stage) {
+            CaptureStage.RECORDING -> CaptureViews.recording(state)?.let(::Recording) ?: None
+            CaptureStage.PROCESSING -> CaptureViews.processing(state)?.let(::Processing) ?: None
+            CaptureStage.MIC_OFF -> MicOff
+            CaptureStage.TYPING, CaptureStage.MIC_REASON, CaptureStage.IDLE -> None
+        }
     }
 }

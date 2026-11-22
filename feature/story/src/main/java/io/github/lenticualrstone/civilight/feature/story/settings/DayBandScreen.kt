@@ -31,6 +31,8 @@ import io.github.lenticualrstone.civilight.designsystem.component.RadioRow
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import io.github.lenticualrstone.civilight.domain.story.structure.UnitSettingsEdit
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.common.StoryServices
@@ -81,35 +83,38 @@ fun DayBandScreen(route: DayBandSettings, deps: FeatureDeps) {
             smallLine = ui?.projectName,
             back = if (LocalPaneRole.current == PaneRole.DETAIL) null else IconAction(StoryCopy.BACK) { deps.navigator.pop() },
         ) { padding ->
-            val u = ui
-            if (u == null) {
-                Box(Modifier.fillMaxSize().background(colors.bg))
-                return@CivilightScreen
-            }
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .background(colors.bg)
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
-            ) {
-                listOf(DayBoundary.DAWN_0400 to DayBandCopy.DAWN_DAY, DayBoundary.MIDNIGHT to DayBandCopy.MIDNIGHT).forEach { (boundary, label) ->
-                    RadioRow(
-                        title = label,
-                        selected = u.boundary == boundary,
-                        onClick = {
-                            if (u.boundary != boundary) vm.apply(DayBandCopy.TITLE) { d, ctx -> UnitSettingsEdit.setDayBoundary(d, boundary, ctx.edit) }
-                        },
-                        enabled = !u.readOnly,
-                    )
-                }
-                SectionLabel(DayBandCopy.BANDS, Modifier.padding(top = 20.dp))
-                u.bands.forEach { row ->
-                    BandEditRow(row) { start ->
-                        vm.apply(DayBandCopy.TITLE) { d, ctx -> UnitSettingsEdit.setBandStart(d, row.band, start, ctx.edit) }
+            // Loading -> content swaps on the kind, never on the data (motion audit, feature:story 7).
+            ContentSwap(ui != null, Modifier.fillMaxSize()) { loaded ->
+                val u = ui
+                if (!loaded || u == null) {
+                    Box(Modifier.fillMaxSize().background(colors.bg))
+                } else {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .background(colors.bg)
+                            .verticalScroll(rememberScrollState())
+                            .padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+                    ) {
+                        listOf(DayBoundary.DAWN_0400 to DayBandCopy.DAWN_DAY, DayBoundary.MIDNIGHT to DayBandCopy.MIDNIGHT).forEach { (boundary, label) ->
+                            RadioRow(
+                                title = label,
+                                selected = u.boundary == boundary,
+                                onClick = {
+                                    if (u.boundary != boundary) vm.apply(DayBandCopy.TITLE) { d, ctx -> UnitSettingsEdit.setDayBoundary(d, boundary, ctx.edit) }
+                                },
+                                enabled = !u.readOnly,
+                            )
+                        }
+                        SectionLabel(DayBandCopy.BANDS, Modifier.padding(top = 20.dp))
+                        u.bands.forEach { row ->
+                            BandEditRow(row) { start ->
+                                vm.apply(DayBandCopy.TITLE) { d, ctx -> UnitSettingsEdit.setBandStart(d, row.band, start, ctx.edit) }
+                            }
+                        }
+                        if (u.readOnly) CivilightText(StoryCopy.READ_ONLY, type.small, Modifier.padding(top = 12.dp), color = colors.ink3)
                     }
                 }
-                if (u.readOnly) CivilightText(StoryCopy.READ_ONLY, type.small, Modifier.padding(top = 12.dp), color = colors.ink3)
             }
         }
     }
@@ -125,7 +130,7 @@ private fun BandEditRow(row: BandRow, onStart: (io.github.lenticualrstone.civili
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         CivilightText(row.word, type.itemTitleCompact, Modifier.width(48.dp), color = colors.ink, maxLines = 1)
-        CivilightText(row.hours, type.number, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
+        ValueSwap(row.hours, type.number, Modifier.weight(1f), color = colors.ink3)
         if (row.editable) {
             // Committed on Done or focus loss only; an invalid start is not applied (the field returns to the stored value).
             CommitField(

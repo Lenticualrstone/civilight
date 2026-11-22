@@ -21,7 +21,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.CommandBar
@@ -29,7 +30,12 @@ import io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock
 import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.LockRow
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.checks.CheckCopy
 import io.github.lenticualrstone.civilight.domain.checks.CheckListRow
 import io.github.lenticualrstone.civilight.domain.checks.CheckResult
@@ -114,26 +120,29 @@ fun CheckCenterScreen(route: CheckCenter, deps: FeatureDeps) {
             },
         ) { padding ->
             val doc = ready?.doc
-            if (ui == null || doc == null) {
-                Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg)) {
-                    CivilightText(CheckCopy.SCANNING, CivilightTheme.type.small, Modifier.padding(top = padding.calculateTopPadding() + 12.dp, start = 24.dp), color = CivilightTheme.colors.ink3)
+            // `점검 중` -> list swaps on the kind, never on the data (motion audit, feature:story 7).
+            ContentSwap(ui != null && doc != null, Modifier.fillMaxSize()) { loaded ->
+                if (!loaded || ui == null || doc == null || ready == null) {
+                    Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg)) {
+                        CivilightText(CheckCopy.SCANNING, CivilightTheme.type.small, Modifier.padding(top = padding.calculateTopPadding() + 12.dp, start = 24.dp), color = CivilightTheme.colors.ink3)
+                    }
+                } else {
+                    CheckList(
+                        ui = ui,
+                        doc = doc,
+                        padding = padding,
+                        expanded = expanded,
+                        readOnly = ready.readOnly,
+                        onFilter = { filterName = it.name },
+                        onToggle = { id -> expanded = if (id in expanded) expanded - id else expanded + id },
+                        onLocation = { key -> navigator.openDetail(CheckFixes.scriptAt(doc, p, key)) },
+                        onButton = ::run,
+                        onUnlock = gate.unlock,
+                        onManuscript = { navigator.openDetail(CheckModel.manuscriptRoute(doc)) },
+                        buttonsOf = { result, actions, members -> CheckFixes.shown(doc, p, result, actions, vm.inputs, members, ready.readOnly).map { it.first } },
+                        selectedKey = CheckModel.selectedKey(navigator.backStack, p),
+                    )
                 }
-            } else {
-                CheckList(
-                    ui = ui,
-                    doc = doc,
-                    padding = padding,
-                    expanded = expanded,
-                    readOnly = ready.readOnly,
-                    onFilter = { filterName = it.name },
-                    onToggle = { id -> expanded = if (id in expanded) expanded - id else expanded + id },
-                    onLocation = { key -> navigator.openDetail(CheckFixes.scriptAt(doc, p, key)) },
-                    onButton = ::run,
-                    onUnlock = gate.unlock,
-                    onManuscript = { navigator.openDetail(CheckModel.manuscriptRoute(doc)) },
-                    buttonsOf = { result, actions, members -> CheckFixes.shown(doc, p, result, actions, vm.inputs, members, ready.readOnly).map { it.first } },
-                    selectedKey = CheckModel.selectedKey(navigator.backStack, p),
-                )
             }
         }
     }
@@ -157,28 +166,34 @@ private fun CheckList(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    val lines = remember(ui.rows, expanded) { CheckLines.flatten(ui.rows, expanded) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(colors.bg),
         contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
     ) {
         item(key = "intro") {
-            CivilightText(ui.header.intro, type.small, color = colors.ink3)
+            CivilightText(ui.header.intro, type.small, civilightItem(), color = colors.ink3)
         }
         item(key = "chips") {
             Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 12.dp),
+                civilightItem().fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ui.header.chips.forEach { chip ->
-                    FilterChip(chip.label, chip.filter == ui.filter, { onFilter(chip.filter) }, Modifier.alpha(if (chip.dimmed) DIMMED else 1f))
+                    // `점검 중` dims the chips; the dim fades (animatedAlpha) instead of jumping.
+                    val dim by animatedAlpha(if (chip.dimmed) DIMMED else 1f)
+                    FilterChip(chip.label, chip.filter == ui.filter, { onFilter(chip.filter) }, Modifier.graphicsLayer { alpha = dim })
                 }
-                ui.header.scanningLabel?.let { CivilightText(it, type.small, Modifier.padding(start = 6.dp), color = colors.ink3, maxLines = 1) }
+                FoldRevealValue(ui.header.scanningLabel, horizontal = true) {
+                    CivilightText(it, type.small, Modifier.padding(start = 6.dp), color = colors.ink3, maxLines = 1)
+                }
             }
         }
         ui.empty?.let { empty ->
             item(key = "empty") {
                 EmptyBlock(
+                    modifier = civilightItem(),
                     title = empty.title,
                     subtitle = empty.line,
                     primaryLabel = empty.buttons[0],
@@ -188,85 +203,88 @@ private fun CheckList(
                 )
             }
         }
-        items(ui.rows, key = ::rowKey) { row ->
-            when (row) {
-                is CheckListRow.HiddenGroup -> LockRow(title = row.text.substringBefore(" · ${CheckCopy.UNLOCK}"), actionLabel = row.action.label, onAction = onUnlock, modifier = Modifier.padding(vertical = 8.dp))
-                is CheckListRow.Item -> {
-                    val target = CheckModel.locationTarget(doc, row.result)
-                    val buttons = buttonsOf(row.result, row.actions, listOf(row.result))
-                    val selected = target != null && target == selectedKey
-                    when (val look = TravelLooks.of(row.result, ui.filter)) {
-                        is TravelLook.Card -> TravelCard(
-                            title = row.result.title,
-                            tag = row.result.tag,
-                            routeLine = look.warning.routeLine,
-                            warning = look.warning,
-                            detail = look.detail,
-                            chips = buttons.map { it.label },
-                            onChip = { i -> onButton(row.result, buttons[i], listOf(row.result)) },
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            map = remember(doc, look.warning) { MiniMaps.travel(doc, look.warning) },
-                            location = row.result.location,
-                            onLocation = target?.let { { onLocation(it) } },
-                        )
-                        is TravelLook.Compact -> TravelCompactRow(
-                            look,
-                            buttons,
-                            { onButton(row.result, it, listOf(row.result)) },
-                            selected,
-                            location = row.result.location,
-                            onLocation = target?.let { { onLocation(it) } },
-                        )
-                        TravelLook.Plain -> CheckItemRow(
-                            result = row.result,
-                            buttons = buttons,
-                            onLocation = target?.let { { onLocation(it) } },
-                            onButton = { onButton(row.result, it, listOf(row.result)) },
-                            selected = selected,
-                        )
-                    }
-                    row.subRows.forEach { sub ->
-                        val subTarget = CheckModel.locationTarget(doc, sub)
-                        CheckItemRow(
-                            result = sub,
-                            buttons = buttonsOf(sub, sub.actions, listOf(sub)),
-                            onLocation = subTarget?.let { { onLocation(it) } },
-                            onButton = { onButton(sub, it, listOf(sub)) },
-                            nested = true,
-                            selected = subTarget != null && subTarget == selectedKey,
-                        )
-                    }
+        items(lines, key = { it.key }) { line ->
+            // Every line is its own keyed item; members of a group open and close on the fold tokens.
+            val item = civilightItem()
+            val fold = civilightItem(CivilightMotion.foldOpen, fadeOut = CivilightMotion.foldClose)
+            when (line) {
+                is CheckLine.Sub -> {
+                    val subTarget = CheckModel.locationTarget(doc, line.result)
+                    CheckItemRow(
+                        result = line.result,
+                        buttons = buttonsOf(line.result, line.result.actions, listOf(line.result)),
+                        onLocation = subTarget?.let { { onLocation(it) } },
+                        onButton = { onButton(line.result, it, listOf(line.result)) },
+                        nested = true,
+                        selected = subTarget != null && subTarget == selectedKey,
+                        modifier = item,
+                    )
                 }
-                is CheckListRow.Group -> {
-                    val id = row.group.id
-                    val open = id in expanded
-                    CheckGroupRow(row.title, row.members.any { it.marker == Marker.WARNING }, open) { onToggle(id) }
-                    val first = row.members.first()
-                    val groupButtons = buttonsOf(first, row.actions, row.members)
-                    if (groupButtons.isNotEmpty()) ButtonsRow(groupButtons) { onButton(first, it, row.members) }
-                    if (open) {
-                        row.members.forEach { member ->
-                            val memberTarget = CheckModel.locationTarget(doc, member)
-                            CheckItemRow(
-                                result = member,
-                                buttons = buttonsOf(member, member.actions, listOf(member)),
-                                onLocation = memberTarget?.let { { onLocation(it) } },
-                                onButton = { onButton(member, it, listOf(member)) },
-                                nested = true,
-                                selected = memberTarget != null && memberTarget == selectedKey,
+                is CheckLine.Member -> {
+                    val member = line.result
+                    val memberTarget = CheckModel.locationTarget(doc, member)
+                    CheckItemRow(
+                        result = member,
+                        buttons = buttonsOf(member, member.actions, listOf(member)),
+                        onLocation = memberTarget?.let { { onLocation(it) } },
+                        onButton = { onButton(member, it, listOf(member)) },
+                        nested = true,
+                        selected = memberTarget != null && memberTarget == selectedKey,
+                        modifier = fold,
+                    )
+                }
+                is CheckLine.Top -> when (val row = line.row) {
+                    is CheckListRow.HiddenGroup -> LockRow(title = row.text.substringBefore(" · ${CheckCopy.UNLOCK}"), actionLabel = row.action.label, onAction = onUnlock, modifier = item.padding(vertical = 8.dp))
+                    is CheckListRow.Item -> {
+                        val target = CheckModel.locationTarget(doc, row.result)
+                        val buttons = buttonsOf(row.result, row.actions, listOf(row.result))
+                        val selected = target != null && target == selectedKey
+                        when (val look = TravelLooks.of(row.result, ui.filter)) {
+                            is TravelLook.Card -> TravelCard(
+                                title = row.result.title,
+                                tag = row.result.tag,
+                                routeLine = look.warning.routeLine,
+                                warning = look.warning,
+                                detail = look.detail,
+                                chips = buttons.map { it.label },
+                                onChip = { i -> onButton(row.result, buttons[i], listOf(row.result)) },
+                                modifier = item.padding(vertical = 8.dp),
+                                map = remember(doc, look.warning) { MiniMaps.travel(doc, look.warning) },
+                                location = row.result.location,
+                                onLocation = target?.let { { onLocation(it) } },
                             )
+                            is TravelLook.Compact -> TravelCompactRow(
+                                look,
+                                buttons,
+                                { onButton(row.result, it, listOf(row.result)) },
+                                selected,
+                                location = row.result.location,
+                                onLocation = target?.let { { onLocation(it) } },
+                                modifier = item,
+                            )
+                            TravelLook.Plain -> CheckItemRow(
+                                result = row.result,
+                                buttons = buttons,
+                                onLocation = target?.let { { onLocation(it) } },
+                                onButton = { onButton(row.result, it, listOf(row.result)) },
+                                selected = selected,
+                                modifier = item,
+                            )
+                        }
+                    }
+                    is CheckListRow.Group -> {
+                        val id = row.group.id
+                        val first = row.members.first()
+                        val groupButtons = buttonsOf(first, row.actions, row.members)
+                        Column(item) {
+                            CheckGroupRow(row.title, row.members.any { it.marker == Marker.WARNING }, id in expanded) { onToggle(id) }
+                            if (groupButtons.isNotEmpty()) ButtonsRow(groupButtons) { onButton(first, it, row.members) }
                         }
                     }
                 }
             }
         }
     }
-}
-
-private fun rowKey(row: CheckListRow): String = when (row) {
-    is CheckListRow.HiddenGroup -> "hidden"
-    is CheckListRow.Item -> row.result.id
-    is CheckListRow.Group -> "group:${row.group.id}"
 }
 
 private const val DIMMED = 0.5f

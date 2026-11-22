@@ -10,6 +10,11 @@ import io.github.lenticualrstone.civilight.model.position.LensPoint
 import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.navigation.CanvasBoard
 import io.github.lenticualrstone.civilight.navigation.CastList
+import io.github.lenticualrstone.civilight.navigation.CheckCenter
+import io.github.lenticualrstone.civilight.navigation.Gallery
+import io.github.lenticualrstone.civilight.navigation.PageList
+import io.github.lenticualrstone.civilight.model.project.WorldTimeMode
+import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.navigation.ProjectSettings
 import io.github.lenticualrstone.civilight.navigation.StoryStructure
 import io.github.lenticualrstone.civilight.navigation.Timeline
@@ -86,13 +91,28 @@ class HomeModelTest {
     @Test
     fun shortcutsInBoardOrderAndTheirRoutes() {
         val ui = home()
-        assertEquals(listOf("스토리", "인물", "세계", "연표", "캔버스", "설정"), ui.shortcuts.map { it.label })
+        assertEquals(listOf("스토리", "인물", "세계", "연표", "캔버스", "갤러리", "페이지", "점검 센터", "설정"), ui.shortcuts.map { it.label })
         assertTrue(HomeShortcut.SETTINGS.dim)
         val p = K.PROJECT
         assertEquals(
-            listOf(StoryStructure(p), CastList(p), World(p), Timeline(p), CanvasBoard(p), ProjectSettings(p)),
+            listOf(
+                StoryStructure(p), CastList(p), World(p), Timeline(p), CanvasBoard(p),
+                Gallery.ofProject(p), PageList(p), CheckCenter(p), ProjectSettings(p),
+            ),
             HomeShortcut.entries.map { it.route(p) },
         )
+    }
+
+    @Test
+    fun settingsKeepsItsOwnLastRow_GAL03() {
+        val rows = HomeModel.shortcutRows(HomeModel.shortcuts(doc))
+        assertEquals(listOf(3, 3, 2, 1), rows.map { it.size })
+        assertEquals(listOf(HomeShortcut.SETTINGS), rows.last())
+        assertTrue(rows.dropLast(1).all { HomeShortcut.SETTINGS !in it })
+        val none = doc.copy(project = doc.project.copy(worldTime = doc.project.worldTime.copy(mode = WorldTimeMode.NONE.open())))
+        val noTime = HomeModel.shortcutRows(HomeModel.shortcuts(none))
+        assertEquals(listOf(3, 3, 1, 1), noTime.map { it.size })
+        assertEquals(listOf(HomeShortcut.SETTINGS), noTime.last())
     }
 
     @Test

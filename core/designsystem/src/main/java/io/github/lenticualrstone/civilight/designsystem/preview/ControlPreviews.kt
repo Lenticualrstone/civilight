@@ -48,6 +48,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.TabGap
 import io.github.lenticualrstone.civilight.designsystem.component.TabSets
 import io.github.lenticualrstone.civilight.designsystem.component.TypeGridCell
 import io.github.lenticualrstone.civilight.designsystem.component.ViewToggle
+import io.github.lenticualrstone.civilight.designsystem.component.ViewToggleMode
 import io.github.lenticualrstone.civilight.designsystem.component.ThemeSwatch
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.ThemeMode
@@ -121,6 +122,7 @@ private fun SegmentedAndSliderPreview() = PreviewSurface {
     SegmentedControl(listOf("기기 설정", "라이트", "다크"), 0, {})
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         ViewToggle(showCards = false, onChange = {})
+        ViewToggle(mode = ViewToggleMode.GRID, onChange = {})
         OutlinedSegmented(listOf(SegmentItem("정확"), SegmentItem("대략")), 1, {}, height = 32.dp)
     }
     StepSlider(value = 2, stepCount = 5, onValueChange = {})

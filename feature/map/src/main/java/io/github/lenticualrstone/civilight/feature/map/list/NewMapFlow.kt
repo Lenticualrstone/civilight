@@ -74,7 +74,7 @@ fun rememberNewMapFlow(projectKey: Key, deps: FeatureDeps, vm: MapScreenViewMode
             val blob = runCatching { deps.stores.blobs.import(context.contentResolver, uri, BlobSource.SKETCH) }
                 .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
                 .getOrNull()
-            if (blob == null) deps.toasts.show(MapCopy.TODO_COPY_MAP_IMPORT_FAILED, actionLabel = null) else straighten(blob)
+            if (blob == null) deps.toasts.show(MapCopy.IMPORT_FAILED, actionLabel = null) else straighten(blob)
         }
     }
     val shoot = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
@@ -89,7 +89,7 @@ fun rememberNewMapFlow(projectKey: Key, deps: FeatureDeps, vm: MapScreenViewMode
                 File(path).delete()
                 null
             }
-            if (blob != null) straighten(blob) else if (ok) deps.toasts.show(MapCopy.TODO_COPY_MAP_IMPORT_FAILED, actionLabel = null)
+            if (blob != null) straighten(blob) else if (ok) deps.toasts.show(MapCopy.IMPORT_FAILED, actionLabel = null)
         }
     }
 
@@ -117,7 +117,7 @@ fun rememberNewMapFlow(projectKey: Key, deps: FeatureDeps, vm: MapScreenViewMode
                         runCatching { shoot.launch(uri) }.onFailure {
                             captureFile = null
                             file.delete()
-                            deps.toasts.show(MapCopy.TODO_COPY_MAP_IMPORT_FAILED, actionLabel = null)
+                            deps.toasts.show(MapCopy.IMPORT_FAILED, actionLabel = null)
                         }
                     }
                 }

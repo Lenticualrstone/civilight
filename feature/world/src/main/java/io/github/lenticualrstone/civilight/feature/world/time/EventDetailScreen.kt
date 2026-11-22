@@ -1,6 +1,11 @@
 package io.github.lenticualrstone.civilight.feature.world.time
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.feature.world.common.BodyStage
+import io.github.lenticualrstone.civilight.feature.world.common.CardBodySwap
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -99,7 +104,7 @@ fun EventDetailScreen(route: EventDetail, deps: FeatureDeps) {
                 is EventChangeSheet -> {
                     {
                         EventChangeContent(key.eventKey) { draft ->
-                            vm.addChange(draft).also { added -> if (added) deps.toasts.show(WorldCopy.TODO_COPY_WORLD_CHANGE_ADDED_TOAST) { vm.undoLast() } }
+                            vm.addChange(draft).also { added -> if (added) deps.toasts.show(WorldCopy.CHANGE_ADDED_TOAST) { vm.undoLast() } }
                         }
                     }
                 }
@@ -123,65 +128,68 @@ fun EventDetailScreen(route: EventDetail, deps: FeatureDeps) {
         },
     ) { padding ->
         CenterColumn {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
-                if (detail == null) return@LazyColumn
-                when (val access = detail.access) {
-                    EventAccess.Locked -> item(key = "locked") {
-                        LockRow(title = WorldCopy.HIDDEN_SCENE, actionLabel = WorldCopy.UNLOCK, onAction = gate.unlock, modifier = Modifier.padding(top = 12.dp))
-                    }
-                    is EventAccess.Gone -> item(key = "gone") {
-                        Column {
-                            if (access.text.isNotEmpty()) ListRow(title = access.text, titleDotted = true, modifier = Modifier.padding(top = 12.dp))
-                            if (access.restorable && !readOnly) {
-                                CivilightButton(
-                                    text = WorldCopy.BTN_RESTORE,
-                                    variant = ButtonVariant.GHOST,
-                                    modifier = Modifier.padding(top = 12.dp),
-                                    onClick = {
-                                        scope.launch {
-                                            when (val r = vm.restore(route.eventKey, authenticated = gate.open)) {
-                                                is Restored.Done -> deps.toasts.show(r.toast.message, actionLabel = r.toast.action) { vm.undoLast() }
-                                                Restored.NeedsAuth -> gate.unlock()
-                                                Restored.NotFound -> Unit
+            CardBodySwap(detail, { eventStage(it?.access) }) { shown ->
+                val detail = shown
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
+                    if (detail == null) return@LazyColumn
+                    when (val access = detail.access) {
+                        EventAccess.Locked -> item(key = "locked") {
+                            LockRow(title = WorldCopy.HIDDEN_SCENE, actionLabel = WorldCopy.UNLOCK, onAction = gate.unlock, modifier = civilightItem().padding(top = 12.dp))
+                        }
+                        is EventAccess.Gone -> item(key = "gone") {
+                            Column(civilightItem()) {
+                                if (access.text.isNotEmpty()) ListRow(title = access.text, titleDotted = true, modifier = Modifier.padding(top = 12.dp))
+                                FoldReveal(access.restorable && !readOnly) {
+                                    CivilightButton(
+                                        text = WorldCopy.BTN_RESTORE,
+                                        variant = ButtonVariant.GHOST,
+                                        modifier = Modifier.padding(top = 12.dp),
+                                        onClick = {
+                                            scope.launch {
+                                                when (val r = vm.restore(route.eventKey, authenticated = gate.open)) {
+                                                    is Restored.Done -> deps.toasts.show(r.toast.message, actionLabel = r.toast.action) { vm.undoLast() }
+                                                    Restored.NeedsAuth -> gate.unlock()
+                                                    Restored.NotFound -> Unit
+                                                }
                                             }
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                    EventAccess.Open -> {
-                        item(key = "head") {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .then(if (edit != null) Modifier.pressable(PressAction.Click(edit), role = Role.Button, scaleOnPress = false) else Modifier),
-                            ) {
-                                CivilightText(detail.name, CivilightTheme.type.pageTitle, Modifier.padding(top = 20.dp), color = CivilightTheme.colors.ink)
-                                if (detail.time.isNotEmpty()) {
-                                    CivilightText(detail.time, CivilightTheme.type.number, Modifier.padding(top = 4.dp), color = CivilightTheme.colors.ink3)
-                                }
-                                CardDescription(detail.description)
-                            }
-                        }
-                        item(key = "rows") {
-                            Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
-                                detail.rows.forEach { (label, value) -> FieldTableRow(label, value, onClick = edit) }
-                            }
-                        }
-                        val canAdd = detail.changeOffered && !readOnly
-                        if (detail.changes.isNotEmpty() || canAdd) {
-                            item(key = "changes") { SectionLabel(WorldCopy.EVENT_CHANGES, Modifier.padding(top = 22.dp, bottom = 2.dp)) }
-                            items(detail.changes, key = { it.id }) { change -> FieldTableRow(change.label, change.value) }
-                            if (canAdd) {
-                                item(key = "addChange") {
-                                    TextAction(
-                                        WorldCopy.CHANGE_ADD,
-                                        { sheets.open(EventChangeSheet(route.eventKey)) },
-                                        Modifier.padding(top = 4.dp),
-                                        color = CivilightTheme.colors.acc,
-                                        style = CivilightTheme.type.small,
+                                        },
                                     )
+                                }
+                            }
+                        }
+                        EventAccess.Open -> {
+                            item(key = "head") {
+                                Column(
+                                    civilightItem()
+                                        .fillMaxWidth()
+                                        .then(if (edit != null) Modifier.pressable(PressAction.Click(edit), role = Role.Button, scaleOnPress = false) else Modifier),
+                                ) {
+                                    CivilightText(detail.name, CivilightTheme.type.pageTitle, Modifier.padding(top = 20.dp), color = CivilightTheme.colors.ink)
+                                    if (detail.time.isNotEmpty()) {
+                                        CivilightText(detail.time, CivilightTheme.type.number, Modifier.padding(top = 4.dp), color = CivilightTheme.colors.ink3)
+                                    }
+                                    CardDescription(detail.description)
+                                }
+                            }
+                            item(key = "rows") {
+                                Column(civilightItem().fillMaxWidth().padding(top = 14.dp)) {
+                                    detail.rows.forEach { (label, value) -> FieldTableRow(label, value, onClick = edit) }
+                                }
+                            }
+                            val canAdd = detail.changeOffered && !readOnly
+                            if (detail.changes.isNotEmpty() || canAdd) {
+                                item(key = "changes") { SectionLabel(WorldCopy.EVENT_CHANGES, civilightItem().padding(top = 22.dp, bottom = 2.dp)) }
+                                items(detail.changes, key = { it.id }) { change -> Box(civilightItem()) { FieldTableRow(change.label, change.value) } }
+                                if (canAdd) {
+                                    item(key = "addChange") {
+                                        TextAction(
+                                            WorldCopy.CHANGE_ADD,
+                                            { sheets.open(EventChangeSheet(route.eventKey)) },
+                                            civilightItem().padding(top = 4.dp),
+                                            color = CivilightTheme.colors.acc,
+                                            style = CivilightTheme.type.small,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -190,6 +198,14 @@ fun EventDetailScreen(route: EventDetail, deps: FeatureDeps) {
             }
         }
     }
+}
+
+/** [EventAccess] as the body stage of the event screen. */
+private fun eventStage(access: EventAccess?): BodyStage = when (access) {
+    null -> BodyStage.LOADING
+    EventAccess.Locked -> BodyStage.LOCKED
+    is EventAccess.Gone -> BodyStage.GONE
+    EventAccess.Open -> BodyStage.OPEN
 }
 
 @Composable

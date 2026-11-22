@@ -1,5 +1,10 @@
 package io.github.lenticualrstone.civilight.ui.scaffold
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -18,7 +23,9 @@ import androidx.compose.ui.Modifier
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightSheetLayout
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.navigation.RouteCodec
 import io.github.lenticualrstone.civilight.navigation.SharedSheet
 import io.github.lenticualrstone.civilight.navigation.SheetKey
@@ -101,26 +108,61 @@ fun SheetHostLayout(
         gone.forEach(holder::removeState)
         seen.removeAll(gone)
     }
+    // A sheet opened over an empty host starts fresh; only sheet-to-sheet changes crossfade (S4).
+    val isOpen = host.top != null
+    val track = remember { OpenTrack(isOpen) }
+    val session = track.session(isOpen)
+    val motion = LocalMotion.current
     CivilightSheetLayout(
-        sheetVisible = host.top != null,
+        sheetVisible = isOpen,
         onDismissRequest = { host.close() },
         modifier = modifier,
         centered = isInner,
         sheet = {
-            shown?.let { sheet ->
-                val id = RouteCodec.encode(sheet)
-                if (id in open) seen += id
-                key(id) {
-                    holder.SaveableStateProvider(id) {
-                        val column = this
-                        val scope = remember(column, host, isInner) { HostSheetScope(column, host, isInner) }
-                        scope.SheetBody(sheet, localSheets, registry)
+            key(session) {
+                // The sheet surface already animates its height (DS `animateContentSize`), so the swap itself
+                // only crossfades and leaves sizing to the surface.
+                AnimatedContent(
+                    targetState = shown,
+                    contentKey = { it?.let(RouteCodec::encode) },
+                    transitionSpec = {
+                        ContentTransform(
+                            fadeIn(motion.spec(CivilightMotion.standard)),
+                            fadeOut(motion.spec(CivilightMotion.exit)),
+                            sizeTransform = null,
+                        )
+                    },
+                    label = "sheetSwap",
+                ) { sheet ->
+                    if (sheet != null) {
+                        Column {
+                            val id = RouteCodec.encode(sheet)
+                            if (id in open) seen += id
+                            key(id) {
+                                holder.SaveableStateProvider(id) {
+                                    val column = this@Column
+                                    val scope = remember(column, host, isInner) { HostSheetScope(column, host, isInner) }
+                                    scope.SheetBody(sheet, localSheets, registry)
+                                }
+                            }
+                        }
                     }
                 }
             }
         },
         content = content,
     )
+}
+
+/** Counts openings of an empty host (plain values: read and written only while composing this host). */
+private class OpenTrack(private var wasOpen: Boolean) {
+    private var count = 0
+
+    fun session(isOpen: Boolean): Int {
+        if (isOpen && !wasOpen) count++
+        wasOpen = isOpen
+        return count
+    }
 }
 
 /** The [SheetScope] of a host: the sheet's column plus the host's stack. */

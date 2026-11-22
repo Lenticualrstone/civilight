@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.feature.world.common
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -175,52 +176,55 @@ private fun SheetScope.DescriptionContent(kind: WorldKind, key: Key, doc: Projec
         LockRow(title = WorldCopy.HIDDEN_ITEM, actionLabel = WorldCopy.UNLOCK, onAction = gate.unlock, modifier = Modifier.padding(top = 12.dp))
         return
     }
-    if (picking) {
-        LinkPickerSheet(
-            doc = doc,
-            gate = gate,
-            title = WorldCopy.TODO_COPY_WORLD_LINK_PICKER_TITLE,
-            onPick = { pickKind, target, text ->
-                val linkKind = DescriptionDraft.linkKind(pickKind)
-                if (linkKind != null) {
-                    val (next, caret) = DescriptionDraft.insert(draft, field.text, field.selection.start, linkKind, target, text, Keys::newKey)
-                    draft = next
-                    field = TextFieldValue(RichTextEdit.textOf(next), TextRange(caret))
+    // The link picker opens in place of the editor as the next step (P3): it pushes in, back pops.
+    SheetSteps(picking, forward = { _, to -> to }) { shownPicking ->
+        if (shownPicking) {
+            LinkPickerSheet(
+                doc = doc,
+                gate = gate,
+                title = WorldCopy.LINK_PICKER_TITLE,
+                onPick = { pickKind, target, text ->
+                    val linkKind = DescriptionDraft.linkKind(pickKind)
+                    if (linkKind != null) {
+                        val (next, caret) = DescriptionDraft.insert(draft, field.text, field.selection.start, linkKind, target, text, Keys::newKey)
+                        draft = next
+                        field = TextFieldValue(RichTextEdit.textOf(next), TextRange(caret))
+                    }
+                    picking = false
+                },
+                onClose = { picking = false },
+            )
+        } else {
+            SheetHeader(title = WorldCopy.EDIT_DESCRIPTION, onClose = sheet::close)
+            SheetScrollBody {
+                CivilightTextField(
+                    value = field,
+                    onValueChange = {
+                        // Each change goes into the draft as it happens, so links between two edits stay.
+                        if (it.text != field.text) draft = RichTextEdit.apply(draft, it.text, Keys::newKey)
+                        field = it
+                    },
+                    label = WorldCopy.DESCRIPTION,
+                    singleLine = false,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    enabled = !readOnly,
+                )
+                FoldReveal(!readOnly) {
+                    KeyboardToolsRow(Modifier.padding(top = 8.dp)) {
+                        KeyboardTool(onClick = { picking = true }, text = WorldCopy.LINK_TOOL, contentDescription = WorldCopy.LINK_PICKER_TITLE)
+                    }
                 }
-                picking = false
-            },
-            onClose = { picking = false },
-        )
-        return
-    }
-    SheetHeader(title = WorldCopy.EDIT_DESCRIPTION, onClose = ::close)
-    SheetScrollBody {
-        CivilightTextField(
-            value = field,
-            onValueChange = {
-                // Each change goes into the draft as it happens, so links between two edits stay.
-                if (it.text != field.text) draft = RichTextEdit.apply(draft, it.text, Keys::newKey)
-                field = it
-            },
-            label = WorldCopy.DESCRIPTION,
-            singleLine = false,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            enabled = !readOnly,
-        )
-        if (!readOnly) {
-            KeyboardToolsRow(Modifier.padding(top = 8.dp)) {
-                KeyboardTool(onClick = { picking = true }, text = WorldCopy.LINK_TOOL, contentDescription = WorldCopy.TODO_COPY_WORLD_LINK_PICKER_TITLE)
+            }
+            SheetActions {
+                val next = RichTextEdit.apply(draft, field.text, Keys::newKey)
+                CivilightButton(
+                    text = if (readOnly) WorldCopy.READ_ONLY else WorldCopy.BTN_EDIT,
+                    onClick = { scope.launch { if (vm.setDescriptionDoc(kind, key, next) == EditResult.APPLIED) sheet.close() } },
+                    modifier = Modifier.weight(1f),
+                    enabled = !readOnly && next != description,
+                )
             }
         }
-    }
-    SheetActions {
-        val next = RichTextEdit.apply(draft, field.text, Keys::newKey)
-        CivilightButton(
-            text = if (readOnly) WorldCopy.READ_ONLY else WorldCopy.BTN_EDIT,
-            onClick = { scope.launch { if (vm.setDescriptionDoc(kind, key, next) == EditResult.APPLIED) sheet.close() } },
-            modifier = Modifier.weight(1f),
-            enabled = !readOnly && next != description,
-        )
     }
 }
 

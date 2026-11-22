@@ -57,13 +57,13 @@ data class CalendarDraft(
 
     /** The line that stops `저장`, or null when the draft is a valid calendar. */
     fun problem(): String? {
-        if (months.isEmpty()) return WorldCopy.TODO_COPY_WORLD_CALENDAR_NO_MONTH
-        if (months.any { it.name.isBlank() }) return WorldCopy.TODO_COPY_WORLD_CALENDAR_MONTH_NAME
-        if (months.any { days(it) == null }) return WorldCopy.TODO_COPY_WORLD_CALENDAR_MONTH_DAYS
-        if (weekdays.any { it.isBlank() }) return WorldCopy.TODO_COPY_WORLD_CALENDAR_WEEKDAY_NAME
-        val start = months.getOrNull(startMonth - 1) ?: return WorldCopy.TODO_COPY_WORLD_CALENDAR_START
-        val day = startDay.trim().toIntOrNull() ?: return WorldCopy.TODO_COPY_WORLD_CALENDAR_START
-        if (day !in 1..(days(start) ?: 0)) return WorldCopy.TODO_COPY_WORLD_CALENDAR_START
+        if (months.isEmpty()) return WorldCopy.CALENDAR_NO_MONTH
+        if (months.any { it.name.isBlank() }) return WorldCopy.CALENDAR_MONTH_NAME
+        if (months.any { days(it) == null }) return WorldCopy.CALENDAR_MONTH_DAYS
+        if (weekdays.any { it.isBlank() }) return WorldCopy.CALENDAR_WEEKDAY_NAME
+        val start = months.getOrNull(startMonth - 1) ?: return WorldCopy.CALENDAR_START
+        val day = startDay.trim().toIntOrNull() ?: return WorldCopy.CALENDAR_START
+        if (day !in 1..(days(start) ?: 0)) return WorldCopy.CALENDAR_START
         return null
     }
 

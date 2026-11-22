@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.cast.relation
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,6 +25,8 @@ import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationDrafts
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationKinds
 import io.github.lenticualrstone.civilight.domain.cast.relation.SheetSlot
@@ -76,6 +79,9 @@ fun SheetScope.RelationSlotContent(sheet: RelationSlotSheet) {
     RelationEditBody(sheet.projectKey, sheet.viewerKey, sheet.partnerKey, sheet.slot, saveKey = sheet)
 }
 
+/** The steps of the relation sheet: partner picker, start picker, the form. They swap in place (P3). */
+private enum class RelationStage { PICK_PARTNER, PICK_START, FORM }
+
 /** The relation sheet body for [viewerKey] (and [partnerKey], or the picker first) opened on [initialSlot]. */
 @Composable
 private fun SheetScope.RelationEditBody(projectKey: Key, viewerKey: Key?, partnerKey: Key?, initialSlot: SheetSlot, saveKey: Any) {
@@ -94,110 +100,131 @@ private fun SheetScope.RelationEditBody(projectKey: Key, viewerKey: Key?, partne
     val sheet = saveKey
     var partner by rememberSaveable(sheet) { mutableStateOf(partnerKey) }
     val chosen = partner
-    if (chosen == null) {
-        CharacterPickerSheet(doc, gate, onPick = { picked -> if (picked != viewer) partner = picked }, onClose = ::close, title = CastUiCopy.PICK_PARTNER)
-        return
-    }
     var slotName by rememberSaveable(sheet, chosen) { mutableStateOf(initialSlot.name) }
     val slot = SheetSlot.valueOf(slotName)
     var start by rememberSaveable(sheet, chosen) { mutableStateOf(RelationSheetModel.defaultStart(doc, lens)) }
     var pickingStart by rememberSaveable(sheet, chosen) { mutableStateOf(false) }
-    val view = remember(doc, viewer, chosen, slot, start, lens) { RelationSheetModel.view(doc, viewer, chosen, slot, start, lens) }
-    if (view == null) {
+    val view = if (chosen == null) null else remember(doc, viewer, chosen, slot, start, lens) { RelationSheetModel.view(doc, viewer, chosen, slot, start, lens) }
+    if (chosen != null && view == null) {
         LaunchedEffect(Unit) { close() }
         return
     }
-    if (pickingStart) {
-        UnitPickerSheet(doc, gate, RelationDrafts.START, onPick = { start = it; pickingStart = false }, onClose = { pickingStart = false }, selectedKey = start)
-        return
-    }
-    val initial = remember(chosen, slot) { RelationSheetModel.initialDraft(doc, viewer, chosen, slot, lens) }
-    var kindKey by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial.kindKey) }
-    var partnerFirst by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial.partnerHoldsFirst) }
-    var description by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial.description) }
-    var address by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial.address) }
+    // The draft lives above the step swap, so a trip to the start picker keeps what was typed.
+    val initial = if (chosen == null) null else remember(chosen, slot) { RelationSheetModel.initialDraft(doc, viewer, chosen, slot, lens) }
+    var kindKey by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial?.kindKey) }
+    var partnerFirst by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial?.partnerHoldsFirst) }
+    var description by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial?.description.orEmpty()) }
+    var address by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial?.address.orEmpty()) }
     var newKind by rememberSaveable(sheet, chosen, slot) { mutableStateOf<String?>(null) }
     val draft = SlotDraft(kindKey, partnerFirst, description, address)
     val editable = !store.readOnly
+    val stage = when {
+        chosen == null -> RelationStage.PICK_PARTNER
+        pickingStart -> RelationStage.PICK_START
+        else -> RelationStage.FORM
+    }
 
-    SheetHeader(view.title, onClose = ::close, closeLabel = CastUiCopy.BTN_CLOSE)
-    SheetScrollBody {
-        SectionLabel(CastUiCopy.WHAT_TO_WRITE, Modifier.padding(top = 14.dp, bottom = 6.dp))
-        ChipFlow {
-            for ((s, label) in view.slots) FilterChip(label, s == slot, { slotName = s.name })
-        }
-        val save = view.save
-        val two = (save as? RelationSave.Edit)?.mode as? EditMode.TwoButtons
-        if (two != null && editable) {
-            TwoButtonHead(two) { deps.lens(store).backToLatest() }
-        } else {
-            FieldTableRow(CastUiCopy.CURRENT_VALUE, view.current, Modifier.padding(top = 12.dp))
-        }
-        if (!editable) return@SheetScrollBody
-        if (slot == SheetSlot.ADDRESS) {
-            CivilightTextField(address, { address = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = RelationDrafts.ADDRESS)
-        } else {
-            ChipFlow(Modifier.padding(top = 12.dp)) {
-                for (chip in view.chips) {
-                    val picked = draft.picks(chip)
-                    FilterChip(chip.label, picked, {
-                        if (picked) {
-                            kindKey = null
-                            partnerFirst = null
-                        } else {
-                            kindKey = chip.kindKey
-                            partnerFirst = chip.partnerHoldsFirst
+    ContentSwap(stage, label = "relationStep") { shown ->
+        Column(Modifier.fillMaxWidth()) {
+            when (shown) {
+                RelationStage.PICK_PARTNER ->
+                    CharacterPickerSheet(doc, gate, onPick = { picked -> if (picked != viewer) partner = picked }, onClose = host::close, title = CastUiCopy.PICK_PARTNER)
+                RelationStage.PICK_START ->
+                    UnitPickerSheet(doc, gate, RelationDrafts.START, onPick = { start = it; pickingStart = false }, onClose = { pickingStart = false }, selectedKey = start)
+                RelationStage.FORM -> if (chosen != null && view != null) {
+                    SheetHeader(view.title, onClose = host::close, closeLabel = CastUiCopy.BTN_CLOSE)
+                    SheetScrollBody {
+                        SectionLabel(CastUiCopy.WHAT_TO_WRITE, Modifier.padding(top = 14.dp, bottom = 6.dp))
+                        ChipFlow {
+                            for ((s, label) in view.slots) FilterChip(label, s == slot, { slotName = s.name })
                         }
-                    })
-                }
-                if (newKind == null) AddChip(RelationKinds.ADD, { newKind = "" })
-            }
-            newKind?.let { typed ->
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    CivilightTextField(typed, { newKind = it }, Modifier.weight(1f), label = CastUiCopy.NAME)
-                    TextAction(CastUiCopy.BTN_INSERT, {
-                        val name = typed
-                        var made: Pair<Key, Boolean?>? = null
-                        editor.act(CastUiCopy.BTN_INSERT, then = {
-                            made?.let { (k, first) ->
-                                kindKey = k
-                                partnerFirst = first
+                        val save = view.save
+                        val two = (save as? RelationSave.Edit)?.mode as? EditMode.TwoButtons
+                        ContentSwap(two != null && editable, label = "relationHead") { twoButtons ->
+                            Column {
+                                if (twoButtons && two != null) {
+                                    TwoButtonHead(two) { deps.lens(store).backToLatest() }
+                                } else {
+                                    FieldTableRow(CastUiCopy.CURRENT_VALUE, view.current, Modifier.padding(top = 12.dp))
+                                }
                             }
-                            newKind = null
-                        }) { d, ctx ->
-                            RelationDrafts.addKind(d, slot, name, ctx)?.let { (next, chip) ->
-                                made = chip.kindKey to chip.partnerHoldsFirst
-                                next
-                            } ?: d
                         }
-                    }, Modifier.padding(start = 8.dp, top = 18.dp))
+                        if (!editable) return@SheetScrollBody
+                        ContentSwap(slot == SheetSlot.ADDRESS, label = "relationSlot") { isAddress ->
+                            Column {
+                                if (isAddress) {
+                                    CivilightTextField(address, { address = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = RelationDrafts.ADDRESS)
+                                } else {
+                                    ChipFlow(Modifier.padding(top = 12.dp)) {
+                                        for (chip in view.chips) {
+                                            val picked = draft.picks(chip)
+                                            FilterChip(chip.label, picked, {
+                                                if (picked) {
+                                                    kindKey = null
+                                                    partnerFirst = null
+                                                } else {
+                                                    kindKey = chip.kindKey
+                                                    partnerFirst = chip.partnerHoldsFirst
+                                                }
+                                            })
+                                        }
+                                        if (newKind == null) AddChip(RelationKinds.ADD, { newKind = "" })
+                                    }
+                                    FoldRevealValue(newKind) { typed ->
+                                        Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                                            CivilightTextField(typed, { newKind = it }, Modifier.weight(1f), label = CastUiCopy.NAME)
+                                            TextAction(CastUiCopy.BTN_INSERT, {
+                                                val name = typed
+                                                var made: Pair<Key, Boolean?>? = null
+                                                editor.act(CastUiCopy.BTN_INSERT, then = {
+                                                    made?.let { (k, first) ->
+                                                        kindKey = k
+                                                        partnerFirst = first
+                                                    }
+                                                    newKind = null
+                                                }) { d, ctx ->
+                                                    RelationDrafts.addKind(d, slot, name, ctx)?.let { (next, chip) ->
+                                                        made = chip.kindKey to chip.partnerHoldsFirst
+                                                        next
+                                                    } ?: d
+                                                }
+                                            }, Modifier.padding(start = 8.dp, top = 18.dp))
+                                        }
+                                    }
+                                    CivilightTextField(description, { description = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = CastUiCopy.DESCRIPTION_OPTIONAL)
+                                }
+                            }
+                        }
+                        val canSave = RelationSheetModel.canSave(doc, viewer, chosen, slot, draft, lens)
+                        ContentSwap(save is RelationSave.FromStart, label = "relationSave") { fromStart ->
+                            Column {
+                                if (fromStart && save is RelationSave.FromStart) {
+                                    ListRow(
+                                        RelationDrafts.START,
+                                        subtitle = view.startLabel ?: CastUiCopy.EMPTY_VALUE,
+                                        onClick = { pickingStart = true },
+                                        compact = true,
+                                        modifier = Modifier.padding(top = 12.dp),
+                                    )
+                                    Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                                        CivilightButton(save.label, {
+                                            val saved = draft
+                                            val from = start
+                                            editor.act(save.label) { d, ctx -> RelationSheetModel.save(d, viewer, chosen, slot, saved, null, from, lens, ctx) }
+                                            host.close()
+                                        }, Modifier.weight(1f), enabled = canSave)
+                                    }
+                                } else if (save is RelationSave.Edit) {
+                                    SaveButtons(save.mode, canSave) { choice ->
+                                        val saved = draft
+                                        editor.act(choice.label(save.mode)) { d, ctx -> RelationSheetModel.save(d, viewer, chosen, slot, saved, choice, null, lens, ctx) }
+                                        host.close()
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-            CivilightTextField(description, { description = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = CastUiCopy.DESCRIPTION_OPTIONAL)
-        }
-        val canSave = RelationSheetModel.canSave(doc, viewer, chosen, slot, draft, lens)
-        when (save) {
-            is RelationSave.FromStart -> {
-                ListRow(
-                    RelationDrafts.START,
-                    subtitle = view.startLabel ?: CastUiCopy.EMPTY_VALUE,
-                    onClick = { pickingStart = true },
-                    compact = true,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-                Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                    CivilightButton(save.label, {
-                        val saved = draft
-                        val from = start
-                        editor.act(save.label) { d, ctx -> RelationSheetModel.save(d, viewer, chosen, slot, saved, null, from, lens, ctx) }
-                        host.close()
-                    }, Modifier.weight(1f), enabled = canSave)
-                }
-            }
-            is RelationSave.Edit -> SaveButtons(save.mode, canSave) { choice ->
-                val saved = draft
-                editor.act(choice.label(save.mode)) { d, ctx -> RelationSheetModel.save(d, viewer, chosen, slot, saved, choice, null, lens, ctx) }
-                host.close()
             }
         }
     }

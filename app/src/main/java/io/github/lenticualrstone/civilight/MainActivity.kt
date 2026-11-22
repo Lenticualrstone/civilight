@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.splashscreen.SplashScreenViewProvider
 import androidx.fragment.app.FragmentActivity
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.navigation.OpenFile
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.navigation.RouteCodec
@@ -32,6 +33,9 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 class MainActivity : FragmentActivity() {
     private val pendingRoute = mutableStateOf<Route?>(null)
+
+    /** CNV-38: false while the system splash is up; the content rises in when it turns true. */
+    private val splashDone = mutableStateOf(true)
     private var wentToBackground = false
     private lateinit var biometric: AndroidBiometricGate
 
@@ -41,6 +45,12 @@ class MainActivity : FragmentActivity() {
         val locator = locator
         splash.setKeepOnScreenCondition { locator.start.value == null }
         splash.setOnExitAnimationListener(::animateSplashExit)
+        // Only a fresh start shows the splash; a recreated activity draws at once. The content also shows if
+        // the system skips the exit callback, after the mark's own exit time.
+        if (savedInstanceState == null) {
+            splashDone.value = false
+            window.decorView.postDelayed({ splashDone.value = true }, SPLASH_FALLBACK_MS)
+        }
         enableEdgeToEdge()
 
         val capture = CaptureGuard(ActivityWindowProtector(this))
@@ -59,6 +69,7 @@ class MainActivity : FragmentActivity() {
                     capture = capture,
                     pendingRoute = pendingRoute.value,
                     onPendingRouteHandled = { pendingRoute.value = null },
+                    splashDone = splashDone,
                 )
             }
         }
@@ -93,23 +104,27 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * CNV-38 app phase: the mark moves up, shrinks to .42 and fades while 서재 shows (≤ 1 s,
-     * `cubic-bezier(.05,.7,.1,1)`); reduced motion: a 120 ms fade.
+     * CNV-38 app phase: the mark moves up, shrinks to .42 and fades on `enterLong` with the `enter` curve
+     * while the content rises 14 dp and fades in on `enter` (CivilightRoot); reduced motion: a 120 ms fade.
+     * Durations and the curve come from the motion tokens (S15); the system animator scale applies to both.
      */
     private fun animateSplashExit(provider: SplashScreenViewProvider) {
         val settings = locator.settings.value
         val reduced = ThemeBridge.reducedMotion(settings.animation, ThemeBridge.systemAnimationsOff(this))
         val root: View = provider.view
+        splashDone.value = true
         if (reduced) {
-            root.animate().alpha(0f).setDuration(REDUCED_MS).withEndAction { provider.remove() }.start()
+            root.animate().alpha(0f).setDuration(CivilightMotion.reducedFadeMs.toLong()).withEndAction { provider.remove() }.start()
             return
         }
-        val easing = PathInterpolator(0.05f, 0.7f, 0.1f, 1f)
+        val curve = CivilightMotion.enterCurve
+        val easing = PathInterpolator(curve.x1, curve.y1, curve.x2, curve.y2)
+        val ms = CivilightMotion.enterLong.durationMs.toLong()
         runCatching { provider.iconView }.getOrNull()?.animate()
             ?.translationY(-MARK_RISE_DP * resources.displayMetrics.density)
             ?.scaleX(MARK_SCALE)?.scaleY(MARK_SCALE)?.alpha(0f)
-            ?.setInterpolator(easing)?.setDuration(EXIT_MS)?.start()
-        root.animate().alpha(0f).setInterpolator(easing).setDuration(EXIT_MS).withEndAction { provider.remove() }.start()
+            ?.setInterpolator(easing)?.setDuration(ms)?.start()
+        root.animate().alpha(0f).setInterpolator(easing).setDuration(ms).withEndAction { provider.remove() }.start()
     }
 
     /**
@@ -133,8 +148,8 @@ class MainActivity : FragmentActivity() {
         const val EXTRA_ROUTE = "io.github.lenticualrstone.civilight.ROUTE"
 
         private const val ROUTE_PACKAGE = "io.github.lenticualrstone.civilight.navigation."
-        private const val EXIT_MS = 450L
-        private const val REDUCED_MS = 120L
+        /** Content shows even when no exit callback comes (the CNV-38 total of 1 s). */
+        private const val SPLASH_FALLBACK_MS = 1_000L
         private const val MARK_RISE_DP = 300f
         private const val MARK_SCALE = 0.42f
     }

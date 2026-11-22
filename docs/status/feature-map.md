@@ -1,6 +1,6 @@
 # feature:map
 
-Package `io.github.lenticualrstone.civilight.feature.map`. Build and tests: `tools/gw :feature:map:compileDebugKotlin :feature:map:testDebugUnitTest :domain:world:test` exits 0. feature:map has 165 JVM tests in 29 classes, all passing; `domain:world` 123 (1 skipped by the world lane), all passing. Nothing was run on a device or emulator, and no APK was built (the APK hold).
+Package `io.github.lenticualrstone.civilight.feature.map`. Build and tests: `tools/gw :feature:map:compileDebugKotlin :feature:map:testDebugUnitTest :domain:world:test` exits 0. feature:map has 188 JVM tests (after the 0.1.0 motion wave), all passing; `domain:world` 123 (1 skipped by the world lane), all passing. Nothing was run on a device or emulator, and no APK was built (the APK hold).
 
 - Batch 1 of 3 (2026-11-22): WLD-36, 37, 38, 39, 40, 41, 42, 43, 44 and 52.
 - Batch 2 of 3 (2026-11-22): WLD-45, 46, 47, 48, 49, 50, 51, 53, 54 and 55.
@@ -8,6 +8,47 @@ Package `io.github.lenticualrstone.civilight.feature.map`. Build and tests: `too
 - Domain changes (additive, `domain:world` `map` package only):
   - Batch 2: `map/TravelModeEdits.kt`, `map/LayerOrder.kt`, `map/MapNesting.kt`, `map/NodeEdits.kt`, tested by `MapAuthoringTest` (WLD-45, 47, 48, 50).
   - Batch 3: `map/HexEdits.kt` (`줄` line, `paintCells`, `setOrientation`, `setCoordEvery`, `infoLine`) and `map/DetailEdits.kt` (author lines, line points flagged author-edited, stamps that attach to the river or road under them, `moveStamp`, `stampChip`), tested by `MapFormatEditsTest` (WLD-58, 60).
+
+## Motion wave (0.1.0, 2026-11-23)
+
+Motion audit §4 "feature:map", most visible first, through the shared helpers only (`motion.swap` / `move` / `enter` / `exit`, `ContentSwap`, `FoldReveal`, `civilightItem`, `animatedFraction` / `animatedAlpha` / `animatedColor`, `rememberUnhide`, `SidePanelHost`, `TabContent`, `SnapCardRow`). No duration or curve literal is left in the module: `MapMotionLintTest` runs `MotionLint.lintModule` and passes. Build line: `tools/gw :feature:map:compileDebugKotlin :feature:map:testDebugUnitTest` exits 0, 188 tests, nothing run on a device or emulator, so **every row below is partial until the orchestrator sees it on the emulator**. `domain:world` was not touched in this wave.
+
+New shared pieces of this module (`common/MapMotion.kt`, `common/MapBarRules.kt`, `canvas/MapGestures.kt`, `canvas/HexSpread.kt`, `gen/GridFill.kt`):
+- `MapBar(slot)`: `AnimatedContent` over plain data (`MapBarSlot(kind, ui)`), key = the kind, so the bar that leaves keeps its own last data and a change inside one kind updates in place. The new bar rises 12 dp on `enter`, the old fades on `exit`, size follows on `standard`; reduced: fades. Which bar shows is the pure `MapBars.view / edit / node` (tested).
+- `FoldSwitch(inner)`: cover ↔ inner overlay layer crossfade on `foldOpen` / `foldClose`; the side panel goes through `SidePanelHost(inner)` (48 dp from the right on `foldOpen`).
+- `Modifier.appear`, `markAlpha`, `markProgress`, `unhideIn`: appear-once helpers for marks that are new to a screen.
+
+| Audit row | Done | Left |
+| --- | --- | --- |
+| 1 Place panel, bars, cover cards | `MapBar` in 지도 보기 (`핀 옮기기` · place sheet · tools), 편집 (move · shape choice · layers · properties · stamps), 노드 지도 (step · layers · properties), 지역 나누기 (split bar), 지도에서 고르기 (pick · new place). Tool bars use `animateContentSize(motion.move(standard))`. Side panels (편집, 노드, 지역, 칸 칠하기, 인물 동선) via `SidePanelHost` + `TabContent`. Hex cell line via `FoldRevealValue`. The exit of the inner place card is the same `MapBar` | – |
+| 2 Programmatic viewport moves | `rememberViewportMover` (`foldOpen`, 360 ms as WLD-68; snap when reduced; the first UNSET resolve is a cut) for the focused pin (지도 보기), a picked node (노드 지도), a map chip (지도에서 고르기 → `Viewport()`) | – |
+| 3 Pan / zoom settle | `detectMapTransform` (`awaitEachGesture` with an end hook, nothing consumed before touch slop) replaces `detectTransformGestures`. A pinch may pass 1 ×…8 × to 0.8 ×…10 × (`ViewportMath.transform(soft = true)`) and settles on release with `animateTo(clamp, standard)`; a pan carries on and decays (`exponentialDecay`). Reduced: snap, no decay. `transform` / `clamp` and their tests are unchanged (the soft path is separate) | `exponentialDecay()` uses the Compose default friction (no token exists) |
+| 4 Fold layout | `FoldSwitch` in 보기, 편집, 노드, 지역, 칸 칠하기, 시점별 공개, 축척, 지형 만들기 (steps), 인물 동선 | 글로 설명 keeps its card placement (no cross-fade); the canvas inset of the inner steps page is inside the swapped layer |
+| 5 Generate | Pages `AnimatedContent(page)` with `motion.push`; preview `Crossfade((world, format), motion.spec(token))`, `mapReroll` (400 ms) on the steps page, `standard` on the format tiles; the focused step's chips `FoldReveal`; candidate tiles `appear` one after another (keyed by history index); candidate ring `animatedColor` + width | The 1.2 s **step-order draw** (`mapGenerate`) and the per-layer re-roll flow (old layer out on `exit`, new in on `mapReroll`): the preview is one raster of all layers, so it needs layer-wise rasters from `GenRaster` (a bigger change, not half-built) |
+| 6 Map list | `SnapCardRow` (DS, `showPager = false`), `ContentSwap` loading / empty / cards (keyed by kind), thumbnails fade in (row 9). QA 8: the empty state no longer repeats `지도 · 0` (the block shows it once) and has 24 dp side margins | To confirm: the DS row scales the thumbnail image 1.1× (card parallax), which crops about 5 % of each map thumbnail edge |
+| 7 Overlay marks | `MapCanvas` keeps per-key looks: shapes (lines, regions, links, routes, stamps) fade to their dim alpha and back, ease the selected stroke on `standard`; labels, link labels, route chips, nodes and pins fade in when new to the scene; label / chip / node dim alpha via `markAlpha`; marks glide in **map coordinates** (`animateOffsetAsState`), so pan and zoom never lag. `MapPin` and `NodeCard` keep their own DS dim and select motion | **Exit** fades of removed marks and the layer filter fade (items leave the scene, they are not dimmed) need the removed marks kept for the fade; not built. Curved labels (`drawCurvedLabel`) still switch dim and selected colour in one frame (static alpha) |
+| 8 Reveal by point | Track fill `animateFloatAsState(move(standard))`, chip counts `ValueSwap`, the pending chip folds in, newly visible marks `unhideIn` (blur and dim clear, 60 ms stagger; `MapCanvas(unhideFresh = true)`) | – |
+| 9 Base image and tiles | Overview picture and generated raster fade in over the placeholder (`standard`); each sharper tile fades in; `DelayedProgress` in 지도 보기 (`지도 이미지 바꾸기` while replacing, `지도 내보내기` while exporting) and 노드 지도 (export) | The chip only names the work: there is no progress fraction in `MapExport.render` or `replaceBase`, and no indeterminate DS bar |
+| 10 Edit drafts, vertex, region close, route, stamp, hex | Vertices that already existed use `MapVertex(popOnAppear = false)`, drafts pop (DS S18g); a closed region fills in over 200 ms (`standard`); a new route draws along its length (`PathMeasure`, `enter`); a new stamp drops 14 dp and settles on `stampDrop` (240 ms); painted hex cells spread by distance within one `standard` run (`HexSpread`, tested) | – |
+| 11 Character track | Position chips walk along the leg on `enter` (`TrackPath`, tested; jump when reduced), the focused leg's stroke `animatedFraction`, the play pause is the named `MapMotion.PLAY_STEP_MS` (900) through `motion.delayMs`, panel tabs `TabContent` | 900 ms has no token (Request) |
+| 12 Text to map | Pages `ContentSwap`; the world `AnimatedVisibility` (last world kept while it leaves); condition rows appear one after another on `rowIn` (250 ms, 60 ms step), in the input and result lists; the highlight fades (`animatedFraction`, last area kept); the card follows its height | – |
+| 13 Panel tabs and lists | `LayersPanel` and `ItemsPanel` are keyed lazy lists with `civilightItem()` (height bounded at 320 dp because they sit in a scrolling panel); 이동 수단 list ↔ form, new-place list ↔ form: `ContentSwap`; new-map source buttons and the `등고선` switch: `FoldReveal`; 축척 card `FoldRevealValue`; A/B chips `appear` | – |
+
+QA 2026-11-23:
+- **#7 grid** (`양식` and `후보 기록`): fixed-width tiles (DS `FormatTile` 166 dp, candidate 150 dp) are laid out by the pure `GridFill`: the column count that fits with a 10 dp minimum gap, the leftover spread between the columns, so the last tile reaches the right margin (`GridFillTest`). The DS tile stays 166 dp (Request).
+- **#9 zoom**: `ViewportMath.resolve(UNSET)` now opens fitted (zoom 1, the whole base inside, `Viewport()`), not at `fillZoom()` (296 % on a tall phone). `fillZoom()` stays for callers that want it. This follows the QA over the board wording "fill, no empty bands" (spec owner: say if the boards should win).
+- **#9 bottom bar `새 지도 · 되돌리기` light in dark mode**: no map code draws it. It is the toast of `MapViewModelBase` (`STEP_NEW_MAP`, action `되돌리기`), and `toastStyle` is `ink` fill with `bg` text, i.e. inverted by design (DS-27). Nothing was hacked locally; see Requests and Spec conflicts.
+
+Pane split (CNV-47): feature:map has no two-pane list + detail frame; its panels float over the canvas (glass cards, side panels). The closest thing to an own split is the inner `지형 만들기` steps page, which reserves a fixed 260 dp for its panel next to the preview (`StepsPage`). `PaneSplit.Modules` has no map id, so nothing was wired (Request below). "Copies that moved to core": a grep found no local `SnapCardRow`, `CardViewMotion`, `FoldMotion`, `RevealMotion` or `ListCardMotion` in this module.
+
+Watch on the emulator (inferred from source, never run):
+- The inner place card (`MapBar`, top-anchored) may still shift while its height settles.
+- Over-pinch settle: release past 8 × or under 1 ×, tap during the 200 ms settle (the tap restarts it, `onEnd` always runs).
+- A new map in `지도에서 고르기` fades every mark in (all keys are new on another map).
+- The glass cards inside `MapBar` while a bar swaps (blur layers during the size animation).
+- `LayersPanel` / `ItemsPanel` heights (bounded at 320 dp inside scrolling panels).
+
+Copy: the nine `TODO_COPY_MAP_*` constants are gone. They now hold the nearest existing words (listed under "Copy to confirm" in Requests) and `MapCopyLintTest` fails on any `TODO_COPY_` value.
 
 ## Architecture
 
@@ -309,8 +350,19 @@ UI built and compiled, logic tested on the JVM, not seen running:
 - **`NodeMap` is not a `LensScreen`**, yet the board `MapNode` draws `최신 · 1-7`. The screen shows the chip (same as `MapEdit`).
 - **Board `MapReveal` vs spec WLD-49 wording**: the spec calls `보이는 것만 | 숨은 것 흐리게` mode chips; the board draws the text `1-5 시점 · 보이는 것만` and a `숨은 것 흐리게` switch. The board is followed.
 - **WLD-T56 vs fixture** (fixture conflict 19): 송전탑 폐허's pin is on 세계 지도, so 하층 구역 지도 at 1-5 reads `아직 공개 전 · 1`, not 2. `RevealStateTest` asserts the fixture value.
+- **Map opens fitted vs boards "fill"**: the boards draw maps filling the view; QA 9 saw 296 %. `Viewport.UNSET` resolves to zoom 1 (fitted). Spec owner decides.
+- **Toast colours in dark mode vs QA 9**: DS-27 gives the toast `ink` fill and `bg` text, so it is light on dark; QA calls it wrong. Not a map matter (DS is frozen).
 
 ## Requests
+
+0.1.0 motion wave:
+- **core:model `AppSettings.PaneSplit.Modules`**: a map id, if the orchestrator wants the inner `지형 만들기` steps panel (now a fixed 260 dp) on the shared split handle.
+- **core:designsystem `FormatTile`**: a width parameter (it is a fixed 166 dp), so the format grid can stretch instead of spreading the leftover width between columns.
+- **core:designsystem tokens**: a name for the `인물 동선` play step (900 ms; the module uses `MapMotion.PLAY_STEP_MS`), and for the 60 ms mark stagger (the module uses `CivilightMotion.searchBoxStaggerMs`).
+- **core:designsystem toast (QA 9)**: decide whether the toast stays `ink` on `bg` (DS-27) in dark mode.
+- **core:designsystem**: an indeterminate progress bar for `DelayedProgress` (map export and base replace have no fraction).
+- **domain:world `gen` / `canvas` raster**: per-layer rasters of a generated world, for the 1.2 s step-order draw and the per-layer re-roll flow (`mapGenerate`, `mapReroll`).
+- **Copy to confirm** (picked from the nearest existing words, replacing the `TODO_COPY_MAP_*` constants): `REROLL_OTHER_VERSION` `다른 버전 지도 · 다시 만들기 안 됨`, `TRACK_PLAY` `재생`, `TRACK_PAUSE` `멈춤`, `TEXT_UNREADABLE` `읽어 낼 수 없음 · 기기 안 모델 없음 · 클라우드 꺼짐`, `TRACK_EMPTY` `동선 없음 · 인물 고르기`, `IMPORT_FAILED` `이미지 가져오기 · 안 됨`, `LAYER_UP` `위로`, `LAYER_DOWN` `아래로`, `NODE_SUB` `부제`, `EXPORT_FAILED` `이미지 내보내기 · 안 됨`. The old "Copy needed (TODO_COPY)" lists below are answered by this.
 
 Batch 3:
 - **Copy needed (TODO_COPY)**, each a constant whose value is its own name:

@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.cast.relation
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -9,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +34,10 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBod
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.domain.cast.relation.ChangeSection
+import io.github.lenticualrstone.civilight.feature.cast.common.CastEditorViewModel
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationDrafts
 import io.github.lenticualrstone.civilight.domain.cast.relation.SheetSlot
@@ -67,84 +73,117 @@ fun SheetScope.RelationChangeContent(projectKey: Key, blockKey: Key, viewerKey: 
     var newKindFor by rememberSaveable(blockKey) { mutableStateOf<String?>(null) }
     var newKind by rememberSaveable(blockKey) { mutableStateOf("") }
 
-    picking?.let { which ->
-        CharacterPickerSheet(doc, gate, onPick = { picked ->
-            if (which == PARTNER && picked != viewer) partner = picked
-            if (which == VIEWER && picked != partner) viewer = picked
-            chosen.clear()
-            picking = null
-        }, onClose = { picking = null }, title = CastUiCopy.PICK_PARTNER)
-        return
-    }
-    val other = partner ?: return
-    val view = remember(doc, blockKey, viewer, other, chosen.keys.toSet()) { RelationDrafts.changeView(doc, blockKey, viewer, other, chosen.keys) }
-    if (view == null) {
+    val other = partner
+    val view = if (other == null) null else remember(doc, blockKey, viewer, other, chosen.keys.toSet()) { RelationDrafts.changeView(doc, blockKey, viewer, other, chosen.keys) }
+    if (other != null && view == null) {
         LaunchedEffect(Unit) { close() }
         return
     }
+    // Every slot's section, so a section folds in and out as its chip is toggled (P2).
+    val everySection = if (other == null || view == null) null else remember(doc, blockKey, viewer, other, view.slotChips) {
+        RelationDrafts.changeView(doc, blockKey, viewer, other, view.slotChips.map { it.first }.toSet())
+    }
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    SheetHeader(view.title, onClose = ::close, subtitle = view.sub, closeLabel = view.cancelLabel)
-    SheetScrollBody {
-        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            PersonChip(view.viewerName) { picking = VIEWER }
-            CivilightText(CastCopy.SEP.trim(), type.small, color = colors.ink3)
-            PersonChip(view.partnerName) { picking = PARTNER }
-        }
-        SectionLabel(RelationDrafts.CHANGE_ITEMS, Modifier.padding(top = 16.dp, bottom = 6.dp))
-        ChipFlow {
-            for ((slot, label) in view.slotChips) {
-                FilterChip(label, slot in chosen, { if (slot in chosen) chosen.remove(slot) else chosen[slot] = SlotDraft() })
-            }
-        }
-        for (section in view.sections) {
-            val draft = chosen[section.slot] ?: SlotDraft()
-            CivilightText(section.valueLabel, type.small, Modifier.padding(top = 14.dp, bottom = 6.dp), color = colors.ink3)
-            if (section.slot == SheetSlot.ADDRESS) {
-                CivilightTextField(draft.address, { chosen[section.slot] = draft.copy(address = it) }, Modifier.fillMaxWidth(), label = RelationDrafts.ADDRESS)
-                continue
-            }
-            ChipFlow {
-                for (chip in section.chips) {
-                    val picked = draft.picks(chip)
-                    FilterChip(chip.label, picked, {
-                        chosen[section.slot] = if (picked) draft.copy(kindKey = null, partnerHoldsFirst = null) else draft.copy(kindKey = chip.kindKey, partnerHoldsFirst = chip.partnerHoldsFirst)
-                    })
-                }
-                if (newKindFor != section.slot.name) AddChip(view.addKindLabel, { newKindFor = section.slot.name; newKind = "" })
-            }
-            if (newKindFor == section.slot.name) {
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    CivilightTextField(newKind, { newKind = it }, Modifier.weight(1f), label = CastUiCopy.NAME)
-                    TextAction(CastUiCopy.BTN_INSERT, {
-                        val name = newKind
-                        val slot = section.slot
-                        var made: SlotDraft? = null
-                        editor.act(CastUiCopy.BTN_INSERT, then = {
-                            made?.let { chosen[slot] = it }
-                            newKindFor = null
-                        }) { d, ctx ->
-                            RelationDrafts.addKind(d, slot, name, ctx)?.let { (next, chip) ->
-                                made = (chosen[slot] ?: SlotDraft()).copy(kindKey = chip.kindKey, partnerHoldsFirst = chip.partnerHoldsFirst)
-                                next
-                            } ?: d
+    // The pair picker and the form swap in place (P3).
+    ContentSwap(picking, label = "changeStep") { which ->
+        Column(Modifier.fillMaxWidth()) {
+            if (which != null) {
+                CharacterPickerSheet(doc, gate, onPick = { picked ->
+                    if (which == PARTNER && picked != viewer) partner = picked
+                    if (which == VIEWER && picked != partner) viewer = picked
+                    chosen.clear()
+                    picking = null
+                }, onClose = { picking = null }, title = CastUiCopy.PICK_PARTNER)
+            } else if (other != null && view != null && everySection != null) {
+                SheetHeader(view.title, onClose = host::close, subtitle = view.sub, closeLabel = view.cancelLabel)
+                SheetScrollBody {
+                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        PersonChip(view.viewerName) { picking = VIEWER }
+                        CivilightText(CastCopy.SEP.trim(), type.small, color = colors.ink3)
+                        PersonChip(view.partnerName) { picking = PARTNER }
+                    }
+                    SectionLabel(RelationDrafts.CHANGE_ITEMS, Modifier.padding(top = 16.dp, bottom = 6.dp))
+                    ChipFlow {
+                        for ((slot, label) in view.slotChips) {
+                            FilterChip(label, slot in chosen, { if (slot in chosen) chosen.remove(slot) else chosen[slot] = SlotDraft() })
                         }
-                    }, Modifier.padding(start = 8.dp, top = 18.dp))
+                    }
+                    for (section in everySection.sections) {
+                        key(section.slot) {
+                            FoldReveal(section.slot in chosen) {
+                                SlotSection(section, view.addKindLabel, chosen, newKindFor, newKind, { newKindFor = it }, { newKind = it }, editor, other)
+                            }
+                        }
+                    }
+                    FieldTableRow(view.startRow.first, view.startRow.second, Modifier.padding(top = 14.dp))
+                    FieldTableRow(view.reflectRow.first, view.reflectRow.second)
+                    val canRecord = !store.readOnly && chosen.isNotEmpty() && chosen.values.none { it == SlotDraft() }
+                    Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                        CivilightButton(view.primaryLabel, {
+                            val drafts = chosen.toMap()
+                            val a = viewer
+                            editor.act(view.primaryLabel) { d, ctx -> RelationDrafts.recordAtBlock(d, blockKey, a, other, drafts, ctx).first }
+                            host.close()
+                        }, Modifier.weight(1f), enabled = canRecord)
+                    }
                 }
             }
-            CivilightTextField(draft.description, { chosen[section.slot] = draft.copy(description = it) }, Modifier.fillMaxWidth().padding(top = 8.dp), label = CastUiCopy.DESCRIPTION_OPTIONAL)
         }
-        FieldTableRow(view.startRow.first, view.startRow.second, Modifier.padding(top = 14.dp))
-        FieldTableRow(view.reflectRow.first, view.reflectRow.second)
-        val canRecord = !store.readOnly && chosen.isNotEmpty() && chosen.values.none { it == SlotDraft() }
-        Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-            CivilightButton(view.primaryLabel, {
-                val drafts = chosen.toMap()
-                val a = viewer
-                editor.act(view.primaryLabel) { d, ctx -> RelationDrafts.recordAtBlock(d, blockKey, a, other, drafts, ctx).first }
-                host.close()
-            }, Modifier.weight(1f), enabled = canRecord)
+    }
+}
+
+/** One chosen slot of the change sheet: `값 · <before> →`, the kind chips with `+ 새 종류` (or the 호칭 text) and a description. */
+@Composable
+private fun SlotSection(
+    section: ChangeSection,
+    addKindLabel: String,
+    chosen: androidx.compose.runtime.snapshots.SnapshotStateMap<SheetSlot, SlotDraft>,
+    newKindFor: String?,
+    newKind: String,
+    setNewKindFor: (String?) -> Unit,
+    setNewKind: (String) -> Unit,
+    editor: CastEditorViewModel,
+    other: Key,
+) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val draft = chosen[section.slot] ?: SlotDraft()
+    Column(Modifier.fillMaxWidth()) {
+        CivilightText(section.valueLabel, type.small, Modifier.padding(top = 14.dp, bottom = 6.dp), color = colors.ink3)
+        if (section.slot == SheetSlot.ADDRESS) {
+            CivilightTextField(draft.address, { chosen[section.slot] = draft.copy(address = it) }, Modifier.fillMaxWidth(), label = RelationDrafts.ADDRESS)
+            return@Column
         }
+        ChipFlow {
+            for (chip in section.chips) {
+                val picked = draft.picks(chip)
+                FilterChip(chip.label, picked, {
+                    chosen[section.slot] = if (picked) draft.copy(kindKey = null, partnerHoldsFirst = null) else draft.copy(kindKey = chip.kindKey, partnerHoldsFirst = chip.partnerHoldsFirst)
+                })
+            }
+            if (newKindFor != section.slot.name) AddChip(addKindLabel, { setNewKindFor(section.slot.name); setNewKind("") })
+        }
+        FoldReveal(newKindFor == section.slot.name) {
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                CivilightTextField(newKind, setNewKind, Modifier.weight(1f), label = CastUiCopy.NAME)
+                TextAction(CastUiCopy.BTN_INSERT, {
+                    val name = newKind
+                    val slot = section.slot
+                    var made: SlotDraft? = null
+                    editor.act(CastUiCopy.BTN_INSERT, then = {
+                        made?.let { chosen[slot] = it }
+                        setNewKindFor(null)
+                    }) { d, ctx ->
+                        RelationDrafts.addKind(d, slot, name, ctx)?.let { (next, chip) ->
+                            made = (chosen[slot] ?: SlotDraft()).copy(kindKey = chip.kindKey, partnerHoldsFirst = chip.partnerHoldsFirst)
+                            next
+                        } ?: d
+                    }
+                }, Modifier.padding(start = 8.dp, top = 18.dp))
+            }
+        }
+        CivilightTextField(draft.description, { chosen[section.slot] = draft.copy(description = it) }, Modifier.fillMaxWidth().padding(top = 8.dp), label = CastUiCopy.DESCRIPTION_OPTIONAL)
     }
 }
 

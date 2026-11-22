@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.canvas
 
-import io.github.lenticualrstone.civilight.feature.canvas.card.CardViewMotion
+import io.github.lenticualrstone.civilight.designsystem.card.CardViewMotion
+import io.github.lenticualrstone.civilight.feature.canvas.page.PageListMotion
 import io.github.lenticualrstone.civilight.feature.canvas.image.CropHandOff
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageEdits
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageOwner
@@ -78,5 +79,12 @@ class ImagePickAndMotionTest {
         assertEquals(0, reduced.textInDelayMs)
         assertFalse(reduced.sharedImages)
         assertEquals(48f, CardViewMotion.THUMB_DP)
+    }
+
+    @Test
+    fun `the second card moves aside only when the card view is switched on with full motion`() {
+        assertEquals(-24f, PageListMotion.nudgeDp(reduced = false, entering = true))
+        assertEquals("first show: no move", 0f, PageListMotion.nudgeDp(reduced = false, entering = false))
+        assertEquals("reduced: no move", 0f, PageListMotion.nudgeDp(reduced = true, entering = true))
     }
 }

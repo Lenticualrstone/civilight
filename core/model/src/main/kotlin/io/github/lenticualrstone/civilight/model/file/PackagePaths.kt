@@ -24,6 +24,12 @@ object PackagePaths {
     const val PAYLOAD = "payload.bin"
 
     const val TRASH_DIR = "trash/"
+
+    /** Gallery file units `gallery/<ownerKey>.json` (55 §3.3). */
+    const val GALLERY_DIR = "gallery/"
+
+    /** Originals of gallery items in a package: `gallery/files/<hash>.<ext>` (never in the working store). */
+    const val GALLERY_FILES_DIR = "gallery/files/"
     const val TRASH_INDEX = "trash/index.json"
 
     /** `.civilight-recorder`: all records. */
@@ -39,6 +45,15 @@ object PackagePaths {
     fun canvas(canvasKey: Key) = "canvas/$canvasKey.json"
     fun page(pageKey: Key) = "pages/$pageKey.json"
     fun asset(hash: String, ext: String) = "assets/$hash.$ext"
+    fun gallery(ownerKey: Key) = "$GALLERY_DIR$ownerKey.json"
+    fun galleryOriginal(hash: String, ext: String) = "$GALLERY_FILES_DIR$hash.$ext"
+
+    /** True for a gallery file unit path (`gallery/<ownerKey>.json`, not an original). */
+    fun isGalleryUnit(path: String): Boolean =
+        path.startsWith(GALLERY_DIR) && path.endsWith(".json") && path.count { it == '/' } == 1
+
+    /** The owner key of a gallery file unit path. */
+    fun galleryOwnerOf(path: String): Key = path.removePrefix(GALLERY_DIR).removeSuffix(".json")
 
     /** The `trash/` mirror path of a normal file path (§7.9). */
     fun trash(path: String) = TRASH_DIR + path

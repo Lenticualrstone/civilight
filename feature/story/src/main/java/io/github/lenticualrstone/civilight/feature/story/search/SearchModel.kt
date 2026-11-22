@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.feature.story.search
 import androidx.navigation3.runtime.NavKey
 import io.github.lenticualrstone.civilight.domain.story.search.SearchCommand
 import io.github.lenticualrstone.civilight.domain.story.search.SearchContext
+import io.github.lenticualrstone.civilight.domain.story.search.SearchFilter
 import io.github.lenticualrstone.civilight.domain.story.search.SearchItem
 import io.github.lenticualrstone.civilight.domain.story.search.SearchSectionKind
 import io.github.lenticualrstone.civilight.domain.story.search.SimilarName
@@ -37,6 +38,28 @@ sealed interface SearchTap {
 
 /** 검색 · 명령 as plain data over `domain:story` `ProjectSearch` (STO-36 … STO-38). */
 object SearchModel {
+    /**
+     * Whether the result list is drawn for [query] under [filter]: a typed query always, and the `명령` chip
+     * also with an empty one (it lists every command of the context; QA 2026-11-23 #11).
+     */
+    fun listsWithoutQuery(query: String, filter: SearchFilter): Boolean = query.isNotBlank() || filter == SearchFilter.COMMAND
+
+    /**
+     * Stable lazy keys for the [items] of [section]: the item's kind and key, never its index, so a row that
+     * stays keeps its place. A repeated key (a term's name and its aliases share the item key) gets `#2`, `#3`
+     * in order; a command has no key and uses its label.
+     */
+    fun itemKeys(section: String, items: List<SearchItem>): List<String> {
+        val seen = HashMap<String, Int>()
+        return items.map { item ->
+            val identity = item.key ?: (item as? SearchItem.CommandItem)?.let { it.command.name }.orEmpty()
+            val base = "$section:${item::class.simpleName}:$identity"
+            val n = (seen[base] ?: 0) + 1
+            seen[base] = n
+            if (n == 1) base else "$base#$n"
+        }
+    }
+
     /**
      * The search context from the screen under the overlay: the script (no `시점 바꾸기`, but `렌즈를 이
      * 씬으로 맞추기`, and `#043` in its episode), else the episode of the last edit; the lens shown in

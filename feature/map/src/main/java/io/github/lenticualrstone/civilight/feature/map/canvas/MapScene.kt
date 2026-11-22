@@ -65,6 +65,18 @@ data class MapScene(
     fun pin(key: Key): ScenePin? = pins.firstOrNull { it.key == key }
 
     fun region(key: Key): SceneRegion? = regions.firstOrNull { it.key == key }
+
+    /** The keys of everything in the scene. */
+    fun keys(): Set<Key> = buildSet {
+        lines.forEach { add(it.key) }
+        regions.forEach { add(it.key) }
+        routes.forEach { add(it.key) }
+        links.forEach { add(it.key) }
+        labels.forEach { add(it.key) }
+        nodes.forEach { add(it.key) }
+        pins.forEach { add(it.key) }
+        stamps.forEach { add(it.key) }
+    }
 }
 
 /**
@@ -74,6 +86,12 @@ data class MapScene(
  * [layerFilter] keeps only the overlays of one layer (the view's layer chips; null = `전체 핀`).
  */
 object MapScenes {
+    /**
+     * The keys that are new in a scene ([now]) since the one before ([previous]); none for the first scene of a screen
+     * (null), so opening a map never animates its content in. These fade in; the rest only change.
+     */
+    fun fresh(previous: Set<Key>?, now: Set<Key>): Set<Key> = if (previous == null) emptySet() else now - previous
+
     fun build(
         doc: ProjectDoc,
         map: WorldMap,

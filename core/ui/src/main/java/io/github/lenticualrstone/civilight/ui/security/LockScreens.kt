@@ -18,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
@@ -45,14 +47,20 @@ object LockCopy {
  * and nothing is composed underneath. It always takes every touch.
  */
 @Composable
-fun AppLockScreen(mode: LockScreenMode, onBiometric: () -> Unit, onDevicePin: () -> Unit) {
+fun AppLockScreen(mode: LockScreenMode, onBiometric: () -> Unit, onDevicePin: () -> Unit, interactive: Boolean = true) {
     val colors = CivilightTheme.colors
     val see = mode == LockScreenMode.BLURRED_CONTENT && lockBlurAvailable()
     Box(
         Modifier
             .fillMaxSize()
             .then(if (see) Modifier.background(colors.shade) else Modifier.background(colors.bg))
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+            .then(
+                if (interactive) {
+                    Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                } else {
+                    Modifier.clearAndSetSemantics { }
+                },
+            ),
     ) {
         LockBody(
             title = LockCopy.APP_TITLE,
@@ -70,14 +78,36 @@ fun lockBlurAvailable(): Boolean = Build.VERSION.SDK_INT >= 31
 /** The blur the shell applies to the screen under [AppLockScreen] (`AppLock`: 14 px, 60 %). */
 fun Modifier.lockedContent(): Modifier = this.blur(14.dp).graphicsLayer { alpha = 0.6f }.clearAndSetSemantics { }
 
+/**
+ * [lockedContent] at a [level] read in the draw phase (1 = locked look, 0 = clear): the unlock ramps the
+ * blur 14 → 0 dp and the dim .6 → 1 (S9). Content is hidden from accessibility while [locked].
+ */
+fun Modifier.lockedContent(level: () -> Float, locked: Boolean): Modifier = this
+    .graphicsLayer {
+        val l = level().coerceIn(0f, 1f)
+        alpha = 1f - (1f - LOCKED_ALPHA) * l
+        val r = LOCKED_BLUR.toPx() * l
+        renderEffect = if (r > 0f && Build.VERSION.SDK_INT >= 31) BlurEffect(r, r, TileMode.Decal) else null
+    }
+    .then(if (locked) Modifier.clearAndSetSemantics { } else Modifier)
+
+private const val LOCKED_ALPHA = 0.6f
+private val LOCKED_BLUR = 14.dp
+
 /** Hidden-project lock (LIB-34 `RHLockMark`): plain `bg`, mark 72, `PIN 사용` · `서재로`. */
 @Composable
-fun HiddenProjectLockScreen(onBiometric: () -> Unit, onPin: () -> Unit, onLibrary: () -> Unit) {
+fun HiddenProjectLockScreen(onBiometric: () -> Unit, onPin: () -> Unit, onLibrary: () -> Unit, interactive: Boolean = true) {
     Box(
         Modifier
             .fillMaxSize()
             .background(CivilightTheme.colors.bg)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+            .then(
+                if (interactive) {
+                    Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                } else {
+                    Modifier.clearAndSetSemantics { }
+                },
+            ),
     ) {
         LockBody(title = LockCopy.HIDDEN_TITLE, markSize = 72, onBiometric = onBiometric) {
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {

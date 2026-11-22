@@ -74,11 +74,44 @@ class CastFilterModelTest {
         assertEquals(listOf("리엔", "???", "세라"), lead.cards.map { it.title }.take(3).let { titles -> titles })
         val hart = lead.cards.single { it.key == K.HART }
         assertEquals("하르트 · 이름 공개 1-9", hart.subtitle)
-        // The list view has no card rows.
-        assertTrue(build(CastListUi()).cardGroups.isEmpty())
+        // Both views are built in either mode, so the `목록 ↔ 카드` switch has two sides to animate between.
+        assertEquals(cards.map { it.header }, build(CastListUi()).cardGroups.map { it.header })
         // A search narrows the cards too.
         val found = build(CastListUi(cards = true, query = "리엔", searching = true)).cardGroups
         assertEquals(listOf(K.RIEN), found.flatMap { it.cards }.map { it.key })
         assertEquals("주연 · 1", found.single().header)
+    }
+
+    /** Every lazy key the list screen builds in both views; a lazy list throws on a repeat. */
+    private fun lazyKeys(ui: CastListUi, unlocked: Boolean = false): List<String> {
+        val state = CastListModel.build(doc, ui, hiddenUnlocked = unlocked, readOnly = false)
+        val list = state.view.groups.flatMap { g -> listOf(CastListModel.sectionKey(g.tagKey)) + g.rows.map { CastListModel.rowKey(g.tagKey, it.key) } }
+        val cards = state.cardGroups.map { CastListModel.cardsKey(it.tagKey) }
+        return list + cards
+    }
+
+    @Test
+    fun `lazy keys never repeat, in any tag, sort, filter or search state`() {
+        val states = listOf(
+            CastListUi(),
+            CastListUi(cards = true),
+            CastListUi(selectedTag = doc.project.tags.first().key),
+            CastListUi(filters = FieldFilterState().sort(K.FIELD_HEIGHT)),
+            CastListUi(searching = true, query = "리엔"),
+        )
+        for (ui in states) {
+            for (unlocked in listOf(false, true)) {
+                val keys = lazyKeys(ui, unlocked)
+                assertEquals("$ui", keys.size, keys.toSet().size)
+            }
+        }
+    }
+
+    @Test
+    fun `equal field hits get distinct keys`() {
+        val hit = io.github.lenticualrstone.civilight.feature.cast.list.FieldHitRow(K.RIEN, "리엔", "소개 · 같은 문장", 5..6)
+        val keys = CastListModel.hitKeys(listOf(hit, hit, hit.copy(characterKey = K.SERA), hit))
+        assertEquals(4, keys.toSet().size)
+        assertEquals(CastListModel.hitKeys(listOf(hit)).single(), keys.first())
     }
 }

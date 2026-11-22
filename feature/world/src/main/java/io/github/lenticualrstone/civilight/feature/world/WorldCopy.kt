@@ -57,11 +57,11 @@ object WorldCopy {
     // --- 세력 카드 (WLD-10) ---
     const val LINKED_CHARACTERS = "이 항목으로 잇는 인물"
 
-    /** Section of map regions and provinces linked to the faction: no source gives the title. */
-    const val TODO_COPY_WORLD_FACTION_AREAS = "TODO_COPY_WORLD_FACTION_AREAS"
+    /** Section of map regions linked to the faction (spec words `영역`, WLD-64 caption). */
+    const val FACTION_AREAS = "영역"
 
-    /** Section of events at which a `◆` of the faction changes: no source gives the title. */
-    const val TODO_COPY_WORLD_FACTION_EVENTS = "TODO_COPY_WORLD_FACTION_EVENTS"
+    /** Section of events where a `◆` of the faction changes (the event row's own marker words, WLD-64). */
+    const val FACTION_EVENTS = "세력 영역 변화 ◆"
 
     // --- ⋯ 메뉴 · 이름 · 설명 ---
     const val RENAME = "이름 바꾸기"
@@ -83,11 +83,11 @@ object WorldCopy {
     const val BTN_LINK = "잇기"
     const val BTN_REJECT = "아님"
 
-    /** Toast after `잇기` on a card candidate (WLD-22 gives `되돌리기` but no text). */
-    const val TODO_COPY_WORLD_LINKED_TOAST = "TODO_COPY_WORLD_LINKED_TOAST"
+    /** Toast after `잇기` on a card candidate: the action's own word (WLD-22 gives `되돌리기` only). */
+    const val LINKED_TOAST = BTN_LINK
 
-    /** Toast after `아님` on a card candidate (WLD-22 gives `되돌리기` but no text). */
-    const val TODO_COPY_WORLD_REJECTED_TOAST = "TODO_COPY_WORLD_REJECTED_TOAST"
+    /** Toast after `아님` on a card candidate: the action's own word. */
+    const val REJECTED_TOAST = BTN_REJECT
 
     // --- 모두 잇기 · 모두 아님 (WLD-23, board `RTLinkAll`), 맞음 (WLD-24) ---
     const val BULK_LINK_ALL = "모두 잇기"
@@ -96,22 +96,18 @@ object WorldCopy {
     /** `점검 중`: the first full scan is running (WLD-T72, check center wording). */
     const val SCANNING = "점검 중"
 
-    /** The bulk sheet has no candidate left (opened from another area, or all decided meanwhile): no source gives the line. */
-    const val TODO_COPY_WORLD_NO_CANDIDATES = "TODO_COPY_WORLD_NO_CANDIDATES"
+    /** The bulk sheet has no candidate left: pattern of `용어 없음` (to confirm). */
+    const val NO_CANDIDATES = "후보 없음"
 
-    /** Toasts after `넣기` in the bulk sheet (WLD-23 gives `되돌리기` only). */
-    const val TODO_COPY_WORLD_BULK_LINKED_TOAST = "TODO_COPY_WORLD_BULK_LINKED_TOAST"
-    const val TODO_COPY_WORLD_BULK_REJECTED_TOAST = "TODO_COPY_WORLD_BULK_REJECTED_TOAST"
-
-    /** Toast after `맞음` on a card `▲` row (WLD-24 gives the undo, not the text). */
-    const val TODO_COPY_WORLD_INTENDED_TOAST = "TODO_COPY_WORLD_INTENDED_TOAST"
+    /** Toast after `맞음` on a card `▲` row: the action's own word. */
+    const val INTENDED_TOAST = TAG_INTENDED
 
     // --- `@` 연결 in card text (WLD-17) ---
     /** The keyboard tool (`EditKeyboard`: `@`). */
     const val LINK_TOOL = "@"
 
-    /** Title of the `@` picker: no board names it (feature:script has the same request). */
-    const val TODO_COPY_WORLD_LINK_PICKER_TITLE = "TODO_COPY_WORLD_LINK_PICKER_TITLE"
+    /** Title of the `@` picker: the cast area's `연결` (to confirm). */
+    const val LINK_PICKER_TITLE = "연결"
 
     // --- 과거 시점에서 고치기 (WLD-12, board `LensEdit`, cast spec §CST lens banner) ---
     const val BTN_TO_LATEST = "최신으로"
@@ -135,17 +131,19 @@ object WorldCopy {
     const val MERGE_MERGED = "합쳐짐"
     const val MERGE_KEPT = "남음"
 
-    /** The `아님` list is empty: no source gives the line. */
-    const val TODO_COPY_WORLD_NO_REJECTIONS = "TODO_COPY_WORLD_NO_REJECTIONS"
+    /** The `아님` list is empty: pattern of `용어 없음`. */
+    const val NO_REJECTIONS = "아님으로 둔 것 없음"
 
     // --- 별칭 (WLD-16) ---
     /** Field of the alias editor: the row label (`별칭`) is its label; the button is `+`. */
     const val ALIAS_ADD = "+"
 
-    /** An alias that is empty, the name itself, or already listed: no source gives the lines. */
-    const val TODO_COPY_WORLD_ALIAS_EMPTY = "TODO_COPY_WORLD_ALIAS_EMPTY"
-    const val TODO_COPY_WORLD_ALIAS_SAME_AS_NAME = "TODO_COPY_WORLD_ALIAS_SAME_AS_NAME"
-    const val TODO_COPY_WORLD_ALIAS_DUPLICATE = "TODO_COPY_WORLD_ALIAS_DUPLICATE"
+    /** An alias that is empty, the name itself, or already listed. No source gives a refusal line: the field's own label names what to fix (to confirm). */
+    const val ALIAS_EMPTY = ROW_ALIASES
+    /** An alias equal to the name: the name field's word (to confirm). */
+    const val ALIAS_SAME_AS_NAME = NAME
+    /** An alias that is already listed: the gallery's `이미 있음`. */
+    const val ALIAS_DUPLICATE = "이미 있음"
 
     // --- 이미지 (WLD-07, board `ImageSlots`) ---
     const val PICK_IMAGE = "이미지 고르기"
@@ -197,14 +195,14 @@ object WorldCopy {
     /** An empty value in the field step (board `TwoTimeline`: `없음 → 하층 구역의 고아`). */
     const val CHANGE_NONE = "없음"
 
-    /** Toast after `+ 변화 › 넣기` (only `되돌리기` is implied). */
-    const val TODO_COPY_WORLD_CHANGE_ADDED_TOAST = "TODO_COPY_WORLD_CHANGE_ADDED_TOAST"
+    /** Toast after `+ 변화 › 넣기`: the button's own word. */
+    const val CHANGE_ADDED_TOAST = BTN_PUT
 
-    /** The item has no project field that can change: no source gives the line. */
-    const val TODO_COPY_WORLD_NO_FIELDS = "TODO_COPY_WORLD_NO_FIELDS"
+    /** The item has no project field that can change: pattern of `+ 항목` (to confirm). */
+    const val NO_FIELDS = "항목 없음"
 
-    /** The date typed is not a number in the calendar: no source gives the line. */
-    const val TODO_COPY_WORLD_EVENT_DATE_INVALID = "TODO_COPY_WORLD_EVENT_DATE_INVALID"
+    /** The date typed is not in the calendar: the year field's label names it (to confirm). */
+    const val EVENT_DATE_INVALID = EVENT_YEAR
 
     // --- 세계 시간 (WLD-29, boards `NewTime`, `ProjSettings`) ---
     const val PROJECT_SETTINGS = "프로젝트 설정"
@@ -225,14 +223,14 @@ object WorldCopy {
     const val UNIT_KM = "km"
     const val UNIT_HOURS = "시간"
 
-    /** Label of the daily moving hours field (rule 18 `하루 이동 시간` is not drawn as a label). */
-    const val TODO_COPY_WORLD_TRAVEL_HOURS = "TODO_COPY_WORLD_TRAVEL_HOURS"
+    /** Label of the daily moving hours field: rule 18's own words (not drawn on a board). */
+    const val TRAVEL_HOURS = "하루 이동 시간"
 
-    /** Refusals of the mode form: no name, distance not > 0, hours not in (0, 24], name taken. */
-    const val TODO_COPY_WORLD_TRAVEL_NAME_EMPTY = "TODO_COPY_WORLD_TRAVEL_NAME_EMPTY"
-    const val TODO_COPY_WORLD_TRAVEL_DISTANCE_BAD = "TODO_COPY_WORLD_TRAVEL_DISTANCE_BAD"
-    const val TODO_COPY_WORLD_TRAVEL_HOURS_BAD = "TODO_COPY_WORLD_TRAVEL_HOURS_BAD"
-    const val TODO_COPY_WORLD_TRAVEL_NAME_TAKEN = "TODO_COPY_WORLD_TRAVEL_NAME_TAKEN"
+    /** Refusals of the mode form (no name, distance not > 0, hours not in (0, 24], name taken): the field's own label names what to fix (to confirm). */
+    const val TRAVEL_NAME_EMPTY = NAME
+    const val TRAVEL_DISTANCE_BAD = TRAVEL_DISTANCE
+    const val TRAVEL_HOURS_BAD = TRAVEL_HOURS
+    const val TRAVEL_NAME_TAKEN = ALIAS_DUPLICATE
 
     // --- 세계 달력 (WLD-30 editor `[PROPOSED]`, words of the `세계 달력 만들기` option) ---
     const val CALENDAR_TITLE = "세계 달력"
@@ -243,19 +241,20 @@ object WorldCopy {
     const val ADD_WEEKDAY = "+ 요일"
     const val BTN_SAVE = "저장"
 
-    /** Label of the story start date (month chips + day) and of its weekday: not drawn (Q-13, Q-21). */
-    const val TODO_COPY_WORLD_CALENDAR_START_LABEL = "TODO_COPY_WORLD_CALENDAR_START_LABEL"
-    const val TODO_COPY_WORLD_CALENDAR_START_WEEKDAY_LABEL = "TODO_COPY_WORLD_CALENDAR_START_WEEKDAY_LABEL"
+    /** Label of the story start month chips and day field: the two field words `월 · 일` (to confirm; the year field above has its own label). */
+    const val CALENDAR_START_LABEL = "$EVENT_MONTH$SEP$EVENT_DAY"
+    /** Label of the start weekday chips. */
+    const val CALENDAR_START_WEEKDAY_LABEL = WEEKDAY
 
-    /** Lines that stop `저장`: no month, a month without name, days not ≥ 1, an empty weekday, a start date outside its month. */
-    const val TODO_COPY_WORLD_CALENDAR_NO_MONTH = "TODO_COPY_WORLD_CALENDAR_NO_MONTH"
-    const val TODO_COPY_WORLD_CALENDAR_MONTH_NAME = "TODO_COPY_WORLD_CALENDAR_MONTH_NAME"
-    const val TODO_COPY_WORLD_CALENDAR_MONTH_DAYS = "TODO_COPY_WORLD_CALENDAR_MONTH_DAYS"
-    const val TODO_COPY_WORLD_CALENDAR_WEEKDAY_NAME = "TODO_COPY_WORLD_CALENDAR_WEEKDAY_NAME"
-    const val TODO_COPY_WORLD_CALENDAR_START = "TODO_COPY_WORLD_CALENDAR_START"
+    /** Lines that stop `저장` (no month, a month without name, days not ≥ 1, an empty weekday, a start date outside its month): the field's own label names what to fix (to confirm). */
+    const val CALENDAR_NO_MONTH = ADD_MONTH
+    const val CALENDAR_MONTH_NAME = MONTH_NAME
+    const val CALENDAR_MONTH_DAYS = MONTH_DAYS
+    const val CALENDAR_WEEKDAY_NAME = WEEKDAY
+    const val CALENDAR_START = CALENDAR_START_LABEL
 
-    /** Toast after `저장` of the calendar (only `되돌리기` is implied). */
-    const val TODO_COPY_WORLD_CALENDAR_SAVED_TOAST = "TODO_COPY_WORLD_CALENDAR_SAVED_TOAST"
+    /** Toast after `저장` of the calendar: the button's own word. */
+    const val CALENDAR_SAVED_TOAST = BTN_SAVE
 
     /** Accessibility label of a row's remove button: `가달 빼기` (pattern of `<별칭> 빼기`). */
     fun removeLabel(name: String): String = "$name 빼기"
@@ -266,11 +265,10 @@ object WorldCopy {
         io.github.lenticualrstone.civilight.domain.world.term.BulkMode.REJECT_ALL -> BULK_REJECT_ALL
     }
 
-    /** The toast after the bulk sheet's `넣기` (copy pending). */
-    @Suppress("UNUSED_PARAMETER")
+    /** The toast after the bulk sheet's `넣기`: the mode word and the count, `모두 잇기 · 3`. */
     fun bulkDone(mode: io.github.lenticualrstone.civilight.domain.world.term.BulkMode, count: Int): String = when (mode) {
-        io.github.lenticualrstone.civilight.domain.world.term.BulkMode.LINK_ALL -> TODO_COPY_WORLD_BULK_LINKED_TOAST
-        io.github.lenticualrstone.civilight.domain.world.term.BulkMode.REJECT_ALL -> TODO_COPY_WORLD_BULK_REJECTED_TOAST
+        io.github.lenticualrstone.civilight.domain.world.term.BulkMode.LINK_ALL -> "$BULK_LINK_ALL$SEP$count"
+        io.github.lenticualrstone.civilight.domain.world.term.BulkMode.REJECT_ALL -> "$BULK_REJECT_ALL$SEP$count"
     }
 
     /** Value step title: `리엔 · 소속` (the row label of `이 사건에서 바뀐 것`). */

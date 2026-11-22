@@ -53,7 +53,7 @@ object MapMenu {
             formatEditTitle(map)?.let { out += MapMenuRow(MapMenuAction.FORMAT_EDIT, it) }
             if (map.baseKind.known == MapBaseKind.GENERATED && map.generation != null) {
                 val ok = canReroll(map)
-                out += MapMenuRow(MapMenuAction.REROLL, MapCopy.REROLL_TITLE, if (ok) null else MapCopy.TODO_COPY_MAP_REROLL_OTHER_VERSION, ok)
+                out += MapMenuRow(MapMenuAction.REROLL, MapCopy.REROLL_TITLE, if (ok) null else MapCopy.REROLL_OTHER_VERSION, ok)
             }
         }
         if (screen == MapMenuScreen.VIEW && !MapScales.isNodeMap(map)) out += MapMenuRow(MapMenuAction.TRACK, MapCopy.TRACK_TITLE)

@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.library.backup
 
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,19 +65,24 @@ internal fun RestoringScreen(services: LibraryServices) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     SettingsFrame(title = "", smallLine = RestoreCopy.RESTORING_SMALL, onBack = { navigator.pop() }) {
-        val current = status
-        if (current == null) {
-            CivilightText(RestoreCopy.TODO_COPY_LIB60_NOT_RUNNING, type.small, color = colors.ink3)
-            return@SettingsFrame
+        // Nothing running ↔ the progress swap in place (audit row 7).
+        ContentSwap(status != null, label = "restoring") { running ->
+            val current = status
+            if (!running || current == null) {
+                CivilightText(RestoreCopy.NOT_RUNNING, type.small, color = colors.ink3)
+            } else {
+                val ui = RestoringModel.of(current)
+                Column {
+                    SectionLabel(ui.section)
+                    CivilightText(current.progress.title, type.pageTitle, Modifier.padding(top = 8.dp), color = colors.ink)
+                    ProgressBar(ui.fraction, Modifier.padding(top = 18.dp), valueText = ui.bytes, estimateText = ui.estimate)
+                    Column(Modifier.padding(top = 18.dp)) {
+                        ui.steps.forEachIndexed { i, (title, sub) -> StepRow(title, sub, stepState(i, ui.current)) }
+                    }
+                    CivilightText(current.progress.note, type.small, Modifier.padding(top = 16.dp), color = colors.ink3)
+                }
+            }
         }
-        val ui = RestoringModel.of(current)
-        SectionLabel(ui.section)
-        CivilightText(current.progress.title, type.pageTitle, Modifier.padding(top = 8.dp), color = colors.ink)
-        ProgressBar(ui.fraction, Modifier.padding(top = 18.dp), valueText = ui.bytes, estimateText = ui.estimate)
-        Column(Modifier.padding(top = 18.dp)) {
-            ui.steps.forEachIndexed { i, (title, sub) -> StepRow(title, sub, stepState(i, ui.current)) }
-        }
-        CivilightText(current.progress.note, type.small, Modifier.padding(top = 16.dp), color = colors.ink3)
     }
 }
 
@@ -89,14 +97,14 @@ private fun StepRow(title: String, sub: String, state: StepState) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val marker = when (state) {
-            StepState.DONE -> Modifier.clip(shape).background(colors.acc)
-            StepState.CURRENT -> Modifier.insetOutline(colors.acc, 2.dp, shape)
-            StepState.UPCOMING -> Modifier.insetOutline(colors.ink3, 1.5.dp, shape)
-        }
-        Box(Modifier.size(20.dp).then(marker))
+        // The marker changes fill and outline colour on `standard` (S6): todo → current → done.
+        val fill by animatedFraction(state == StepState.DONE)
+        val outline by animatedColor(if (state == StepState.UPCOMING) colors.ink3 else colors.acc)
+        val stroke = if (state == StepState.UPCOMING) 1.5.dp else 2.dp
+        Box(Modifier.size(20.dp).clip(shape).background(colors.acc.copy(alpha = colors.acc.alpha * fill)).insetOutline(outline, stroke, shape))
         Column(Modifier.weight(1f)) {
-            CivilightText(title, type.command, color = if (state == StepState.UPCOMING) colors.ink3 else colors.ink)
+            val titleColor by animatedColor(if (state == StepState.UPCOMING) colors.ink3 else colors.ink)
+            CivilightText(title, type.command, color = titleColor)
             CivilightText(sub, type.small, color = colors.ink3)
         }
     }

@@ -1,5 +1,19 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.animation.core.Animatable
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,8 +58,10 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.LayoutMetrics
 
 /**
- * A full-window dialog with the `shade` scrim drawn by us (the platform dim is turned off). Back and the
- * scrim call [onDismissRequest].
+ * A full-window dialog with the `shade` scrim drawn by us (the platform dim and window animations are turned
+ * off). It opens with one progress on `enter`: the scrim fades in and the content rises 12 dp (S8; reduced:
+ * fade only). Back and the scrim fade it out on `exit` first, then call [onDismissRequest]; so does a
+ * `취소` in [ConfirmDialog]. Removing the dialog from composition is an instant close.
  */
 @Composable
 fun ScrimDialog(
@@ -54,31 +70,70 @@ fun ScrimDialog(
     dismissOnScrim: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val motion = LocalMotion.current
+    val progress = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val onDismiss by rememberUpdatedState(onDismissRequest)
+    val closing = remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { progress.animateTo(1f, motion.spec(CivilightMotion.enter)) }
+    val animatedDismiss: () -> Unit = {
+        if (!closing.value) {
+            closing.value = true
+            scope.launch {
+                progress.animateTo(0f, motion.spec(CivilightMotion.exit))
+                onDismiss()
+                // Self-healing: a caller that keeps the dialog (a no-op or guarded dismiss) must not be left
+                // with an invisible window that eats every touch, so fade back in if still composed.
+                withFrameNanos { }
+                withFrameNanos { }
+                closing.value = false
+                progress.animateTo(1f, motion.spec(CivilightMotion.enter))
+            }
+        }
+    }
     Dialog(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = animatedDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
         SideEffect {
             window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             window?.setDimAmount(0f)
+            window?.setWindowAnimations(0)
         }
+        val rise = with(LocalDensity.current) { DIALOG_RISE.toPx() }
         Box(Modifier.fillMaxSize(), contentAlignment = contentAlignment) {
             Box(
                 Modifier
                     .fillMaxSize()
+                    .graphicsLayer { alpha = progress.value }
                     .background(CivilightTheme.colors.shade)
                     .clearAndSetSemantics { }
                     .then(
                         if (dismissOnScrim) {
-                            Modifier.clickable(remember { MutableInteractionSource() }, indication = null, onClick = onDismissRequest)
+                            Modifier.clickable(remember { MutableInteractionSource() }, indication = null, onClick = animatedDismiss)
                         } else Modifier,
                     ),
             )
-            content()
+            Box(
+                Modifier.graphicsLayer {
+                    val p = progress.value
+                    alpha = p
+                    translationY = if (motion.reduced) 0f else (1f - p) * rise
+                },
+                contentAlignment = contentAlignment,
+            ) {
+                CompositionLocalProvider(LocalDialogDismiss provides animatedDismiss, content = content)
+            }
         }
     }
 }
+
+/** How far a dialog's content rises while it opens (S8). */
+private val DIALOG_RISE = 12.dp
+
+/** The animated dismiss of the enclosing [ScrimDialog] (null outside one). */
+val LocalDialogDismiss = staticCompositionLocalOf<(() -> Unit)?> { null }
 
 /**
  * DS-25 centred dialog (`ConfirmDelete`): 20 dp from the sides (max 420 dp), radius 26, padding 22, `raise`,
@@ -105,7 +160,8 @@ fun ConfirmDialog(
             facts.forEach { (label, value) -> FieldTableRow(label = label, value = value) }
             body?.invoke(this)
             ButtonRow(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                CivilightButton(cancelLabel, onDismissRequest, Modifier.weight(1f), variant = ButtonVariant.GHOST)
+                val cancel = LocalDialogDismiss.current ?: onDismissRequest
+                CivilightButton(cancelLabel, cancel, Modifier.weight(1f), variant = ButtonVariant.GHOST)
                 CivilightButton(confirmLabel, onConfirm, Modifier.weight(1f), variant = confirmButtonVariant(hardToUndo), enabled = confirmEnabled)
             }
         }

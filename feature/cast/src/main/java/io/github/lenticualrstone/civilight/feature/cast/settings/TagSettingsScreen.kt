@@ -5,7 +5,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.PaddingValues
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -75,16 +78,20 @@ fun TagSettingsScreen(route: TagSettings, deps: FeatureDeps) {
                 }
             },
         ) { padding ->
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 8.dp, bottom = padding.calculateBottomPadding() + 24.dp),
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 8.dp, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
-                for (row in rows) {
-                    ListRow(row.title, compact = true, onClick = if (editable) ({ sheets.open(TagNameSheet(route.projectKey, row.key)) }) else null)
+                items(rows, key = { it.key }) { row ->
+                    ListRow(
+                        row.name,
+                        civilightItem(),
+                        subtitle = row.line,
+                        compact = true,
+                        onClick = if (editable) ({ sheets.open(TagNameSheet(route.projectKey, row.key)) }) else null,
+                    )
                 }
-                if (editable) AddChip(CastUiCopy.TAGS, { sheets.open(TagNameSheet(route.projectKey)) }, Modifier.padding(top = 12.dp))
+                if (editable) item(key = "add") { AddChip(CastUiCopy.TAGS, { sheets.open(TagNameSheet(route.projectKey)) }, civilightItem().padding(top = 12.dp)) }
             }
         }
     }

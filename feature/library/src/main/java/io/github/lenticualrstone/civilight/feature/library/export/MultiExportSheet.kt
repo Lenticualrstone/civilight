@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.library.export
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.LocalActivityResultRegistryOwner
@@ -96,12 +99,15 @@ internal fun SheetScope.MultiExportContent(docs: List<ProjectDoc>, services: Lib
                     }.all { it }
                 }
                 keys.values.forEach { it.fill('\u0000') }
-                deps.toasts.show(if (ok) ExportCopy.TODO_COPY_LIB41_DONE else ExportCopy.TODO_COPY_LIB41_SAVE_FAILED, actionLabel = null)
+                deps.toasts.show(if (ok) ExportCopy.DONE else ExportCopy.SAVE_FAILED, actionLabel = null)
             }
         }
     }
 
-    if (step == 0) {
+    // Pick → one password page per locked file: the page swaps in place (audit row 5, P3).
+    ContentSwap(step, Modifier.fillMaxWidth(), label = "multiExportStep") { page ->
+    Column {
+    if (page == 0) {
         val (title, sub) = ExportDefaults.formatCard(ExportFormat.PROJECT_FILE)
         SheetHeader(ExportCopy.HEADER, onClose = sheet::close, subtitle = title)
         SheetScrollBody(Modifier.padding(top = 4.dp)) {
@@ -117,20 +123,20 @@ internal fun SheetScope.MultiExportContent(docs: List<ProjectDoc>, services: Lib
         }
         SheetActions(Modifier.padding(bottom = 12.dp)) {
             CivilightButton(ExportCopy.CANCEL, sheet::close, Modifier.weight(1f), variant = ButtonVariant.GHOST)
-            CivilightButton(ExportSheets.TODO_COPY_LIB41_CREATE_FILE, { if (locked.isEmpty()) finish() else step = 1 }, Modifier.weight(1f), enabled = files.isNotEmpty() && registry != null)
+            CivilightButton(ExportSheets.CREATE_FILE, { if (locked.isEmpty()) finish() else step = 1 }, Modifier.weight(1f), enabled = files.isNotEmpty() && registry != null)
         }
     } else {
-        val file = locked.getOrNull(step - 1) ?: return
-        val doc = docs.firstOrNull { it.key == file.key } ?: return
-        SheetHeader(doc.project.name, onClose = sheet::close, subtitle = "${ExportCopy.PASSWORD} · $step/${locked.size}")
+        val file = locked.getOrNull(page - 1) ?: return@ContentSwap
+        val doc = docs.firstOrNull { it.key == file.key } ?: return@ContentSwap
+        SheetHeader(doc.project.name, onClose = sheet::close, subtitle = "${ExportCopy.PASSWORD} · $page/${locked.size}")
         val mismatch = repeat.isNotEmpty() && password != repeat
         PasswordInput(ExportCopy.PASSWORD, password, { password = it })
-        PasswordInput(ExportCopy.PASSWORD_REPEAT, repeat, { repeat = it }, Modifier.padding(top = 12.dp), error = if (mismatch) ExportCopy.TODO_COPY_LIB41_PASSWORD_MISMATCH else null)
-        CivilightText(ExportRow.TODO_COPY_LIB41_PASSWORD_WARNING, CivilightTheme.type.small, Modifier.padding(top = 8.dp), color = CivilightTheme.colors.ink3)
+        PasswordInput(ExportCopy.PASSWORD_REPEAT, repeat, { repeat = it }, Modifier.padding(top = 12.dp), error = if (mismatch) ExportCopy.PASSWORD_MISMATCH else null)
+        CivilightText(ExportRow.PASSWORD_WARNING, CivilightTheme.type.small, Modifier.padding(top = 8.dp), color = CivilightTheme.colors.ink3)
         SheetActions(Modifier.padding(bottom = 12.dp)) {
             CivilightButton(ExportCopy.CANCEL, sheet::close, Modifier.weight(1f), variant = ButtonVariant.GHOST)
             CivilightButton(
-                ExportSheets.TODO_COPY_LIB41_CREATE_FILE,
+                ExportSheets.CREATE_FILE,
                 {
                     passwords[file.key] = password.toCharArray()
                     password = ""
@@ -141,6 +147,8 @@ internal fun SheetScope.MultiExportContent(docs: List<ProjectDoc>, services: Lib
                 enabled = password.isNotEmpty() && password == repeat,
             )
         }
+    }
+    }
     }
 }
 

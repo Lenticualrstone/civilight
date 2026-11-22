@@ -1,5 +1,12 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.getValue
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -89,14 +96,15 @@ fun MapToolbar(
         ) {
             tools.forEachIndexed { i, tool ->
                 val selected = i == selectedIndex
-                val content = if (selected) colors.onpri else colors.ink2
+                val content by animatedColor(if (selected) colors.onpri else colors.ink2, label = "toolContent")
+                val fill = animatedFraction(selected, label = "toolFill")
                 val cellShape = RoundedCornerShape(14.dp)
                 Column(
                     Modifier
                         .pressable(PressAction.Select(selected) { onSelect(i) }, role = Role.RadioButton, shape = cellShape)
                         .size(52.dp, 50.dp)
                         .clip(cellShape)
-                        .background(if (selected) colors.pri else Color.Transparent),
+                        .drawBehind { val a = fill.value; if (a > 0f) drawRect(colors.pri, alpha = a) },
                     verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -116,16 +124,20 @@ fun MapToolbar(
 fun LockToggle(locked: Boolean, onToggle: (Boolean) -> Unit, modifier: Modifier = Modifier, label: String = "고정") {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(10.dp)
+    val fill = animatedFraction(locked, label = "lockFill")
+    val tint by animatedColor(if (locked) colors.acc else colors.ink3, label = "lockTint")
     Box(
         modifier
             .pressable(PressAction.Toggle(locked, onToggle), role = Role.Switch, hitTarget = HitTarget.LOCK_TOGGLE, shape = shape)
             .size(36.dp)
             .clip(shape)
-            .background(if (locked) colors.tint else Color.Transparent)
+            .drawBehind { val a = fill.value; if (a > 0f) drawRect(colors.tint, alpha = a) }
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        CivilightIcon(if (locked) IconId.StepLock else IconId.StepOpen, null, size = 18.dp, tint = if (locked) colors.acc else colors.ink3)
+        ContentSwap(locked, contentAlignment = Alignment.Center, label = "lockIcon") { on ->
+            CivilightIcon(if (on) IconId.StepLock else IconId.StepOpen, null, size = 18.dp, tint = tint)
+        }
     }
 }
 
@@ -187,17 +199,28 @@ fun GeneratorStepRow(
 fun StepChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, icon: IconId? = null) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(12.dp)
+    val on = animatedFraction(selected, label = "stepChip")
+    val content by animatedColor(if (selected) colors.ink else colors.ink2, label = "stepChipContent")
     Column(
         modifier
             .pressable(PressAction.Select(selected, onClick), role = Role.RadioButton, hitTarget = HitTarget.BUTTON, shape = shape)
             .clip(shape)
-            .then(if (selected) Modifier.background(colors.sel).insetOutline(colors.acc, 1.5.dp, shape) else Modifier)
+            .drawWithContent {
+                val a = on.value
+                if (a > 0f) drawRect(colors.sel, alpha = a)
+                drawContent()
+                if (a > 0f) {
+                    val w = 1.5.dp.toPx()
+                    val outline = shape.createOutline(Size(size.width - w, size.height - w), layoutDirection, this)
+                    translate(w / 2, w / 2) { drawOutline(outline, colors.acc, alpha = a, style = Stroke(w)) }
+                }
+            }
             .padding(vertical = 8.dp, horizontal = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (icon != null) CivilightIcon(icon, null, size = 18.dp, tint = if (selected) colors.ink else colors.ink2)
-        CivilightText(label, CivilightTheme.type.micro.merge(Micro500), color = if (selected) colors.ink else colors.ink2, maxLines = 1, textAlign = TextAlign.Center)
+        if (icon != null) CivilightIcon(icon, null, size = 18.dp, tint = content)
+        CivilightText(label, CivilightTheme.type.micro.merge(Micro500), color = content, maxLines = 1, textAlign = TextAlign.Center)
     }
 }
 
@@ -220,6 +243,8 @@ private fun hexagon(w: Float, h: Float, inset: Float = 0f) = Path().apply {
 fun TerrainSwatch(terrain: Terrain, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val fill = FixedColors.terrain.getValue(terrain)
+    val ring = animatedFraction(selected, label = "terrainRing")
+    val labelColor by animatedColor(if (selected) colors.ink else colors.ink2, label = "terrainLabel")
     Column(
         modifier
             .width(52.dp)
@@ -233,13 +258,14 @@ fun TerrainSwatch(terrain: Terrain, label: String, selected: Boolean, onClick: (
             val h = size.height - off * 2
             val path = hexagon(w, h).apply { translate(Offset(off, off)) }
             drawPath(path, fill)
-            if (selected) {
+            val a = ring.value
+            if (a > 0f) {
                 val g = 2.dp.toPx()
-                val ring = hexagon(size.width, size.height, inset = g / 2)
-                drawPath(ring, colors.acc, style = Stroke(g))
+                val path = hexagon(size.width, size.height, inset = g / 2)
+                drawPath(path, colors.acc, style = Stroke(g), alpha = a)
             }
         }
-        CivilightText(label, CivilightTheme.type.micro.merge(Micro500), color = if (selected) colors.ink else colors.ink2, maxLines = 1)
+        CivilightText(label, CivilightTheme.type.micro.merge(Micro500), color = labelColor, maxLines = 1)
     }
 }
 
@@ -257,6 +283,8 @@ fun FormatTile(
 ) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(14.dp)
+    val ring = animatedFraction(selected, label = "formatRing")
+    val labelColor by animatedColor(if (selected) colors.ink else colors.ink3, label = "formatLabel")
     Column(
         modifier
             .width(166.dp)
@@ -268,16 +296,17 @@ fun FormatTile(
                 .size(166.dp, 118.dp)
                 .drawWithContent {
                     drawContent()
-                    if (selected) {
+                    val a = ring.value
+                    if (a > 0f) {
                         val g = 2.dp.toPx()
                         val r = 14.dp.toPx()
-                        drawRoundRect(colors.bg, Offset(-g / 2, -g / 2), Size(size.width + g, size.height + g), CornerRadius(r + g / 2), style = Stroke(g))
-                        drawRoundRect(colors.acc, Offset(-g * 1.5f, -g * 1.5f), Size(size.width + g * 3, size.height + g * 3), CornerRadius(r + g * 1.5f), style = Stroke(g))
+                        drawRoundRect(colors.bg, Offset(-g / 2, -g / 2), Size(size.width + g, size.height + g), CornerRadius(r + g / 2), style = Stroke(g), alpha = a)
+                        drawRoundRect(colors.acc, Offset(-g * 1.5f, -g * 1.5f), Size(size.width + g * 3, size.height + g * 3), CornerRadius(r + g * 1.5f), style = Stroke(g), alpha = a)
                     }
                 },
         ) {
             Box(Modifier.matchParentSize().clip(shape).insetOutline(colors.line, 1.dp, shape), content = preview)
         }
-        if (label != null) CivilightText(label, CivilightTheme.type.small, color = if (selected) colors.ink else colors.ink3, maxLines = 1)
+        if (label != null) CivilightText(label, CivilightTheme.type.small, color = labelColor, maxLines = 1)
     }
 }

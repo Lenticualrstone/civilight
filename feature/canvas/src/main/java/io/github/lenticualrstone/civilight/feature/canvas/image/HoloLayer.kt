@@ -6,27 +6,33 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import io.github.lenticualrstone.civilight.designsystem.component.HoloStrength
 import io.github.lenticualrstone.civilight.designsystem.component.holoFoil
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
 import io.github.lenticualrstone.civilight.designsystem.theme.ResolvedTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -92,49 +98,70 @@ private fun currentHub(): HoloTiltHub {
 
 /**
  * The tilt of one holo surface (CNV-30): the device tilt while a rotation sensor exists, else a drag that
- * sways back on release; the turn-on sweep while it plays; [Tilt.STILL] under reduced motion. Composing it
- * counts the surface as visible for the sensor gate (T-CNV-55).
+ * sways back on release (a damped spring); the turn-on sweep while it plays, and after it the sweep's end
+ * settles into the live tilt on `standard`; [Tilt.STILL] when decorative loops do not run (reduced motion or
+ * animator scale 0). Composing it counts the surface as visible for the sensor gate (T-CNV-55).
  */
 @Stable
 class HoloTilt internal constructor(
     private val hub: HoloTiltHub,
-    private val reduced: Boolean,
+    private val loops: Boolean,
     private val sweep: Animatable<Float, *>,
+    private val settle: Animatable<Float, *>,
     internal val drag: DragTilt,
     internal val scope: CoroutineScope,
 ) {
+    private val live: Tilt get() = if (hub.gate.usesSensor) hub.deviceTilt else drag.value
+
     val value: Tilt
         get() = when {
-            reduced -> Tilt.STILL
+            !loops -> Tilt.STILL
             sweep.isRunning -> HoloRules.sweepTilt(sweep.value)
-            hub.gate.usesSensor -> hub.deviceTilt
-            else -> drag.value
+            else -> HoloRules.blend(HoloRules.sweepTilt(1f), live, settle.value)
         }
 
-    /** True when the surface must be dragged to tilt (no gyro, motion not reduced). */
-    val usesDrag: Boolean get() = !reduced && !hub.gate.usesSensor
+    /** True when the surface must be dragged to tilt (no gyro, loops running). */
+    val usesDrag: Boolean get() = loops && !hub.gate.usesSensor
 }
 
-/** A [HoloTilt] for a surface; [sweepOnStart] plays the 480 ms sweep once (holo was just switched on). */
+/** A [HoloTilt] for a surface without a turn-on sweep (the holo experiment's shared tilt). */
 @Composable
-fun rememberHoloTilt(sweepOnStart: Boolean = false): HoloTilt {
-    val reduced = CivilightTheme.reducedMotion
+fun rememberHoloTilt(): HoloTilt = rememberHoloTilt(null)
+
+/** The edge detector of one holo surface: [stamp] is raised once per toggle edge; [played] is the last one that swept. */
+@Stable
+internal class SweepGate(initialTrigger: Int) {
+    var seenTrigger: Int = initialTrigger
+    var stamp: Int by mutableIntStateOf(0)
+    var played: Int = 0
+}
+
+/** A [HoloTilt] for a surface; the 480 ms sweep plays once for each edge [gate] reports. */
+@Composable
+internal fun rememberHoloTilt(gate: SweepGate?): HoloTilt {
+    val motion = CivilightTheme.motion
+    val loops = motion.loops
     val hub = currentHub()
-    DisposableEffect(hub, reduced) {
-        hub.gate.reducedMotion(reduced)
+    DisposableEffect(hub, loops) {
+        hub.gate.reducedMotion(!loops)
         hub.gate.shown()
         onDispose { hub.gate.hidden() }
     }
     val sweep = remember { Animatable(1f) }
-    LaunchedEffect(Unit) {
-        if (!sweepOnStart) return@LaunchedEffect
-        val token = HoloRules.sweepOnTurnOn(reduced) ?: return@LaunchedEffect
+    val settle = remember { Animatable(1f) }
+    val stamp = gate?.stamp ?: 0
+    LaunchedEffect(stamp) {
+        if (gate == null || stamp <= gate.played) return@LaunchedEffect
+        gate.played = stamp
+        val token = HoloRules.sweepOnTurnOn(!loops) ?: return@LaunchedEffect
         sweep.snapTo(0f)
+        settle.snapTo(0f)
         sweep.animateTo(1f, tween(token.durationMs, easing = token.easing))
+        settle.animateTo(1f, motion.spec(CivilightMotion.standard))
     }
     val scope = rememberCoroutineScope()
     val drag = remember { DragTilt() }
-    return remember(hub, reduced, sweep, drag, scope) { HoloTilt(hub, reduced, sweep, drag, scope) }
+    return remember(hub, loops, sweep, settle, drag, scope) { HoloTilt(hub, loops, sweep, settle, drag, scope) }
 }
 
 /** Drag-to-tilt input for [tilt] when the device has no rotation sensor (board `Holo`). */
@@ -153,22 +180,39 @@ fun Modifier.holoDrag(tilt: HoloTilt): Modifier = if (!tilt.usesDrag) this else 
 fun Modifier.holoFoilAt(tilt: Tilt, theme: ResolvedTheme, strength: Float = HoloStrength.of(theme)): Modifier =
     holoFoil(Offset(tilt.x, tilt.y), theme, strength)
 
-/**
- * The holo foil of a surface while [on] (CNV-30): DS `holoFoil` driven by the device tilt; without a
- * rotation sensor the surface is dragged to tilt and sways back on release; when [sweepOnStart] (the
- * surface appears because holo was just switched on) one sweep left → right, 480 ms decelerate. Reduced
- * motion: a still foil, no sweep, no sensor. The sensor is registered only while a holo surface is
- * composed (on screen), T-CNV-55. [strength] defaults to the theme's tint strength.
- */
+/** [tilt] followed through a critically damped spring, so a noisy sensor reads smoothly (audit §4 canvas 11). */
 @Composable
-fun Modifier.holoSurface(on: Boolean, sweepOnStart: Boolean = false, strength: Float? = null): Modifier {
-    if (!on) return this
-    val theme = if (CivilightTheme.colors.isDark) ResolvedTheme.DARK else ResolvedTheme.LIGHT
-    val tilt = rememberHoloTilt(sweepOnStart)
-    return holoDrag(tilt).holoFoilAt(tilt.value, theme, strength ?: HoloStrength.of(theme))
+fun rememberSpringTilt(target: Tilt): Tilt {
+    val x by animateFloatAsState(target.x, spring(dampingRatio = CivilightMotion.holoTiltDamping, stiffness = CivilightMotion.holoTiltStiffness), label = "tiltX")
+    val y by animateFloatAsState(target.y, spring(dampingRatio = CivilightMotion.holoTiltDamping, stiffness = CivilightMotion.holoTiltStiffness), label = "tiltY")
+    return Tilt(x, y)
 }
 
-/** Drag-to-tilt without a gyro: follows the finger, then sways slowly back to rest ([HoloRules.sway]). */
+/**
+ * The holo foil of a surface while [on] (CNV-30): DS `holoFoil` driven by the device tilt; without a
+ * rotation sensor the surface is dragged to tilt and sways back on release. The foil fades in and out on
+ * `standard` when [on] changes. The turn-on sweep (one pass left → right, 480 ms decelerate) plays on the
+ * edge of [sweepTrigger]: the caller raises it when the user switches holo on, so it does not replay on a
+ * restore or when another tile becomes the shown one. Reduced motion: a still foil, no sweep, no sensor. The
+ * sensor is registered only while a holo surface is composed (on screen), T-CNV-55. [strength] defaults to
+ * the theme's tint strength.
+ */
+@Composable
+fun Modifier.holoSurface(on: Boolean, sweepTrigger: Int = 0, strength: Float? = null): Modifier {
+    val amount by animatedFraction(on, label = "holoFoil")
+    val gate = remember { SweepGate(sweepTrigger) }
+    val fire = HoloRules.sweepEdge(gate.seenTrigger, sweepTrigger, on)
+    SideEffect {
+        gate.seenTrigger = sweepTrigger
+        if (fire) gate.stamp++
+    }
+    if (!on && amount <= 0f) return this
+    val theme = if (CivilightTheme.colors.isDark) ResolvedTheme.DARK else ResolvedTheme.LIGHT
+    val tilt = rememberHoloTilt(gate)
+    return holoDrag(tilt).holoFoilAt(tilt.value, theme, (strength ?: HoloStrength.of(theme)) * amount)
+}
+
+/** Drag-to-tilt without a gyro: follows the finger, then sways back to rest on a damped spring ([HoloRules.SWAY_DAMPING]). */
 internal class DragTilt {
     var value by mutableStateOf(Tilt.ZERO)
     private var sway: Job? = null
@@ -181,12 +225,17 @@ internal class DragTilt {
         sway?.cancel()
         val from = value
         sway = scope.launch {
-            val start = withFrameMillis { it }
-            while (true) {
-                val t = HoloRules.sway(from, withFrameMillis { it } - start)
-                value = t
-                if (t == Tilt.ZERO) break
-            }
+            val a = Animatable(Offset(from.x, from.y), Offset.VectorConverter)
+            a.animateTo(
+                Offset.Zero,
+                spring(HoloRules.SWAY_DAMPING, HoloRules.SWAY_STIFFNESS, Offset(SWAY_THRESHOLD, SWAY_THRESHOLD)),
+            ) { this@DragTilt.value = Tilt(a.value.x, a.value.y) }
+            value = Tilt.ZERO
         }
+    }
+
+    private companion object {
+        /** Tilt units; the Offset default (0.5) would stop a ±1 tilt at once. */
+        const val SWAY_THRESHOLD = 0.002f
     }
 }

@@ -1,7 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.script.panel
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +27,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.Avatar
@@ -42,10 +42,10 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
-import io.github.lenticualrstone.civilight.feature.script.motion.ScriptMotion
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
@@ -64,22 +64,25 @@ fun ScriptSidePanel(
     modifier: Modifier = Modifier,
     /** The tab's scroll, shared with the cover sheet (SCR-66); null = this panel's own. */
     scrollOf: ((PanelTab) -> ScrollState)? = null,
+    /** CNV-47: the panel's width; the writer's ratio of the manuscript and the panel. */
+    width: Dp = CivilightTheme.sizes.sidePanel,
     content: @Composable ColumnScope.(PanelTab) -> Unit,
 ) {
     val tabs = PanelTab.BUILT
     val shown = tab.takeIf { it in tabs } ?: tabs.first()
-    val reduced = CivilightTheme.reducedMotion
+    val motion = CivilightTheme.motion
     CompositionLocalProvider(LocalBackHandler provides { _, _ -> }) {
         SidePanel(
             onClose = onClose,
             modifier = modifier,
+            width = width,
             tabs = tabs.map { it.label },
             selectedTab = tabs.indexOf(shown),
             onSelectTab = { onSelectTab(tabs[it]) },
             closeLabel = ScriptCopy.CLOSE,
         ) {
             // SCR-67: a tab change crossfades over 200 ms (reduced motion 120 ms).
-            Crossfade(shown, animationSpec = tween(ScriptMotion.tabMs(reduced)), label = "panelTab") { t ->
+            Crossfade(shown, animationSpec = motion.spec(CivilightMotion.standard), label = "panelTab") { t ->
                 val scroll = scrollOf?.invoke(t) ?: rememberScrollState()
                 Column(
                     Modifier.fillMaxWidth().verticalScroll(scroll).padding(top = 18.dp, bottom = 24.dp),
@@ -108,7 +111,7 @@ fun SheetScope.PanelSheet(
 ) {
     val tabs = PanelTab.BUILT
     val shown = tab.takeIf { it in tabs } ?: tabs.first()
-    val reduced = CivilightTheme.reducedMotion
+    val motion = CivilightTheme.motion
     SheetTabsHeader(
         tabs = tabs.map { it.label },
         selectedIndex = tabs.indexOf(shown),
@@ -116,7 +119,7 @@ fun SheetScope.PanelSheet(
         onClose = ::close,
         closeLabel = ScriptCopy.CLOSE,
     )
-    Crossfade(shown, Modifier.weight(1f, fill = false), animationSpec = tween(ScriptMotion.tabMs(reduced)), label = "panelTab") { t ->
+    Crossfade(shown, Modifier.weight(1f, fill = false), animationSpec = motion.spec(CivilightMotion.standard), label = "panelTab") { t ->
         val scroll = scrollOf?.invoke(t) ?: rememberScrollState()
         Column(
             Modifier.verticalScroll(scroll).padding(top = 12.dp, bottom = 24.dp),

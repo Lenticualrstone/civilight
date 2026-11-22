@@ -53,6 +53,9 @@ enum class IconId(val pathData: String) {
     Folder("M3 7h7l2 2h9v10H3z"),
     Image("M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4"),
     Grid("M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"),
+
+    /** Gallery `격자` (GAL, board `scr_gallery.py` I_GRID9): three columns of tall 3:4 tiles, two rows. */
+    GridTall("M3.5 3.5h4.5v7.5H3.5zM9.75 3.5h4.5v7.5h-4.5zM16 3.5h4.5v7.5H16zM3.5 13h4.5v7.5H3.5zM9.75 13h4.5v7.5h-4.5zM16 13h4.5v7.5H16z"),
     List("M4 6h16M4 12h16M4 18h16"),
     Rotate("M4 12a8 8 0 1 0 3-6.2M4 4v4h4"),
     Flip("M12 3v18M8 7l-4 5 4 5M16 7l4 5-4 5"),

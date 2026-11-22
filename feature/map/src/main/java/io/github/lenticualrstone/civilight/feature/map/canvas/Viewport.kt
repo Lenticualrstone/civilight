@@ -1,11 +1,12 @@
 package io.github.lenticualrstone.civilight.feature.map.canvas
 
 import io.github.lenticualrstone.civilight.model.Point
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
  * What part of a map is on screen: the map point at the view centre ([cx], [cy] in 0–1) and the
- * zoom (1 = the whole base fits the view). Saved per screen so fold and process death keep centre
+ * zoom (1 = the whole base fits the view, which is how every map screen opens). Saved per screen so fold and process death keep centre
  * and zoom (WLD-37 fold rule).
  */
 data class Viewport(val cx: Float = 0.5f, val cy: Float = 0.5f, val zoom: Float = 1f) {
@@ -23,8 +24,29 @@ data class Viewport(val cx: Float = 0.5f, val cy: Float = 0.5f, val zoom: Float 
 
         fun fromArray(a: FloatArray?): Viewport = if (a == null || a.size < 3) Viewport() else Viewport(a[0], a[1], a[2])
 
-        /** A screen's first viewport: [ViewportMath.resolve] turns it into the fill zoom once the view size is known. */
+        /**
+         * How far a pinch may go past [MIN_ZOOM] and [MAX_ZOOM] while the fingers are down; on release the
+         * viewport settles back (`ViewportMath.clamp`).
+         */
+        const val SOFT_MIN_ZOOM = 0.8f
+        const val SOFT_MAX_ZOOM = 10f
+
+        /** A screen's first viewport: [ViewportMath.resolve] turns it into the fitted view (zoom 1) once the view size is known. */
         val UNSET = Viewport(zoom = 0f)
+
+        /**
+         * [a] to [b] at [t] (0–1): the centre moves in a straight line and the zoom geometrically, so a
+         * zoom change feels even. A viewport with no zoom yet ([UNSET]) is not interpolated: [b] is returned.
+         */
+        fun lerp(a: Viewport, b: Viewport, t: Float): Viewport {
+            if (a.zoom <= 0f || b.zoom <= 0f) return b
+            val k = t.coerceIn(0f, 1f)
+            return Viewport(
+                a.cx + (b.cx - a.cx) * k,
+                a.cy + (b.cy - a.cy) * k,
+                a.zoom * (b.zoom / a.zoom).pow(k),
+            )
+        }
     }
 }
 
@@ -62,21 +84,30 @@ class ViewportMath(val viewW: Float, val viewH: Float, val aspect: Float) {
      * A two-finger gesture: zoom by [factor] around [centroid] (the point under it stays put), then
      * pan by [panX], [panY] px. The centre stays on the base and the zoom within the limits.
      */
-    fun transform(v: Viewport, centroid: ScreenPoint, panX: Float, panY: Float, factor: Float): Viewport {
+    fun transform(v: Viewport, centroid: ScreenPoint, panX: Float, panY: Float, factor: Float, soft: Boolean = false): Viewport {
         val anchor = toMap(v, centroid)
-        val zoom = (v.zoom * factor).coerceIn(Viewport.MIN_ZOOM, Viewport.MAX_ZOOM)
+        val zoom = if (soft) {
+            (v.zoom * factor).coerceIn(Viewport.SOFT_MIN_ZOOM, Viewport.SOFT_MAX_ZOOM)
+        } else {
+            (v.zoom * factor).coerceIn(Viewport.MIN_ZOOM, Viewport.MAX_ZOOM)
+        }
         val zoomed = v.copy(zoom = zoom)
         val cx = anchor.x - (centroid.x - viewW / 2) / contentW(zoomed)
         val cy = anchor.y - (centroid.y - viewH / 2) / contentH(zoomed)
         val panned = Viewport(cx - panX / contentW(zoomed), cy - panY / contentH(zoomed), zoom)
-        return clamp(panned)
+        return if (soft) clampCentre(panned) else clamp(panned)
     }
 
-    /** The zoom at which the base fills the view (no empty bands), as the boards draw maps. */
+    /** True when the zoom is past the hard limits (only a [soft] pinch gets there): it settles on release. */
+    fun overshoots(v: Viewport): Boolean = v.zoom < Viewport.MIN_ZOOM || v.zoom > Viewport.MAX_ZOOM
+
+    private fun clampCentre(v: Viewport): Viewport = v.copy(cx = v.cx.coerceIn(0f, 1f), cy = v.cy.coerceIn(0f, 1f))
+
+    /** The zoom at which the base fills the view (no empty bands). Maps do not open at it: QA 2026-11-23 #9 (296 %). */
     fun fillZoom(): Float = maxOf(viewW / fitW, viewH / fitH).coerceIn(Viewport.MIN_ZOOM, Viewport.MAX_ZOOM)
 
-    /** [Viewport.UNSET] (zoom ≤ 0) becomes the fill zoom; any other viewport is kept. */
-    fun resolve(v: Viewport): Viewport = if (v.zoom > 0f) v else v.copy(zoom = fillZoom())
+    /** [Viewport.UNSET] (zoom ≤ 0) becomes the fitted view (zoom 1, the whole base inside); any other viewport is kept. */
+    fun resolve(v: Viewport): Viewport = if (v.zoom > 0f) v else v.copy(zoom = Viewport.MIN_ZOOM)
 
     fun clamp(v: Viewport): Viewport = Viewport(
         v.cx.coerceIn(0f, 1f),

@@ -26,7 +26,7 @@ class MapExporter internal constructor(private val run: (MapBase, MapScene, Stri
     fun export(base: MapBase, scene: MapScene, mapName: String, size: LargeMapExport) = run(base, scene, mapName, size)
 }
 
-/** One exporter per screen; a failure shows `TODO_COPY_MAP_EXPORT_FAILED`. */
+/** One exporter per screen; a failure shows `MapCopy.EXPORT_FAILED`. */
 @Composable
 fun rememberMapExporter(deps: FeatureDeps): MapExporter {
     val context = LocalContext.current
@@ -45,7 +45,7 @@ fun rememberMapExporter(deps: FeatureDeps): MapExporter {
             try {
                 val bitmap = MapExport.render(context, deps.stores.blobs, base, scene, colorsNow[0], ExportPlan.longEdge(size))
                 val shared = bitmap != null && MapExport.share(context, bitmap, ExportPlan.fileName(name, size))
-                if (!shared) deps.toasts.show(MapCopy.TODO_COPY_MAP_EXPORT_FAILED, actionLabel = null)
+                if (!shared) deps.toasts.show(MapCopy.EXPORT_FAILED, actionLabel = null)
             } finally {
                 exporter.exporting = false
             }

@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.script.select
 
+import io.github.lenticualrstone.civilight.feature.script.ui.dimmedWhen
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -214,7 +216,7 @@ private fun BarTool(label: String, icon: IconId?, enabled: Boolean, onClick: () 
     val colors = CivilightTheme.colors
     Column(
         modifier
-            .alpha(if (enabled) 1f else 0.38f)
+            .dimmedWhen(!enabled)
             .pressable(PressAction.Click(onClick), enabled = enabled, role = Role.Button, hitTarget = HitTarget.BUTTON, scaleOnPress = false)
             .heightIn(min = 56.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -237,7 +239,7 @@ fun ClipboardStrip(entry: ScriptClipboard.Entry, canPaste: Boolean, onPaste: () 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CivilightText(MoveCopy.clipboard(entry.count, entry.clipboard.cut), CivilightTheme.type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
-        Box(Modifier.alpha(if (canPaste) 1f else 0.38f)) {
+        Box(Modifier.dimmedWhen(!canPaste)) {
             TextAction(MoveCopy.PASTE, { if (canPaste) onPaste() }, color = colors.acc)
         }
     }
@@ -260,7 +262,10 @@ fun SheetScope.MoveSheet(key: MoveSheetKey, doc: ProjectDoc, unlocked: Boolean, 
     val count = SelectRows.bar(doc, SelectState(true, key.blockKeys.toSet())).count
     SheetHeader(title = MoveCopy.MOVE, onClose = ::close, subtitle = count)
     SheetScrollBody(Modifier.padding(top = 8.dp, bottom = 16.dp)) {
-        if (picked == null) {
+      // Motion audit P3: the two steps crossfade, and the sheet follows the new height.
+      ContentSwap(picked, label = "moveStep") { step ->
+      Column(Modifier.fillMaxWidth()) {
+        if (step == null) {
             MoveTargets.scenes(doc, key.blockKeys, unlocked).forEach { row ->
                 Row(
                     Modifier
@@ -281,9 +286,9 @@ fun SheetScope.MoveSheet(key: MoveSheetKey, doc: ProjectDoc, unlocked: Boolean, 
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CivilightIconButton(IconId.Back, MoveCopy.BACK, { scene = null })
-                CivilightText(MoveTargets.scenes(doc, key.blockKeys, unlocked).firstOrNull { it.sceneKey == picked }?.location.orEmpty(), type.command, color = colors.ink2)
+                CivilightText(MoveTargets.scenes(doc, key.blockKeys, unlocked).firstOrNull { it.sceneKey == step }?.location.orEmpty(), type.command, color = colors.ink2)
             }
-            MoveTargets.positions(doc, picked, key.blockKeys, unlocked).forEach { row ->
+            MoveTargets.positions(doc, step, key.blockKeys, unlocked).forEach { row ->
                 val line = row.line
                 val go = {
                     this@MoveSheet.close()
@@ -303,5 +308,7 @@ fun SheetScope.MoveSheet(key: MoveSheetKey, doc: ProjectDoc, unlocked: Boolean, 
                 }
             }
         }
+      }
+      }
     }
 }

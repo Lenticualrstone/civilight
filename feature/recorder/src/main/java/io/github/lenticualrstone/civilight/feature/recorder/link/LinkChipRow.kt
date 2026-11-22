@@ -44,7 +44,7 @@ fun LinkChipRow(
     onCard: (Chip) -> Unit = {},
 ) {
     ChipFlow(modifier) {
-        for (chip in chips) {
+        PresenceItems(chips, key = ::chipKey) { chip ->
             if (chip.plain) {
                 // Plain text (a purged target); a purged card still opens its card (`영구 삭제 · 노아`, LRC-23).
                 val card = hasCard(chip)
@@ -71,6 +71,9 @@ fun LinkChipRow(
         AddLinkChip(RecorderCopy.ADD_LINK, onAdd)
     }
 }
+
+/** A chip's identity across edits: its links, so a chip whose label moved (the first reads `연결 · …`) stays the same chip. */
+internal fun chipKey(chip: Chip): Any = chip.links.takeIf { it.isNotEmpty() }?.map { it.key.toString() } ?: chip.text
 
 /** One link chip: link icon 14, the label in `ink`, ` ◇` for a deleted card, the small `@` mark, ×; dotted while the target is in the trash. */
 @Composable

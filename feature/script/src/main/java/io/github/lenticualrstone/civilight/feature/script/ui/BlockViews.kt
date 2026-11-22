@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +25,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
@@ -159,15 +162,24 @@ private fun MarginWarning(selected: Boolean, onClick: (() -> Unit)?, modifier: M
     }
 }
 
+/**
+ * The vertical padding of a block's frame while the manuscript animates it (SCR-67): the row keeps
+ * one state across the reading look and the field, so selecting and typing grow it instead of
+ * cutting. Null = the frame decides (`12 dp` selected).
+ */
+val LocalBlockPad = staticCompositionLocalOf<State<Dp>?> { null }
+
 /** Shared block frame: column gap 6, side padding 24 (the caller's column), selection look. */
 @Composable
 fun BlockFrame(selected: Boolean, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val colors = CivilightTheme.colors
+    val animated = LocalBlockPad.current
     Column(
         modifier = modifier
             .fillMaxWidth()
             .selectedRowBackground(selected, colors.sel, colors.acc, outset = 0.dp)
-            .padding(horizontal = 24.dp, vertical = if (selected) 12.dp else 0.dp),
+            .padding(horizontal = 24.dp)
+            .padding(vertical = animated?.value ?: if (selected) 12.dp else 0.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         content = content,
     )

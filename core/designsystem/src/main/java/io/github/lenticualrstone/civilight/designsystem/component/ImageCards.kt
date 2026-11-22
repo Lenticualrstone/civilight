@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.designsystem.component
 
+import androidx.compose.runtime.getValue
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -144,6 +147,8 @@ fun ImageTile(
 ) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(12.dp)
+    val ring = animatedFraction(selected, label = "tileRing")
+    val nameColor by animatedColor(if (selected) colors.ink else colors.ink3, label = "tileName")
     Column(
         modifier.pressable(PressAction.Select(selected, onClick), role = Role.RadioButton, shape = shape),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -154,17 +159,18 @@ fun ImageTile(
                 .aspectRatio(aspectRatio)
                 .drawWithContent {
                     drawContent()
-                    if (selected) {
+                    val a = ring.value
+                    if (a > 0f) {
                         val g = 2.dp.toPx()
                         val r = 12.dp.toPx()
-                        drawRoundRect(colors.bg, Offset(-g / 2, -g / 2), Size(size.width + g, size.height + g), CornerRadius(r + g / 2), style = Stroke(g))
-                        drawRoundRect(colors.acc, Offset(-g * 1.5f, -g * 1.5f), Size(size.width + g * 3, size.height + g * 3), CornerRadius(r + g * 1.5f), style = Stroke(g))
+                        drawRoundRect(colors.bg, Offset(-g / 2, -g / 2), Size(size.width + g, size.height + g), CornerRadius(r + g / 2), style = Stroke(g), alpha = a)
+                        drawRoundRect(colors.acc, Offset(-g * 1.5f, -g * 1.5f), Size(size.width + g * 3, size.height + g * 3), CornerRadius(r + g * 1.5f), style = Stroke(g), alpha = a)
                     }
                 },
         ) {
             Box(Modifier.matchParentSize().clip(shape), content = image)
         }
-        CivilightText(name, CivilightTheme.type.small, color = if (selected) colors.ink else colors.ink3, maxLines = 1)
+        CivilightText(name, CivilightTheme.type.small, color = nameColor, maxLines = 1)
     }
 }
 

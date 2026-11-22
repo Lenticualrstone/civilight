@@ -21,13 +21,16 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderEnv
 import io.github.lenticualrstone.civilight.domain.recorder.picker.LinkCandidate
 import io.github.lenticualrstone.civilight.domain.recorder.capture.Recording
 import io.github.lenticualrstone.civilight.domain.recorder.text.Runs
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureHub
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureProtection
+import io.github.lenticualrstone.civilight.feature.recorder.capture.PickerRequest
 import io.github.lenticualrstone.civilight.feature.recorder.capture.PickerTarget
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLink
 import io.github.lenticualrstone.civilight.ui.picker.PickerCopy
@@ -40,9 +43,10 @@ import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
  * the tapped chip's target, and closes the sheet.
  */
 @Composable
-fun ColumnScope.LinkPickerContent(hub: CaptureHub, onClose: () -> Unit) {
+fun ColumnScope.LinkPickerContent(hub: CaptureHub, onClose: () -> Unit, request: PickerRequest? = null) {
     val state by hub.state.collectAsState()
-    val request = state.picker
+    // [request] keeps the last request while the sheet leaves (the live one is already null).
+    val request = request ?: state.picker
     val links = when (request?.target) {
         PickerTarget.MEMO -> state.memo?.draft?.pendingLinks
         PickerTarget.SESSION -> state.session?.pendingLinks
@@ -75,7 +79,7 @@ fun ColumnScope.LinkPickerBody(
     }
     val shownProjects = remember(sections) { sections.flatMap { it.rows }.map { it.candidate.target.projectKey }.toSet() }
     ProtectWindow(CaptureProtection.of(env, shownProjects))
-    SheetHeader(title = RecorderCopy.TODO_PICKER_TITLE, onClose = onClose)
+    SheetHeader(title = ShownCopy.PICKER_TITLE, onClose = onClose)
     SearchField(
         value = field,
         onValueChange = { field = it },
@@ -85,11 +89,12 @@ fun ColumnScope.LinkPickerBody(
     LazyColumn(Modifier.weight(1f, fill = false).padding(top = 8.dp)) {
         for ((index, section) in sections.withIndex()) {
             if (section.title != null) {
-                item(key = "section-$index") { SectionLabel(section.title, Modifier.padding(top = 12.dp, bottom = 4.dp)) }
+                item(key = "section-$index") { SectionLabel(section.title, civilightItem().padding(top = 12.dp, bottom = 4.dp)) }
             }
             items(section.rows, key = { "$index-${it.candidate.target}" }) { row ->
                 ListRow(
                     title = row.title,
+                    modifier = civilightItem(),
                     subtitle = row.sub.takeIf { it.isNotEmpty() },
                     compact = true,
                     onClick = if (row.linked) null else ({ onPick(row.candidate) }),

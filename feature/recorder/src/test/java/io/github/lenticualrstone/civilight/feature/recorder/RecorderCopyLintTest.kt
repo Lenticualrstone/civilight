@@ -1,10 +1,12 @@
 package io.github.lenticualrstone.civilight.feature.recorder
 
 import io.github.lenticualrstone.civilight.designsystem.text.CopyLint
+import io.github.lenticualrstone.civilight.designsystem.theme.MotionLint
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.lang.reflect.Modifier
 
 /** DECISIONS §3: every value of this feature's copy objects passes the DS-62 / DS-63 copy lint. */
@@ -35,6 +37,13 @@ class RecorderCopyLintTest {
     @Test
     fun domainCopyShownByTheseScreensPassesTheLint() {
         assertEquals(emptyList<String>(), lint(RecorderCopy::class.java))
+    }
+
+    /** Motion audit §3.2: no literal durations, default crossfades, default `animateItem` or snap flings in this module. */
+    @Test
+    fun `motion lint`() {
+        val issues = MotionLint.lintModule(File("."))
+        assertEquals(MotionLint.report(issues), 0, issues.size)
     }
 
     @Test

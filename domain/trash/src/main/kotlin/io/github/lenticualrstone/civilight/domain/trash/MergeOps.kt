@@ -14,6 +14,9 @@ import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.change.RelationSlotName
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.doc.history
+import io.github.lenticualrstone.civilight.model.OrderKeys
+import io.github.lenticualrstone.civilight.model.gallery.GalleryFile
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
 import io.github.lenticualrstone.civilight.model.nfc
 import io.github.lenticualrstone.civilight.model.open
@@ -277,6 +280,10 @@ object MergeOps {
             }
         }
 
+        // 3b. Gallery (55 GAL-20, §12.1): the merged character's images move to the target, appended in
+        // their order; one whose source the target already holds (live or trashed) stays behind.
+        if (kind == ItemKind.CHARACTER) d = moveGallery(d, mergedKey, targetKey, ctx, moved)
+
         // 4. Terms: first reveal and aliases.
         if (kind == ItemKind.TERM) d = mergeTermReveal(d, mergedKey, targetKey, choices.revealFromMerged, ctx, chosen)
 
@@ -325,6 +332,29 @@ object MergeOps {
         val restored = record?.let { rebuild(doc, item, it.mergedOriginal, ctx) }
         return restored ?: doc.setMark(item, null, null, ctx.now, ctx.deviceId)
     }
+
+    /** Moves [from]'s gallery items to [to] (see step 3b of [merge]); each move is a `galleryItem` [MovedRef]. */
+    private fun moveGallery(doc: ProjectDoc, from: Key, to: Key, ctx: TrashContext, moved: MutableList<MovedRef>): ProjectDoc {
+        val source = doc.index.galleryItemsOf(from).filter { it.ownerKind.known == GalleryOwnerKind.CHARACTER }
+        if (source.isEmpty()) return doc
+        val targetItems = doc.index.galleryItemsOf(to)
+        val held = targetItems.mapTo(HashSet()) { it.source }
+        val moving = source.filter { it.source !in held }
+        if (moving.isEmpty()) return doc
+        var last = targetItems.maxOfOrNull { it.order }
+        val movedItems = moving.map { item ->
+            val order = OrderKeys.after(last).also { last = it }
+            moved += MovedRef(GALLERY_ITEM_REF, item.key, "ownerKey")
+            item.copy(ownerKey = to, order = order, updatedAt = ctx.now, updatedBy = ctx.deviceId)
+        }
+        val movingKeys = moving.mapTo(HashSet()) { it.key }
+        val d = doc.removeGalleryItems { it.key in movingKeys }
+        val targetFile = d.gallery[to] ?: GalleryFile(GalleryOwnerKind.CHARACTER.open(), to)
+        return d.copy(gallery = d.gallery + (to to targetFile.copy(items = targetFile.items + movedItems)))
+    }
+
+    /** [MovedRef.ownerKind] of a gallery item moved by a merge (§12.1). */
+    const val GALLERY_ITEM_REF = "galleryItem"
 
     // --- Reference rewriting ---
 

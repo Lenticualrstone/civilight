@@ -3,12 +3,17 @@ package io.github.lenticualrstone.civilight.feature.library.shelf
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -20,11 +25,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.lenticualrstone.civilight.designsystem.card.CardViewMotion
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.HoloDefaultTilt
 import io.github.lenticualrstone.civilight.designsystem.component.HoloStrength
 import io.github.lenticualrstone.civilight.designsystem.component.ShardArt
 import io.github.lenticualrstone.civilight.designsystem.component.holoFoil
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.FixedColors
 import io.github.lenticualrstone.civilight.designsystem.theme.ResolvedTheme
@@ -58,16 +65,42 @@ internal object CoverBitmaps {
     }
 }
 
-/** A picked image from the blob store, or nothing while it decodes or when it is gone. */
+/**
+ * A picked image from the blob store. While it decodes (or when it is gone) nothing is drawn; once it is
+ * there it fades in on `standard` (audit row 9, `Crossfade(bitmap, spec(standard))`).
+ */
 @Composable
 internal fun BlobImage(hash: String, crop: Crop?, targetWidth: Int, modifier: Modifier = Modifier) {
     val deps = LocalFeatureDeps.current
+    val motion = CivilightTheme.motion
     val bitmap by produceState<ImageBitmap?>(null, hash, crop) {
         value = withContext(Dispatchers.IO) {
             deps.stores.blobs.fileOf(hash)?.let { runCatching { CoverBitmaps.decode(it, crop, targetWidth) }.getOrNull() }?.asImageBitmap()
         }
     }
-    bitmap?.let { Image(it, contentDescription = null, modifier = modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+    Crossfade(bitmap, modifier.fillMaxSize(), animationSpec = motion.spec(CivilightMotion.standard), label = "blobImage") { image ->
+        if (image != null) Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    }
+}
+
+/** The 48 dp thumbnail of a 서재 row (D6; CNV-45 `MCardView`): radius 10, the cover's 1:1 crop, a preset, or the initial. */
+@Composable
+internal fun CoverThumb(cover: CoverUi, modifier: Modifier = Modifier) {
+    val colors = CivilightTheme.colors
+    val px = with(LocalDensity.current) { CardViewMotion.THUMB_DP.dp.roundToPx() }
+    Box(modifier.size(CardViewMotion.THUMB_DP.dp).clip(RoundedCornerShape(CardViewMotion.THUMB_RADIUS_DP.dp)).background(colors.chip)) {
+        when {
+            cover.hash != null -> BlobImage(cover.hash, cover.crop, px)
+            cover.presetId != null -> ShardArt(listOf(colors.raise, colors.chip, colors.edge, colors.acc))
+            else -> CivilightText(
+                cover.initial,
+                CivilightTheme.type.title.merge(TextStyle(fontSize = 20.sp, lineHeight = 24.sp)),
+                Modifier.align(Alignment.Center),
+                color = colors.ink3,
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 /**

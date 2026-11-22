@@ -16,6 +16,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
@@ -59,9 +60,10 @@ fun RecordFieldRow(
             if (value.isEmpty()) {
                 CivilightText(CastUiCopy.EMPTY_VALUE, type.command, color = colors.ink3, maxLines = 1)
             } else {
-                CivilightText(value, valueStyle, Modifier.weight(1f, fill = false), color = colors.ink, maxLines = 2)
+                // A value that changes with the lens or an edit swaps with the shared value motion (P4, CNV-42).
+                ValueSwap(value, valueStyle, Modifier.weight(1f, fill = false), color = colors.ink, maxLines = 2, contentAlignment = Alignment.CenterEnd)
             }
-            if (since != null) CivilightText(since, type.small, color = colors.ink3, maxLines = 1)
+            if (since != null) ValueSwap(since, type.small, color = colors.ink3, maxLines = 1, contentAlignment = Alignment.CenterEnd)
             if (hasHistory) {
                 Box(
                     Modifier
@@ -95,7 +97,7 @@ fun PlannedRow(point: String, value: String, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CivilightText(point, type.number.merge(TextStyle(fontSize = 11.sp)), color = colors.ink3, maxLines = 1)
-        CivilightText(value, type.small.merge(TextStyle(fontSize = 13.sp, lineHeight = 18.sp)), color = colors.ink3, maxLines = 1)
+        ValueSwap(point, type.number.merge(TextStyle(fontSize = 11.sp)), color = colors.ink3, maxLines = 1, contentAlignment = Alignment.CenterEnd)
+        ValueSwap(value, type.small.merge(TextStyle(fontSize = 13.sp, lineHeight = 18.sp)), color = colors.ink3, maxLines = 1, contentAlignment = Alignment.CenterEnd)
     }
 }

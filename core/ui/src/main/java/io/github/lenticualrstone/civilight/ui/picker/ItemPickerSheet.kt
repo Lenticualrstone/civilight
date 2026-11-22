@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
@@ -69,6 +70,7 @@ fun ColumnScope.ItemPickerSheet(
         model.deleted?.let { deleted ->
             item(key = "deleted") {
                 ListRow(
+                    modifier = civilightItem(),
                     title = "${deletedWord(deleted.kind)}${PickerCopy.SEP}${deleted.name}",
                     titleDotted = true,
                     trailing = onRestoreDeleted?.let { restore -> { TextAction(PickerCopy.RESTORE, { restore(deleted) }) } },
@@ -76,10 +78,12 @@ fun ColumnScope.ItemPickerSheet(
             }
         }
         for ((index, section) in model.sections.withIndex()) {
-            if (section.title != null) item(key = "section-$index") { SectionLabel(section.title, Modifier.padding(top = 12.dp)) }
+            if (section.title != null) item(key = "section-$index") { SectionLabel(section.title, civilightItem().padding(top = 12.dp)) }
+            // S11: rows fade in and out and move on `standard` when the query or a chip changes the list. The
+            // title stays in the key because a term's name and its aliases are rows with the same item key.
             items(section.items, key = { "${it.kind}-${it.key}-${it.title}-$index" }) { item ->
                 if (item.avatar) {
-                    PickerRow(name = item.title, selected = item.key == selectedKey, onClick = { onPick(item) }, subtitle = item.subtitle)
+                    PickerRow(name = item.title, selected = item.key == selectedKey, onClick = { onPick(item) }, subtitle = item.subtitle, modifier = civilightItem())
                 } else {
                     ListRow(
                         title = item.title,
@@ -87,7 +91,7 @@ fun ColumnScope.ItemPickerSheet(
                         onClick = { onPick(item) },
                         selected = item.key == selectedKey,
                         compact = true,
-                        modifier = Modifier.padding(start = (item.depth * 16).dp),
+                        modifier = civilightItem().padding(start = (item.depth * 16).dp),
                     )
                 }
             }
@@ -95,6 +99,7 @@ fun ColumnScope.ItemPickerSheet(
         if (model.hiddenCount > 0) {
             item(key = "hidden") {
                 LockRow(
+                    modifier = civilightItem(),
                     title = PickerCopy.hiddenRow(model.hiddenKindWord, model.hiddenCount),
                     actionLabel = PickerCopy.UNLOCK,
                     onAction = { onUnlockHidden?.invoke() },

@@ -31,7 +31,7 @@ data class CastListState(
     val readOnly: Boolean,
     /** The tag chip in effect (a chip whose tag was removed falls back to `전체`). */
     val selectedTag: Key?,
-    /** Card rows (CST-04), only in the card view. */
+    /** Card rows (CST-04), built in both views so the switch can animate between them; the screen draws them when `ui.cards`. */
     val cardGroups: List<CardGroup> = emptyList(),
     /** The field filters in effect (fields that are gone dropped) and their chips. */
     val filters: FieldFilterState = FieldFilterState(),
@@ -58,7 +58,8 @@ object CastListModel {
         val lens = doc.castLens
         val filters = CastFilterModel.clean(doc, ui.filters)
         val view = CastFilterModel.apply(doc, CastList.build(doc, lens, tag, query, hiddenUnlocked), filters, lens)
-        val cards = if (ui.cards && view.empty == null) CastFilterModel.cards(doc, CastList.cards(doc, lens, hiddenUnlocked), view, filters, lens) else emptyList()
+        // Both views are built whatever `ui.cards` says: the `목록 ↔ 카드` switch animates between them (CNV-45).
+        val cards = if (view.empty == null) CastFilterModel.cards(doc, CastList.cards(doc, lens, hiddenUnlocked), view, filters, lens) else emptyList()
         return CastListState(
             view = view,
             readOnly = readOnly,
@@ -85,6 +86,27 @@ object CastListModel {
             FieldHitRow(hit.characterKey, hit.characterName, hit.label, (hit.match.first + shift)..(hit.match.last + shift))
         }
     }
+
+    /**
+     * Stable lazy-list keys of the hit rows: character and sentence, with `#n` appended to the n-th repeat so
+     * two equal hits (the same sentence twice in one `긴 글`) never share a key, which a lazy list rejects.
+     */
+    fun hitKeys(hits: List<FieldHitRow>): List<String> {
+        val seen = HashMap<String, Int>()
+        return hits.map { hit ->
+            val base = "hit-${hit.characterKey}-${hit.sentence}"
+            val n = seen.merge(base, 1, Int::plus)!!
+            if (n == 1) base else "$base#$n"
+        }
+    }
+
+    /** Lazy key of a list section header and of its rows: the group is part of it, a character can sit in several groups. */
+    fun sectionKey(tagKey: Key?): String = "sec-$tagKey"
+
+    fun rowKey(tagKey: Key?, characterKey: Key): String = "row-$tagKey-$characterKey"
+
+    /** Lazy key of one card row (one per group; the sort order's single group has no tag). */
+    fun cardsKey(tagKey: Key?): String = "cards-$tagKey"
 
     /** Tapping a chip: the tag, or `전체` (null); one chip at a time (CST-02). */
     fun selectTag(ui: CastListUi, tagKey: Key?): CastListUi = ui.copy(selectedTag = tagKey)

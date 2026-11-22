@@ -160,6 +160,15 @@ object RelationMapModel {
     )
 
     /**
+     * Where a node dragged to [topLeft] comes to rest: the saved place clamps its centre into the layout
+     * area, so a node let go outside settles back in (the screen animates from [topLeft] to this).
+     */
+    fun settled(topLeft: Pt): Pt {
+        val p = normalized(topLeft)
+        return Pt(p.x * AREA.toFloat() - NODE.w / 2f, p.y * AREA.toFloat() - NODE.h / 2f)
+    }
+
+    /**
      * What a finished drag saves: every shown node at its place now (the dragged one at [moved]),
      * so pinning one node does not re-settle the others (the layout only moves unsaved nodes).
      */

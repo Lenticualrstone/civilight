@@ -65,9 +65,12 @@ object Features {
     const val RECORDER = "recorder"
     const val RECORDER_AUDIO = "recorder.audio"
 
+    /** `gallery/` (55 §3.3): present when any gallery file is written. Part of format 1.0. */
+    const val GALLERY = "gallery"
+
     val ALWAYS_REQUIRED: List<String> = listOf(STORY_BLOCKS, CHANGES, TIME_BASE_INTERVAL)
 
-    val OPTIONAL: List<String> = listOf(FIELDS_CUSTOM, MAPS_GEN, CHECKS_ACK, TOMBSTONES, DELETIONS, TRASH, RECORDER, RECORDER_AUDIO)
+    val OPTIONAL: List<String> = listOf(FIELDS_CUSTOM, MAPS_GEN, CHECKS_ACK, TOMBSTONES, DELETIONS, TRASH, RECORDER, RECORDER_AUDIO, GALLERY)
 
     /** Every id this reader understands; a required id outside this set refuses the file. */
     val KNOWN: Set<String> = (ALWAYS_REQUIRED + OPTIONAL).toSet()

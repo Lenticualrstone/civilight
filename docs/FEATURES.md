@@ -23,11 +23,12 @@ One row per feature of the area specs in `docs/spec/`. The spec file is the sour
 | STO · 스토리 · 시점 · 때 · 점검 (story, lens, scene time, checks) | `spec/20-story-time.md` | 43 | 21 | 22 | 0 | 0 |
 | CST · 인물 (cast) | `spec/30-cast.md` | 52 | 18 | 30 | 4 | 0 |
 | WLD · 세계 (terms, places, factions, timeline, maps) | `spec/40-world.md` | 69 | 24 | 44 | 1 | 1 |
-| CNV · 캔버스 · 페이지 · 카드와 이미지 · 펼친 화면 · 모션 | `spec/50-canvas-pages.md` | 46 | 2 | 42 | 2 | 0 |
+| CNV · 캔버스 · 페이지 · 카드와 이미지 · 펼친 화면 · 모션 | `spec/50-canvas-pages.md` | 47 | 2 | 43 | 2 | 0 |
+| GAL · 갤러리 (image galleries of characters and projects) | `spec/55-gallery.md` | 25 | 0 | 22 | 3 | 0 |
 | LIB · 서재 · 보호 · 파일 (library, protection, files, backup, settings) | `spec/60-library-security-files.md` | 72 | 35 | 36 | 1 | 6 |
 | LRC · 라이프 레코더 (life recorder) | `spec/70-life-recorder.md` | 47 | 18 | 29 | 0 | 9 |
 | DS · 디자인 시스템 (design system) | `spec/80-design-system.md` | 64 | 35 | 29 | 0 | 0 |
-| **All** | | **462** | 168 | 285 | 9 | 16 |
+| **All** | | **488** | 168 | 308 | 12 | 16 |
 
 ## SCR · 스크립트 (script editor)
 
@@ -342,6 +343,39 @@ Spec: `docs/spec/50-canvas-pages.md`
 | CNV-44 | 검색 하이라이트 모션 (search highlight) | P1 | not started |  |
 | CNV-45 | 카드 · 이미지 모션 (list ↔ card, carousel, picker → crop, holo on) | P1 | not started |  |
 | CNV-46 | 움직임 · 투명도 (motion & transparency preferences, glass fallback) | P1 | not started | domain model C-12 one `AppSettings` record |
+| CNV-47 | 펼친 화면 비율 (two-pane ratio handle: drag settles to 1:2 · 1:1 · 2:1, popover with 기본, per module) | P1 | partial | data done: `AppSettings.paneSplit` · `PaneSplit` · `SettingsStore.setPaneSplit`; core:ui `PaneSplitRules` (tested), `SplitPanes`, `rememberPaneSplitState` + `PaneSplitHandle`, wired into every `목록 + 상세` frame (2026-11-23); script side panel and gallery list + detail: lanes; not seen on the emulator |
+
+## GAL · 갤러리 (image galleries of characters and projects)
+
+Spec: `docs/spec/55-gallery.md`
+
+| id | feature | priority | status | notes |
+| --- | --- | --- | --- | --- |
+| GAL-01 | 인물 개요의 갤러리 칸 (gallery section in the profile) | P1 | not started | domain model §12 `GalleryItem` |
+| GAL-02 | 인물 카드의 갤러리 수 (count chip on character cards) | P2 | not started |  |
+| GAL-03 | 프로젝트 갤러리 들어가는 곳 (project home `작업` entry) | P1 | not started |  |
+| GAL-04 | 갤러리 화면 틀 (header, 3-way view toggle, filters, order line, search) | P1 | not started | `ViewMode.GRID` (domain model §12.4); route `Gallery` and sheets `GalleryAddSheet` · `GalleryInfoSheet` · `GalleryMenuSheet` in core:navigation, shared `GalleryCard` in core:ui, command-bar index `domain:story` `GallerySearch` (2026-11-23) |
+| GAL-05 | 목록 (list view) | P1 | not started |  |
+| GAL-06 | 격자 (grid view) | P1 | not started |  |
+| GAL-07 | 카드 (snapping card row) | P1 | not started |  |
+| GAL-08 | 고른 카드와 설명 판 (picking a card and showing its text) | P1 | not started | hint only in `카드` while nothing is picked |
+| GAL-09 | 보기 (full-screen viewer, `이전 · 설명 · 다음`) | P1 | not started |  |
+| GAL-10 | 프로젝트 갤러리 (project gallery and grouping by owner) | P1 | not started |  |
+| GAL-11 | 이미지 넣기 (add several images) | P1 | not started |  |
+| GAL-12 | 자르기 (gallery slot crop) | P1 | not started |  |
+| GAL-13 | 이미지 정보 (title, description, tags, scene link) | P1 | not started | domain model §12 `GalleryItem.caption`, `tagKeys`, `sceneKey` |
+| GAL-14 | 메뉴 · 초상으로 · 배경으로 · 표지로 (item menu and use as the main image) | P1 | not started | derived from `ImageUse`, no stored flag (domain model §12) |
+| GAL-15 | 순서 (order buttons, `순서 바꾸기`, `옮기기`) | P1 | partial | data done: `GalleryActions.move` · `moveAfter` (visible items, one undo step); screens not built |
+| GAL-16 | 다른 곳에도 넣기 (same original in several galleries) | P2 | not started | copies every field incl. `hidden` |
+| GAL-17 | 홀로그램 효과 (holo per item) | P1 | not started |  |
+| GAL-18 | 여러 장 고르기 (act on several) | P2 | not started |  |
+| GAL-19 | 숨기기 · 등급 (hiding and rating) | P1 | partial | data done: `HideableKind.GALLERY_IMAGE`, `ItemSurfaces.gallery` · `projectGallery` · `searchScope`; screens not built |
+| GAL-20 | 지우기 · 되살리기 (delete, restore, owner delete, purge, merge) | P1 | partial | data done: trash kind `galleryItem`, `OwnedKind.GALLERY_ITEM`, `MergeOps`, `GalleryActions.delete` · `restore` · `purge`; menu and toast UI not built |
+| GAL-21 | 저장과 용량 (storage and size) | P1 | partial | data done: one blob reference function `BlobRefs`, `GalleryActions.galleryBytes`; size labels not built |
+| GAL-22 | 내보내기 (export) | P1 | partial | data done: feature id `gallery`, format 1.0 (no 1.1), `gallery/` files and originals; export-sheet size row (Q13) not built |
+| GAL-23 | 펼친 화면 (inner layouts) | P1 | not started |  |
+| GAL-24 | 모션 (motion) | P1 | not started |  |
+| GAL-25 | 빈 갤러리 · 많은 이미지 (empty and large) | P1 | not started |  |
 
 ## LIB · 서재 · 보호 · 파일 (library, protection, files, backup, settings)
 

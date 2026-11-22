@@ -40,17 +40,23 @@ fun CenterColumn(modifier: Modifier = Modifier, content: @Composable () -> Unit)
 /**
  * `목록 + 상세` (CNV-33): [list] at 390 dp (or 50 % on narrow Medium windows, Q-LY-01), a 1 dp
  * `line` divider, [detail] in the rest. [detail] null leaves the right pane empty on `bg`
- * (Q-LY-02: nothing selected yet).
+ * (Q-LY-02: nothing selected yet). With a [module] id (`PaneSplit.Modules`) the frame carries the CNV-47
+ * handle and uses that module's stored ratio ([SplitPanes]); without one it keeps the fixed split.
  */
 @Composable
 fun ListDetailPanes(
     list: @Composable () -> Unit,
     detail: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
+    module: String? = null,
 ) {
+    if (module != null) {
+        SplitPanes(module, left = list, right = { detail?.invoke() }, modifier = modifier)
+        return
+    }
     val colors = CivilightTheme.colors
     BoxWithConstraints(modifier.fillMaxSize().background(colors.bg)) {
-        val listWidth = minOf(WindowLayout.LIST_PANE_DP.dp, maxWidth / 2)
+        val listWidth = PaneSplitRules.listDetailDefaultLeft(maxWidth.value).dp
         Row(Modifier.fillMaxSize()) {
             Box(Modifier.width(listWidth).fillMaxHeight()) { list() }
             Spacer(Modifier.width(1.dp).fillMaxHeight().background(colors.line))

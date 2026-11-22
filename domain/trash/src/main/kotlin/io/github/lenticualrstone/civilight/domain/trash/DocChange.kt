@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.domain.trash
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.file.EpisodeFile
+import io.github.lenticualrstone.civilight.model.gallery.GalleryFile
 
 /**
  * The before and after state of one operation (delete, merge, bulk change …), used for the toast's
@@ -60,7 +61,34 @@ data class DocChange(val before: ProjectDoc, val after: ProjectDoc) {
                 scriptAssets = revertList(c.assets.scriptAssets, b.assets.scriptAssets, a.assets.scriptAssets) { it.key },
             ),
             trash = c.trash.copy(entries = revertList(c.trash.entries, b.trash.entries, a.trash.entries) { it.key }),
+            gallery = revertGallery(c.gallery, b.gallery, a.gallery),
         )
+    }
+
+    /**
+     * Gallery items reverted row by row across every owner (a merge moves items between owners), then
+     * filed again under their owner. Files left without items (and without `ext`) are dropped.
+     */
+    private fun revertGallery(
+        current: Map<Key, GalleryFile>,
+        before: Map<Key, GalleryFile>,
+        after: Map<Key, GalleryFile>,
+    ): Map<Key, GalleryFile> {
+        if (before == after) return current
+        val items = revertList(
+            current.values.flatMap { it.items },
+            before.values.flatMap { it.items },
+            after.values.flatMap { it.items },
+        ) { it.key }
+        val out = LinkedHashMap<Key, GalleryFile>()
+        for ((owner, file) in current) if (file.ext != null) out[owner] = file.copy(items = emptyList())
+        for (item in items) {
+            val file = out[item.ownerKey]
+                ?: (current[item.ownerKey] ?: before[item.ownerKey])?.copy(items = emptyList())
+                ?: GalleryFile(item.ownerKind, item.ownerKey)
+            out[item.ownerKey] = file.copy(items = file.items + item)
+        }
+        return out
     }
 
     private fun revertEpisodes(

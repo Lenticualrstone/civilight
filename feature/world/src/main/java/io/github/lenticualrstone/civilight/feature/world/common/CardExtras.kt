@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.feature.world.common
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -31,7 +32,10 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.ShardArt
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
 import io.github.lenticualrstone.civilight.model.Key
@@ -120,24 +124,12 @@ fun CardImageSlot(
     onPick: () -> Unit,
 ) {
     val image = CardImages.of(doc, kind, key, name)
-    val deps = LocalFeatureDeps.current
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val shape = RoundedCornerShape(18.dp)
     Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape).background(colors.raise)) {
-            when (image) {
-                is CardImageUi.Initial -> CivilightText(image.letter, type.hero, Modifier.align(Alignment.Center), color = colors.ink3)
-                is CardImageUi.Preset -> ShardArt(listOf(colors.tint, colors.raise, colors.edge))
-                is CardImageUi.Picked -> {
-                    val bitmap by produceState<ImageBitmap?>(null, image) {
-                        value = withContext(Dispatchers.IO) {
-                            deps.stores.blobs.fileOf(image.hash)?.let { runCatching { CardImages.decode(it, image.crop, 1280) }.getOrNull() }?.asImageBitmap()
-                        }
-                    }
-                    bitmap?.let { Image(it, contentDescription = name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
-                }
-            }
+            CardImageContent(image, name, targetWidth = 1280)
             if (label != null) {
                 CivilightText(
                     text = label,
@@ -159,6 +151,35 @@ fun CardImageSlot(
 }
 
 /**
+ * What a 16:9 image slot draws (card, card row tile): the initial-letter card, a preset, or the picked image
+ * decoded off the main thread; the picked image fades in on `standard` (and a changed crop or image
+ * crossfades). [modifier] goes on the image layer only (the card row's parallax), not on the letter.
+ */
+@Composable
+fun CardImageContent(image: CardImageUi, name: String, targetWidth: Int, modifier: Modifier = Modifier) {
+    val deps = LocalFeatureDeps.current
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val motion = CivilightTheme.motion
+    Box(Modifier.fillMaxSize()) {
+        when (image) {
+            is CardImageUi.Initial -> CivilightText(image.letter, type.hero, Modifier.align(Alignment.Center), color = colors.ink3)
+            is CardImageUi.Preset -> ShardArt(listOf(colors.tint, colors.raise, colors.edge), modifier)
+            is CardImageUi.Picked -> {
+                val bitmap by produceState<ImageBitmap?>(null, image) {
+                    value = withContext(Dispatchers.IO) {
+                        deps.stores.blobs.fileOf(image.hash)?.let { runCatching { CardImages.decode(it, image.crop, targetWidth) }.getOrNull() }?.asImageBitmap()
+                    }
+                }
+                Crossfade(targetState = bitmap, modifier = modifier.fillMaxSize(), animationSpec = motion.spec(CivilightMotion.standard), label = "cardImage") { shown ->
+                    if (shown != null) Image(shown, contentDescription = name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                }
+            }
+        }
+    }
+}
+
+/**
  * The card of a trashed item: its dotted label (`지운 장소 · 잿더미 시장`) and, while its trash entry
  * exists, `되살리기` (WLD-14). A hidden item asks for `지문으로 보기` first.
  */
@@ -169,7 +190,7 @@ fun WorldGoneCard(access: CardAccess.Gone, doc: ProjectDoc?, vm: WorldViewModel,
     val item = ItemLifecycle.itemId(kind, key)
     Column {
         if (access.text.isNotEmpty()) ListRow(title = access.text, titleDotted = access.dotted, modifier = Modifier.padding(top = 12.dp))
-        if (!readOnly && doc != null && ItemLifecycle.restorable(doc, item)) {
+        FoldReveal(!readOnly && doc != null && ItemLifecycle.restorable(doc, item)) {
             CivilightButton(
                 text = WorldCopy.BTN_RESTORE,
                 variant = ButtonVariant.GHOST,
@@ -191,11 +212,13 @@ fun WorldGoneCard(access: CardAccess.Gone, doc: ProjectDoc?, vm: WorldViewModel,
 /** `◇ 같은 이름 2 · 노아` with `합치기` (WLD-15 entry): only when another live item has the same name. */
 @Composable
 fun SameNameLine(doc: ProjectDoc?, kind: WorldKind, key: Key, readOnly: Boolean, onMerge: () -> Unit) {
-    val text = doc?.let { ItemLifecycle.sameName(it, kind, key) } ?: return
+    val text = doc?.let { ItemLifecycle.sameName(it, kind, key) }
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        CivilightText(text, type.small, color = colors.ink3)
-        if (!readOnly) TextAction(WorldCopy.MENU_MERGE, onMerge, color = colors.acc, style = type.small)
+    FoldRevealValue(text) { line ->
+        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            CivilightText(line, type.small, color = colors.ink3)
+            if (!readOnly) TextAction(WorldCopy.MENU_MERGE, onMerge, color = colors.acc, style = type.small)
+        }
     }
 }

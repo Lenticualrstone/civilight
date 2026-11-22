@@ -1,8 +1,19 @@
+@file:OptIn(ExperimentalSharedTransitionApi::class)
+
 package io.github.lenticualrstone.civilight.feature.library.shelf
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.Lifecycle
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.key
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,13 +41,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import kotlinx.coroutines.delay
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
+import io.github.lenticualrstone.civilight.designsystem.card.CardViewMotion
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
@@ -54,6 +65,13 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.Unhide
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberUnhide
+import io.github.lenticualrstone.civilight.designsystem.theme.unhide
 import io.github.lenticualrstone.civilight.domain.library.newproject.ProjectDeleteDialog
 import io.github.lenticualrstone.civilight.domain.library.newproject.ProjectMenuAction
 import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
@@ -94,6 +112,7 @@ import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 @Composable
 internal fun LibraryScreen(services: LibraryServices) {
     val deps = services.deps
+    val motion = CivilightTheme.motion
     services.attach(LocalContext.current)
     LaunchedEffect(Unit) { services.backups.load() }
     val vm = entryViewModel { LibraryViewModel(services) }
@@ -112,20 +131,54 @@ internal fun LibraryScreen(services: LibraryServices) {
     }
 
     fun openProject(key: Key) = navigator.openDetail(ProjectHome(key))
-    // `MUnlock` reversed (`다시 잠글 때 반대로`): armed only by the header `다시 잠그기` tap, with the group
-    // as it was; drawn only once the group is really locked, and for [UNBLUR_MS] at most.
-    val reduced = CivilightTheme.reducedMotion
-    var relocking by remember { mutableStateOf<OpenGroupUi?>(null) }
-    LaunchedEffect(relocking) {
-        if (relocking != null) {
-            delay(UNBLUR_MS.toLong())
-            relocking = null
+    // CNV-43 unhide: the open group comes out of the blur when the lock opens and goes back into it when
+    // the group locks again (header tap, leaving, screen off, 5 minutes). A group already open when the
+    // screen first composes (process restore) is clear at once. The lock state drives it, not the rows:
+    // `숨김 풀기` of the last hidden project empties the group while the lock stays open.
+    val unlock by deps.unlock.state.collectAsState()
+    val unhide = rememberUnhide(unlock.hiddenGroupOpen)
+    var groupSnapshot by remember { mutableStateOf<OpenGroupUi?>(null) }
+    val reversing by remember(unhide) { derivedStateOf { unhide.value > 0f } }
+    // A lock that lands while the app is stopped (leaving, screen off) plays nothing: Compose runs no frames
+    // then, so the first frame after the return would show the hidden names clear and only then blur them.
+    // The reverse is for a lock that lands while the screen is on (header tap, 5 minutes); any other is a cut.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val groupOpenNow by rememberUpdatedState(unlock.hiddenGroupOpen)
+    var stoppedWhileOpen by remember { mutableStateOf(false) }
+    var cutEpoch by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP && groupOpenNow) stoppedWhileOpen = true }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    // Back on screen with the group still open (no lock came with the return): later locks animate again.
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            withFrameNanos { }
+            withFrameNanos { }
+            if (groupOpenNow) stoppedWhileOpen = false
         }
     }
-    val closingGroup = relocking?.takeIf { ui.openGroup == null && !reduced }
-    fun relockFromHeader() {
-        if (!reduced) relocking = ui.openGroup
-        vm.relock()
+    val cut = stoppedWhileOpen && !unlock.hiddenGroupOpen
+    LaunchedEffect(ui.openGroup, unlock.hiddenGroupOpen, reversing, cut) {
+        val group = ui.openGroup
+        when {
+            group != null -> groupSnapshot = group
+            // Opened-and-emptied, a cut, or the reverse finished: the hidden titles are not kept in state.
+            unlock.hiddenGroupOpen || cut || !reversing -> groupSnapshot = null
+        }
+        if (cut) {
+            stoppedWhileOpen = false
+            cutEpoch++
+        }
+    }
+    // The kept group plays the reverse in place, inert; once clear the lock row takes over.
+    val closingGroup = groupSnapshot.takeIf { ui.openGroup == null && !unlock.hiddenGroupOpen && reversing && !cut }
+    val lastLock = rememberLastNonNull(ui.lockedGroup)
+    val groupKind = when {
+        ui.openGroup != null || closingGroup != null -> GroupKind.OPEN
+        ui.lockedGroup != null -> GroupKind.LOCKED
+        else -> GroupKind.NONE
     }
 
     // LIB-06 `목록 + 상세`: the row whose project fills the right pane is marked.
@@ -186,12 +239,17 @@ internal fun LibraryScreen(services: LibraryServices) {
                 ViewToggle(showCards = ui.showCards, onChange = vm::showCards)
                 // `ED`: no board draws the way into 설정 (LIB-63); a labelled icon button.
                 CivilightIconButton(IconId.Props, ShelfCopy.SETTINGS, { navigator.push(Settings) })
-                // LIB-72 `ED` (§6 Q23, undrawn): 여러 프로젝트 내보내기 from the 서재 header.
-                if (ui.exportable.isNotEmpty()) CivilightIconButton(IconId.Download, ExportCopy.HEADER, { sheets.open(MultiExportSheet) })
-                if (ui.headerRelock) {
-                    CivilightButton(ShelfCopy.RELOCK, ::relockFromHeader, variant = ButtonVariant.COMPACT_GHOST, icon = IconId.Lock)
-                } else {
-                    CivilightIconButton(IconId.Plus, ShelfCopy.NEW_PROJECT, { services.startNewProject() })
+                // LIB-72 `ED` (§6 Q23, undrawn): 여러 프로젝트 내보내기 from the 서재 header; folds in from the start.
+                FoldReveal(ui.exportable.isNotEmpty(), horizontal = true) {
+                    CivilightIconButton(IconId.Download, ExportCopy.HEADER, { sheets.open(MultiExportSheet) })
+                }
+                // `+` ↔ `다시 잠그기` swap in place (board `LibUnlocked`, §6 Q30).
+                ContentSwap(ui.headerRelock, label = "headerAction") { relock ->
+                    if (relock) {
+                        CivilightButton(ShelfCopy.RELOCK, vm::relock, variant = ButtonVariant.COMPACT_GHOST, icon = IconId.Lock)
+                    } else {
+                        CivilightIconButton(IconId.Plus, ShelfCopy.NEW_PROJECT, { services.startNewProject() })
+                    }
                 }
             },
             commandBar = {
@@ -227,94 +285,129 @@ internal fun LibraryScreen(services: LibraryServices) {
         ) { padding ->
           BoxWithConstraints(Modifier.fillMaxSize()) {
             val wide = ShelfCards.isWide(maxWidth.value.toInt())
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = SIDE,
-                    end = SIDE,
-                    top = padding.calculateTopPadding() + 8.dp,
-                    bottom = padding.calculateBottomPadding() + 16.dp,
-                ),
-            ) {
-                if (ui.loaded && ui.showCards && ui.empty == null) {
-                    item(key = "cards") {
-                        ProjectCardsBlock(
-                            ui = ui,
-                            wide = wide,
-                            side = SIDE,
-                            onOpen = ::openProject,
-                            onMenu = { sheets.open(ShelfMenuSheet(it)) },
-                            onUnlock = vm::unlockHiddenGroup,
-                            onNewProject = { services.startNewProject() },
-                        )
-                    }
-                    item(key = "recents") {
-                        RecentsBlock(ui.recents, wide, SIDE) { item ->
-                            openProject(item.projectKey)
-                            navigator.push(RecentsModel.routeOf(item))
-                        }
-                    }
-                } else if (ui.loaded) {
-                    item(key = "section") { SectionLabel(ui.sectionLabel) }
-                    items(ui.rows, key = { it.key }) { row ->
-                        ProjectRow(row, onOpen = { openProject(row.key) }, onMenu = { sheets.open(ShelfMenuSheet(row.key)) }, selected = row.key == selectedKey)
-                    }
-                    ui.empty?.let { empty ->
-                        item(key = "empty") {
-                            Column {
-                                EmptyBlock(
-                                    title = empty.title,
-                                    subtitle = empty.sub,
-                                    primaryLabel = empty.buttons[0],
-                                    onPrimary = { services.startNewProject() },
-                                    secondaryLabel = empty.buttons[1],
-                                    onSecondary = { navigator.push(RestoreBackup) },
-                                )
-                                empty.notice?.let {
-                                    // `OnbEmpty`: a small trash mark before `예시 프로젝트 삭제됨` (LIB-18).
-                                    Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        CivilightIcon(IconId.Trash, contentDescription = null, size = 14.dp, tint = CivilightTheme.colors.ink3)
-                                        CivilightText(it, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
+            val inset = CardMetrics.inset(wide).dp
+            val cardsOn = ui.showCards && ui.empty == null
+            // Loading → content (audit row 7): nothing is drawn until the stores answered, then it fades in.
+            ContentSwap(ui.loaded, Modifier.fillMaxSize(), label = "shelfLoaded") { loaded ->
+              if (loaded) {
+                // CNV-45 `목록 ↔ 카드`: thumbnails grow in place into the cards (one shared cover each); list
+                // text leaves first, card text comes in after; reduced motion crossfades.
+                // `key(cut, …)`: a cut starts the list afresh, so no row or card runs a fade for a lock that already happened.
+                key(cut, cutEpoch) {
+                SharedTransitionLayout {
+                    val transition = this
+                    AnimatedContent(cardsOn, transitionSpec = { CardViewMotion.transform(motion) }, label = "shelfView") { showCards ->
+                        val covers = SharedCovers.of(transition, this, motion)
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                top = padding.calculateTopPadding() + 8.dp,
+                                bottom = padding.calculateBottomPadding() + 16.dp,
+                            ),
+                        ) {
+                            if (showCards) {
+                                item(key = "cards") {
+                                    ProjectCardsBlock(
+                                        ui = ui,
+                                        wide = wide,
+                                        covers = covers,
+                                        unhide = unhide,
+                                        onOpen = ::openProject,
+                                        onMenu = { sheets.open(ShelfMenuSheet(it)) },
+                                        onUnlock = vm::unlockHiddenGroup,
+                                        onNewProject = { services.startNewProject() },
+                                    )
+                                }
+                                item(key = "recents") {
+                                    RecentsBlock(ui.recents, wide, inset) { item ->
+                                        openProject(item.projectKey)
+                                        navigator.push(RecentsModel.routeOf(item))
+                                    }
+                                }
+                            } else {
+                                item(key = "section") { SectionLabel(ui.sectionLabel, civilightItem().padding(horizontal = SIDE)) }
+                                items(ui.rows, key = { it.key }) { row ->
+                                    ProjectRow(
+                                        row,
+                                        onOpen = { openProject(row.key) },
+                                        onMenu = { sheets.open(ShelfMenuSheet(row.key)) },
+                                        modifier = civilightItem().padding(horizontal = SIDE),
+                                        selected = row.key == selectedKey,
+                                        thumbModifier = covers.cover(row.key.toString(), CardViewMotion.THUMB_RADIUS_DP),
+                                    )
+                                }
+                                ui.empty?.let { empty ->
+                                    item(key = "empty") {
+                                        Column(civilightItem().padding(horizontal = SIDE)) {
+                                            EmptyBlock(
+                                                title = empty.title,
+                                                subtitle = empty.sub,
+                                                primaryLabel = empty.buttons[0],
+                                                onPrimary = { services.startNewProject() },
+                                                secondaryLabel = empty.buttons[1],
+                                                onSecondary = { navigator.push(RestoreBackup) },
+                                            )
+                                            empty.notice?.let {
+                                                // `OnbEmpty`: a small trash mark before `예시 프로젝트 삭제됨` (LIB-18).
+                                                Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    CivilightIcon(IconId.Trash, contentDescription = null, size = 14.dp, tint = CivilightTheme.colors.ink3)
+                                                    CivilightText(it, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                // The hidden group: lock row ↔ open group crossfade; a re-lock plays the unhide in reverse
+                                // over the kept rows first, then the lock row takes over.
+                                if (groupKind != GroupKind.NONE) {
+                                    item(key = "group") {
+                                        ContentSwap(groupKind, Modifier.padding(horizontal = SIDE), label = "hiddenGroup") { kind ->
+                                            when (kind) {
+                                                GroupKind.LOCKED -> lastLock?.let { group ->
+                                                    LockRow(
+                                                        title = group.title,
+                                                        subtitle = group.sub,
+                                                        actionLabel = group.button,
+                                                        onAction = vm::unlockHiddenGroup,
+                                                        modifier = Modifier.padding(top = 12.dp),
+                                                    )
+                                                }
+                                                GroupKind.OPEN -> (ui.openGroup ?: groupSnapshot)?.let { group ->
+                                                    val closing = ui.openGroup == null
+                                                    OpenGroup(
+                                                        group = group,
+                                                        unhide = unhide,
+                                                        covers = if (closing) SharedCovers.None else covers,
+                                                        onOpen = if (closing) ({ _ -> }) else ::openProject,
+                                                        onMenu = if (closing) ({ _ -> }) else ({ sheets.open(ShelfMenuSheet(it)) }),
+                                                        onUnhide = if (closing) ({ _ -> }) else vm::unhide,
+                                                        selectedKey = selectedKey.takeUnless { closing },
+                                                        closing = closing,
+                                                    )
+                                                }
+                                                GroupKind.NONE -> Unit
+                                            }
+                                        }
                                     }
                                 }
                             }
-                        }
-                    }
-                    // `MUnlock` reversed: right after a re-lock the rows blur out where the group was, then the lock row.
-                    closingGroup?.let { group ->
-                        item(key = "closing") { OpenGroup(group, onOpen = {}, onMenu = {}, onUnhide = {}, selectedKey = null, closing = true) }
-                    }
-                    ui.lockedGroup?.takeIf { closingGroup == null }?.let { group ->
-                        item(key = "locked") {
-                            LockRow(
-                                title = group.title,
-                                subtitle = group.sub,
-                                actionLabel = group.button,
-                                onAction = vm::unlockHiddenGroup,
-                                modifier = Modifier.padding(top = 12.dp),
-                            )
-                        }
-                    }
-                    ui.openGroup?.let { group ->
-                        item(key = "open") {
-                            OpenGroup(group, onOpen = ::openProject, onMenu = { sheets.open(ShelfMenuSheet(it)) }, onUnhide = vm::unhide, selectedKey = selectedKey)
+                            // Both views end with the library section (LIB-01, board `LibCards`).
+                            item(key = "librarySection") { SectionLabel(ShelfCopy.LIBRARY_SECTION, civilightItem().padding(top = 30.dp, start = SIDE, end = SIDE)) }
+                            item(key = "recorder") {
+                                ListRow(
+                                    title = ShelfCopy.RECORDER,
+                                    subtitle = ui.recorderSub,
+                                    leading = { RecorderTile() },
+                                    trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = CivilightTheme.colors.ink3) },
+                                    onClick = { navigator.push(RecorderInbox()) },
+                                    modifier = civilightItem().padding(top = 8.dp, start = SIDE, end = SIDE),
+                                )
+                            }
                         }
                     }
                 }
-                // Both views end with the library section (LIB-01, board `LibCards`).
-                if (ui.loaded) {
-                    item(key = "librarySection") { SectionLabel(ShelfCopy.LIBRARY_SECTION, Modifier.padding(top = 30.dp)) }
-                    item(key = "recorder") {
-                        ListRow(
-                            title = ShelfCopy.RECORDER,
-                            subtitle = ui.recorderSub,
-                            leading = { RecorderTile() },
-                            trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = CivilightTheme.colors.ink3) },
-                            onClick = { navigator.push(RecorderInbox()) },
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
-                    }
                 }
+              }
             }
           }
         }
@@ -346,14 +439,21 @@ private fun RecorderTile() {
     }
 }
 
+/** What the hidden group's slot shows: the lock row, the open group (also while it re-locks), or nothing. */
+private enum class GroupKind { NONE, LOCKED, OPEN }
+
 /**
  * The open hidden group (`LibUnlocked`): tinted box, unlock icon, `숨긴 프로젝트 <M> · 열림` with the
  * re-lock note, then the hidden projects with `숨김 풀기`. Each row protects the window while shown
- * (LIB-26, S-10; LIB-29 recents preview).
+ * (LIB-26, S-10; LIB-29 recents preview). The rows draw the [unhide] progress (CNV-43: blur 7 dp and
+ * alpha .55 → 1 while the lock opens, the reverse when it locks again); [closing] is that reverse over the
+ * kept group, inert and silent to accessibility.
  */
 @Composable
 private fun OpenGroup(
     group: OpenGroupUi,
+    unhide: Unhide,
+    covers: SharedCovers,
     onOpen: (Key) -> Unit,
     onMenu: (Key) -> Unit,
     onUnhide: (Key) -> Unit,
@@ -363,17 +463,9 @@ private fun OpenGroup(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val shape = RoundedCornerShape(16.dp)
-    // `MUnlock`: the opened rows come out of a 7 px blur in 320 ms (none with reduced motion);
-    // [closing] plays it backwards over the whole group (`다시 잠글 때 반대로`), inert and silent.
-    var clear by remember { mutableStateOf(closing) }
-    LaunchedEffect(Unit) { clear = !closing }
-    val still = clear || (CivilightTheme.reducedMotion && !closing)
-    val blur by animateDpAsState(if (still) 0.dp else 7.dp, tween(UNBLUR_MS), label = "unblur")
-    val fade by animateFloatAsState(if (still) 1f else if (closing) 0f else 0.55f, tween(UNBLUR_MS), label = "unblurFade")
-    val rowsLook = if (closing) Modifier else Modifier.blur(blur).alpha(fade)
     Column(
         Modifier
-            .then(if (closing) Modifier.blur(blur).alpha(fade).clearAndSetSemantics { } else Modifier)
+            .then(if (closing) Modifier.clearAndSetSemantics { } else Modifier)
             .padding(top = 12.dp)
             .fillMaxWidth()
             .clip(shape)
@@ -390,22 +482,19 @@ private fun OpenGroup(
             CivilightText(group.header, type.label.merge(TextStyle(fontWeight = FontWeight.SemiBold)), Modifier.weight(1f), color = colors.ink, maxLines = 1)
             CivilightText(group.note, type.small, color = colors.ink3, maxLines = 1)
         }
-        Column(rowsLook) {
+        Column(Modifier.unhide(unhide)) {
             group.rows.forEach { row ->
-                OpenGroupRow(row, onOpen, onMenu, onUnhide, row.key == selectedKey)
+                OpenGroupRow(row, covers, onOpen, onMenu, onUnhide, row.key == selectedKey)
             }
         }
     }
 }
 
-private const val UNBLUR_MS = 320
-
-
 /** The 서재's side margin (boards: 24). */
 private val SIDE = 24.dp
 
 @Composable
-private fun OpenGroupRow(row: ProjectRowUi, onOpen: (Key) -> Unit, onMenu: (Key) -> Unit, onUnhide: (Key) -> Unit, selected: Boolean) {
+private fun OpenGroupRow(row: ProjectRowUi, covers: SharedCovers, onOpen: (Key) -> Unit, onMenu: (Key) -> Unit, onUnhide: (Key) -> Unit, selected: Boolean) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     ProtectWindow(WindowProtection.forProject(row.protections))
@@ -414,6 +503,7 @@ private fun OpenGroupRow(row: ProjectRowUi, onOpen: (Key) -> Unit, onMenu: (Key)
         onOpen = { onOpen(row.key) },
         onMenu = { onMenu(row.key) },
         selected = selected,
+        thumbModifier = covers.cover(row.key.toString(), CardViewMotion.THUMB_RADIUS_DP),
         extra = { TextAction(ShelfCopy.UNHIDE, { onUnhide(row.key) }, color = colors.ink3, style = type.small) },
     )
 }

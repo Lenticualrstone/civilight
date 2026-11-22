@@ -15,7 +15,7 @@ internal data class RunOwner(val kind: String, val key: Key, val field: String)
 /**
  * Rewrites `@` link runs on every text surface of the project, live and trashed (blocks and their
  * options, transitions, character bodies, long-text fields, voice lines, archive documents, world
- * and event descriptions, pages, long-text values of `◆` records). [transform] returns the
+ * and event descriptions, pages, long-text values of `◆` records, gallery descriptions). [transform] returns the
  * replacement run, or the same run to keep it.
  */
 internal fun ProjectDoc.rewriteLinks(
@@ -141,6 +141,14 @@ internal fun ProjectDoc.rewriteLinks(
             updatedAt = at, updatedBy = by,
         )
     }
+    val gallery = gallery.mapValues { (_, file) ->
+        val items = file.items.map { item ->
+            val caption = item.caption ?: return@map item
+            val next = rich(caption) { RunOwner("galleryItem", item.key, "caption") }
+            if (next !== caption) item.copy(caption = next, updatedAt = at, updatedBy = by) else item
+        }
+        if (items == file.items) file else file.copy(items = items)
+    }
     if (owners.isEmpty()) return this to emptyList()
     return copy(
         episodes = episodes,
@@ -149,5 +157,6 @@ internal fun ProjectDoc.rewriteLinks(
         world = world.copy(places = places, terms = terms, factions = factions, events = events),
         pages = pages,
         changes = changes.copy(records = records),
+        gallery = gallery,
     ) to owners.toList()
 }

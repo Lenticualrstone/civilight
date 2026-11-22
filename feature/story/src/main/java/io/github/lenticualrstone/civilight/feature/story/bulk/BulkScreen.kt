@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.story.bulk
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +18,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.domain.story.bulk.BulkFilter
 import io.github.lenticualrstone.civilight.feature.story.common.storyServices
 import io.github.lenticualrstone.civilight.model.story.PlaceRef
@@ -85,31 +87,7 @@ fun BulkScreen(route: BulkPlaceTime, deps: FeatureDeps) {
     }
 
     BackHandler(enabled = suggesting) { suggesting = false }
-    if (suggesting && doc != null && ui != null) {
-        BulkSuggestPage(
-            doc = doc,
-            selected = ui.selected,
-            handled = handled,
-            readOnly = readOnly,
-            locked = locked,
-            sheets = sheets,
-            localSheets = localSheets,
-            onBack = { suggesting = false },
-            onPut = { key ->
-                vm.put(key)
-                handled = handled + key
-            },
-            onFix = { key -> sheets.open(SceneWhereSheet(p, key)) },
-            onSkip = { key -> handled = handled + key },
-            onPutAll = { keys ->
-                vm.putAll(keys)
-                handled = handled + keys
-                suggesting = false
-            },
-        )
-        return
-    }
-
+    val showSuggest = suggesting && doc != null && ui != null
     val actions = BulkActions(
         onToggle = { key -> selected = BulkModel.toggle(selected, key) },
         onSelectAll = { ui?.let { selected = BulkModel.selectAll(it, selected) } },
@@ -124,29 +102,61 @@ fun BulkScreen(route: BulkPlaceTime, deps: FeatureDeps) {
         onPin = { placeKey -> ui?.takeIf { it.canApply(readOnly) }?.let { vm.placeSame(it.selected, PlaceRef(PlaceRefKind.PLACE, placeKey)) } },
         locked = locked,
     )
-    CivilightScreen(
-        title = ui?.title ?: BulkCopy.TITLE,
-        smallLine = if (wide) ui?.wideHead else ui?.head,
-        back = IconAction(BulkCopy.BACK) { deps.navigator.pop() },
-        actions = {
-            if (ui != null) {
-                TextAction(BulkCopy.SELECT_ALL, actions.onSelectAll)
-                if (wide) {
-                    val empty = ui.filter == BulkFilter.EMPTY
-                    FilterChip(ui.emptyChip.label, empty, { actions.onFilter(if (empty) BulkFilter.ALL else BulkFilter.EMPTY) })
+    // `제안 받기` is a page of this entry (no route), so it moves like a route: the list pushes it in and
+    // back pops it, with the shell's push / pop shape (`motion.push`; fades only when reduced).
+    val motion = CivilightTheme.motion
+    AnimatedContent(showSuggest, Modifier.fillMaxSize(), transitionSpec = { motion.push(forward = targetState) }, label = "bulkPage") { suggestPage ->
+        if (suggestPage && doc != null && ui != null) {
+            BulkSuggestPage(
+                doc = doc,
+                selected = ui.selected,
+                handled = handled,
+                readOnly = readOnly,
+                locked = locked,
+                sheets = sheets,
+                localSheets = localSheets,
+                onBack = { suggesting = false },
+                onPut = { key ->
+                    vm.put(key)
+                    handled = handled + key
+                },
+                onFix = { key -> sheets.open(SceneWhereSheet(p, key)) },
+                onSkip = { key -> handled = handled + key },
+                onPutAll = { keys ->
+                    vm.putAll(keys)
+                    handled = handled + keys
+                    suggesting = false
+                },
+            )
+        } else {
+            CivilightScreen(
+                title = ui?.title ?: BulkCopy.TITLE,
+                smallLine = if (wide) ui?.wideHead else ui?.head,
+                back = IconAction(BulkCopy.BACK) { deps.navigator.pop() },
+                actions = {
+                    if (ui != null) {
+                        TextAction(BulkCopy.SELECT_ALL, actions.onSelectAll)
+                        if (wide) {
+                            val empty = ui.filter == BulkFilter.EMPTY
+                            FilterChip(ui.emptyChip.label, empty, { actions.onFilter(if (empty) BulkFilter.ALL else BulkFilter.EMPTY) })
+                        }
+                    }
+                },
+                bottomBar = { ui?.let { BulkFooter(it, readOnly, wide, actions) } },
+                sheets = sheets,
+                localSheets = localSheets,
+            ) { padding ->
+                // Loading -> list swaps on the kind (loaded, wide), never on the data (motion audit, feature:story 7).
+                ContentSwap(BulkBody.of(loaded = ui != null && doc != null, wide = wide), Modifier.fillMaxSize()) { body ->
+                    if (body == BulkBody.LOADING || ui == null || doc == null) {
+                        Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
+                    } else if (body == BulkBody.WIDE) {
+                        BulkWide(ui, doc, padding, readOnly, actions)
+                    } else {
+                        BulkCover(ui, padding, actions)
+                    }
                 }
             }
-        },
-        bottomBar = { ui?.let { BulkFooter(it, readOnly, wide, actions) } },
-        sheets = sheets,
-        localSheets = localSheets,
-    ) { padding ->
-        if (ui == null || doc == null) {
-            Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
-        } else if (wide) {
-            BulkWide(ui, doc, padding, readOnly, actions)
-        } else {
-            BulkCover(ui, padding, actions)
         }
     }
 }

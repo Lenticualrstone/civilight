@@ -3,6 +3,8 @@ package io.github.lenticualrstone.civilight.feature.map.gen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -69,26 +71,32 @@ internal fun FormatPage(
                 .padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp, start = 24.dp, end = 24.dp),
         ) {
             CivilightText(ui.formatNote, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
-            FlowRow(
-                Modifier.padding(top = 14.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                FormatCard.entries.forEach { card ->
-                    val format = card.format
-                    Column(Modifier.width(166.dp)) {
-                        FormatTile(
-                            selected = format != null && format == state.format,
-                            onClick = { if (format == null) onText() else onPick(format) },
-                        ) {
-                            when (format) {
-                                null -> TextCardPreview()
-                                MapFormat.NODE -> NodeCardPreview()
-                                else -> WorldPreview(vm, input, format)
+            BoxWithConstraints(Modifier.padding(top = 14.dp).fillMaxWidth()) {
+                // Fixed-width tiles spread across the width: the leftover goes between the columns (QA 7).
+                val tile = 166f
+                val columns = GridFill.columns(maxWidth.value, tile)
+                val gap = GridFill.gap(maxWidth.value, tile, columns).dp
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    GridFill.rows(FormatCard.entries.toList(), columns).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                            row.forEach { card ->
+                                val format = card.format
+                                Column(Modifier.width(166.dp)) {
+                                    FormatTile(
+                                        selected = format != null && format == state.format,
+                                        onClick = { if (format == null) onText() else onPick(format) },
+                                    ) {
+                                        when (format) {
+                                            null -> TextCardPreview()
+                                            MapFormat.NODE -> NodeCardPreview()
+                                            else -> WorldPreview(vm, input, format)
+                                        }
+                                    }
+                                    CivilightText(card.title, CivilightTheme.type.itemTitle, Modifier.padding(top = 7.dp), maxLines = 1)
+                                    CivilightText(card.sub, CivilightTheme.type.small, color = CivilightTheme.colors.ink3, maxLines = 1)
+                                }
                             }
                         }
-                        CivilightText(card.title, CivilightTheme.type.itemTitle, Modifier.padding(top = 7.dp), maxLines = 1)
-                        CivilightText(card.sub, CivilightTheme.type.small, color = CivilightTheme.colors.ink3, maxLines = 1)
                     }
                 }
             }

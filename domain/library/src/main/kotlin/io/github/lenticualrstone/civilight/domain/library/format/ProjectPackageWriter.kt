@@ -73,7 +73,9 @@ class ProjectPackageContent(
  * - Without `휴지통도 포함` non-live rows are left out and every trashed character · place · term ·
  *   faction · page · unit still referenced by exported data gets a `NameTag(notExported)` (§5.6).
  * - Only blobs referenced by an exported row are written (§7.8); recorder audio only with
- *   `원본 음성 포함`.
+ *   `원본 음성 포함`. Originals of written gallery items go to `gallery/files/<hash>.<ext>`, and also to
+ *   `assets/` only when a non-gallery row uses them (55 §3.3); every written blob keeps its metadata
+ *   row in `assets/index.json`.
  * - Unknown files kept from an earlier import are written back unchanged (§8.3).
  * - `features` are computed from the content (§7.3).
  */
@@ -101,14 +103,18 @@ object ProjectPackageWriter {
         dropEmpty(json, PackagePaths.TOMBSTONES, exportedDoc.tombstones == TombstonesFile())
         dropEmpty(json, PackagePaths.DELETIONS, exportedDoc.deletions == DeletionsFile())
 
-        // Blobs: referenced by any written row (the blob catalogue itself does not count).
+        // Blobs: referenced by any written row (the blob catalogue itself does not count). Gallery
+        // files are scanned apart: their originals go under `gallery/files/` (55 §3.3).
         val refs = HashSet<String>()
+        val galleryRefs = HashSet<String>()
         for ((path, element) in json) {
-            if (path == PackagePaths.ASSETS_INDEX || path == PackagePaths.trash(PackagePaths.ASSETS_INDEX)) {
-                val assets = CivilightJson.decodeElement(AssetsIndexFile.serializer(), element)
-                JsonScan.strings(CivilightJson.encodeElement(AssetsIndexFile.serializer(), assets.copy(blobs = emptyList())), refs)
-            } else {
-                JsonScan.strings(element, refs)
+            when {
+                path == PackagePaths.ASSETS_INDEX || path == PackagePaths.trash(PackagePaths.ASSETS_INDEX) -> {
+                    val assets = CivilightJson.decodeElement(AssetsIndexFile.serializer(), element)
+                    JsonScan.strings(CivilightJson.encodeElement(AssetsIndexFile.serializer(), assets.copy(blobs = emptyList())), refs)
+                }
+                isGalleryJson(path) -> JsonScan.strings(element, galleryRefs)
+                else -> JsonScan.strings(element, refs)
             }
         }
         val audioBlobs = if (options.includeRecorderAudio) {
@@ -122,10 +128,12 @@ object ProjectPackageWriter {
         } else {
             emptyList()
         }
+        val galleryBlobs = exportedDoc.assets.blobs.filter { it.hash in galleryRefs }
         val writtenBlobs = (exportedDoc.assets.blobs.filter { it.hash in refs } + audioBlobs).distinctBy { it.hash }
+        val catalogue = (writtenBlobs + galleryBlobs).distinctBy { it.hash }
         json[PackagePaths.ASSETS_INDEX] = CivilightJson.encodeElement(
             AssetsIndexFile.serializer(),
-            fileSet.live.assets.copy(blobs = writtenBlobs),
+            fileSet.live.assets.copy(blobs = catalogue),
         )
 
         val files = LinkedHashMap<String, ByteArray>()
@@ -135,6 +143,14 @@ object ProjectPackageWriter {
         for (blob in writtenBlobs) {
             val bytes = blobs.read(blob)
             if (bytes == null) missing += blob.hash else files[PackagePaths.asset(blob.hash, blob.fileExt)] = bytes
+        }
+        for (blob in galleryBlobs) {
+            val bytes = blobs.read(blob)
+            if (bytes == null) {
+                if (blob.hash !in missing) missing += blob.hash
+            } else {
+                files[PackagePaths.galleryOriginal(blob.hash, blob.fileExt)] = bytes
+            }
         }
         if (options.preview != null && !hidden) files[PackagePaths.PREVIEW] = options.preview
         for ((path, unknown) in exportedDoc.unknownFiles) {
@@ -151,6 +167,7 @@ object ProjectPackageWriter {
             if (options.includeTrash) add(Features.TRASH)
             if (recorderJson != null) add(Features.RECORDER)
             if (audioBlobs.isNotEmpty()) add(Features.RECORDER_AUDIO)
+            if (json.keys.any(::isGalleryJson)) add(Features.GALLERY)
         }
         val manifest = FileManifest(
             format = FileManifest.FORMAT_PROJECT,
@@ -210,6 +227,9 @@ object ProjectPackageWriter {
         if (tags.isEmpty()) return doc
         return doc.copy(tombstones = doc.tombstones.copy(nameTags = doc.tombstones.nameTags + tags))
     }
+
+    /** `gallery/<owner>.json` and its trash mirror `trash/gallery/<owner>.json`. */
+    internal fun isGalleryJson(path: String): Boolean = PackagePaths.isGalleryUnit(path.removePrefix(PackagePaths.TRASH_DIR))
 
     private fun dropEmpty(json: MutableMap<String, JsonElement>, path: String, empty: Boolean) {
         if (empty) json.remove(path)

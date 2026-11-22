@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Column
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -82,55 +84,59 @@ fun ColumnScope.TravelModeContent(
     var km by rememberSaveable { mutableStateOf("") }
     var hours by rememberSaveable { mutableStateOf("") }
     SheetHeader(MapCopy.TRAVEL_MODES, onClose = onClose)
-    val target = editing
-    if (target == null) {
-        SheetScrollBody {
-            TravelModeRows.rows(doc, selectedKey).forEach { row ->
-                ListRow(
-                    title = row.label,
-                    selected = row.selected,
-                    onClick = {
-                        if (onPick != null) {
-                            onPick(row.index)
-                        } else if (!readOnly) {
-                            val form = TravelModeForm.of(doc, row.modeKey)
-                            name = form.name; km = form.km; hours = form.hours
-                            editing = row.modeKey
-                        }
-                    },
-                )
-            }
-            ListRow(MapCopy.CUSTOM_MODE, onClick = if (readOnly) null else ({ name = ""; km = ""; hours = ""; editing = "" }))
-        }
-        return
-    }
-    val key = target.ifEmpty { null }
-    val form = TravelModeForm(name, km, hours)
-    SheetScrollBody {
-        CivilightTextField(name, { name = it }, Modifier.padding(top = 12.dp), label = MapCopy.NAME)
-        CivilightTextField(
-            km, { km = it }, Modifier.padding(top = 10.dp), label = MapCopy.DAY_TRAVEL, unit = MapCopy.UNIT_KM,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        )
-        CivilightTextField(
-            hours, { hours = it }, Modifier.padding(top = 10.dp), label = MapCopy.PER_DAY, unit = MapCopy.UNIT_HOURS,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        )
-    }
-    SheetActions {
-        CivilightButton(MapCopy.BTN_CANCEL, { editing = null }, Modifier.weight(1f), variant = ButtonVariant.GHOST)
-        CivilightButton(
-            if (key == null) MapCopy.BTN_CREATE else MapCopy.BTN_DONE,
-            {
-                val k = form.kmValue
-                val h = form.hoursValue
-                if (k != null && h != null) {
-                    onSave(key, name.trim(), k, h)
-                    editing = null
+    // The list and the form swap with a crossfade and the sheet follows the height (motion audit row 13).
+    ContentSwap(editing, contentKey = { it == null }) { target ->
+        Column {
+            if (target == null) {
+                SheetScrollBody {
+                    TravelModeRows.rows(doc, selectedKey).forEach { row ->
+                        ListRow(
+                            title = row.label,
+                            selected = row.selected,
+                            onClick = {
+                                if (onPick != null) {
+                                    onPick(row.index)
+                                } else if (!readOnly) {
+                                    val form = TravelModeForm.of(doc, row.modeKey)
+                                    name = form.name; km = form.km; hours = form.hours
+                                    editing = row.modeKey
+                                }
+                            },
+                        )
+                    }
+                    ListRow(MapCopy.CUSTOM_MODE, onClick = if (readOnly) null else ({ name = ""; km = ""; hours = ""; editing = "" }))
                 }
-            },
-            Modifier.weight(1f),
-            enabled = !readOnly && form.canSave(doc, key),
-        )
+            } else {
+                val key = target.ifEmpty { null }
+                val form = TravelModeForm(name, km, hours)
+                SheetScrollBody {
+                    CivilightTextField(name, { name = it }, Modifier.padding(top = 12.dp), label = MapCopy.NAME)
+                    CivilightTextField(
+                        km, { km = it }, Modifier.padding(top = 10.dp), label = MapCopy.DAY_TRAVEL, unit = MapCopy.UNIT_KM,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    )
+                    CivilightTextField(
+                        hours, { hours = it }, Modifier.padding(top = 10.dp), label = MapCopy.PER_DAY, unit = MapCopy.UNIT_HOURS,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    )
+                }
+                SheetActions {
+                    CivilightButton(MapCopy.BTN_CANCEL, { editing = null }, Modifier.weight(1f), variant = ButtonVariant.GHOST)
+                    CivilightButton(
+                        if (key == null) MapCopy.BTN_CREATE else MapCopy.BTN_DONE,
+                        {
+                            val k = form.kmValue
+                            val h = form.hoursValue
+                            if (k != null && h != null) {
+                                onSave(key, name.trim(), k, h)
+                                editing = null
+                            }
+                        },
+                        Modifier.weight(1f),
+                        enabled = !readOnly && form.canSave(doc, key),
+                    )
+                }
+            }
+        }
     }
 }

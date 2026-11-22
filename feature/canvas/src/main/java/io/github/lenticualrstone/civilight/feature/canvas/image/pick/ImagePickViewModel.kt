@@ -17,7 +17,7 @@ import io.github.lenticualrstone.civilight.ui.project.ProjectSessions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-/** Result of `갤러리` / `파일`. */
+/** Result of `사진` / `파일`. */
 sealed interface ImportResult {
     data class Imported(val blobHash: String) : ImportResult
 
@@ -30,7 +30,7 @@ sealed interface ImportResult {
 /**
  * The picker's view model (CNV-27), one per owner × slot in the hosting entry (cast's profile opens two
  * slots from one screen). Writes: a preset into the slot (`고르기`), or an imported original into
- * `내 이미지` (`갤러리` / `파일`); the crop editor places an original.
+ * `내 이미지` (`사진` / `파일`); the crop editor places an original.
  */
 class ImagePickViewModel(
     projectKey: Key,
@@ -56,7 +56,7 @@ class ImagePickViewModel(
                 null
             }
             if (blob == null || !blob.mime.startsWith("image/")) return@launch then(ImportResult.Failed)
-            val label = if (source == BlobSource.FILE) ImageCopy.BTN_FILE else ImageCopy.BTN_GALLERY
+            val label = if (source == BlobSource.FILE) ImageCopy.BTN_FILE else ImageCopy.BTN_PHOTO
             when (apply(label) { doc, _ -> ImageEdits.addBlob(doc, blob) }) {
                 EditResult.APPLIED -> then(ImportResult.Imported(blob.hash))
                 EditResult.READ_ONLY -> then(ImportResult.ReadOnly)

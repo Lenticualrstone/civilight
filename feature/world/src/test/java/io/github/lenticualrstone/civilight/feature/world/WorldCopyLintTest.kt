@@ -1,10 +1,12 @@
 package io.github.lenticualrstone.civilight.feature.world
 
 import io.github.lenticualrstone.civilight.designsystem.text.CopyLint
+import io.github.lenticualrstone.civilight.designsystem.theme.MotionLint
 import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.lang.reflect.Modifier
 
 /** DECISIONS §3: every value of the world copy object passes the design-system copy lint. */
@@ -48,6 +50,7 @@ class WorldCopyLintTest {
             io.github.lenticualrstone.civilight.ui.picker.PickKind.FACTION,
         ).forEach { add(WorldCopy.pickLabel(it)) }
         add(WorldCopy.removeLabel("가달"))
+        io.github.lenticualrstone.civilight.domain.world.term.BulkMode.entries.forEach { add(WorldCopy.bulkDone(it, 3)) }
     }
 
     @Test
@@ -63,11 +66,20 @@ class WorldCopyLintTest {
         assertEquals(emptyList<String>(), failures)
     }
 
+    /** Motion audit §3.2: no duration literal, no default spec, no `animateItem()`, no default snap fling in this module. */
     @Test
-    fun `missing copy is marked as such`() {
+    fun `motion lint`() {
+        val issues = MotionLint.lintModule(File("."))
+        assertEquals(MotionLint.report(issues), 0, issues.size)
+    }
+
+    /** DECISIONS §3: missing copy is a `TODO_COPY_*` constant equal to its name, and none may reach the screen (none is left now). */
+    @Test
+    fun `missing copy is marked as such and none is left`() {
         val todo = values().filterKeys { it.startsWith("TODO_COPY_") }
-        assertTrue(todo.isNotEmpty())
         todo.forEach { (name, texts) -> assertEquals(listOf(name), texts) }
+        assertEquals("missing copy left: ${todo.keys}", emptySet<String>(), todo.keys)
+        assertTrue("formatted copy has no placeholder", formatted().none { it.contains("TODO_COPY") })
     }
 
     @Test

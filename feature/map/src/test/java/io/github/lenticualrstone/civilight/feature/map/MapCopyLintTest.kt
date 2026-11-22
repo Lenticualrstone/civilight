@@ -59,7 +59,7 @@ class MapCopyLintTest {
         val found = values()
         assertTrue("the copy object exposes its constants", found.size > 40)
         val failures = found.flatMap { (name, texts) ->
-            texts.filterNot { it.startsWith("TODO_COPY_") }.mapNotNull { text ->
+            texts.mapNotNull { text ->
                 val issues = CopyLint.lint(text, isButton = name.startsWith("BTN_"))
                 if (issues.isEmpty()) null else "$name = $text: $issues"
             }
@@ -68,8 +68,9 @@ class MapCopyLintTest {
     }
 
     @Test
-    fun `missing copy is marked as such`() {
-        values().filterKeys { it.startsWith("TODO_COPY_") }.forEach { (name, texts) -> assertEquals(listOf(name), texts) }
+    fun `no placeholder copy can reach the screen`() {
+        val placeholders = values().filter { (name, texts) -> name.startsWith("TODO_COPY_") || texts.any { it.contains("TODO_COPY_") } }
+        assertEquals(emptyList<String>(), placeholders.keys.toList())
     }
 
     @Test

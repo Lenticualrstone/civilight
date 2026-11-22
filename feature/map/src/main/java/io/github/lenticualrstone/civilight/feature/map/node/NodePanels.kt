@@ -43,7 +43,7 @@ fun ColumnScope.NodePropsPanel(props: NodePropsUi, readOnly: Boolean, actions: N
         is NodePropsUi.NodeProps -> {
             CardHeader(props.title, actions::deselect)
             CardRow(MapCopy.NAME, props.title, onClick = edit { actions.editNode(props.key) })
-            CardRow(MapCopy.TODO_COPY_MAP_NODE_SUB, props.sub, onClick = edit { actions.editNode(props.key) })
+            CardRow(MapCopy.NODE_SUB, props.sub, onClick = edit { actions.editNode(props.key) })
             CardRow(MapCopy.PLACE, props.place, onClick = edit { actions.openPlace(props.key) })
             CardRow(MapCopy.REVEAL_POINT, props.reveal, onClick = edit { actions.openReveal(props.key) })
             ButtonRow(Modifier.padding(top = 4.dp)) {

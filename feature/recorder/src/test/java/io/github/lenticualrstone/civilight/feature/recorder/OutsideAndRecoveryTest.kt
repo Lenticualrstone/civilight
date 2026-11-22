@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.recorder
 
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.designsystem.component.GlowMode
 import io.github.lenticualrstone.civilight.domain.actions.ActionContext
 import io.github.lenticualrstone.civilight.domain.recorder.capture.Recording
@@ -99,7 +100,7 @@ class OutsideAndRecoveryTest {
         f.engine.confirm(Fx.R1_TEXT)
         val notice = RecordingNotices.of(f.hub.state.value)!!
         assertEquals("라이프 레코더", notice.title)
-        assertEquals("TODO_COPY_LRC_04", notice.text)
+        assertEquals(ShownCopy.RECORDING, notice.text)
         for (part in listOf(notice.title, notice.text)) {
             assertFalse(part.contains("하르트") || part.contains("1-7") || part.contains("잿빛"))
         }

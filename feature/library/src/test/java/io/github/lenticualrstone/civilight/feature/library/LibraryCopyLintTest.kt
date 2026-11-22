@@ -1,12 +1,20 @@
 package io.github.lenticualrstone.civilight.feature.library
 
 import io.github.lenticualrstone.civilight.designsystem.text.CopyLint
+import io.github.lenticualrstone.civilight.designsystem.theme.MotionLint
 import io.github.lenticualrstone.civilight.domain.library.onboarding.ModuleTours
 import io.github.lenticualrstone.civilight.domain.library.onboarding.TourModule
 import io.github.lenticualrstone.civilight.feature.library.backup.BackupCopy
 import io.github.lenticualrstone.civilight.feature.library.backup.RecoveryCopy
 import io.github.lenticualrstone.civilight.feature.library.backup.RestoreCopy
+import io.github.lenticualrstone.civilight.domain.library.backup.BackupFailure
+import io.github.lenticualrstone.civilight.domain.library.export.ExportRow
+import io.github.lenticualrstone.civilight.domain.library.export.ExportSheets
+import io.github.lenticualrstone.civilight.domain.library.newproject.StartBlock
+import io.github.lenticualrstone.civilight.domain.library.rating.R18DefaultsBlock
 import io.github.lenticualrstone.civilight.feature.library.export.ExportCopy
+import io.github.lenticualrstone.civilight.feature.library.export.ExportGalleryLine
+import io.github.lenticualrstone.civilight.feature.library.notices.LibraryNotices
 import io.github.lenticualrstone.civilight.feature.library.help.HelpCopy
 import io.github.lenticualrstone.civilight.feature.library.onboarding.OnboardingCopy
 import io.github.lenticualrstone.civilight.feature.library.newproject.NewProjectCopy
@@ -27,6 +35,7 @@ import io.github.lenticualrstone.civilight.navigation.NewProjectStep
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.lang.reflect.Modifier
 
 /** DECISIONS §3: every value of this module's copy objects passes the design-system copy lint. */
@@ -62,6 +71,15 @@ class LibraryCopyLintTest {
             ModuleTours.steps(m).filter { it.hasCopy }.forEach { add(it.title); add(it.sub) }
         }
         addAll(listOf(ModuleTours.SKIP, ModuleTours.PREVIOUS, ModuleTours.NEXT, ModuleTours.FINISH))
+        // 0.1.0 motion wave: copy that lives outside the copy objects (domain:library constants, notices, the export gallery row).
+        addAll(listOf(ExportGalleryLine(12, 148L * 1024 * 1024).text, ExportGalleryLine(8, 3L * 1024 * 1024).label))
+        addAll(listOf(ExportSheets.CREATE_CSV, ExportSheets.CREATE_JSON, ExportSheets.CREATE_FILE, ExportRow.PASSWORD_WARNING))
+        io.github.lenticualrstone.civilight.model.app.RelockPolicy.entries.forEach { add(io.github.lenticualrstone.civilight.domain.library.lock.Relock.openGroupNote(it)) }
+        BackupFailure.entries.forEach { add(it.label) }
+        add(R18DefaultsBlock.RECORDER_LINE)
+        add(StartBlock.PROTAGONIST_SUB)
+        add(LibraryNotices.RESTORE_DONE)
+        add(LibraryNotices.EXPORT_DONE)
         // Batch 5: 복구 암호 strength line and the 되살리는 중 lines.
         add(io.github.lenticualrstone.civilight.feature.library.backup.RecoveryPasswordState.strength("등불지기의새벽1잿빛하층구역".toCharArray())!!.line)
         add("${RestoreCopy.DRIVE} · 11월 20일 ${RestoreCopy.BACKUP}")
@@ -79,7 +97,7 @@ class LibraryCopyLintTest {
     fun `every copy value passes the lint`() {
         val found = values()
         assertTrue("every copy object exposes its constants", objects.all { obj -> found.keys.any { it.startsWith(obj::class.java.simpleName + ".") } })
-        val failures = found.filterValues { !it.startsWith("TODO_COPY_") }.mapNotNull { (name, text) ->
+        val failures = found.mapNotNull { (name, text) ->
             val issues = CopyLint.lint(text)
             if (issues.isEmpty()) null else "$name = $text: $issues"
         } + formatted().mapNotNull { text -> CopyLint.lint(text).takeIf { it.isNotEmpty() }?.let { "$text: $it" } }
@@ -101,11 +119,15 @@ class LibraryCopyLintTest {
         assertEquals(emptyList<String>(), failures)
     }
 
+    /** QA 2026-11-23 #1, #4: no placeholder reaches a screen, a toast or a content description. */
     @Test
-    fun `missing copy is marked as such`() {
-        values().filterKeys { it.substringAfter('.').startsWith("TODO_COPY_") }.forEach { (name, text) ->
-            assertEquals(name.substringAfter('.'), text)
-        }
+    fun `no placeholder copy is left in this module`() {
+        val left = values().filterValues { it.startsWith("TODO_COPY_") }.keys
+        assertEquals(emptyList<String>(), left.toList())
+        val sources = File("src/main").walkTopDown().filter { it.extension == "kt" }
+            .filter { file -> file.readLines().any { line -> Regex("\"TODO_COPY_|\\bTODO_COPY_\\w+\\s*=").containsMatchIn(line) } }
+            .map { it.path }.toList()
+        assertEquals(emptyList<String>(), sources)
     }
 
     @Test
@@ -115,5 +137,12 @@ class LibraryCopyLintTest {
         assertEquals("이미 있는 R-18 프로젝트 2", RatingSettingsState.applyTitle(Rating.R18, 2))
         assertEquals("처음 설정 · 2/4", OnboardingCopy.setupLine(2))
         assertEquals("3단계 · 아직 안 봄", HelpCopy.stepsLine(3, seen = false))
+    }
+
+    /** Motion audit §4: no literal durations or curves, no default `animateItem()` or snap fling in this module. */
+    @Test
+    fun `motion lint`() {
+        val issues = MotionLint.lintModule(File("."))
+        assertEquals(MotionLint.report(issues), 0, issues.size)
     }
 }

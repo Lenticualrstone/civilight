@@ -14,6 +14,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.Color
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.feature.map.common.FoldSwitch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -94,29 +104,46 @@ fun MapRevealScreen(route: MapReveal, deps: FeatureDeps) {
                 scene = state.scene,
                 viewport = Viewport.fromArray(viewportArray),
                 onViewportChange = { viewportArray = it.toArray() },
+                unhideFresh = true,
             )
             TopBarTapGuard(padding.calculateTopPadding())
-            Column(
-                Modifier
-                    .align(if (inner) Alignment.BottomStart else Alignment.BottomCenter)
-                    .padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp)
-                    .then(if (inner) Modifier.widthIn(max = 480.dp) else Modifier.fillMaxWidth()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                GlassCard(Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CivilightText(state.modeLine, CivilightTheme.type.label, Modifier.weight(1f), maxLines = 1)
-                        CivilightText(MapCopy.REVEAL_DIM, CivilightTheme.type.small, Modifier.padding(end = 8.dp), color = CivilightTheme.colors.ink3)
-                        CivilightSwitch(state.dim, if (readOnly) null else ({ vm.setDim(it) }), enabled = !readOnly)
+            FoldSwitch(inner) { isInner ->
+                Column(
+                    Modifier
+                        .align(if (isInner) Alignment.BottomStart else Alignment.BottomCenter)
+                        .padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 16.dp)
+                        .then(if (isInner) Modifier.widthIn(max = 480.dp) else Modifier.fillMaxWidth()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    GlassCard(Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ValueSwap(state.modeLine, CivilightTheme.type.label, Modifier.weight(1f))
+                            CivilightText(MapCopy.REVEAL_DIM, CivilightTheme.type.small, Modifier.padding(end = 8.dp), color = CivilightTheme.colors.ink3)
+                            CivilightSwitch(state.dim, if (readOnly) null else ({ vm.setDim(it) }), enabled = !readOnly)
+                        }
+                        Scrubber(state.stops) { key -> lens.set(LensPoint.UnitEnd(key)) }
                     }
-                    Scrubber(state.stops) { key -> lens.set(LensPoint.UnitEnd(key)) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    MapValueChip(state.visibleChip, contentColor = CivilightTheme.colors.ink2)
-                    if (state.pendingChip.isNotEmpty()) MapValueChip(state.pendingChip, contentColor = CivilightTheme.colors.ink3)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // The counts change with the lens: the value swap (CNV-42), the pending chip folds in and out.
+                        ChipValue(state.visibleChip, CivilightTheme.colors.ink2)
+                        FoldReveal(state.pendingChip.isNotEmpty(), horizontal = true) { ChipValue(state.pendingChip, CivilightTheme.colors.ink3) }
+                    }
                 }
             }
         }
+    }
+}
+
+/** A summary chip (the `MapValueChip` pill) whose text swaps like a lens value. */
+@Composable
+private fun ChipValue(text: String, color: Color) {
+    val shown = rememberLastNonNull(text.takeIf { it.isNotEmpty() }).orEmpty()
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        Modifier.heightIn(min = 32.dp).clip(shape).background(CivilightTheme.colors.tint).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ValueSwap(shown, CivilightTheme.type.chip.merge(TextStyle(fontWeight = FontWeight.SemiBold)), color = color)
     }
 }
 
@@ -129,8 +156,10 @@ internal fun Scrubber(stops: List<RevealStop>, onStop: (Key) -> Unit) {
     val colors = CivilightTheme.colors
     val current = stops.indexOfFirst { it.current }
     val fraction = if (stops.size <= 1 || current < 0) (if (current >= 0) 1f else 0f) else current.toFloat() / (stops.size - 1)
+    // The filled part of the track follows the lens on `standard` (it snaps when motion is reduced).
+    val filled by animateFloatAsState(fraction, CivilightTheme.motion.move(CivilightMotion.standard), label = "revealFill")
     Box(Modifier.fillMaxWidth().padding(top = 6.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(colors.line)) {
-        Box(Modifier.fillMaxWidth(fraction).height(4.dp).background(colors.acc))
+        Box(Modifier.fillMaxWidth(filled).height(4.dp).background(colors.acc))
     }
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
         stops.forEach { stop ->

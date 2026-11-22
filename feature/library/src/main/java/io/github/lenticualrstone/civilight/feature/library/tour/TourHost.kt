@@ -1,5 +1,11 @@
 package io.github.lenticualrstone.civilight.feature.library.tour
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.animateIntOffsetAsState
+import androidx.compose.animation.AnimatedVisibility
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -71,6 +77,7 @@ fun TourHost(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val targets = remember { TourTargets() }
+    val motion = CivilightTheme.motion
     var hostOrigin by remember { mutableStateOf(Offset.Zero) }
     var hostHeight by remember { mutableStateOf(0f) }
     Box(
@@ -80,15 +87,18 @@ fun TourHost(
         },
     ) {
         CompositionLocalProvider(LocalTourTargets provides targets) { content() }
-        if (running && steps.isNotEmpty()) {
+        // The tour fades in and out as a whole (audit row 11); a closed tour is not composed at all.
+        AnimatedVisibility(running && steps.isNotEmpty(), Modifier.matchParentSize(), enter = motion.enter(), exit = motion.exit()) {
             var index by rememberSaveable { mutableIntStateOf(0) }
+            // The last steps stay drawn while the tour fades out; an empty list (never while running) draws nothing.
+            if (steps.isEmpty()) return@AnimatedVisibility
             val step = steps[index.coerceIn(0, steps.size - 1)]
             val last = index >= steps.size - 1
             LocalBackHandler.current(true, onDone)
             val target = targets.rects[index]?.translate(-hostOrigin)
             Box(
                 Modifier
-                    .matchParentSize()
+                    .fillMaxSize()
                     .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } } },
             ) {
                 TourDim(target)
@@ -146,10 +156,17 @@ private fun BoxScope.TourCardAt(
         TourPlacement.Arrow.BOTTOM -> ArrowEdge.BOTTOM
         TourPlacement.Arrow.NONE -> ArrowEdge.NONE
     }
+    // The card glides to its next place on `standard` (snaps when reduced and until it is first measured).
+    val motion = CivilightTheme.motion
+    val cardOffset by animateIntOffsetAsState(
+        IntOffset(0, placement.cardTop.toInt()),
+        if (cardHeight > 0f) motion.move(CivilightMotion.standard) else snap(),
+        label = "tourCard",
+    )
     Box(
         Modifier
             .align(Alignment.TopCenter)
-            .offset { IntOffset(0, placement.cardTop.toInt()) }
+            .offset { cardOffset }
             .readingMeasure(360.dp)
             .fillMaxWidth()
             .padding(horizontal = 16.dp)

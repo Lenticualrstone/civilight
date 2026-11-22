@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -23,6 +22,7 @@ import io.github.lenticualrstone.civilight.designsystem.text.DecoratedText
 import io.github.lenticualrstone.civilight.designsystem.text.DecorationRange
 import io.github.lenticualrstone.civilight.designsystem.text.InlineDecoration
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.feature.world.common.dimmed
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
 
 /** Width of the location column (board `Term`: mono 11 in 64 px, then 10 px gap). */
@@ -37,6 +37,7 @@ private val GAP = 10.dp
 @Composable
 fun UsageRowView(
     row: UsageRowUi,
+    modifier: Modifier = Modifier,
     onOpen: (() -> Unit)?,
     readOnly: Boolean = true,
     onLink: () -> Unit = {},
@@ -47,12 +48,12 @@ fun UsageRowView(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .topHairline(colors.line)
             .then(if (onOpen != null) Modifier.pressable(PressAction.Click(onOpen), role = Role.Button, scaleOnPress = false) else Modifier)
             .heightIn(min = 44.dp)
-            .alpha(if (row.dimmed) 0.5f else 1f)
+            .dimmed(row.dimmed)
             .padding(vertical = 11.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(GAP)) {

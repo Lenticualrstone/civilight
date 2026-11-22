@@ -11,6 +11,7 @@ import io.github.lenticualrstone.civilight.domain.trash.RecorderTrashState
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Keys
 import io.github.lenticualrstone.civilight.model.Timestamp
+import io.github.lenticualrstone.civilight.model.doc.BlobRefs
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.model.trash.DeletionLogEntry
@@ -143,14 +144,10 @@ object PurgeActions {
     fun applyProjectPurge(library: RecorderLibrary, projectKey: Key, result: PurgeResult, ctx: ActionContext): RecorderLibrary =
         RecorderTrash.applyProjectPurge(library, projectKey, result, ctx.trash)
 
-    /** Blob hashes a project holds: its asset index and every row that points at a blob (live or trashed). */
-    fun heldBlobs(doc: ProjectDoc): Set<String> = buildSet {
-        doc.assets.blobs.mapTo(this) { it.hash }
-        doc.assets.imageUses.mapNotNullTo(this) { it.blobHash }
-        doc.assets.scriptAssets.mapNotNullTo(this) { it.fileHash }
-        doc.maps.values.forEach { m ->
-            m.baseImageHash?.let(::add)
-            m.sketch?.photoHash?.let(::add)
-        }
-    }
+    /**
+     * Blob hashes a project holds: every row that points at a blob, live or trashed (the one function
+     * `core:model` [BlobRefs], gallery items included, T-GAL-27), plus its asset index rows (so a
+     * purged project's catalogue is a candidate too).
+     */
+    fun heldBlobs(doc: ProjectDoc): Set<String> = BlobRefs.of(doc) + doc.assets.blobs.map { it.hash }
 }

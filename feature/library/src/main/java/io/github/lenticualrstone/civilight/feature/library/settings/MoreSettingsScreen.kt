@@ -66,7 +66,7 @@ internal fun MoreSettingsScreen(services: LibraryServices) {
 
 @Composable
 private fun ValueRow(row: MoreValueRow, onClick: (MoreValueRow) -> Unit) {
-    SettingsRow(title = row.title, onClick = { onClick(row) }, value = row.current, subtitle = row.sub)
+    SettingsValueRow(title = row.title, onClick = { onClick(row) }, value = row.current, subtitle = row.sub)
 }
 
 /** Head = the row's title; one radio per choice; a pick writes and closes. */

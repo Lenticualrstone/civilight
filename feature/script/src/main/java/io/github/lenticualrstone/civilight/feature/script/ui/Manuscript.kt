@@ -1,8 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.script.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,7 +13,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberUnhide
+import io.github.lenticualrstone.civilight.designsystem.theme.unhide
 import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
 import io.github.lenticualrstone.civilight.feature.script.layout.ScriptLayout
 import io.github.lenticualrstone.civilight.feature.script.motion.ScriptMotion
@@ -43,6 +49,7 @@ import io.github.lenticualrstone.civilight.feature.script.links.BlockTap
 import io.github.lenticualrstone.civilight.domain.world.term.TermCandidate
 import io.github.lenticualrstone.civilight.feature.script.state.OptionLine
 import io.github.lenticualrstone.civilight.feature.script.state.ScriptRow
+import io.github.lenticualrstone.civilight.feature.script.state.ScriptRowKeys
 import io.github.lenticualrstone.civilight.feature.script.state.SpeakerModel
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.script.BlockKind
@@ -50,6 +57,29 @@ import io.github.lenticualrstone.civilight.model.script.BlockKind
 /** Block gap of the manuscript (`space-7`, SCR-01). */
 val BlockGap: Dp = 26.dp
 
+
+/** Padding above and below the selected block (SCR-14, board `Blocks`). */
+private val SELECTED_PAD: Dp = 12.dp
+
+/**
+ * A row that appears after the manuscript was shown (a hidden scene the gate just opened) unblurs
+ * and brightens in (CNV-43); a row that comes back from the scroll is clear at once.
+ */
+@Composable
+private fun Modifier.revealOnAppear(key: String, revealed: MutableSet<String>): Modifier {
+    var shown by remember { mutableStateOf(key in revealed) }
+    LaunchedEffect(Unit) { shown = true }
+    val unhide = rememberUnhide(shown)
+    LaunchedEffect(shown, unhide.isRunning) { if (shown && !unhide.isRunning) revealed.add(key) }
+    return unhide(unhide)
+}
+
+private val HIDDEN_PREFIX = ScriptRowKeys.hidden("")
+
+/** The row keys the manuscript drew last (read in composition, written after it). */
+private class KeysHolder {
+    var keys: Set<String>? = null
+}
 
 /** What the manuscript calls back into. */
 class ManuscriptActions(
@@ -95,7 +125,7 @@ fun Manuscript(
     editor: EditorState,
     showParens: Boolean,
     readOnly: Boolean,
-    entered: Key?,
+    entered: Set<Key>,
     listState: LazyListState,
     padding: PaddingValues,
     layout: ScriptLayout,
@@ -107,7 +137,7 @@ fun Manuscript(
     /** The block row whose swipe buttons are open (SCR-30). */
     revealedRow: String? = null,
 ) {
-    val reduced = CivilightTheme.reducedMotion
+    val motion = CivilightTheme.motion
     val column = if (layout.wide) Modifier.padding(start = layout.columnStart.dp).width(layout.columnWidth.dp) else Modifier.fillMaxWidth()
     if (rows.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -119,25 +149,45 @@ fun Manuscript(
         }
         return
     }
+    // The row keys of the last composition: a change is an insert, a remove or a reorder (not a typed letter).
+    val keys = remember(rows) { rows.mapTo(HashSet()) { it.key } }
+    val revealedRows = remember { HashSet<String>() }
+    val lastKeys = remember { KeysHolder() }
+    // SCR-58 / CNV-43: the rows that came with the gate opening (a `hidden:` placeholder left this composition and
+    // its scene's rows joined); never a block the writer makes later in that scene.
+    val revealKeys = remember { HashSet<String>() }
+    lastKeys.keys?.let { before ->
+        val unlockedScenes = rows.filterIsInstance<HeadRow>().filter { it.hiddenTag }.mapTo(HashSet()) { it.sceneKey }
+        val opened = before.filter { it.startsWith(HIDDEN_PREFIX) }.map { it.removePrefix(HIDDEN_PREFIX) }.filter { it in unlockedScenes }.toSet()
+        if (opened.isNotEmpty()) rows.filter { it.sceneKey in opened && it.key !in before }.forEach { revealKeys.add(it.key) }
+    }
+    val structural = ScriptMotion.structural(lastKeys.keys, keys)
+    SideEffect { lastKeys.keys = keys }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxHeight().then(column),
-        contentPadding = PaddingValues(top = padding.calculateTopPadding() + 8.dp, bottom = padding.calculateBottomPadding() + BlockGap),
+        // The scene head brings its own 8 dp top margin (DS-43): no second gap under the bar (QA #13).
+        contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + BlockGap),
         verticalArrangement = Arrangement.spacedBy(BlockGap),
     ) {
         items(rows, key = { it.key }, contentType = { it::class }) { row ->
-            val enter = if (row is BlockRow && row.blockKey == entered) {
+            val isEntering = row is BlockRow && row.blockKey in entered
+            val enter = if (row is BlockRow && isEntering) {
                 Modifier.enterFromBelow(row.key) { actions.onEntered(row.blockKey) }
             } else Modifier
-            // SCR-67 / CNV-39: rows around a new block slide with it; a removed row closes its gap.
-            // The row being typed never moves.
-            val placement = ScriptMotion.placement(isCaretRow = row.key == editor.caretRowKey, entering = entered != null, reduced = reduced, editing = editor.editing)
+            // SCR-67 / CNV-39: rows around a new block slide with it; a removed row closes its gap, also
+            // while typing, whenever the row set changed. The row being typed never moves, and a pure
+            // edit moves nothing.
+            val placement = ScriptMotion.placement(isCaretRow = row.key == editor.caretRowKey, entering = entered.isNotEmpty(), structural = structural)
             val place = Modifier.animateItem(
-                fadeInSpec = null,
-                placementSpec = placement?.let { ScriptMotion.token(it) }?.let { tween(it.durationMs, easing = it.easing) },
-                fadeOutSpec = tween(ScriptMotion.removeMs(reduced), easing = if (reduced) LinearEasing else CivilightMotion.exit.easing),
+                // A block made by the writer enters with its own rise; every other inserted row fades in.
+                fadeInSpec = if (isEntering) null else motion.spec(CivilightMotion.enter),
+                placementSpec = placement?.let { motion.placement(ScriptMotion.token(it)) },
+                fadeOutSpec = motion.spec(CivilightMotion.exit),
             )
-            Box(place) {
+            // SCR-58 / CNV-43: the rows of a hidden scene that appear because the gate opened unblur in.
+            val reveal = if (row.key in revealKeys) Modifier.revealOnAppear(row.key, revealedRows) else Modifier
+            Box(place.then(reveal)) {
                 when (row) {
                     is HeadRow -> HeadView(
                         row,
@@ -152,7 +202,10 @@ fun Manuscript(
                         } else {
                             EmptySceneView(row, actions.emptySpeaker(row)) { actions.onTapEmptyScene(row.sceneKey) }
                         }
-                    is BlockRow ->
+                    is BlockRow -> {
+                        // SCR-67: the selection's 12 dp padding grows and shrinks with the row, typing or not.
+                        val pad = animateDpAsState(if (editor.selected == row.blockKey) SELECTED_PAD else 0.dp, motion.move(CivilightMotion.standard), label = "blockPad")
+                        CompositionLocalProvider(LocalBlockPad provides pad) {
                         if (!readOnly && !previewOnly && editor.caretBlock == row.blockKey && (row.isText || row.kind == BlockKind.CHOICE && editor.caretOption != null)) {
                             actions.editableBlock(row, enter)
                         } else {
@@ -183,6 +236,8 @@ fun Manuscript(
                             }
                         }
                 }
+                        }
+                    }
             }
         }
     }
@@ -230,16 +285,15 @@ private fun SwipeBlock(
  */
 @Composable
 private fun Modifier.enterFromBelow(key: String, onDone: () -> Unit): Modifier {
-    val reduced = CivilightTheme.reducedMotion
-    val shift = with(LocalDensity.current) { 8.dp.toPx() }
+    val motion = CivilightTheme.motion
+    val shift = with(LocalDensity.current) { ScriptMotion.ENTER_SHIFT_DP.dp.toPx() }
     val progress = remember(key) { Animatable(0f) }
     LaunchedEffect(key) {
-        val token = CivilightMotion.enter
-        progress.animateTo(1f, if (reduced) tween(CivilightMotion.reducedFadeMs) else tween(token.durationMs, easing = token.easing))
+        progress.animateTo(1f, motion.spec(CivilightMotion.enter))
         onDone()
     }
     return graphicsLayer {
         alpha = progress.value
-        translationY = if (reduced) 0f else (1f - progress.value) * shift
+        translationY = if (motion.reduced) 0f else (1f - progress.value) * shift
     }
 }

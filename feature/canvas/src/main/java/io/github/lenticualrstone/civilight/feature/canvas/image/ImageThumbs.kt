@@ -17,14 +17,18 @@ import kotlinx.coroutines.withContext
 /** Longest side of a picker tile's decoded thumbnail (px). */
 private const val THUMB_SIDE = 360
 
-/** An original of `내 이미지` as a picker tile: decoded small, off the main thread, centre-cropped. */
+/**
+ * An original of `내 이미지` as a picker tile: decoded small, off the main thread, centre-cropped. [onBitmap] hands the
+ * decoded thumbnail to the picker, which passes it to the crop editor.
+ */
 @Composable
-fun BoxScope.MineThumb(hash: String) {
+fun BoxScope.MineThumb(hash: String, onBitmap: (ImageBitmap) -> Unit = {}) {
     val deps = LocalFeatureDeps.current
     val bitmap by produceState<ImageBitmap?>(null, hash) {
         value = withContext(Dispatchers.IO) {
             deps.stores.blobs.fileOf(hash)?.let { runCatching { SlotImages.decode(it, null, THUMB_SIDE) }.getOrNull() }?.asImageBitmap()
         }
     }
+    bitmap?.let { onBitmap(it) }
     bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Crop) }
 }

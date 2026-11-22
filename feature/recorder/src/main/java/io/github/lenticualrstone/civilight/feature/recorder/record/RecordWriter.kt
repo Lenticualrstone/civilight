@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.recorder.record
 
+import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.actions.ActionContext
 import io.github.lenticualrstone.civilight.domain.actions.RecorderActions
 import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
@@ -115,7 +116,7 @@ class RecordWriter(
         if (record.deletedAt != null) return null
         recorder.updateTrash { RecorderActions.delete(it, recordKey, ctx) }
         val entry = recorder.current().record(recordKey)?.trashEntryKey ?: return null
-        return DeleteDone(recordKey, entry, Toast(RecorderCopy.TODO_DELETED_TOAST, listOf(RecorderCopy.UNDO)))
+        return DeleteDone(recordKey, entry, Toast(ShownCopy.DELETED_TOAST, listOf(RecorderCopy.UNDO)))
     }
 
     /** The `지우기` toast's `되돌리기`: back with its links, placements, hidden flag and state (the user's own delete, so no prompt). */

@@ -22,7 +22,7 @@ object BackupCopy {
     const val STORAGE_PROJECTS = "프로젝트"
 
     /** Turning the switch off or on could not reach Google (needsExternal stub; copy not in sources). */
-    const val TODO_COPY_LIB57_DRIVE_NOT_READY = "TODO_COPY_LIB57_DRIVE_NOT_READY"
+    const val DRIVE_NOT_READY = "Drive 연결 준비 중"
 }
 
 /** 복구 암호 정하기 (LIB-58, board `RHRecoveryPw`). */
@@ -46,18 +46,18 @@ object RecoveryCopy {
     const val STRENGTH_GOOD = "좋음"
 
     /** Strength words other than `좋음` (LIB-58: not in sources). */
-    const val TODO_COPY_LIB58_STRENGTH_WEAK = "TODO_COPY_LIB58_STRENGTH_WEAK"
-    const val TODO_COPY_LIB58_STRENGTH_FAIR = "TODO_COPY_LIB58_STRENGTH_FAIR"
-    const val TODO_COPY_LIB58_STRENGTH_STRONG = "TODO_COPY_LIB58_STRENGTH_STRONG"
+    const val STRENGTH_WEAK = "약함"
+    const val STRENGTH_FAIR = "보통"
+    const val STRENGTH_STRONG = "아주 좋음"
 
     /** The eye button while the password shows (the board only labels `보이기`). */
-    const val TODO_COPY_LIB58_HIDE = "TODO_COPY_LIB58_HIDE"
+    const val HIDE = "가리기"
 
     /** `정하기` failed (Keystore or disk; copy not in sources). */
-    const val TODO_COPY_LIB58_SET_FAILED = "TODO_COPY_LIB58_SET_FAILED"
+    const val SET_FAILED = "정하지 못함"
 
     /** Under `한 번 더` when the two fields differ (copy not in sources). */
-    const val TODO_COPY_LIB58_MISMATCH = "TODO_COPY_LIB58_MISMATCH"
+    const val MISMATCH = "암호가 서로 다름"
 }
 
 /** 백업에서 되살리기 and 되살리는 중 (LIB-59, LIB-60; boards `Restore`, `Restoring`). */
@@ -83,26 +83,26 @@ object RestoreCopy {
     const val SECONDS = "초"
 
     /** Not connected: sign-in comes first (LIB-59: copy not in sources). */
-    const val TODO_COPY_LIB59_NOT_CONNECTED = "TODO_COPY_LIB59_NOT_CONNECTED"
+    const val NOT_CONNECTED = "Google Drive 연결 먼저"
 
     /** No run within 30 days (copy not in sources). */
-    const val TODO_COPY_LIB59_NO_RUNS = "TODO_COPY_LIB59_NO_RUNS"
+    const val NO_RUNS = "백업 없음"
 
     /** The per-project checklist's label (§6 Q25 `ED`: undrawn). */
-    const val TODO_COPY_LIB59_PROJECTS = "TODO_COPY_LIB59_PROJECTS"
+    const val PROJECTS = "프로젝트"
 
     /** A visible project whose name the run index does not hold (an index written elsewhere). */
-    const val TODO_COPY_LIB59_UNNAMED_PROJECT = "TODO_COPY_LIB59_UNNAMED_PROJECT"
+    const val UNNAMED_PROJECT = "이름 없는 프로젝트"
 
     /** The 복구 암호 sheet's title (LIB-54 sheet reused; `암호 파일` names one file). */
     const val PASSWORD_TITLE = "복구 암호"
 
     /** Wrong 복구 암호 (LIB-54 `ED`: field error, retry; copy not in sources). */
-    const val TODO_COPY_LIB59_WRONG_PASSWORD = "TODO_COPY_LIB59_WRONG_PASSWORD"
+    const val WRONG_PASSWORD = "복구 암호가 맞지 않음"
 
     /** Some files could not be restored (gone, damaged, newer; copy not in sources). */
-    const val TODO_COPY_LIB60_PARTLY_FAILED = "TODO_COPY_LIB60_PARTLY_FAILED"
+    const val PARTLY_FAILED = "일부 되살리지 못함"
 
     /** 되살리는 중 reached with no restore running (after a process death; copy not in sources). */
-    const val TODO_COPY_LIB60_NOT_RUNNING = "TODO_COPY_LIB60_NOT_RUNNING"
+    const val NOT_RUNNING = "되살리는 중 아님"
 }

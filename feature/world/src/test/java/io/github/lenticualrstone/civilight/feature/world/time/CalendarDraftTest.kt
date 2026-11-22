@@ -38,11 +38,11 @@ class CalendarDraftTest {
 
     @Test
     fun `problems stop 저장`() {
-        assertEquals(WorldCopy.TODO_COPY_WORLD_CALENDAR_MONTH_NAME, CalendarDraft().problem())
-        assertEquals(WorldCopy.TODO_COPY_WORLD_CALENDAR_MONTH_DAYS, CalendarDraft(listOf(MonthDraft("가달", "0"))).problem())
-        assertEquals(WorldCopy.TODO_COPY_WORLD_CALENDAR_WEEKDAY_NAME, t52().addWeekday().problem())
-        assertEquals(WorldCopy.TODO_COPY_WORLD_CALENDAR_START, t52().copy(startDay = "31").problem())
-        assertEquals(WorldCopy.TODO_COPY_WORLD_CALENDAR_NO_MONTH, CalendarDraft(emptyList()).problem())
+        assertEquals(WorldCopy.CALENDAR_MONTH_NAME, CalendarDraft().problem())
+        assertEquals(WorldCopy.CALENDAR_MONTH_DAYS, CalendarDraft(listOf(MonthDraft("가달", "0"))).problem())
+        assertEquals(WorldCopy.CALENDAR_WEEKDAY_NAME, t52().addWeekday().problem())
+        assertEquals(WorldCopy.CALENDAR_START, t52().copy(startDay = "31").problem())
+        assertEquals(WorldCopy.CALENDAR_NO_MONTH, CalendarDraft(emptyList()).problem())
         assertNull(CalendarDraft().toCalendar())
     }
 

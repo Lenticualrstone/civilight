@@ -16,8 +16,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,8 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
@@ -42,6 +42,9 @@ import io.github.lenticualrstone.civilight.designsystem.component.NoResults
 import io.github.lenticualrstone.civilight.designsystem.component.SearchField
 import io.github.lenticualrstone.civilight.designsystem.component.SearchHit
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
+import io.github.lenticualrstone.civilight.designsystem.text.DecoratedText
+import io.github.lenticualrstone.civilight.designsystem.text.searchHitDecorations
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
@@ -118,7 +121,8 @@ fun SearchScreen(route: ProjectSearch, deps: FeatureDeps) {
                 }
                 val u = ui
                 val result = u?.result
-                if (u != null && result != null && field.text.isNotBlank()) {
+                // QA #11: the `명령` chip lists the commands with an empty query too (SearchModel.listsWithoutQuery).
+                if (u != null && result != null && SearchModel.listsWithoutQuery(field.text, filter)) {
                     Results(
                         result = result,
                         onItem = { item -> go(SearchModel.tap(p, item, u.context)) },
@@ -161,45 +165,53 @@ private fun Results(result: SearchResult, onItem: (SearchItem) -> Unit, onSimila
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         result.sections.forEach { section ->
-            item(key = "h:${section.kind}") { SectionLabel(section.header, Modifier.padding(top = 14.dp)) }
-            section.items.forEachIndexed { i, item -> row(section.kind.name, i, item, onItem) }
+            item(key = "h:${section.kind}") { SectionLabel(section.header, civilightItem().padding(top = 14.dp)) }
+            rows(section.kind.name, section.items, onItem)
         }
         result.footer?.let { footer ->
-            item(key = "footer") { CivilightText(footer, CivilightTheme.type.small, Modifier.padding(top = 14.dp), color = colors.ink3) }
+            item(key = "footer") { CivilightText(footer, CivilightTheme.type.small, civilightItem().padding(top = 14.dp), color = colors.ink3) }
         }
     }
 }
 
-internal fun LazyListScope.row(section: String, index: Int, item: SearchItem, onItem: (SearchItem) -> Unit) {
-    item(key = "$section:$index:${item.key}") {
+/**
+ * The rows of one section, each its own keyed item. The key is the item's own (kind + key, never the
+ * index), so a row that stays keeps its place while others come and go (motion audit, feature:story 3).
+ */
+internal fun LazyListScope.rows(section: String, items: List<SearchItem>, onItem: (SearchItem) -> Unit) {
+    val keys = SearchModel.itemKeys(section, items)
+    items(items.size, key = { keys[it] }) { i ->
+        val item = items[i]
+        val modifier = civilightItem()
         when (item) {
             is SearchItem.LineItem -> SearchHit(
                 location = item.location,
                 sentence = item.sentence.text,
                 matches = item.sentence.hits,
                 trailingWarning = item.flag,
+                modifier = modifier,
                 onClick = { onItem(item) },
             )
-            is SearchItem.TermItem -> NameRow(item.name, item.sub, item.action) { onItem(item) }
-            is SearchItem.CharacterItem -> NameRow(item.name, item.intro, null) { onItem(item) }
-            is SearchItem.SceneItem -> NameRow(item.title, item.sub, null) { onItem(item) }
-            is SearchItem.NamedItem -> NameRow(item.name, null, null) { onItem(item) }
-            is SearchItem.CommandItem -> CommandRow(item) { onItem(item) }
+            is SearchItem.TermItem -> NameRow(item.name, item.sub, item.action, modifier) { onItem(item) }
+            is SearchItem.CharacterItem -> NameRow(item.name, item.intro, null, modifier) { onItem(item) }
+            is SearchItem.SceneItem -> NameRow(item.title, item.sub, null, modifier) { onItem(item) }
+            is SearchItem.NamedItem -> NameRow(item.name, null, null, modifier) { onItem(item) }
+            is SearchItem.CommandItem -> CommandRow(item, modifier) { onItem(item) }
         }
     }
 }
 
 /** A name with its hit boxed (`hl` fill), a small sub line and an optional right word (`카드`). */
 @Composable
-private fun NameRow(name: Highlight, sub: String?, trailing: String?, onClick: () -> Unit) {
+private fun NameRow(name: Highlight, sub: String?, trailing: String?, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(
-        Modifier.fillMaxWidth().topHairline(colors.line).pressable(onClick = onClick, scaleOnPress = false).heightIn(min = 48.dp).padding(vertical = 8.dp),
+        modifier.fillMaxWidth().topHairline(colors.line).pressable(onClick = onClick, scaleOnPress = false).heightIn(min = 48.dp).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            BasicText(boxed(name, colors.hl), style = type.itemTitleCompact.merge(androidx.compose.ui.text.TextStyle(color = colors.ink)), maxLines = 1)
+            HitText(name.text, name.hits, type.itemTitleCompact)
             sub?.let { CivilightText(it, type.small, color = colors.ink3, maxLines = 1) }
         }
         trailing?.let { CivilightText(it, type.small, color = colors.ink2, maxLines = 1) }
@@ -208,22 +220,36 @@ private fun NameRow(name: Highlight, sub: String?, trailing: String?, onClick: (
 
 /** `› 시점 바꾸기 | 지금: 최신 · 1-7`. */
 @Composable
-private fun CommandRow(item: SearchItem.CommandItem, onClick: () -> Unit) {
+private fun CommandRow(item: SearchItem.CommandItem, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(
-        Modifier.fillMaxWidth().topHairline(colors.line).pressable(onClick = onClick, scaleOnPress = false).heightIn(min = 48.dp).padding(vertical = 8.dp),
+        modifier.fillMaxWidth().topHairline(colors.line).pressable(onClick = onClick, scaleOnPress = false).heightIn(min = 48.dp).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        BasicText(boxed(Highlight("› ${item.label.text}", item.label.hits.map { (it.first + 2)..(it.last + 2) }), colors.hl), style = type.command.merge(androidx.compose.ui.text.TextStyle(color = colors.ink)), maxLines = 1)
+        HitText("› ${item.label.text}", item.label.hits.map { (it.first + 2)..(it.last + 2) }, type.command)
         item.sub?.let { CivilightText(it, type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1) }
     }
 }
 
-private fun boxed(h: Highlight, fill: androidx.compose.ui.graphics.Color): AnnotatedString = buildAnnotatedString {
-    append(h.text)
-    h.hits.forEach { r -> if (r.first >= 0 && r.last < h.text.length) addStyle(SpanStyle(background = fill), r.first, r.last + 1) }
+/**
+ * A name or command with its hit boxed inline. It goes through the DS `DecoratedText` with `revealBoxes`,
+ * so the box grows left to right like every other search hit (CNV-44; motion audit, feature:story 10).
+ */
+@Composable
+private fun HitText(text: String, hits: List<IntRange>, style: TextStyle, modifier: Modifier = Modifier) {
+    val decorations = remember(text, hits) { searchHitDecorations(text, hits) }
+    DecoratedText(
+        text = AnnotatedString(text),
+        style = style,
+        modifier = modifier,
+        color = CivilightTheme.colors.ink,
+        decorations = decorations,
+        revealBoxes = true,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 private const val SCRIM = 0.82f

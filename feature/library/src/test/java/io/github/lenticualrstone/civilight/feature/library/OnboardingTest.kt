@@ -86,6 +86,10 @@ class OnboardingTest {
         assertFalse(OnboardingFlow.walkShowsBanner(replay = true))
         assertTrue(OnboardingFlow.exampleInstalled(OnboardingState(exampleState = ExampleState.INSTALLED), example))
         assertFalse(OnboardingFlow.exampleInstalled(OnboardingState(exampleState = ExampleState.DELETED), example))
+        // QA #12: a live example entry is shown even when its state write was cut short; Finish never deletes it unseen.
+        assertTrue(OnboardingFlow.exampleInstalled(OnboardingState(exampleState = ExampleState.NOT_INSTALLED), example))
+        assertFalse("after 온보딩 끝내기 the example is gone for good (LIB-18)", OnboardingFlow.exampleInstalled(OnboardingState(firstRunCompleted = true, exampleState = ExampleState.INSTALLED), example))
+        assertFalse(OnboardingFlow.exampleInstalled(OnboardingState(exampleState = ExampleState.INSTALLED), null))
     }
 
     @Test

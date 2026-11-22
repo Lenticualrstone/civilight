@@ -20,7 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.text.TextStyle
@@ -32,7 +32,10 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
 
 /**
  * DS-30 button. Labels are verbs (never `확인` alone). [subText] is required for the two-line variants.
@@ -62,15 +65,18 @@ fun CivilightButton(
         style.compact -> type.button.copy(fontSize = 12.sp)
         else -> type.button
     }
+    val ghostLayer = animatedFraction(pressed && ghostLike && enabled, CivilightMotion.press, label = "ghostLayer")
+    val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
     Box(
         modifier = modifier
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .graphicsLayer { alpha = enabledAlpha.value }
             .pressable(
                 onClick = onClick,
                 enabled = enabled,
                 hitTarget = HitTarget.BUTTON,
                 shape = shape,
                 interactionSource = source,
+                pressOverlay = !ghostLike,
             )
             .heightIn(min = style.height)
             .clip(shape)
@@ -78,7 +84,8 @@ fun CivilightButton(
             .then(if (style.outline != null) Modifier.border(1.dp, style.outline, shape) else Modifier)
             .drawWithContent {
                 drawContent()
-                if (pressed && ghostLike && enabled) drawRect(colors.ink.copy(alpha = 0.08f))
+                val a = ghostLayer.value
+                if (a > 0f) drawRect(colors.ink, alpha = 0.08f * a)
             }
             .padding(
                 if (twoLine) PaddingValues(horizontal = style.horizontalPadding, vertical = 8.dp)

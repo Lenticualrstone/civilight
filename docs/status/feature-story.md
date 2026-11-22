@@ -1,6 +1,6 @@
 # feature:story
 
-Package `io.github.lenticualrstone.civilight.feature.story`. Build and tests (batch 4, 2026-11-22, last batch of this lane): `tools/gw :feature:story:compileDebugKotlin :feature:story:testDebugUnitTest` exits 0: feature:story 140 JVM tests in 20 classes, all passing. Batch 4 changed no domain module. Batch 3: domain:story 180 tests (176 passed, 4 ignored as before). Batch 3 added to `domain:story` (additive, tested): `scene/AppearanceEdit` (`addSilent`, `removeSilent`), `time/FlashbackLines.skipLine`, `TimeLabels.dayPart` and the `직접` 회상 result line without the kept event (`AppearanceEditTest`, 5 tests). Batch 2 added `UnitSettingsEdit.setDayBoundary`, `setBandStart`, `canSetBandStart`, `movableBands`, `setHidden` (`DaySettingsEditTest`). Nothing was run on a device or emulator, and no APK was built.
+Package `io.github.lenticualrstone.civilight.feature.story`. **Motion pass (0.1.0 wave, 2026-11-23):** `tools/gw :feature:story:compileDebugKotlin :feature:story:testDebugUnitTest` exits 0, feature:story 149 JVM tests (140 + 9 new), no domain module changed. Nothing was run on a device or emulator, so every UI row below stays partial until the orchestrator's emulator pass; see `## Motion pass` for what changed. Earlier build line (batch 4, 2026-11-22, last batch of this lane): `tools/gw :feature:story:compileDebugKotlin :feature:story:testDebugUnitTest` exits 0: feature:story 140 JVM tests in 20 classes, all passing. Batch 4 changed no domain module. Batch 3: domain:story 180 tests (176 passed, 4 ignored as before). Batch 3 added to `domain:story` (additive, tested): `scene/AppearanceEdit` (`addSilent`, `removeSilent`), `time/FlashbackLines.skipLine`, `TimeLabels.dayPart` and the `직접` 회상 result line without the kept event (`AppearanceEditTest`, 5 tests). Batch 2 added `UnitSettingsEdit.setDayBoundary`, `setBandStart`, `canSetBandStart`, `movableBands`, `setHidden` (`DaySettingsEditTest`). Nothing was run on a device or emulator, and no APK was built.
 
 ## Architecture
 
@@ -82,6 +82,46 @@ Pure logic with passing tests. The screens that use it are listed under Partial,
 - **STO-43 selection (logic, batch 4):** `TravelLookTest.sto43_…`, `NavigationCommandTest.sto43_…`.
 - **Copy lint:** now also `BulkCopy`, `SearchCopy`.
 
+## Motion pass (0.1.0 wave)
+
+Rows of `docs/status/motion-audit.md` §4 `feature:story`, most visible first. Only the shared helpers are used (`civilightItem`, `ContentSwap`, `FoldReveal` / `FoldRevealValue`, `ValueSwap`, `animatedAlpha`, `motion.push`, `motion.move`); no literal durations or curves, and no code branches on reduced motion. `StoryCopyLintTest.motionLint` runs `MotionLint.lintModule` over the module (passes). All rows are **partial** (not seen on the emulator).
+
+| Audit row | State | What changed |
+| --- | --- | --- |
+| 1 two-pane detail | nothing to do | S3 is the shell's. The module draws no split of its own except `BulkWide` (see Requests). `TwoHome` and `TwoCheck` get the CNV-47 handle from `ListDetailPanes` (modules `home`, `checks`). |
+| 2 structure and check groups | built | Structure rows: `civilightItem(foldOpen, fadeOut = foldClose)` on episode and scene rows, default tokens on chapter headers. Check: `check/CheckLines.kt` flattens rows into keyed lines (`Top`, `Sub`, `Member`), so the members of an open group, and the `◇` sub-rows, are their own lazy items (fold tokens for members). Keys are prefixed by kind and made unique; `MotionModelsTest` covers it. `CheckGroupRow` Plus / Minus cross-fade on `standard`. |
+| 3 lists | built | `civilightItem()` on home rows, start block, structure, check lines, filter chips row, empty block, lock row, bulk rows (cover, wide, suggest cards), search and `LibrarySearch` rows. Search rows have stable keys (`SearchModel.itemKeys`: kind + item key, `#2` for repeats such as a term and its alias, never the index). |
+| 4 sheet body swaps | built | `장소와 때` sheet: `ContentSwap(WhereBody)` between form, cascade preview and the four pickers (the old early returns; `WhereBody.of` keeps their order); 회상 form ↔ 때 section, 회상 mode, `전환 문구` field ↔ preview. Conditional rows in `FoldReveal` / `FoldRevealValue`: deleted-place actions, silent and deleted cast, day / band / precision block, `직접` day field, result box, rebase action, order line, skip line. `NewUnitSheet`: form ↔ place picker, title field, 때 chips, direct text. `BulkPlaceSheet`: `씬마다 차례로` chips and step line, place ↔ region list. `BulkWhenSheet`: `씬마다 고르기`, approx note, per-row day chips. `MoveSheets`: slot alpha via `animatedAlpha`. In `WhereTimeSection`, `WhereFlashbackForm`, `WhereCastRow`, `WhereTransitionSection` and the bulk `PreviewRow` the `spacedBy` of the parent Column is gone: each block that folds carries its own gap inside its content, so the gap does not jump when the fold starts or ends. Not changed: `CascadeSheetContent` (its `Preview` / `Direct` / `NoChange` branches stay a plain `when`; left). `MoveTargetSheet` swaps parent picker → slots with `close()` + `open()`, so it relies on S4's sheet cross-fade; whether that cross-fades or starts fresh (shell: a sheet opened over an empty host starts fresh) is an emulator check. |
+| 5 bulk ↔ suggest | built | `AnimatedContent(showSuggest, motion.push(forward))` over the list screen and `BulkSuggestPage` (both use the same `sheets` host). Still a page state, not a route (needs a core:navigation key for a real push). |
+| 6 lens value swap | partly | `ValueSwap` on home stats, `이어 쓰기` location and quote, episode status, the `장소와 때` result box and its sub line, the 회상 skip value, the bulk preview label and note, bulk progress figures and footer counts, travel bar values, the band hours. Left: check chip counts (the DS `FilterChip` takes a plain label; Request). |
+| 7 loading → content | built | `ContentSwap` keyed by the kind (loaded, or `BulkBody`), never by the data: home, structure, check, bulk (`LOADING` / `COVER` / `WIDE`), `DayBandScreen`, `NotationScreen`. |
+| 8 home `newReady` and dismiss | built | The `시작해 볼 것` block, list header and rows use `civilightItem` (start block: fold tokens). The head rating badge and lens chip are one `FoldRevealValue(horizontal = true)`. |
+| 9 bulk progress and footer | built | Progress rows use the DS `ProgressBar` (fraction animates itself). The footer height follows a fold with `animateDpAsState(motion.move(foldOpen / foldClose))`. |
+| 10 search hits | built | Name and command hits go through `DecoratedText(revealBoxes = true)` with `searchHitDecorations`, like `SearchHit` sentences. |
+| 11 travel card | built, local copy | `TravelCard` draws `AnimatedTravelBar` (the DS `TravelBar` rows with the `있음` fill on `animateFloatAsState(motion.move(standard))`). It goes when the DS bar animates (Request). Labels `필요` / `있음` are `TravelCopy` (in the lint test). |
+| 12 `CommitField` focus | nothing to do | `CivilightTextField` already animates its outline (DS S6, `animatedColor`); `CommitField` wraps it. |
+
+Moved-to-core pieces: the module had no copies of `SnapCardRow`, `CardViewMotion`, `FoldMotion`, `RevealMotion`, `ListCardMotion` or the lens chip transition (grep found none), so nothing was deleted.
+
+**QA 2026-11-23 (story parts).**
+- **Entry points (CNV-14, CNV-17, GAL-03):** the `작업` grid is `스토리 · 인물 · 세계 · 연표 · 캔버스 · 갤러리 · 페이지 · 점검 센터` and `설정` alone on the last row (`HomeModel.shortcutRows`; GAL-03 "`설정` keeps its own row"; `연표` still drops out in `시간 없이`). Routes: `Gallery.ofProject(p)`, `PageList(p)`, `CheckCenter(p)`. The page placement is this lane's default (CNV-14 leaves the entry open, Q-PG-05). `HomeModelTest` covers labels, routes and rows.
+- **The `공개 시점 전 사용 → 점검 센터` hint** is `feature:world` `WorldCopy.TERM_HINT`; it is not drawn by this module, so it is a Request (below). `점검 센터` itself is now reachable from home.
+- **#11 `명령` chip with an empty query:** `SearchModel.listsWithoutQuery(query, filter)` gates both `SearchViewModel` and `SearchScreen` (the shell hand-off named only the view model; the screen had its own `isNotBlank()` check). Test: `theCommandChipListsWithAnEmptyQuery_QA11`. `includeGallery` stays off (no `갤러리` section yet).
+- **#13 selected-row highlight past margins:** the structure list had margins 24 / 12 and the DS fill outsets 10 dp, so the fill ended 2 dp from the right edge. The list now has 14 / 14 margins, every row adds 10 dp inside, and scene rows pass `outset = 0.dp`: the fill spans 14 to 14 dp from the edges, text stays at 24 dp, the `⋯` glyph sits 26 dp from the right. The episode hairline starts at the text margin as before. Check on the emulator.
+- **#13 `Ⅰ` glyph:** QA saw `Ⅰ` as a bar; the font file was not inspected, so the cause (the Pretendard glyph or a fallback) is an assumption. `common/ChapterGlyph.kt` (pure) and `ChapterHeaderText.kt` (the composable) draws a leading `Ⅰ` … `Ⅻ` as Latin letters in the system serif (`I` has serifs there); the stored and spec string is unchanged (`UnitCodes.roman` is shared). Used for the home list header and the structure chapter header. Not applied to the ⋯ menu title (`MenuModels`) or the library tour card, which draw `chapterHeader` as plain text. A proper numeral face is a DS decision (Request).
+- **`갤러리` shortcut:** `feature:canvas` has not registered `entry<Gallery>` yet, so the shortcut shows the shell's `PlaceholderScreen` (no crash) until it does.
+- **`TODO_COPY_LIB13_PROTAGONIST_SUB`:** `domain:library` now draws `인물` there; `HomeStartModelTest` expects it (it expected an empty sub line before).
+
+**Check on the emulator** (nothing here was run):
+- Sheet height during body swaps: `ContentSwap` size change inside the DS sheet's own `animateContentSize` (`장소와 때`, `새 씬`, `장소 정하기`), and the `SheetScrollBody` weight inside the swapped Column.
+- Bulk ↔ suggest with two `CivilightScreen`s on one sheet host during the push, and back with a sheet open.
+- Structure margins and the scene-row fill (14 / 14 dp), also in the `TwoHome` right pane.
+- The serif numeral in the home list header and the structure chapter header.
+- Check groups: members folding in and out, `Plus` / `Minus` cross-fade, `점검 중` chip dimming; two-pane `TwoCheck` selection fill.
+- Home: the head chip group folding when `newReady` flips, `목록 닫기`, the new shortcut grid (3 · 3 · 2 · 1) and the `갤러리` placeholder.
+- Search: name and command hit boxes growing, the `명령` chip with an empty query.
+- With `항상 줄이기` and with animator scale 0.
+
 ## Partial
 
 UI features are built and wired to the store, but have not been seen on a device.
@@ -148,6 +188,8 @@ UI features are built and wired to the store, but have not been seen on a device
 
 ## Defaults used
 
+- **Motion pass (0.1.0):** the `페이지` shortcut sits in the `작업` grid after `갤러리` (CNV-14 Q-PG-05 open); `점검 센터` opens `CheckCenter(p)` with the `전체` chip. The chapter numeral uses the system serif until the DS has a numeral face. Bulk ↔ suggest stays a page state (no route).
+
 - **Home by hierarchy:**
   - 3+ levels: the current chapter (the top-level unit of the last edit, else the first) and its episodes.
   - 2 levels: every top-level unit as an episode row, with no header.
@@ -210,6 +252,12 @@ UI features are built and wired to the store, but have not been seen on a device
 - **`시작해 볼 것 · n/4`** keeps `/4` when the `연결된 기록` row is hidden (k = 0, LIB-13 `ED`), so a fresh project reads `0/4` with three rows. This is `domain:library`'s header; it is flagged here for the library lane.
 
 ## Requests
+
+- **feature:world (QA 2026-11-23, 용어 tab hint):** `WorldCopy.TERM_HINT` (`공개 시점 전 사용 → 점검 센터`) must be a real button: a `TextAction` that pushes `CheckCenter(projectKey, CheckFilter.TERM.name)` (`domain:story` `CheckFilter`; the route filter is the enum name, and `점검 센터` opens on the `용어 공개` chip, as already done for the 용어 tab elsewhere). This lane cannot edit the world module.
+- **core:designsystem (motion pass):** (1) `TravelBar` should animate its `있음` fill on `standard` (story keeps a local `AnimatedTravelBar` in `check/TravelCard.kt` until then). (2) `FilterChip` with a value-swapping count (check chips `전체 <N>`, `이동 <N>`) so audit row 6 can finish. (3) A roman-numeral face or glyph for `Ⅰ` … `Ⅻ` (QA saw `Ⅰ` as a bar); story uses the system serif meanwhile.
+- **core:model / core:ui (CNV-47):** `BulkWide` (table + 252 dp place-map card) is the only split this module draws. It has no `PaneSplit.Modules` entry and the map card is a fixed side card, not a pane, so it keeps its own layout. If it should get the handle, add a `BULK` module key (AppSettings) and the handle is a one-line `SplitPanes` swap.
+- **core:navigation:** a `BulkSuggest` route (or a `suggesting` argument on `BulkPlaceTime`) would make `제안 받기` a real push, as audit row 5 prefers; today it is an `AnimatedContent` page state.
+- **Gallery (GAL-03 follow-ups):** `/갤러리` as a command target (`[PROPOSED]`, STO-36) and the `갤러리` search section (`SearchResult.gallery`, `includeGallery = true`) are not built; the command list lives in `domain:story` `CommandBar`.
 
 - **core:navigation (batch 4):** `BulkPlaceTime(p, sceneKeys: List<Key> = emptyList(), chapterKey: Key? = null)`, so `한꺼번에 ›` survives process death without the `deps.results` hand-over (`BulkModel.preselectKey`).
 - **core:navigation / shared sheet (STO-34 `고치기`):** `SceneWhereSheet` pre-filled with a proposal (place ref + day interval + band, nothing stored before the author applies), e.g. optional `placeKey`, `days`, `band` arguments. Today `고치기` opens the sheet as it is.

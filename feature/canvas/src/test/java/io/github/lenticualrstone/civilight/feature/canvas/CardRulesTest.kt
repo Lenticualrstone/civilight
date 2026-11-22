@@ -2,11 +2,11 @@ package io.github.lenticualrstone.civilight.feature.canvas
 
 import io.github.lenticualrstone.civilight.feature.canvas.card.CardCopy
 import io.github.lenticualrstone.civilight.feature.canvas.card.CardInitial
-import io.github.lenticualrstone.civilight.feature.canvas.card.CardKind
-import io.github.lenticualrstone.civilight.feature.canvas.card.CardMetrics
-import io.github.lenticualrstone.civilight.feature.canvas.card.CardParallax
-import io.github.lenticualrstone.civilight.feature.canvas.card.CardSnap
-import io.github.lenticualrstone.civilight.feature.canvas.card.SnapTicker
+import io.github.lenticualrstone.civilight.designsystem.card.CardKind
+import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
+import io.github.lenticualrstone.civilight.designsystem.card.CardParallax
+import io.github.lenticualrstone.civilight.designsystem.card.CardSnap
+import io.github.lenticualrstone.civilight.designsystem.card.SnapTicker
 import io.github.lenticualrstone.civilight.feature.canvas.card.ViewChoice
 import io.github.lenticualrstone.civilight.model.app.AppSettings
 import io.github.lenticualrstone.civilight.model.app.ViewMode
@@ -63,6 +63,8 @@ class CardRulesTest {
         assertEquals(-236f * (1 - 0.08f), CardParallax.imageOnScreen(-236f, reduced = false), 0.001f)
         assertEquals(0f, CardParallax.imageShift(-236f, reduced = true), 0f)
         assertEquals(-236f, CardParallax.imageOnScreen(-236f, reduced = true), 0f)
+        assertEquals("constant scale, not tied to the shift", 1.1f, CardParallax.imageScale(reduced = false), 0f)
+        assertEquals(1f, CardParallax.imageScale(reduced = true), 0f)
     }
 
     @Test

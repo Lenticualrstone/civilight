@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.script.ui
 
+import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -92,11 +93,14 @@ fun ScriptSpeakerLine(
                     decorations = listOf(DecorationRange(0, part.text.length, InlineDecoration.DELETED_REF)),
                     maxLines = 1,
                 )
-                else -> CivilightText(part.text, type.of(part.role), color = color, maxLines = 1)
+                // CNV-42: a changed name (another speaker, `입력 중`) swaps like a lens value.
+                else -> ValueSwap(part.text, type.of(part.role), color = color, maxLines = 1)
             }
         }
         if (extraLabel != null) {
-            CivilightText(extraLabel, type.small.merge(TextStyle(fontSize = 11.sp)), color = colors.ink3, maxLines = 1)
+            AppearOnJoin(horizontal = true) {
+                CivilightText(extraLabel, type.small.merge(TextStyle(fontSize = 11.sp)), color = colors.ink3, maxLines = 1)
+            }
         }
         val ends = parts.filter { it.alignEnd }
         if (ends.isNotEmpty()) {

@@ -66,10 +66,10 @@ object TravelModesState {
     }
 
     fun line(reason: TravelModeRefusal): String = when (reason) {
-        TravelModeRefusal.EMPTY_NAME -> WorldCopy.TODO_COPY_WORLD_TRAVEL_NAME_EMPTY
-        TravelModeRefusal.BAD_DISTANCE -> WorldCopy.TODO_COPY_WORLD_TRAVEL_DISTANCE_BAD
-        TravelModeRefusal.BAD_HOURS -> WorldCopy.TODO_COPY_WORLD_TRAVEL_HOURS_BAD
-        TravelModeRefusal.DUPLICATE_NAME -> WorldCopy.TODO_COPY_WORLD_TRAVEL_NAME_TAKEN
-        TravelModeRefusal.NO_MODE -> WorldCopy.TODO_COPY_WORLD_TRAVEL_NAME_EMPTY
+        TravelModeRefusal.EMPTY_NAME -> WorldCopy.TRAVEL_NAME_EMPTY
+        TravelModeRefusal.BAD_DISTANCE -> WorldCopy.TRAVEL_DISTANCE_BAD
+        TravelModeRefusal.BAD_HOURS -> WorldCopy.TRAVEL_HOURS_BAD
+        TravelModeRefusal.DUPLICATE_NAME -> WorldCopy.TRAVEL_NAME_TAKEN
+        TravelModeRefusal.NO_MODE -> WorldCopy.TRAVEL_NAME_EMPTY
     }
 }

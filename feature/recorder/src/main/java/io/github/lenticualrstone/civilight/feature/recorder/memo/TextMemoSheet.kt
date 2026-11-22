@@ -55,6 +55,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureViews
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureState
 import io.github.lenticualrstone.civilight.feature.recorder.capture.MemoView
@@ -106,9 +107,10 @@ fun ColumnScope.TextMemoSheetContent(state: CaptureState, actions: MemoActions) 
         onCaret = actions.onCaret,
         modifier = Modifier.padding(top = 12.dp),
     )
-    if (view.atOpen && view.atCandidates.isNotEmpty()) {
+    // The `@` candidates fold in under the field and out when the query closes; the sheet grows with them.
+    FoldRevealValue(view.atCandidates.takeIf { view.atOpen && it.isNotEmpty() }) { candidates ->
         Column(Modifier.padding(top = 6.dp)) {
-            for (candidate in view.atCandidates) {
+            for (candidate in candidates) {
                 val row = LinkPickerRows.row(candidate)
                 ListRow(title = row.title, subtitle = row.sub.takeIf { it.isNotEmpty() }, compact = true, onClick = { actions.onPickAt(candidate) })
             }
@@ -121,7 +123,7 @@ fun ColumnScope.TextMemoSheetContent(state: CaptureState, actions: MemoActions) 
         onRemove = actions.onRemoveLinks,
         modifier = Modifier.padding(top = 10.dp),
     )
-    view.sheet.hideRow?.let { row ->
+    FoldRevealValue(view.sheet.hideRow) { row ->
         SwitchRow(title = row.title, subtitle = row.sub, checked = row.on, onCheckedChange = actions.onHide, modifier = Modifier.padding(top = 6.dp))
     }
     Row(

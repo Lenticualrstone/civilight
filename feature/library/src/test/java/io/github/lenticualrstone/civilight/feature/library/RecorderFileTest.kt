@@ -67,7 +67,7 @@ class RecorderFileTest {
         val ask = OpenFileFlow.open(locked, "library.civilight-recorder", emptyList(), { 0 }, now, zone) as OpenStage.Password
         assertEquals("복구 암호", ask.sheet.field.label)
         val wrong = OpenFileFlow.unlock(locked, "틀린암호입니다".toCharArray(), ask.sheet, emptyList(), { 0 }, now, zone) as OpenStage.Password
-        assertEquals(OpenFileCopy.TODO_COPY_LIB54_WRONG_PASSWORD, wrong.error)
+        assertEquals(OpenFileCopy.WRONG_PASSWORD, wrong.error)
         val opened = OpenFileFlow.unlock(locked, "등불지기의새벽1".toCharArray(), ask.sheet, emptyList(), { 0 }, now, zone) as OpenStage.Recorder
         assertEquals(library.records.count { it.deletedAt == null }, opened.records)
     }

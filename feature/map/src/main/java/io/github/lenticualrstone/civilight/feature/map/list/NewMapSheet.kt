@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -96,7 +97,7 @@ fun ColumnScope.NewMapSheetContent(
                         }
                     },
                 )
-                if (open == option && !readOnly) {
+                FoldReveal(open == option && !readOnly) {
                     ButtonRow(Modifier.padding(start = 54.dp, bottom = 12.dp)) {
                         when (option) {
                             NewMapOption.IMAGE -> {

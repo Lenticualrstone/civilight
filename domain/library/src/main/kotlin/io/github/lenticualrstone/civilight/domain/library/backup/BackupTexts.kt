@@ -24,11 +24,11 @@ data class RestoreRunRow(val title: String, val sub: String, val button: String)
     }
 }
 
-/** Failure reasons; only the login reason has copy in the sources. */
+/** Failure reasons; the login reason is drawn; the others follow its pattern. */
 enum class BackupFailure(val code: String, val label: String) {
     LOGIN_EXPIRED("loginExpired", "Google 로그인 만료"),
-    NO_SPACE("noSpace", "TODO_COPY_LIB61_NO_SPACE"),
-    NETWORK("network", "TODO_COPY_LIB61_NETWORK"),
+    NO_SPACE("noSpace", "Drive 저장 공간 부족"),
+    NETWORK("network", "네트워크 연결 없음"),
     ;
 
     companion object {
@@ -46,7 +46,7 @@ data class BackupFailureBanner(val title: String, val sub: String, val buttons: 
         fun of(state: BackupState, now: Timestamp, zone: ZoneId): BackupFailureBanner? {
             val start = state.failureStreakStartedAt ?: return null
             val day = TimeLabels.daysBetween(start, now, zone) + 1
-            val reason = BackupFailure.of(state.lastFailureReason)?.label ?: (state.lastFailureReason ?: "TODO_COPY_LIB61_UNKNOWN")
+            val reason = BackupFailure.of(state.lastFailureReason)?.label ?: (state.lastFailureReason ?: "이유 알 수 없음")
             return BackupFailureBanner(
                 title = "백업 실패 · ${day}일째",
                 sub = "$reason · 원고는 기기에 안전",

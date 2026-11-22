@@ -1,7 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.story
 
 import io.github.lenticualrstone.civilight.designsystem.text.CopyLint
+import io.github.lenticualrstone.civilight.designsystem.theme.MotionLint
 import io.github.lenticualrstone.civilight.feature.story.bulk.BulkCopy
+import io.github.lenticualrstone.civilight.feature.story.check.TravelCopy
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.search.SearchCopy
 import io.github.lenticualrstone.civilight.feature.story.home.HomeCopy
@@ -15,6 +17,7 @@ import io.github.lenticualrstone.civilight.feature.story.settings.DayBandCopy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.lang.reflect.Modifier
 
 /**
@@ -22,7 +25,7 @@ import java.lang.reflect.Modifier
  * `CopyLint` (terse fragments, ` · `, no em dash, DS-63 vocabulary). Add new copy objects to [copyObjects].
  */
 class StoryCopyLintTest {
-    private val copyObjects: List<Any> = listOf(StoryCopy, HomeCopy, StructureCopy, MenuCopy, NewUnitCopy, NotationCopy, WhereCopy, MoveCopy, DayBandCopy, BulkCopy, SearchCopy)
+    private val copyObjects: List<Any> = listOf(StoryCopy, HomeCopy, StructureCopy, MenuCopy, NewUnitCopy, NotationCopy, WhereCopy, MoveCopy, DayBandCopy, BulkCopy, SearchCopy, TravelCopy)
 
     /** Button labels (the lint also rejects a lone `확인` on buttons). */
     private val buttons = setOf("NEW_SCENE", "CREATE", "UNDO", "CLEAR", "CHANGE", "WRITE", "RENUMBER", "CANCEL", "DISMISS", "APPLY", "MATCH", "REBASE_TO_PREVIOUS", "MOVE", "RESTORE", "KEEP", "REMOVE", "CHANGE_LINK", "SET_PLACE", "SET_TIME", "SUGGEST", "PUT", "FIX", "SKIP", "SELECT_ALL")
@@ -55,5 +58,12 @@ class StoryCopyLintTest {
         val haeyo = Regex("""(해요|세요|어요|아요|예요|이에요|습니다)[.!?]?$""")
         val hits = copyObjects.flatMap { values(it).values }.filter { haeyo.containsMatchIn(it) }
         assertEquals(emptyList<String>(), hits)
+    }
+
+    /** Motion rules of the DS (no literal tweens, no bare `animateItem()` or `Crossfade(`, no default snap fling). */
+    @Test
+    fun motionLint() {
+        val issues = MotionLint.lintModule(File("."))
+        assertEquals(MotionLint.report(issues), 0, issues.size)
     }
 }

@@ -1,6 +1,10 @@
 package io.github.lenticualrstone.civilight.feature.world.faction
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
+import io.github.lenticualrstone.civilight.feature.world.common.CardBodySwap
+import io.github.lenticualrstone.civilight.feature.world.common.stageOf
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -114,46 +118,52 @@ fun FactionCardScreen(route: FactionCardRoute, deps: FeatureDeps) {
         localSheets = { key -> itemSheet(key, doc, vm as WorldViewModel, readOnly, gate) },
     ) { padding ->
         CenterColumn {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
-                if (card == null) return@LazyColumn
-                when (val access = card.access) {
-                    is CardAccess.Locked -> item(key = "locked") { LockedCard(access.text, gate.unlock) }
-                    is CardAccess.Gone -> item(key = "gone") { WorldGoneCard(access, doc, vm, WorldKind.FACTION, route.factionKey, readOnly, gate) }
-                    CardAccess.Open -> {
-                        val head = card.head ?: return@LazyColumn
-                        item(key = "art") {
-                            doc?.let { d ->
-                                CardImageSlot(d, WorldKind.FACTION, route.factionKey, head.name, label = null, readOnly = readOnly) {
-                                    sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.FACTION, route.factionKey))
+            CardBodySwap(card, { stageOf(it?.access) }) { shown ->
+                val card = shown
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
+                    if (card == null) return@LazyColumn
+                    when (val access = card.access) {
+                        is CardAccess.Locked -> item(key = "locked") { Box(civilightItem()) { LockedCard(access.text, gate.unlock) } }
+                        is CardAccess.Gone -> item(key = "gone") { Box(civilightItem()) { WorldGoneCard(access, doc, vm, WorldKind.FACTION, route.factionKey, readOnly, gate) } }
+                        CardAccess.Open -> {
+                            val head = card.head ?: return@LazyColumn
+                            item(key = "art") {
+                                Box(civilightItem()) {
+                                    doc?.let { d ->
+                                        CardImageSlot(d, WorldKind.FACTION, route.factionKey, head.name, label = null, readOnly = readOnly) {
+                                            sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.FACTION, route.factionKey))
+                                        }
+                                    }
                                 }
                             }
-                        }
-                        item(key = "head") {
-                            Column {
-                                CardHead(head)
-                                SameNameLine(doc, WorldKind.FACTION, route.factionKey, readOnly) { sheets.open(MergePickSheet(WorldKind.FACTION.name, route.factionKey)) }
+                            item(key = "head") {
+                                Column(civilightItem()) {
+                                    CardHead(head)
+                                    SameNameLine(doc, WorldKind.FACTION, route.factionKey, readOnly) { sheets.open(MergePickSheet(WorldKind.FACTION.name, route.factionKey)) }
+                                }
                             }
-                        }
-                        item(key = "fields") {
-                            Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
-                                FieldSection(
-                                    section = card.fields,
-                                    showEmpty = showEmpty,
-                                    readOnly = readOnly,
-                                    onShowEmpty = { showEmpty = true },
-                                    onEdit = { sheets.open(FieldValueEditSheet(route.projectKey, EntityKind.FACTION, route.factionKey, it.fieldDefKey)) },
-                                    onAdd = { sheets.open(AddFieldSheet(route.projectKey, EntityKind.FACTION, route.factionKey)) },
-                                )
+                            item(key = "fields") {
+                                Column(civilightItem().fillMaxWidth().padding(top = 14.dp)) {
+                                    FieldSection(
+                                        section = card.fields,
+                                        showEmpty = showEmpty,
+                                        readOnly = readOnly,
+                                        onShowEmpty = { showEmpty = true },
+                                        onEdit = { sheets.open(FieldValueEditSheet(route.projectKey, EntityKind.FACTION, route.factionKey, it.fieldDefKey)) },
+                                        onAdd = { sheets.open(AddFieldSheet(route.projectKey, EntityKind.FACTION, route.factionKey)) },
+                                    )
+                                }
                             }
-                        }
-                        card.sections.forEach { section ->
-                            item(key = "sec:${section.id}") { SectionLabel(section.title, Modifier.padding(top = 22.dp, bottom = 2.dp)) }
-                            items(section.rows, key = { it.id }) { row ->
-                                ListRow(
-                                    title = row.title,
-                                    compact = true,
-                                    onClick = row.target?.let { target -> { deps.navigator.openFromWorld(target) } },
-                                )
+                            card.sections.forEach { section ->
+                                item(key = "sec:${section.id}") { SectionLabel(section.title, civilightItem().padding(top = 22.dp, bottom = 2.dp)) }
+                                items(section.rows, key = { it.id }) { row ->
+                                    ListRow(
+                                        modifier = civilightItem(),
+                                        title = row.title,
+                                        compact = true,
+                                        onClick = row.target?.let { target -> { deps.navigator.openFromWorld(target) } },
+                                    )
+                                }
                             }
                         }
                     }
