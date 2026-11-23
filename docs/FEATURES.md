@@ -17,6 +17,8 @@ One row per feature of the area specs in `docs/spec/`. The spec file is the sour
 
 ## Summary
 
+**(0.2.0, 2026-11-24)** Rows `LIB-80` … `LIB-97`, `LRC-48` … `LRC-50` and `DS-65` … `DS-75` were added by hand, and the LIB, LRC, DS and All counts include them. The scope is `docs/status/0.2.0-scope.md`; a note starting `0.2.0:` marks a row whose behaviour changes in 0.2.0. Other areas (for example `CST-53` … `CST-64`) are not yet counted here.
+
 | Area | Spec | Features | P0 | P1 | P2 | needsExternal |
 | --- | --- | --- | --- | --- | --- | --- |
 | SCR · 스크립트 (script editor) | `spec/10-script.md` | 69 | 15 | 53 | 1 | 0 |
@@ -25,10 +27,10 @@ One row per feature of the area specs in `docs/spec/`. The spec file is the sour
 | WLD · 세계 (terms, places, factions, timeline, maps) | `spec/40-world.md` | 69 | 24 | 44 | 1 | 1 |
 | CNV · 캔버스 · 페이지 · 카드와 이미지 · 펼친 화면 · 모션 | `spec/50-canvas-pages.md` | 47 | 2 | 43 | 2 | 0 |
 | GAL · 갤러리 (image galleries of characters and projects) | `spec/55-gallery.md` | 25 | 0 | 22 | 3 | 0 |
-| LIB · 서재 · 보호 · 파일 (library, protection, files, backup, settings) | `spec/60-library-security-files.md` | 72 | 35 | 36 | 1 | 6 |
-| LRC · 라이프 레코더 (life recorder) | `spec/70-life-recorder.md` | 47 | 18 | 29 | 0 | 9 |
-| DS · 디자인 시스템 (design system) | `spec/80-design-system.md` | 64 | 35 | 29 | 0 | 0 |
-| **All** | | **488** | 168 | 308 | 12 | 16 |
+| LIB · 서재 · 보호 · 파일 (library, protection, files, backup, settings) | `spec/60-library-security-files.md` | 90 | 38 | 51 | 1 | 6 |
+| LRC · 라이프 레코더 (life recorder) | `spec/70-life-recorder.md` | 50 | 20 | 30 | 0 | 9 |
+| DS · 디자인 시스템 (design system) | `spec/80-design-system.md` | 75 | 43 | 32 | 0 | 0 |
+| **All** | | **520** | 181 | 327 | 12 | 16 |
 
 ## SCR · 스크립트 (script editor)
 
@@ -383,36 +385,36 @@ Spec: `docs/spec/60-library-security-files.md`
 
 | id | feature | priority | status | notes |
 | --- | --- | --- | --- | --- |
-| LIB-01 | 서재 목록 (커버 화면) | P0 | not started |  |
-| LIB-02 | 프로젝트 ⋯ 메뉴 | P0 | not started |  |
+| LIB-01 | 서재 목록 (커버 화면) | P0 | not started | 0.2.0: no rating badge (LIB-92); footer mic removed (LIB-95); head toggle per LIB-93 |
+| LIB-02 | 프로젝트 ⋯ 메뉴 | P0 | not started | 0.2.0: row `수위 등급` and badge removed (LIB-92) |
 | LIB-03 | 프로젝트 지우기 확인 | P0 | not started |  |
-| LIB-04 | 목록 \| 카드 보기 (서재) | P1 | not started |  |
-| LIB-05 | 최근 연 파일 | P1 | not started |  |
+| LIB-04 | 목록 \| 카드 보기 (서재) | P1 | not started | 0.2.0: superseded by LIB-93 (서재 보기 3D views + list) |
+| LIB-05 | 최근 연 파일 | P1 | not started | 0.2.0: masked label `TODO_COPY_LIB_MASKED_NAME` (LIB-92) |
 | LIB-06 | 펼친 화면 서재 | P1 | not started |  |
-| LIB-07 | 모든 프로젝트에서 찾기 (범위 규칙) | P1 | not started |  |
+| LIB-07 | 모든 프로젝트에서 찾기 (범위 규칙) | P1 | not started | 0.2.0: no badge on results (LIB-92) |
 | LIB-08 | 스플래시와 시작 흐름 | P1 | not started |  |
-| LIB-09 | 1/4 이름과 형식 | P0 | not started |  |
+| LIB-09 | 1/4 이름과 형식 | P0 | not started | 0.2.0: rating row, picker and R-18 block removed; stores `rating: all` (LIB-92) |
 | LIB-10 | 2/4 구조 | P0 | not started |  |
 | LIB-11 | 3/4 시간 | P0 | not started |  |
-| LIB-12 | 4/4 시작 재료 | P0 | not started | domain model C-08 structure list; C-09 world time |
-| LIB-13 | 만든 직후 · 시작해 볼 것 | P1 | not started |  |
+| LIB-12 | 4/4 시작 재료 | P0 | not started | domain model C-08 structure list; C-09 world time; 0.2.0: `이 프로젝트 숨기기` starts off (LIB-92) |
+| LIB-13 | 만든 직후 · 시작해 볼 것 | P1 | not started | 0.2.0: no badge in the summary (LIB-92) |
 | LIB-14 | 새 프로젝트 펼친 화면 | P1 | not started |  |
-| LIB-15 | 첫 실행 설정 | P1 | not started | needsExternal: Drive sign-in, widget → stub first |
+| LIB-15 | 첫 실행 설정 | P1 | not started | needsExternal: Drive sign-in, widget → stub first; 0.2.0: `OnbVoice` widget choice hidden (LIB-95) |
 | LIB-16 | 워크스루 3장 | P1 | not started |  |
 | LIB-17 | 예시 프로젝트 (읽기 전용) | P1 | not started |  |
 | LIB-18 | 온보딩 끝내기 · 예시 삭제 | P1 | not started |  |
-| LIB-19 | 모듈 안내 (툴팁 투어) | P1 | not started |  |
+| LIB-19 | 모듈 안내 (툴팁 투어) | P1 | not started | 0.2.0: steps for hidden features left out; map and route tours out (LIB-96) |
 | LIB-20 | 기능 첫 사용 한 줄 안내 | P1 | not started |  |
-| LIB-21 | 도움말 · 안내 다시 보기 | P1 | not started |  |
-| LIB-22 | 수위 등급 (값 · 배지 · 표기) | P0 | not started |  |
-| LIB-23 | 보호 값과 등급별 기본값 (설정 · 수위 등급) | P0 | not started |  |
-| LIB-24 | 등급 바꾸기 · `바뀌는 것` 시트 | P0 | not started |  |
-| LIB-25 | 프로젝트 설정 › 등급 · 숨기기 | P0 | not started |  |
+| LIB-21 | 도움말 · 안내 다시 보기 | P1 | not started | 0.2.0: rows of empty tours hidden (LIB-96) |
+| LIB-22 | 수위 등급 (값 · 배지 · 표기) | P0 | not started | 0.2.0: superseded, rating not shown; value kept (LIB-92) |
+| LIB-23 | 보호 값과 등급별 기본값 (설정 · 수위 등급) | P0 | not started | 0.2.0: screen removed from navigation; per-project protections stay (LIB-92) |
+| LIB-24 | 등급 바꾸기 · `바뀌는 것` 시트 | P0 | not started | 0.2.0: no entry point (LIB-92) |
+| LIB-25 | 프로젝트 설정 › 등급 · 숨기기 | P0 | not started | 0.2.0: section `숨기기`, rating row removed, switches stay (LIB-92) |
 | LIB-26 | 화면 캡처 가리기 | P0 | not started |  |
-| LIB-27 | 이름 가리기 | P0 | not started |  |
-| LIB-28 | 라이프 레코더 연결 가리기 | P1 | not started |  |
-| LIB-29 | 시스템 최근 앱 미리 보기와 카드 이름 | P0 | not started |  |
-| LIB-30 | 알림 문구 가림 | P1 | not started |  |
+| LIB-27 | 이름 가리기 | P0 | not started | 0.2.0: masked label `TODO_COPY_LIB_MASKED_NAME` (LIB-92) |
+| LIB-28 | 라이프 레코더 연결 가리기 | P1 | not started | 0.2.0: masked label instead of `R-18` (LIB-92, LRC-50) |
+| LIB-29 | 시스템 최근 앱 미리 보기와 카드 이름 | P0 | not started | 0.2.0: task label uses the masked label (LIB-92) |
+| LIB-30 | 알림 문구 가림 | P1 | not started | 0.2.0: masked label (LIB-92) |
 | LIB-31 | 프로젝트 숨기기 · 숨김 풀기 | P0 | not started |  |
 | LIB-32 | 숨긴 프로젝트 열기 (지문 · PIN) | P0 | not started |  |
 | LIB-33 | 다시 잠그는 때 · 다시 잠그기 | P0 | not started |  |
@@ -423,13 +425,13 @@ Spec: `docs/spec/60-library-security-files.md`
 | LIB-38 | 휴지통 | P0 | not started | domain model C-20 trash kinds `PAGE · MAP · CANVAS · EVENT` added |
 | LIB-39 | 영구 삭제 · 비우기 · 30일 자동 삭제 · 이름표 | P0 | not started | domain model C-15 `NameTag` shape |
 | LIB-40 | 되돌리기 알림 (Toast host) | P0 | not started |  |
-| LIB-41 | 내보내기 시트 | P0 | not started |  |
+| LIB-41 | 내보내기 시트 | P0 | not started | 0.2.0: PDF and .civilight only while `게임 제작 도구` is off (LIB-91); rating fragments dropped (LIB-92); versions row (LIB-97) |
 | LIB-42 | 숨긴 것과 내보내기 | P1 | not started |  |
-| LIB-43 | 대본 PDF | P1 | not started |  |
+| LIB-43 | 대본 PDF | P1 | not started | 0.2.0: no rating on the cover (LIB-92) |
 | LIB-44 | 대사 표 CSV | P1 | not started |  |
 | LIB-45 | 게임 엔진 JSON | P0 | not started |  |
-| LIB-46 | 보이스 ID 고정 (내보낼 때) | P1 | not started | domain model C-17 voice state per block |
-| LIB-47 | 프로젝트 파일 내보내기 (.civilight) | P0 | not started | domain model §7 package layout |
+| LIB-46 | 보이스 ID 고정 (내보낼 때) | P1 | not started | domain model C-17 voice state per block; 0.2.0: only via CSV and JSON, hidden while the switch is off (LIB-91) |
+| LIB-47 | 프로젝트 파일 내보내기 (.civilight) | P0 | not started | domain model §7 package layout; 0.2.0: always carries `gameTools` and game data (LIB-91); versions only when chosen (LIB-97) |
 | LIB-48 | 레코더 라이브러리 파일 (.civilight-recorder) | P1 | not started |  |
 | LIB-72 | 여러 프로젝트 한꺼번에 내보내기 | P2 | not started | P2 · later |
 | LIB-49 | 묶음 구조와 적는 법 | P0 | not started | domain model §7 package layout; C-14 `trash/`; C-15/C-16 extra files |
@@ -440,21 +442,39 @@ Spec: `docs/spec/60-library-security-files.md`
 | LIB-54 | 암호 파일 열기 | P0 | not started |  |
 | LIB-55 | 깨진 파일 부분 가져오기 | P1 | not started | domain model C-32 block counter lives in `story/index.json`, so a damaged episode file never causes reissued numbers |
 | LIB-56 | 양식 회귀 예시 파일 | P1 | not started |  |
-| LIB-57 | Google Drive 자동 백업 | P1 | not started | needsExternal: Google Drive → stub first |
+| LIB-57 | Google Drive 자동 백업 | P1 | not started | needsExternal: Google Drive → stub first; 0.2.0: backups always carry versions and game data (LIB-91, LIB-97) |
 | LIB-58 | 복구 암호 | P1 | not started |  |
 | LIB-59 | 백업에서 되살리기 | P1 | not started | needsExternal: Google Drive → stub first |
 | LIB-60 | 되살리는 중 | P1 | not started | needsExternal: Google Drive → stub first |
 | LIB-61 | 백업 실패 · Drive 로그인 만료 | P1 | not started | needsExternal: Google Drive → stub first |
 | LIB-62 | 설정 › 보관 | P1 | not started | needsExternal: Google Drive → stub first |
-| LIB-63 | 설정 (앱) | P0 | not started | domain model C-12 one `AppSettings` record |
-| LIB-64 | 설정 · 숨기기 | P0 | not started |  |
+| LIB-63 | 설정 (앱) | P0 | not started | domain model C-12 one `AppSettings` record; 0.2.0: rows `서재 보기` · `카드 보기` (LIB-94) |
+| LIB-64 | 설정 · 숨기기 | P0 | not started | 0.2.0: row `수위 등급별 동작` removed (LIB-92) |
 | LIB-65 | 화면 · 글자 크기 | P0 | not started |  |
 | LIB-66 | 설정 · 펼친 화면 배치 | P1 | not started |  |
 | LIB-67 | 설정 · 움직임 · 투명도 | P1 | not started |  |
 | LIB-68 | 설정 · 지도 · 이미지 · 연표 (container) | P1 | not started |  |
-| LIB-69 | 프로젝트 설정 (container) | P0 | not started |  |
-| LIB-70 | 빈 상태 | P1 | not started |  |
+| LIB-69 | 프로젝트 설정 (container) | P0 | not started | 0.2.0: `게임 제작 도구` row; game rows hide while off (LIB-91); section `숨기기` (LIB-92) |
+| LIB-70 | 빈 상태 | P1 | not started | 0.2.0: `EmptyLr` sub `TODO_COPY_LRC_EMPTY_SUB` (LIB-95) |
 | LIB-71 | 오류 · 불러오는 중 공통 꼴 | P1 | not started |  |
+| LIB-80 | 표지 (what the cover is) | P1 | not started | U-08 (0.1.1 work on the branch, unverified) |
+| LIB-81 | 서재 ⋯ › 표지 이미지 | P1 | not started | U-08 |
+| LIB-82 | 프로젝트 설정 › 표지 | P1 | not started | U-08 |
+| LIB-83 | 프로젝트 홈 머리의 표지 | P1 | not started | U-08; drawn by `feature:story` |
+| LIB-84 | 표지 고르기 (the picker in cover mode) | P1 | not started | U-08; drawn by `feature:canvas` |
+| LIB-85 | 갤러리에서 고르기 | P1 | not started | U-08 |
+| LIB-86 | 사진에서 넣기 · 기본 이미지 · 내 이미지 | P1 | not started | U-08 |
+| LIB-87 | 표지 빼기 | P1 | not started | U-08 |
+| LIB-88 | 보이는 곳 · 없을 때 · 등급 배지 | P1 | not started | U-08; 0.2.0: no badge (LIB-92) |
+| LIB-89 | 숨김 · 잠금 · 캡처 (masking of the cover) | P0 | not started | U-08 |
+| LIB-90 | 저장 · .civilight · 휴지통 | P1 | not started | U-08 |
+| LIB-91 | 게임 제작 도구 (project switch) | P0 | not started | 0.2.0 G-1 … G-7; model 00 §13.2 `gameTools` (absent ≠ false), one-time upgrade by `GameData.present` (D6) |
+| LIB-92 | 등급 표시 없앰 (rating removed from the UI) | P0 | not started | 0.2.0 S-4, D34; data kept (00 §13.3); masked label `TODO_COPY_LIB_MASKED_NAME` |
+| LIB-93 | 서재 보기 (3D views and list) | P1 | not started | 0.2.0 U-16; supersedes LIB-04; default `3D 책장` (D1, 확인 필요) |
+| LIB-94 | 설정 › 서재 보기 · 카드 보기 | P1 | not started | 0.2.0 U-16; tilt switch `TODO_COPY_LIB_VIEW_TILT` (default on) plus reduced motion; toggle fields `libraryToggle` · `castToggle` (absent = 3D) |
+| LIB-95 | 레코더 입구 (서재 and onboarding side) | P1 | not started | 0.2.0 S-8 |
+| LIB-96 | 안내 · 도움말 follow what is shown | P1 | not started | 0.2.0 S-9, D15 |
+| LIB-97 | 지난 판 in files and backups | P1 | not started | 0.2.0 N-29; working store; Drive backup always; manual export row default on while Drive is a stub (supersedes D20, 00 C-34) |
 
 ## LRC · 라이프 레코더 (life recorder)
 
@@ -462,15 +482,15 @@ Spec: `docs/spec/70-life-recorder.md`
 
 | id | feature | priority | status | notes |
 | --- | --- | --- | --- | --- |
-| LRC-01 | 명령 칸 마이크 (command-bar mic) | P0 | not started |  |
-| LRC-02 | 홈 화면 위젯 (home-screen widget) | P1 | not started | needsExternal: home-screen widget → stub first |
-| LRC-03 | 빠른 설정 타일 (quick-settings tile) | P1 | not started | needsExternal: quick-settings tile → stub first |
-| LRC-04 | 커버 화면 위젯 (cover-screen widget) and unfold continuation | P1 | not started | needsExternal: cover-screen widget host → stub first |
-| LRC-05 | 잠금 화면 녹음 (lock-screen recording) | P1 | not started | needsExternal: lock-screen activity → stub first |
+| LRC-01 | 명령 칸 마이크 (command-bar mic) | P0 | not started | 0.2.0: mic only on 프로젝트 홈 (LRC-48) |
+| LRC-02 | 홈 화면 위젯 (home-screen widget) | P1 | not started | needsExternal: home-screen widget → stub first; 0.2.0: not offered (LRC-48, N-73 안 함) |
+| LRC-03 | 빠른 설정 타일 (quick-settings tile) | P1 | not started | needsExternal: quick-settings tile → stub first; 0.2.0: not offered (LRC-48) |
+| LRC-04 | 커버 화면 위젯 (cover-screen widget) and unfold continuation | P1 | not started | needsExternal: cover-screen widget host → stub first; 0.2.0: not offered (LRC-48) |
+| LRC-05 | 잠금 화면 녹음 (lock-screen recording) | P1 | not started | needsExternal: lock-screen activity → stub first; 0.2.0: not offered; setting row hidden, value kept (LRC-48) |
 | LRC-06 | 마이크 권한과 `마이크 꺼짐` (mic permission and error) | P0 | not started |  |
-| LRC-07 | 녹음 중 (recording screen) | P0 | not started | needsExternal: speech-to-text → stub first |
+| LRC-07 | 녹음 중 (recording screen) | P0 | not started | needsExternal: speech-to-text → stub first; 0.2.0: pause and back rules replaced by LRC-49 (U-13) |
 | LRC-08 | 침묵 자동 멈춤 없음 (no auto-stop) | P0 | not started | needsExternal: continuous recognition → stub first |
-| LRC-09 | 녹음 계속 (background continuity, interruptions) | P1 | not started | needsExternal: microphone foreground service → stub first |
+| LRC-09 | 녹음 계속 (background continuity, interruptions) | P1 | not started | needsExternal: microphone foreground service → stub first; 0.2.0: in-app leave saves and releases (LRC-49); background keeps recording (D32) |
 | LRC-10 | 빛 띠 (voice glow) | P1 | not started |  |
 | LRC-11 | 받아쓰기 · 기기 안 (on-device transcription, default) | P0 | not started | needsExternal: on-device speech model → stub first |
 | LRC-12 | 받아쓰기 · 클라우드 (cloud transcription, optional) | P1 | not started | needsExternal: cloud speech provider → stub first |
@@ -480,10 +500,10 @@ Spec: `docs/spec/70-life-recorder.md`
 | LRC-16 | 말 ↔ 글 바꾸기 (switch voice ↔ text) | P1 | not started |  |
 | LRC-17 | 글 메모의 `@` (links inside text) | P0 | not started | domain model C-05 recorder link runs carry `projectKey` |
 | LRC-18 | 연결 모델 (link model) | P0 | not started | domain model C-29 `RecorderLink.targetKind = unit` for chapter · episode · scene |
-| LRC-19 | 보던 곳 연결 (pre-filled link from the entry context) | P0 | not started |  |
+| LRC-19 | 보던 곳 연결 (pre-filled link from the entry context) | P0 | not started | 0.2.0: only home and inbox entries remain (LRC-48) |
 | LRC-20 | 연결 고르기 (link picker: `+ 연결` and chip tap) | P0 | not started |  |
 | LRC-21 | 연결 칩 표시 (chip rendering rules) | P0 | not started |  |
-| LRC-22 | 연결 가림 (masking: R-18, hidden project, hidden item) | P1 | not started |  |
+| LRC-22 | 연결 가림 (masking: R-18, hidden project, hidden item) | P1 | not started | 0.2.0: masked label instead of `R-18` (LRC-50) |
 | LRC-23 | 연결 대상이 지워졌을 때 (deleted, moved and example targets) | P1 | not started | domain model C-15 recorder `lastLabel` (not `nameTag`) |
 | LRC-24 | 대상 쪽에서 보이는 줄 (`레코더 · 정리 안 됨 n ›`) | P1 | not started |  |
 | LRC-25 | 기록함 목록 (inbox list) | P0 | not started |  |
@@ -491,7 +511,7 @@ Spec: `docs/spec/70-life-recorder.md`
 | LRC-27 | 필터와 `프로젝트 ▾` (filters) | P0 | not started |  |
 | LRC-28 | 기록 화면 (record screen) | P1 | not started |  |
 | LRC-29 | 기록 ⋯ 메뉴 (record menu) | P0 | not started |  |
-| LRC-30 | 빈 기록함 (empty inbox) | P1 | not started |  |
+| LRC-30 | 빈 기록함 (empty inbox) | P1 | not started | 0.2.0: sub `TODO_COPY_LRC_EMPTY_SUB` (LRC-48) |
 | LRC-31 | 펼친 화면 배치 (unfolded layouts) | P1 | not started |  |
 | LRC-32 | 넣기 공통 규칙 (common rules for every insertion) | P0 | not started | domain model C-05 copies re-mint `linkKey`; C-07 card paragraphs are keyed `DocBlock`s |
 | LRC-33 | 원고에 넣기 · 위치 시트 (insert into the manuscript) | P0 | not started |  |
@@ -505,10 +525,13 @@ Spec: `docs/spec/70-life-recorder.md`
 | LRC-41 | 지문으로 열기 · 다시 잠그기 · 숨김 풀기 (open, re-lock, unhide) | P1 | not started |  |
 | LRC-42 | 숨기기 줄 기본값 (hide by default for hidden / R-18 targets) | P1 | not started |  |
 | LRC-43 | 기록 지우기 (delete records) | P1 | not started |  |
-| LRC-44 | 설정 · 라이프 레코더 (settings screen) | P1 | not started |  |
+| LRC-44 | 설정 · 라이프 레코더 (settings screen) | P1 | not started | 0.2.0: `잠금 화면에서 녹음` row hidden (LRC-48) |
 | LRC-45 | 내보내기와 레코더 기록 (export contents) | P1 | not started | domain model §7.10 recorder slice in `recorder.json` |
 | LRC-46 | 레코더 라이브러리 파일 · 백업 (`.civilight-recorder`) | P1 | not started | domain model §7.11 `.civilight-recorder` |
-| LRC-47 | 다른 화면의 레코더 고리 (hooks used by other areas) | P1 | not started |  |
+| LRC-47 | 다른 화면의 레코더 고리 (hooks used by other areas) | P1 | not started | 0.2.0: widget choice hidden; rating-sheet hook unused (LRC-48) |
+| LRC-48 | 입구는 홈에서만 (entry points in 0.2.0) | P0 | not started | 0.2.0 S-8; outside entries 안 함 (N-73) |
+| LRC-49 | 일시정지 · 나가기 (pause and leaving, U-13) | P0 | not started | 0.2.0 U-13, D8, D32; lane 1 work on the branch, unverified |
+| LRC-50 | 연결 가림 without ratings | P1 | not started | 0.2.0 S-4, D34 |
 
 ## DS · 디자인 시스템 (design system)
 
@@ -527,7 +550,7 @@ Spec: `docs/spec/80-design-system.md`
 | DS-09 | 간격과 배치 (spacing and layout metrics) | P0 | not started |  |
 | DS-10 | 모서리 · 그림자 · 흐림 · 크기 (shape, elevation, blur and size tokens) | P0 | not started |  |
 | DS-11 | 누르는 범위 (touch targets ≥ 44 dp) | P0 | not started |  |
-| DS-12 | 아이콘 (icon set) | P0 | not started |  |
+| DS-12 | 아이콘 (icon set) | P0 | not started | 0.2.0: r2 icon set adds ids and replaces some paths (DS-71) |
 | DS-13 | 원고 줄 표식 (app mark, lock mark, launcher icon) | P1 | not started |  |
 | DS-14 | 모션 토큰 (motion tokens) | P1 | not started |  |
 | DS-15 | 햅틱 (haptic tokens) | P1 | not started |  |
@@ -535,7 +558,7 @@ Spec: `docs/spec/80-design-system.md`
 | DS-17 | 연출 기호와 기호 목록 (▸ ♪ ⌁ and the allowed symbol set) | P0 | not started |  |
 | DS-18 | 점선 = 지운 것에 걸림 (dotted = attached to something deleted) | P1 | not started |  |
 | DS-19 | 글 속 표시 (inline decorations: link, candidate, hidden, parenthetical, caret) | P0 | not started |  |
-| DS-20 | 등급 배지 (rating badge) | P1 | not started |  |
+| DS-20 | 등급 배지 (rating badge) | P1 | not started | 0.2.0: not drawn anywhere (S-4, DS-75) |
 | DS-21 | 유리 막대 (GlassBars: top title bar and bottom command bar) | P0 | not started |  |
 | DS-22 | 유리 재질 (glass material and its fallbacks) | P0 | not started |  |
 | DS-23 | 시트 (bottom sheet) | P0 | not started |  |
@@ -544,9 +567,9 @@ Spec: `docs/spec/80-design-system.md`
 | DS-26 | 작은 창 (popover) | P1 | not started |  |
 | DS-27 | 알림 (Toast) | P0 | not started |  |
 | DS-28 | 띠와 그림 가장자리 (banners and image fade) | P1 | not started |  |
-| DS-29 | 명령 칸 (CommandBar) | P0 | not started |  |
+| DS-29 | 명령 칸 (CommandBar) | P0 | not started | 0.2.0: mic only on 프로젝트 홈 (DS-75) |
 | DS-30 | 버튼 (Buttons) | P0 | not started |  |
-| DS-31 | 아이콘 버튼 · 알약 · 키보드 도구 (icon buttons, pills, keyboard tools) | P0 | not started |  |
+| DS-31 | 아이콘 버튼 · 알약 · 키보드 도구 (icon buttons, pills, keyboard tools) | P0 | not started | 0.2.0: icon-button classes a · b · c (DS-70) |
 | DS-32 | 토글 · 라디오 · 체크 (Controls) | P0 | not started |  |
 | DS-33 | 분할 버튼 (segmented controls) | P0 | not started |  |
 | DS-34 | 슬라이더 (slider) | P1 | not started |  |
@@ -554,7 +577,7 @@ Spec: `docs/spec/80-design-system.md`
 | DS-36 | 칩 (Tag: filter chips, removable chips, small chips) | P0 | not started |  |
 | DS-37 | 탭 (Tabs) | P0 | not started |  |
 | DS-38 | 시점 렌즈 칩 (LensChip) | P0 | not started |  |
-| DS-39 | 목록 \| 카드 전환 (ViewToggle) | P1 | not started |  |
+| DS-39 | 목록 \| 카드 전환 (ViewToggle) | P1 | not started | 0.2.0: second cell = chosen 3D view on 서재 and cast list (DS-74) |
 | DS-40 | 목록 행 · 항목 표 · 섹션 머리 (ListRow, field table, section label) | P0 | not started |  |
 | DS-41 | 잠긴 줄 (LockRow) | P1 | not started |  |
 | DS-42 | 원고 블록 (ScriptBlock typesetting) | P0 | not started |  |
@@ -580,6 +603,17 @@ Spec: `docs/spec/80-design-system.md`
 | DS-62 | 문구 규칙 (UI copy rules and lint) | P0 | not started |  |
 | DS-63 | 낱말 (vocabulary: one word per meaning) | P0 | not started |  |
 | DS-64 | 접근성 의미 (accessibility semantics) | P1 | not started |  |
+| DS-65 | 명령 칸은 창마다 하나 (one command bar per frame) | P0 | not started | U-01 (branch work, unverified) |
+| DS-66 | 떠 있는 것의 아래 간격 (overlay gaps) | P0 | not started | U-04 |
+| DS-67 | 알림의 시간 · 자리 · 움직임 (toast and notice rules) | P0 | not started | U-05 |
+| DS-68 | 누르는 것은 누르는 것처럼 (affordance) | P0 | not started | U-07 |
+| DS-69 | 커서 줄은 늘 보인다 (caret line stays in view) | P0 | not started | U-02 |
+| DS-70 | 아이콘 버튼 규칙 (icon buttons: a · b · c) | P0 | not started | 0.2.0 ICON; 15 a rows, 33 b rows copied into the spec; `고치기` send keeps its text |
+| DS-71 | 아이콘 세트 r2 (icon set additions) | P0 | not started | 0.2.0 ICON; 51 keys, r2 paths win |
+| DS-72 | 만들기 카드 (create card overlay) | P0 | not started | 0.2.0 U-15, D17 |
+| DS-73 | 찾기 칩 줄 (search chip row) | P1 | not started | 0.2.0 N-13; behaviour STO |
+| DS-74 | 3D 보기의 바탕 (3D view primitives and tilt) | P1 | not started | 0.2.0 U-16 |
+| DS-75 | 0.2.0 notes on earlier blocks | P1 | not started | 0.2.0 S-4, S-8, U-16 |
 
 ## Coverage
 

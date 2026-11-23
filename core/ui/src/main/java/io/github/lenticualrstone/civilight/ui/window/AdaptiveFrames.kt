@@ -9,10 +9,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.glass.LocalGlassSource
+import io.github.lenticualrstone.civilight.designsystem.glass.glassSource
+import io.github.lenticualrstone.civilight.designsystem.glass.rememberGlassSource
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 
 /**
@@ -62,7 +66,8 @@ fun EmptyDetailPane(modifier: Modifier = Modifier, text: String = ListDetailCopy
  * `line` divider, [detail] in the rest. [detail] null shows [emptyDetail] centred in the right pane
  * ([EmptyDetailPane], Q-LY-02: nothing selected yet; null leaves it blank on `bg`). With a [module] id
  * (`PaneSplit.Modules`) the frame carries the CNV-47 handle and uses that module's stored ratio
- * ([SplitPanes]); without one it keeps the fixed split.
+ * ([SplitPanes]); without one it keeps the fixed split. [bottomBar] is the frame's one bottom bar (DS-65),
+ * drawn over both panes with the list pane's width.
  */
 @Composable
 fun ListDetailPanes(
@@ -71,6 +76,7 @@ fun ListDetailPanes(
     modifier: Modifier = Modifier,
     module: String? = null,
     emptyDetail: String? = ListDetailCopy.NO_SELECTION,
+    bottomBar: (@Composable (leftDp: () -> Float) -> Unit)? = null,
 ) {
     val right: @Composable () -> Unit = {
         when {
@@ -79,16 +85,22 @@ fun ListDetailPanes(
         }
     }
     if (module != null) {
-        SplitPanes(module, left = list, right = right, modifier = modifier)
+        SplitPanes(module, left = list, right = right, modifier = modifier, bottomBar = bottomBar)
         return
     }
     val colors = CivilightTheme.colors
     BoxWithConstraints(modifier.fillMaxSize().background(colors.bg)) {
         val listWidth = PaneSplitRules.listDetailDefaultLeft(maxWidth.value).dp
-        Row(Modifier.fillMaxSize()) {
+        val source = rememberGlassSource()
+        Row(Modifier.fillMaxSize().then(if (bottomBar != null) Modifier.glassSource(source) else Modifier)) {
             Box(Modifier.width(listWidth).fillMaxHeight()) { list() }
             Spacer(Modifier.width(1.dp).fillMaxHeight().background(colors.line))
             Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopStart) { right() }
+        }
+        if (bottomBar != null) {
+            Box(Modifier.align(Alignment.BottomCenter)) {
+                CompositionLocalProvider(LocalGlassSource provides source) { bottomBar { listWidth.value } }
+            }
         }
     }
 }

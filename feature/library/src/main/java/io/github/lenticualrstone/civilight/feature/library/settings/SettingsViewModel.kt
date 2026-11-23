@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.library.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.lenticualrstone.civilight.domain.cast.field.FieldTemplates
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.model.app.AnimationPref
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
@@ -25,13 +26,21 @@ internal class SettingsViewModel(private val services: LibraryServices) : ViewMo
     private val deps = services.deps
     private val settingsStore = deps.stores.settings
 
-    val root: StateFlow<SettingsUi> = combine(deps.settings, deps.stores.library.state, services.backups.book.state) { settings, library, book ->
+    val root: StateFlow<SettingsUi> = combine(
+        deps.settings, deps.stores.library.state, services.backups.book.state, deps.stores.fieldTemplates.state, deps.unlock.state,
+    ) { settings, library, book, templates, unlock ->
         val hidden = library.live.count { it.hidden && !it.isExample }
-        SettingsState.root(settings, hidden, book.recovery != null, lastBackupAt = book.state.lastSuccessAt, now = deps.clock.now(), zone = deps.clock.zone)
+        // CST-62: only templates the viewer may see are counted.
+        val visibleTemplates = FieldTemplates.visible(templates.templates, unlock.hiddenGroupOpen).size
+        SettingsState.root(
+            settings, hidden, book.recovery != null, lastBackupAt = book.state.lastSuccessAt, now = deps.clock.now(), zone = deps.clock.zone,
+            visibleTemplates = visibleTemplates,
+        )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsState.root(deps.settings.value, 0, services.facts.recoverySet(), null, deps.clock.now(), deps.clock.zone))
 
     init {
         services.backups.load()
+        viewModelScope.launch { deps.stores.fieldTemplates.ensureLoaded() }
     }
 
     val hiding: StateFlow<HidingSettingsUi> = deps.settings

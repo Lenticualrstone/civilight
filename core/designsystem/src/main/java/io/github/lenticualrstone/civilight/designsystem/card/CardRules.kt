@@ -133,3 +133,61 @@ object CardParallax {
     /** The constant image scale: [CivilightMotion.cardImageScale], or 1 when reduced. */
     fun imageScale(reduced: Boolean): Float = if (reduced) 1f else CivilightMotion.cardImageScale
 }
+
+/**
+ * Fitting a card row's card to its screen (GAL-07, CNV-22): the card keeps its ratio and never grows past its
+ * reference size, but shrinks so that the whole card stands between the top bar and the bottom bar and the
+ * next card still peeks at the right. Without it the inner 236 × 315 card ran under the command bar on an
+ * unfolded screen held landscape (about 700 dp tall), and the 설명 판 under it was out of sight.
+ */
+object CardFit {
+    /** The least card height (dp): the small group card (132 × 176); below it a row scrolls instead. */
+    const val MIN_HEIGHT = 176f
+
+    /** How much of the next card shows at least (dp). */
+    const val MIN_PEEK = 40f
+
+    /**
+     * The height (dp) a card may take: the viewport between the bars ([viewportHeight] less [barsTop] and
+     * [barsBottom]) less the rows above it ([head]: filter chips, order line) and the row's own room
+     * ([rowExtra]: room for the picked card's lift above, the gap below). When the rows above leave less than
+     * [minHeight], they are left out (they scroll away and the row alone fits).
+     */
+    fun room(
+        viewportHeight: Float,
+        barsTop: Float,
+        barsBottom: Float,
+        head: Float,
+        rowExtra: Float,
+        minHeight: Float = MIN_HEIGHT,
+    ): Float {
+        val between = viewportHeight - barsTop - barsBottom - rowExtra
+        val withHead = between - head
+        return if (withHead >= minHeight) withHead else between
+    }
+
+    /**
+     * The card size for [spec] in a row [rowWidth] wide that starts at [inset] with [gap] between cards and
+     * [roomHeight] of height ([room]): [spec] scaled down (ratio kept) to fit the height and to leave [minPeek]
+     * of the next card; never larger than [spec], never lower than [minHeight] (or [spec]'s own height when
+     * that is lower).
+     */
+    fun fit(
+        spec: CardSize,
+        roomHeight: Float,
+        rowWidth: Float,
+        inset: Float,
+        gap: Float,
+        minHeight: Float = MIN_HEIGHT,
+        minPeek: Float = MIN_PEEK,
+    ): CardSize {
+        if (spec.width <= 0f || spec.height <= 0f) return spec
+        val ratio = spec.width / spec.height
+        val widthRoom = rowWidth - inset - gap - minPeek
+        val byWidth = if (widthRoom > 0f) widthRoom / ratio else 0f
+        val floor = minOf(minHeight, spec.height)
+        val height = minOf(spec.height, roomHeight, byWidth).coerceAtLeast(floor)
+        if (height >= spec.height) return spec
+        return CardSize(height * ratio, height)
+    }
+}

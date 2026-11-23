@@ -4,6 +4,11 @@ import io.github.lenticualrstone.civilight.domain.cast.CastCopy
 import io.github.lenticualrstone.civilight.domain.cast.EditContext
 import io.github.lenticualrstone.civilight.domain.cast.field.BundleResult
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldBundles
+import io.github.lenticualrstone.civilight.domain.cast.field.FieldTemplates
+import io.github.lenticualrstone.civilight.domain.cast.field.TemplatePreview
+import io.github.lenticualrstone.civilight.domain.cast.label
+import io.github.lenticualrstone.civilight.feature.cast.templates.TemplateCopy
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.LibraryEntry
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
@@ -35,6 +40,30 @@ object BundleModel {
 
     fun applyFrom(doc: ProjectDoc, source: ProjectDoc, kind: EntityKind, ctx: EditContext): BundleResult =
         FieldBundles.applyFromProject(doc, source, ctx, kind)
+
+    // --- Templates (CST-60) ---
+
+    /** `템플릿 · n` rows: visible live templates (hidden ones only while the group is open), sub = per-kind counts. */
+    fun templateRows(templates: List<FieldTemplate>, hiddenUnlocked: Boolean): List<Pair<FieldTemplate, String>> =
+        FieldTemplates.visible(templates, hiddenUnlocked).map { it to FieldTemplates.kindCounts(it) }
+
+    /** The kinds a template applies to from [kind]'s tab: the tab's own, plus the others when [others] is checked. */
+    fun templateKinds(kind: EntityKind, others: Boolean): Set<EntityKind> = if (others) FieldTemplates.KINDS.toSet() else setOf(kind)
+
+    /** The three-part preview (`더할 항목` · `이미 있음` · `◇ 같은 이름 · 다른 종류`), computed before anything is written. */
+    fun templatePreview(doc: ProjectDoc, template: FieldTemplate, kind: EntityKind, others: Boolean): TemplatePreview =
+        FieldTemplates.preview(doc, template, templateKinds(kind, others))
+
+    /** The `장소 · 용어 · 세력도` checkbox: label and the kinds that would add something (`장소 1`), or null when none. */
+    fun otherKinds(doc: ProjectDoc, template: FieldTemplate, kind: EntityKind): Pair<String, String>? {
+        val adds = FieldTemplates.otherKindsWithAdds(doc, template, kind)
+        if (adds.isEmpty()) return null
+        val label = CastCopy.joinAll(FieldTemplates.KINDS.filter { it != kind }.map { it.label }) + "도"
+        return label to TemplateCopy.otherKindsSub(adds.map { it.kind to it.added.size })
+    }
+
+    fun applyTemplate(doc: ProjectDoc, template: FieldTemplate, kind: EntityKind, others: Boolean, ctx: EditContext): ProjectDoc =
+        FieldTemplates.apply(doc, template, templateKinds(kind, others), ctx).doc
 
     /** `다른 프로젝트에서`: other live projects; hidden ones only while the hidden group is open (TC-F-16). */
     fun sources(entries: List<LibraryEntry>, currentKey: Key, hiddenUnlocked: Boolean): List<LibraryEntry> =

@@ -53,6 +53,7 @@ internal fun iconOf(action: ProjectMenuAction): ImageVector = when (action) {
     ProjectMenuAction.UNHIDE -> IconId.Unlock.vector
     ProjectMenuAction.BACKUP_EXPORT -> IconId.Download.vector
     ProjectMenuAction.DELETE -> IconId.Trash.vector
+    ProjectMenuAction.COVER -> IconId.Image.vector
 }
 
 /**
@@ -61,9 +62,14 @@ internal fun iconOf(action: ProjectMenuAction): ImageVector = when (action) {
  * the window is protected while it is open (LIB-26).
  */
 @Composable
-internal fun SheetScope.ProjectMenuContent(doc: ProjectDoc, isExample: Boolean, onAction: (ProjectMenuAction) -> Unit) {
+internal fun SheetScope.ProjectMenuContent(
+    doc: ProjectDoc,
+    isExample: Boolean,
+    fileExists: (String) -> Boolean = { true },
+    onAction: (ProjectMenuAction) -> Unit,
+) {
     val scope = this
-    val menu: ProjectMenu = ProjectMenus.of(doc, isExample)
+    val menu: ProjectMenu = ProjectMenus.of(doc, isExample, fileExists)
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     ProtectWindow(WindowProtection.forProject(doc.project.protections))

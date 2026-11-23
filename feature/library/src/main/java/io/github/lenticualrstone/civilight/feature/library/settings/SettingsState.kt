@@ -26,6 +26,8 @@ data class SettingsUi(
     val recovery: SettingsLinkRow,
     val appLock: SettingsSwitchRow,
     val hiding: SettingsLinkRow,
+    /** `인물 템플릿` · `템플릿 3` (CST-58; hidden templates are never counted while locked). */
+    val templates: SettingsLinkRow = SettingsLinkRow(SettingsCopy.TEMPLATES_TITLE, SettingsCopy.templatesSub(0), null),
 )
 
 /** One `다시 잠그는 때` radio. */
@@ -106,6 +108,7 @@ object SettingsState {
         lastBackupAt: Timestamp?,
         now: Timestamp,
         zone: ZoneId,
+        visibleTemplates: Int = 0,
     ): SettingsUi = SettingsUi(
         themeIndex = themeIndex(settings.theme),
         textSize = SettingsLinkRow(SettingsCopy.TEXT_SIZE, textSizeLabel(settings.textSizeStep), textSizeValue(settings.textSizeStep)),
@@ -130,6 +133,7 @@ object SettingsState {
             sub = "${SettingsCopy.HIDDEN_PROJECTS} $hiddenProjects · ${SettingsCopy.RELOCK_WHEN}",
             value = relockTitle(settings.relockPolicy),
         ),
+        templates = SettingsLinkRow(SettingsCopy.TEMPLATES_TITLE, SettingsCopy.templatesSub(visibleTemplates), null),
     )
 
     /**

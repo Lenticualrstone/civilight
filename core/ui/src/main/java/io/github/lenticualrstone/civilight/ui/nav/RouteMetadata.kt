@@ -66,4 +66,11 @@ object ListDetailPairs {
         is Script -> list is CheckCenter && list.projectKey == detail.projectKey
         else -> false
     }
+
+    /**
+     * Details that draw their own frame and bottom bar instead of `CivilightScreen` (the script's editor frame,
+     * the cast profile's `RecordFrame`). Until they hand their command bar to the frame (DS-65, Requests in
+     * `docs/status/shell.md`) their pair keeps one bar per pane, so the frame's bar never covers theirs.
+     */
+    fun detailDrawsOwnBar(detail: NavKey?): Boolean = detail is Script || detail is CharacterProfile
 }

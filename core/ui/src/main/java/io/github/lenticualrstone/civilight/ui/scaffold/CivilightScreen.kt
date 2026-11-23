@@ -9,9 +9,16 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.currentCompositionLocalContext
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -23,12 +30,17 @@ import io.github.lenticualrstone.civilight.designsystem.component.BottomGlassBar
 import io.github.lenticualrstone.civilight.designsystem.component.GlassScaffold
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.LensChip
+import io.github.lenticualrstone.civilight.designsystem.component.ReportBottomChrome
+import io.github.lenticualrstone.civilight.designsystem.component.rememberSystemBottom
+import io.github.lenticualrstone.civilight.designsystem.component.systemBottomWithoutKeyboard
 import io.github.lenticualrstone.civilight.designsystem.component.ToastHost
 import io.github.lenticualrstone.civilight.designsystem.component.TopGlassBar
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.designsystem.theme.LayoutMetrics
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
 import io.github.lenticualrstone.civilight.ui.lens.LensChipLabel
+import io.github.lenticualrstone.civilight.ui.nav.LocalPaneRole
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
 import kotlinx.coroutines.MainScope
 
@@ -37,8 +49,12 @@ val LocalToasts = staticCompositionLocalOf { ToastController(MainScope()) }
 
 /**
  * The common screen frame: glass top bar (small line, title, back, lens chip, actions), optional
- * glass bottom bar with the command bar, the `되돌리기` toast above it, an optional [banner] under the
- * top bar (read-only example, lens edit banner), and the screen's sheets.
+ * glass bottom bar with the command bar, an optional [banner] under the top bar (read-only example, lens
+ * edit banner), and the screen's sheets. The toast is the window's (DS-67), not the screen's.
+ *
+ * In a pane of `목록 + 상세` ([LocalPaneRole] `LIST` / `DETAIL` under a [LocalCommandBarHost]) the screen draws
+ * no bottom glass bar: it hands [commandBar] and [bottomExtraRow] to the frame, which draws one bar for both
+ * panes (DS-65), and [content] gets the frame bar's height as bottom padding.
  *
  * [content] scrolls under both bars and receives their heights as padding. The bottom padding is at
  * least the keyboard height, so a field near the end of the content can be scrolled above the keyboard;
@@ -66,8 +82,23 @@ fun CivilightScreen(
     bottomBar: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    // DS-65: in `목록 + 상세` the pane hands its command bar to the frame's host and draws none itself.
+    val host = LocalCommandBarHost.current
+    val scope = CommandScope.of(LocalPaneRole.current)
+    val paneHost = if (scope != null) host else null
+    if (paneHost != null && scope != null) {
+        val token = remember { Any() }
+        val locals = currentCompositionLocalContext
+        val declared = commandBar.takeIf { bottomBar == null }
+        val sheetShown = sheets?.top != null
+        SideEffect {
+            paneHost.declare(CommandBarHost.Registration(token, scope, title, declared, bottomExtraRow.takeIf { declared != null }, locals))
+            paneHost.sheetOpen(token, sheetShown)
+        }
+        DisposableEffect(paneHost, token) { onDispose { paneHost.withdraw(token) } }
+    }
     val frame: @Composable () -> Unit = {
-        ScreenFrame(title, modifier, smallLine, back, lens, onLens, actions, commandBar, bottomExtraRow, banner, topBar, bottomBar, content)
+        ScreenFrame(title, modifier, smallLine, back, lens, onLens, actions, commandBar, bottomExtraRow, banner, topBar, bottomBar, paneHost, content)
     }
     if (sheets != null) SheetHostLayout(sheets, localSheets = localSheets) { frame() } else frame()
 }
@@ -86,6 +117,7 @@ private fun ScreenFrame(
     banner: (@Composable () -> Unit)?,
     topBar: (@Composable () -> Unit)?,
     bottomBar: (@Composable () -> Unit)?,
+    paneHost: CommandBarHost?,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val wide = LocalWindowLayout.current.isInner
@@ -106,8 +138,18 @@ private fun ScreenFrame(
         },
         bottomBar = {
             when {
+                // A pane's own action bar (wizard buttons, record buttons) sits on the frame bar's top (DS-65 §6).
+                bottomBar != null && paneHost != null && paneHost.panePadding > 0.dp ->
+                    Box(Modifier.padding(bottom = (paneHost.panePadding - systemBottomWithoutKeyboard()).coerceAtLeast(0.dp))) { bottomBar() }
                 bottomBar != null -> bottomBar()
-                commandBar != null -> BottomGlassBar(extraRow = bottomExtraRow) { commandBar() }
+                // In a pane: no bar of its own, only the frame bar's height, so both panes get the same padding.
+                // Until the frame bar is measured, its standard height (no reflow when it first appears).
+                paneHost != null -> Spacer(
+                    Modifier.fillMaxWidth().height(
+                        if (paneHost.hasBar && paneHost.barHeight == 0.dp) LayoutMetrics.bottomBar + systemBottomWithoutKeyboard() else paneHost.panePadding,
+                    ),
+                )
+                commandBar != null -> BottomGlassBar(extraRow = bottomExtraRow, inner = wide) { commandBar() }
             }
         },
         overlay = { padding ->
@@ -122,7 +164,11 @@ private fun ScreenFrame(
                     shownBanner?.invoke()
                 }
             }
-            ToastOverlay(bottom = maxOf(padding.calculateBottomPadding(), keyboard))
+            // DS-67: the toast belongs to the window (the shell's `WindowToastHost`); a screen only reports its
+            // bottom bar, which sets the toast slot and the popover limit (DS-66).
+            if (paneHost == null && (bottomBar != null || commandBar != null)) {
+                ReportBottomChrome(padding.calculateBottomPadding() - rememberSystemBottom())
+            }
         },
         content = { padding ->
             content(PaddingValues(top = padding.calculateTopPadding(), bottom = maxOf(padding.calculateBottomPadding(), keyboard)))
@@ -131,9 +177,9 @@ private fun ScreenFrame(
 }
 
 /**
- * The shell's `되돌리기` toast (LIB-40, DS-27), 6 dp above [bottom] (the bottom bar's height). For a
- * screen that draws its own frame (e.g. on `GlassScaffold` directly) inside a full-size box; screens on
- * [CivilightScreen] get it already.
+ * A toast host 6 dp above [bottom], kept for screens that draw their own frame. Inside the app the shell's
+ * `WindowToastHost` draws the one toast of the window (DS-67) and this draws nothing (`LocalWindowToasts`);
+ * outside it (previews) it still shows the toast.
  */
 @Composable
 fun ToastOverlay(bottom: Dp, modifier: Modifier = Modifier) {

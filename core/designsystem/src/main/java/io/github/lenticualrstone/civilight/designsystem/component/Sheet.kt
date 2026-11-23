@@ -66,6 +66,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.LayoutMetrics
+import io.github.lenticualrstone.civilight.designsystem.theme.OverlayGaps
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import kotlinx.coroutines.launch
 
@@ -74,7 +75,8 @@ import kotlinx.coroutines.launch
  * blurs 2 dp (CNV-41; reduced motion: fade only), the sheet rises with `Enter` and leaves with `Exit`.
  * Dismiss: `닫기` (in [sheet]), scrim tap, system back (via [LocalBackHandler]), or dragging down past
  * 40 % of its height. The sheet is glass (blurring [content]), top corners 28, 1 dp `line` inset, grab
- * handle, padding 10 top / [sidePadding] sides / navigation inset bottom; its top never rises above the
+ * handle, padding 10 top / [sidePadding] sides / `systemBottom + 24` bottom (16 above the keyboard, DS-66); its
+ * top never rises above the
  * status bar + 56 dp, and longer content scrolls inside it.
  * [centered] draws the inner-screen centred sheet (max width 560, all corners rounded); it scales .96 → 1
  * with its fade. The back screen scales from 50 % / 30 % (CNV-41); while the sheet is dragged down, the
@@ -172,6 +174,12 @@ private fun SheetSurface(
     val scope = rememberCoroutineScope()
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // DS-66: the box below rides on the keyboard by `ime − navigation`, so with the keyboard up the navigation
+    // inset is still under the sheet and 16 dp more puts the last content 16 above the keyboard top; with the
+    // keyboard hidden the content ends `systemBottom + 24` above the window bottom.
+    val imeUp = keyboardUp()
+    val systemBelow = if (imeUp) navBottom else systemBottomWithoutKeyboard()
+    val sheetBottomPadding = if (imeUp) navBottom + OverlayGaps.sheetBottomIme else systemBelow + OverlayGaps.sheetBottom
     var sheetHeight by sheetHeightState
     val shape: Shape = if (centered) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     BoxWithConstraints(
@@ -181,7 +189,19 @@ private fun SheetSurface(
         val maxSheet = maxHeight - statusTop - LayoutMetrics.sheetMaxTopBelowStatusBar
         Box(
             modifier = Modifier
-                .then(if (centered) Modifier.padding(20.dp).widthIn(max = LayoutMetrics.centredSheetMaxWidth) else Modifier)
+                .then(
+                    // DS-66: the centred sheet sits in the band `[statusTop + 24, H − systemBottom − 24]`, 24 dp sides.
+                    if (centered) {
+                        Modifier
+                            .padding(
+                                start = OverlayGaps.dialogBand,
+                                end = OverlayGaps.dialogBand,
+                                top = statusTop + OverlayGaps.dialogBand,
+                                bottom = systemBelow + OverlayGaps.dialogBand,
+                            )
+                            .widthIn(max = LayoutMetrics.centredSheetMaxWidth)
+                    } else Modifier,
+                )
                 .fillMaxWidth()
                 .heightIn(max = maxSheet)
                 .onSizeChanged { sheetHeight = it.height.toFloat() }
@@ -222,7 +242,7 @@ private fun SheetSurface(
                         .animateContentSize(motion.move(CivilightMotion.standard))
                         .clip(shape)
                         .insetOutline(colors.line, 1.dp, shape)
-                        .padding(top = 10.dp, start = sidePadding, end = sidePadding, bottom = if (centered) 20.dp else navBottom + 16.dp),
+                        .padding(top = 10.dp, start = sidePadding, end = sidePadding, bottom = if (centered) 20.dp else sheetBottomPadding),
                 ) {
                     Box(
                         Modifier

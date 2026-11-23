@@ -15,6 +15,16 @@ val FIELD_KINDS: List<EntityKind> = listOf(EntityKind.CHARACTER, EntityKind.PLAC
 /** The computed fixed fields a record header can hide (CST-14): `첫 등장` and `보이스`. */
 enum class HeaderFixed(val label: String) { FIRST_APPEARANCE(CastUiCopy.FIRST_APPEARANCE), VOICE(CastUiCopy.VOICE) }
 
+/** A row in `순서 바꾸기` mode (CST-54): `3/7`, `앞으로` · `뒤로` enabled or not. */
+data class OrderRow(
+    val key: Key,
+    val name: String,
+    val hidden: Boolean,
+    val position: String,
+    val canForward: Boolean,
+    val canBackward: Boolean,
+)
+
 /** Pure model of `프로젝트 설정 › 인물 항목` (CST-19) and its grip reorder. */
 object FieldSettingsModel {
     fun screen(doc: ProjectDoc, kind: EntityKind): FieldSettingsScreen = FieldSettings.screen(doc, kind)
@@ -59,6 +69,36 @@ object FieldSettingsModel {
         val at = next.indexOf(defKey)
         if (next == keys) return doc
         return FieldDefinitions.move(doc, defKey, afterKey = next.getOrNull(at - 1), beforeKey = next.getOrNull(at + 1), ctx = ctx)
+    }
+
+    // --- Order mode (CST-54): visible `앞으로 · 뒤로` buttons, one undo step per tap ---
+
+    /** `3/7`: 1-based position among every listed definition (hidden ones count, TC-F-29). */
+    fun positionLabel(index: Int, count: Int): String = "${index + 1}/$count"
+
+    /** `앞으로` is disabled on the first row. */
+    fun canForward(index: Int): Boolean = index > 0
+
+    /** `뒤로` is disabled on the last row. */
+    fun canBackward(index: Int, count: Int): Boolean = index in 0 until count - 1
+
+    /** The order-mode rows of a screen: each row with its position and which buttons are enabled. */
+    fun orderRows(screen: FieldSettingsScreen): List<OrderRow> {
+        val n = screen.rows.size
+        return screen.rows.mapIndexed { i, row -> OrderRow(row.key, row.name, row.hidden, positionLabel(i, n), canForward(i), canBackward(i, n)) }
+    }
+
+    /** `앞으로`: one place up; nothing on the first row. */
+    fun forward(doc: ProjectDoc, kind: EntityKind, defKey: Key, ctx: EditContext): ProjectDoc {
+        val i = screen(doc, kind).rows.indexOfFirst { it.key == defKey }
+        return if (!canForward(i)) doc else move(doc, kind, defKey, i, i - 1, ctx)
+    }
+
+    /** `뒤로`: one place down; nothing on the last row. */
+    fun backward(doc: ProjectDoc, kind: EntityKind, defKey: Key, ctx: EditContext): ProjectDoc {
+        val rows = screen(doc, kind).rows
+        val i = rows.indexOfFirst { it.key == defKey }
+        return if (!canBackward(i, rows.size)) doc else move(doc, kind, defKey, i, i + 1, ctx)
     }
 
     /** Whether the record header shows [which] (CST-14; on by default). */

@@ -17,6 +17,7 @@ import io.github.lenticualrstone.civilight.store.blob.ImageSizeReader
 import io.github.lenticualrstone.civilight.store.library.LibraryStore
 import io.github.lenticualrstone.civilight.store.recorder.RecorderStore
 import io.github.lenticualrstone.civilight.store.settings.SettingsStore
+import io.github.lenticualrstone.civilight.store.templates.FieldTemplateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,6 +33,7 @@ import java.io.File
  * - [blobs]: content-addressed files
  * - [settings]: [io.github.lenticualrstone.civilight.model.app.AppSettings] in DataStore
  * - [appState]: onboarding and recent items
+ * - [fieldTemplates]: the user's 인물 템플릿 (CST-63, `files/app/fieldTemplates.json`)
  * - [deviceId], [clock]: what edits are stamped with
  *
  * Everything except the DataStore wiring depends only on `java.io.File`, so tests build a
@@ -51,12 +53,14 @@ class StoreContainer(
     val recorder = RecorderStore(File(filesDir, RECORDER_DIR), env, blobs)
     val settings = SettingsStore(settingsDataStore)
     val appState = AppStateStore(File(filesDir, APP_DIR), env)
+    val fieldTemplates = FieldTemplateStore(File(filesDir, APP_DIR), env)
 
     /** Loads the library, recorder and app state (call once at start; every store also loads on first use). */
     suspend fun start() {
         library.ensureLoaded()
         recorder.ensureLoaded()
         appState.ensureLoaded()
+        fieldTemplates.ensureLoaded()
     }
 
     /** Writes every pending change of every store (`onPause` / `onStop`). */
@@ -65,6 +69,7 @@ class StoreContainer(
         library.flush()
         recorder.flush()
         appState.flush()
+        fieldTemplates.flush()
     }
 
     /** [flushAll] for callers that cannot suspend; blocks the calling thread. */
@@ -101,6 +106,8 @@ class StoreContainer(
             appState.removeRecentsOf(entry.key)
         }
         recorder.purgeExpired()
+        // 지운 템플릿 (CST-63): 30 days after `지우기`.
+        fieldTemplates.purgeDeleted(clock.now())
         collectBlobGarbage()
     }
 

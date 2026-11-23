@@ -126,6 +126,7 @@ object NewProjectFlow {
         FieldBundle.GAME_PROFILE -> "게임 프로필"
         FieldBundle.EMPTY -> "비어 있음"
         FieldBundle.FROM_PROJECT -> "다른 프로젝트에서"
+        FieldBundle.TEMPLATE -> "템플릿"
     }
 
     /**

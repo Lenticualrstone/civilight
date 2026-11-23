@@ -57,9 +57,9 @@ fun SheetScope.BodyEditContent(sheet: BodyEditSheet) {
         )
     }
     Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-        CivilightButton(CastUiCopy.BTN_CORRECT, {
+        CivilightButton(CastUiCopy.BTN_SAVE, {
             val body = state.result
-            editor.act(CastUiCopy.BTN_CORRECT) { d, ctx ->
+            editor.act(CastUiCopy.BTN_SAVE) { d, ctx ->
                 if (sheet.part == BodyPart.SPEECH) CharacterEdits.setSpeech(d, sheet.characterKey, body, ctx) else CharacterEdits.setSecret(d, sheet.characterKey, body, ctx)
             }
             host.close()

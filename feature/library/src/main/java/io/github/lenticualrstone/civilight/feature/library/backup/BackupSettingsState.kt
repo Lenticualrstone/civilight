@@ -8,6 +8,7 @@ import io.github.lenticualrstone.civilight.feature.library.settings.SettingsLink
 import io.github.lenticualrstone.civilight.feature.library.settings.SettingsSwitchRow
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.app.AppSettings
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import java.time.ZoneId
 
@@ -68,6 +69,7 @@ object BackupSettingsState {
     }
 
     /** `숨긴 프로젝트 <n> · 백업 안 됨` and ◇ `숨긴 항목 <n> · 암호 없이 백업 · …` from the next run's plan. */
-    fun warnings(docs: List<ProjectDoc>, settings: AppSettings, recoverySet: Boolean): List<String> =
-        BackupPlanner.plan(docs.map { BackupCandidate.of(it) }, settings, recoverySet).warnings
+    fun warnings(docs: List<ProjectDoc>, settings: AppSettings, recoverySet: Boolean, templates: List<FieldTemplate> = emptyList()): List<String> =
+        BackupPlanner.plan(docs.map { BackupCandidate.of(it) }, settings, recoverySet).warnings +
+            TemplateBackup.plan(templates, settings, recoverySet).warnings
 }

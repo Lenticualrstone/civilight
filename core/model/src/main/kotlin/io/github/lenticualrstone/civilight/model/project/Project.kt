@@ -55,8 +55,11 @@ enum class ProjectFormat { SERIAL, SHORT, SETTING_ONLY }
 /** 수위 등급. Display words (`R-15`) are never stored. */
 enum class Rating { ALL, R15, R18 }
 
-/** Starting field bundle chosen in the new-project wizard (informational, LIB-12). */
-enum class FieldBundle { BASIC, GAME_PROFILE, EMPTY, FROM_PROJECT }
+/**
+ * Starting field bundle chosen in the new-project wizard (informational, LIB-12). [TEMPLATE] = a
+ * user-made 인물 템플릿 (CST-61); stored as an open enum, so an older reader keeps the value.
+ */
+enum class FieldBundle { BASIC, GAME_PROFILE, EMPTY, FROM_PROJECT, TEMPLATE }
 
 /** Rule 19 per-project protection values (LIB-23). */
 @Serializable

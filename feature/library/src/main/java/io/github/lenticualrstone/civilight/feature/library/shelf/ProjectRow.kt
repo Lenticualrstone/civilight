@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.library.shelf
 
+import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
+import io.github.lenticualrstone.civilight.ui.security.WindowProtection
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,6 +59,8 @@ internal fun ProjectRow(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    // A picked cover of a `화면 캡처 가리기` project protects the window while the row shows it (U-08 LIB-89).
+    if (ShelfState.coverProtects(row.protections, row.thumb)) ProtectWindow(COVER_PROTECTION)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -80,3 +84,6 @@ internal fun ProjectRow(
         CivilightIconButton(IconId.More, ShelfCopy.MORE_LABEL, onMenu, Modifier.offset(x = 12.dp).then(menuModifier))
     }
 }
+
+/** What a shown cover picture of a `화면 캡처 가리기` project asks of the window: `FLAG_SECURE` only (U-08 LIB-89). */
+internal val COVER_PROTECTION = WindowProtection(secure = true, hideRecentsPreview = true)

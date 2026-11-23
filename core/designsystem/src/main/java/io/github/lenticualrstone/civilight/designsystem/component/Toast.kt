@@ -10,8 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -31,7 +36,8 @@ import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNul
 /**
  * DS-27 toast: radius 16, padding 6 · 6 · 6 · 16, `ink` fill, message 14 / 20 500 in `bg` (up to two lines),
  * one action button with `bg` fill and `ink` text (`Undo` 16 + `되돌리기`), gap 10.
- * Messages and timing are LIB-40's.
+ * Messages are LIB-40's; timing and placement DS-67's. [onHoldChange] is told when a finger goes down on the
+ * toast (true) and when it lifts (false), so the timer stands still meanwhile; touches still reach the button.
  */
 @Composable
 fun CivilightToast(
@@ -40,12 +46,14 @@ fun CivilightToast(
     actionLabel: String? = "되돌리기",
     onAction: (() -> Unit)? = null,
     actionIcon: IconId? = IconId.Undo,
+    onHoldChange: ((Boolean) -> Unit)? = null,
 ) {
     val colors = CivilightTheme.colors
     val style = toastStyle(colors)
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .then(if (onHoldChange != null) Modifier.holdWatch(onHoldChange) else Modifier)
             .semantics { liveRegion = LiveRegionMode.Polite }
             .heightIn(min = 56.dp)
             .clip(RoundedCornerShape(16.dp))
@@ -71,8 +79,9 @@ fun CivilightToast(
  * Shows [message] as a toast while non-null: rises 8 dp and fades in with `Enter`, fades out with `Exit`
  * (reduced motion: 120 ms fades). A new toast while one shows replaces it (LIB-40): a new [id] crossfades the
  * card ([Motion.swap], S10) and its size follows on `standard`; the same id with new text updates in place.
- * [id] defaults to the message. Place it 16 dp from the sides and 6 dp above the bottom glass bar (e.g. in
- * [GlassScaffold]'s overlay with its bottom padding).
+ * [id] defaults to the message. The app draws one per window (DS-67, [windowHost] = true, placed by the shell's
+ * window toast host); inside such a window ([LocalWindowToasts]) any other host draws nothing, so a screen that
+ * still draws its own never shows the toast twice. [onHoldChange] pauses the timer while a finger is down.
  */
 @Composable
 fun ToastHost(
@@ -81,7 +90,10 @@ fun ToastHost(
     actionLabel: String? = "되돌리기",
     onAction: (() -> Unit)? = null,
     id: Any? = message,
+    windowHost: Boolean = false,
+    onHoldChange: ((Boolean) -> Unit)? = null,
 ) {
+    if (LocalWindowToasts.current && !windowHost) return
     val motion = LocalMotion.current
     val shown = rememberLastNonNull(message?.let { ShownToast(id ?: it, it, actionLabel, onAction) })
     AnimatedVisibility(
@@ -103,10 +115,29 @@ fun ToastHost(
                     Modifier.animateContentSize(motion.move(CivilightMotion.standard)),
                     actionLabel = t.actionLabel,
                     onAction = t.onAction,
+                    onHoldChange = onHoldChange,
                 )
             }
         }
     }
 }
+
+/**
+ * Reports a finger down (true) and its lift or cancel (false) without consuming anything, so the action button
+ * inside still gets its tap.
+ */
+private fun Modifier.holdWatch(onHoldChange: (Boolean) -> Unit): Modifier = this.then(
+    Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            onHoldChange(true)
+            try {
+                waitForUpOrCancellation(PointerEventPass.Initial)
+            } finally {
+                onHoldChange(false)
+            }
+        }
+    },
+)
 
 private data class ShownToast(val id: Any, val message: String, val actionLabel: String?, val onAction: (() -> Unit)?)

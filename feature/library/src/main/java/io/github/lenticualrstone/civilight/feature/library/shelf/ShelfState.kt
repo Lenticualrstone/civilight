@@ -115,11 +115,14 @@ object ShelfState {
         loaded: Boolean = true,
         showCards: Boolean = false,
         recentItems: List<RecentItem> = emptyList(),
+        /** Whether a cover original is on this device; a missing one draws the initial-letter card (U-08 LIB-88). */
+        fileExists: (String) -> Boolean = { true },
     ): ShelfUi {
         val live = projects.filter { it.entry.deletedAt == null }.sortedByDescending { it.entry.updatedAt }
         val byKey = live.associateBy { it.entry.key }
         val listing = LibraryListing.of(live.map(::profileOf), access)
-        fun row(profile: ProjectProfile) = rowOf(byKey.getValue(profile.key), now, zone)
+        // A locked hidden project is neither in `rows` nor in `openGroup`, so its cover is never read (U-08 LIB-89).
+        fun row(profile: ProjectProfile) = rowOf(byKey.getValue(profile.key), now, zone, fileExists)
         val openGroup = listing.openGroup.takeIf { it.isNotEmpty() }?.let { hidden ->
             OpenGroupUi(
                 header = "${HiddenGroupRow(hidden.size).title} · ${ShelfCopy.GROUP_OPEN}",
@@ -129,8 +132,8 @@ object ShelfState {
         }
         val rows = listing.rows.map(::row)
         // Both views carry their data, so a `목록 ↔ 카드` switch can animate (CNV-45); [showCards] only says which is on.
-        val cards = rows.map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = false) } +
-            openGroup?.rows.orEmpty().map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = true) }
+        val cards = rows.map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = false, fileExists) } +
+            openGroup?.rows.orEmpty().map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = true, fileExists) }
         return ShelfUi(
             loaded = loaded,
             sectionLabel = listing.sectionLabel,
@@ -175,7 +178,13 @@ object ShelfState {
                 isExample = p.entry.isExample,
             )
 
-    private fun rowOf(p: ShelfProject, now: Timestamp, zone: ZoneId): ProjectRowUi {
+    /**
+     * `화면 캡처 가리기` for a cover (U-08 LIB-89 `ED`): a row or card that draws a picked original of a
+     * project with `captureBlock` on protects the window while shown. Presets and the initial-letter card do not.
+     */
+    fun coverProtects(protections: Protections, cover: CoverUi): Boolean = protections.captureBlock && cover.isImage
+
+    private fun rowOf(p: ShelfProject, now: Timestamp, zone: ZoneId, fileExists: (String) -> Boolean): ProjectRowUi {
         val doc = p.doc
         return ProjectRowUi(
             key = p.entry.key,
@@ -185,7 +194,7 @@ object ShelfState {
             writing = doc?.let(::isWriting) ?: false,
             protections = doc?.project?.protections ?: Protections(hidden = p.entry.hidden),
             readOnly = p.entry.readOnly || p.entry.isExample,
-            thumb = ShelfCards.thumb(doc, doc?.project?.name ?: p.entry.name),
+            thumb = ShelfCards.thumb(doc, doc?.project?.name ?: p.entry.name, fileExists),
         )
     }
 }

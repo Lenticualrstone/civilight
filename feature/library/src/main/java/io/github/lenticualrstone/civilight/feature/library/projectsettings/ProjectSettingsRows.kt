@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.projectsettings
 
+import io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldSettings
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationKinds
 import io.github.lenticualrstone.civilight.domain.script.VoiceIds
@@ -26,6 +27,12 @@ enum class ProjectSettingsTarget {
     TAGS,
 }
 
+/**
+ * `표지 이미지` · `서재 카드 · 목록 썸네일 · 프로젝트 홈` · `<source word> ›` or `없음 ›` (U-08 LIB-82); it opens
+ * the cover picker, not a route.
+ */
+data class CoverSettingsRow(val title: String, val sub: String, val value: String)
+
 /** The two `스크립트 추가 칸` switches (SCR-24, SCR-25). */
 enum class ScriptSwitch { STAGE_POSITION, VOICE_ID }
 
@@ -42,6 +49,10 @@ data class ScriptSectionUi(val switches: List<ProjectSwitchRow>, val links: List
  * are rebuilt here from the owners' domain modules (a feature module cannot depend on another).
  */
 object ProjectSettingsRows {
+    /** The `표지` section's row (U-08 LIB-82); [fileExists] says whether the cover original is on this device. */
+    fun cover(doc: ProjectDoc, fileExists: (String) -> Boolean = { true }): CoverSettingsRow =
+        CoverSettingsRow(ProjectSettingsCopy.COVER, ProjectSettingsCopy.COVER_SUB, CoverSummary.settingsValue(doc, fileExists))
+
     fun structure(doc: ProjectDoc): List<ProjectLinkRow> = listOf(
         ProjectLinkRow(ProjectSettingsTarget.LEVELS, ProjectSettingsCopy.LEVELS, doc.project.structure.levels.joinToString(" › "), ProjectSettingsCopy.CHANGE),
         worldTime(doc),

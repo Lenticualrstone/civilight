@@ -10,10 +10,11 @@ import io.github.lenticualrstone.civilight.navigation.SettingsLayout
 import io.github.lenticualrstone.civilight.navigation.SettingsMore
 import io.github.lenticualrstone.civilight.navigation.SettingsMotion
 import io.github.lenticualrstone.civilight.navigation.SettingsTextSize
+import io.github.lenticualrstone.civilight.navigation.TemplateList
 import io.github.lenticualrstone.civilight.navigation.Trash
 
 /** Every row of 설정 that opens a screen (CNV-18 row map). The theme and 앱 잠금 act in place. */
-enum class SettingsRootRow { TEXT_SIZE, LAYOUT, MOTION, MORE, DRIVE, RECOVERY, HIDING, TRASH, RECORDER, HELP }
+enum class SettingsRootRow { TEXT_SIZE, LAYOUT, MOTION, MORE, DRIVE, RECOVERY, HIDING, TRASH, RECORDER, HELP, TEMPLATES }
 
 /**
  * CNV-18: where each 설정 row leads. All but `라이프 레코더` (feature:recorder `RecorderSettings`) are
@@ -32,5 +33,7 @@ object SettingsRoutes {
         SettingsRootRow.TRASH -> Trash()
         SettingsRootRow.RECORDER -> RecorderSettings
         SettingsRootRow.HELP -> HelpReplay
+        // CST-58: feature:cast's app-level template list.
+        SettingsRootRow.TEMPLATES -> TemplateList()
     }
 }

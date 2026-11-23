@@ -3,17 +3,15 @@ package io.github.lenticualrstone.civilight.feature.library.shelf
 import io.github.lenticualrstone.civilight.domain.library.masking.HiddenGroupRow
 import io.github.lenticualrstone.civilight.model.app.AppSettings
 import io.github.lenticualrstone.civilight.model.app.ViewMode
-import io.github.lenticualrstone.civilight.model.asset.Crop
-import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
-import io.github.lenticualrstone.civilight.model.asset.ImageSlot
-import io.github.lenticualrstone.civilight.model.asset.Ratio
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.ui.image.ProjectCovers
 
 /**
  * A project card's 3:4 cover (LIB-04): the picked image ([hash] + its 3:4 [crop]), a preset
  * ([presetId]), or neither: the initial-letter card ([initial]). [holo] adds the foil and `홀로`.
+ * Moved to `core:ui` (U-08 §7.6) so the project home head draws the same cover.
  */
-data class CoverUi(val hash: String?, val crop: Crop?, val presetId: String?, val initial: String, val holo: Boolean)
+typealias CoverUi = io.github.lenticualrstone.civilight.ui.image.CoverUi
 
 /** One `ProjectCard` of the card view (LIB-04): the row's data, the status chip and the cover. */
 data class ProjectCardUi(
@@ -87,26 +85,20 @@ object ShelfCards {
             listOfNotNull(ui.lockedGroup?.let { ShelfCardItem.Lock(it) }) +
             listOfNotNull(ShelfCardItem.NewProject.takeIf { wide })
 
-    fun cover(doc: ProjectDoc?, name: String): CoverUi {
-        val initial = name.trim().take(1)
-        val use = doc?.index?.imageUse(ImageOwnerKind.PROJECT, doc.key, ImageSlot.PROJECT_COVER)
-            ?: return CoverUi(null, null, null, initial, holo = false)
-        return CoverUi(use.blobHash, use.cropFor(Ratio.R3X4), use.presetId, initial, use.holo)
-    }
+    /**
+     * The 3:4 cover; [fileExists] says whether an original is on this device (a missing one draws the
+     * initial-letter card, U-08 LIB-88).
+     */
+    fun cover(doc: ProjectDoc?, name: String, fileExists: (String) -> Boolean = { true }): CoverUi = ProjectCovers.cover(doc, name, fileExists)
 
     /** The 48 dp list thumbnail (D6): the project cover's 1:1 crop ("목록 썸네일 · 목록 1:1", 55 GAL-14), a preset, or the initial. */
-    fun thumb(doc: ProjectDoc?, name: String): CoverUi {
-        val initial = name.trim().take(1)
-        val use = doc?.index?.imageUse(ImageOwnerKind.PROJECT, doc.key, ImageSlot.PROJECT_COVER)
-            ?: return CoverUi(null, null, null, initial, holo = false)
-        return CoverUi(use.blobHash, use.cropFor(Ratio.R1X1), use.presetId, initial, use.holo)
-    }
+    fun thumb(doc: ProjectDoc?, name: String, fileExists: (String) -> Boolean = { true }): CoverUi = ProjectCovers.thumb(doc, name, fileExists)
 
     fun chip(writing: Boolean, holo: Boolean): String? =
         listOfNotNull(ShelfCopy.WRITING.takeIf { writing }, ShelfCopy.HOLO.takeIf { holo }).joinToString(" · ").ifEmpty { null }
 
-    fun card(row: ProjectRowUi, doc: ProjectDoc?, hiddenOpen: Boolean): ProjectCardUi {
-        val cover = cover(doc, row.title)
+    fun card(row: ProjectRowUi, doc: ProjectDoc?, hiddenOpen: Boolean, fileExists: (String) -> Boolean = { true }): ProjectCardUi {
+        val cover = cover(doc, row.title, fileExists)
         return ProjectCardUi(row, chip(row.writing, cover.holo), cover, hiddenOpen)
     }
 }

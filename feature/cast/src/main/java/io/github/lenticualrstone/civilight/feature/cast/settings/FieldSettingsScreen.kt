@@ -64,6 +64,9 @@ import io.github.lenticualrstone.civilight.domain.cast.field.FieldSettingRow
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.feature.cast.common.CastViewModel
 import io.github.lenticualrstone.civilight.feature.cast.common.editContext
+import io.github.lenticualrstone.civilight.feature.cast.templates.SaveTemplateSheet
+import io.github.lenticualrstone.civilight.feature.cast.templates.SaveTemplateSheetContent
+import io.github.lenticualrstone.civilight.feature.cast.templates.TemplateCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.navigation.AddFieldSheet
@@ -88,12 +91,25 @@ class FieldSettingsViewModel(
         act(CastUiCopy.REORDER) { doc, ctx -> FieldSettingsModel.move(doc, kind, defKey, from, to, ctx) }
     }
 
+    /** CST-54 `앞으로`: one place up, one undo step `순서 바꾸기`. */
+    fun forward(kind: EntityKind, defKey: Key) {
+        act(CastUiCopy.REORDER) { doc, ctx -> FieldSettingsModel.forward(doc, kind, defKey, ctx) }
+    }
+
+    /** CST-54 `뒤로`: one place down, one undo step `순서 바꾸기`. */
+    fun backward(kind: EntityKind, defKey: Key) {
+        act(CastUiCopy.REORDER) { doc, ctx -> FieldSettingsModel.backward(doc, kind, defKey, ctx) }
+    }
+
     fun showInHeader(which: HeaderFixed, show: Boolean) {
         act(which.label) { doc, ctx -> FieldSettingsModel.setShowInHeader(doc, which, show, ctx) }
     }
 }
 
-/** `RCFields`: kind tabs, fixed fields, project fields with grip handles, `+ 항목`, the start bundle row. */
+/**
+ * `RCFields`: kind tabs, fixed fields, project fields with grip handles and the `순서 바꾸기` mode
+ * (CST-54), `+ 항목`, the start bundle row and `템플릿으로 저장` (CST-57).
+ */
 @Composable
 fun FieldSettingsScreen(route: FieldSettingsRoute, deps: FeatureDeps) {
     val vm = entryViewModel { FieldSettingsViewModel(route.projectKey, deps.projects, deps::editContext) }
@@ -113,87 +129,63 @@ fun FieldSettingsScreen(route: FieldSettingsRoute, deps: FeatureDeps) {
             localSheets = { key ->
                 when (key) {
                     is BundleSheet -> { { BundleSheetContent(key, ready.doc, ready.readOnly) { label, change -> vm.act(label) { d, ctx -> change(d, ctx) } } } }
+                    is SaveTemplateSheet -> { { SaveTemplateSheetContent(key, ready.doc) } }
                     else -> null
                 }
             },
         ) { padding ->
-            val listState = rememberLazyListState()
-            val reorder = rememberFieldReorder(screen.rows.map { it.key }, listState) { key, from, to -> vm.move(kind, key, from, to) }
-            val shownRows = remember(screen.rows, reorder.order) {
-                val byKey = screen.rows.associateBy { it.key }
-                (reorder.order ?: screen.rows.map { it.key }).mapNotNull { byKey[it] }
-            }
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                state = listState,
-                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
-            ) {
-                item(key = "tabs") { CivilightTabs(screen.tabs, kindIndex, { kindIndex = it }, civilightItem()) }
-                item(key = "fixed-head") { SectionLabel(screen.fixedTitle, civilightItem().padding(top = 16.dp)) }
-                item(key = "fixed") {
-                    CivilightText(
-                        CastCopy.joinAll(screen.fixedFields),
-                        CivilightTheme.type.small,
-                        civilightItem()
-                            .padding(top = 6.dp)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(CivilightTheme.colors.tint)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        color = CivilightTheme.colors.ink3,
-                    )
-                }
-                if (kind == EntityKind.CHARACTER) {
-                    items(HeaderFixed.entries, key = { "switch-${it.name}" }) { which ->
-                        SwitchRow(
-                            which.label,
-                            FieldSettingsModel.showsInHeader(ready.doc, which),
-                            { vm.showInHeader(which, it) },
-                            modifier = civilightItem(),
-                            subtitle = CastUiCopy.PLACE_HEADER,
-                            enabled = editable,
+            FieldListBody(
+                screen = screen,
+                kindIndex = kindIndex,
+                onKindIndex = { kindIndex = it },
+                sectionTitle = screen.projectTitle,
+                editable = editable,
+                padding = padding,
+                onMove = { key, from, to -> vm.move(kind, key, from, to) },
+                onForward = { key -> vm.forward(kind, key) },
+                onBackward = { key -> vm.backward(kind, key) },
+                onRowClick = { key -> deps.navigator.push(FieldDefEdit(route.projectKey, key)) },
+                onAdd = { sheets.open(AddFieldSheet(route.projectKey, kind)) },
+                afterFixed = {
+                    if (kind == EntityKind.CHARACTER) {
+                        items(HeaderFixed.entries, key = { "switch-${it.name}" }) { which ->
+                            SwitchRow(
+                                which.label,
+                                FieldSettingsModel.showsInHeader(ready.doc, which),
+                                { vm.showInHeader(which, it) },
+                                modifier = civilightItem(),
+                                subtitle = CastUiCopy.PLACE_HEADER,
+                                enabled = editable,
+                            )
+                        }
+                    }
+                },
+                trailing = {
+                    item(key = "bundle") {
+                        ListRow(
+                            screen.bundleTitle,
+                            civilightItem().padding(top = 4.dp),
+                            subtitle = screen.bundleSub,
+                            compact = true,
+                            trailing = { CivilightText(screen.bundleAction, CivilightTheme.type.small, color = CivilightTheme.colors.ink2, maxLines = 1) },
+                            onClick = { sheets.open(BundleSheet(route.projectKey, kind)) },
                         )
                     }
-                }
-                item(key = "project-head") {
-                    SectionLabel(screen.projectTitle, civilightItem().padding(top = 20.dp, bottom = 6.dp), trailing = screen.reorderNote, trailingAccent = false)
-                }
-                items(shownRows, key = { it.key }) { row ->
-                    val dragged = reorder.dragKey == row.key
-                    FieldSettingRowView(
-                        row = row,
-                        modifier = Modifier
-                            // The dragged row is placed by the finger; its neighbours glide aside (P1).
-                            .then(civilightItem(placement = if (dragged) null else CivilightMotion.standard))
-                            .onSizeChanged { reorder.rowHeight = it.height.toFloat() }
-                            .zIndex(if (dragged) 1f else 0f)
-                            .graphicsLayer { translationY = if (dragged) reorder.offset else 0f },
-                        grip = if (!editable) Modifier else Modifier.pointerInput(row.key) {
-                            detectVerticalDragGestures(
-                                onDragStart = { reorder.start(row.key) },
-                                onDragEnd = { reorder.release() },
-                                onDragCancel = { reorder.cancel() },
-                                onVerticalDrag = { change, delta ->
-                                    change.consume()
-                                    reorder.drag(delta)
-                                },
+                    // CST-57: hidden in the read-only example project.
+                    if (editable) {
+                        item(key = "save-template") {
+                            ListRow(
+                                TemplateCopy.SAVE_ROW,
+                                civilightItem(),
+                                subtitle = TemplateCopy.SAVE_SUB,
+                                compact = true,
+                                trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = CivilightTheme.colors.ink3) },
+                                onClick = { sheets.open(SaveTemplateSheet(route.projectKey, kind)) },
                             )
-                        },
-                        onClick = { deps.navigator.push(FieldDefEdit(route.projectKey, row.key)) },
-                    )
-                }
-                if (editable) item(key = "add") { AddRow(civilightItem()) { sheets.open(AddFieldSheet(route.projectKey, kind)) } }
-                item(key = "bundle") {
-                    ListRow(
-                        screen.bundleTitle,
-                        civilightItem().padding(top = 4.dp),
-                        subtitle = screen.bundleSub,
-                        compact = true,
-                        trailing = { CivilightText(screen.bundleAction, CivilightTheme.type.small, color = CivilightTheme.colors.ink2, maxLines = 1) },
-                        onClick = { sheets.open(BundleSheet(route.projectKey, kind)) },
-                    )
-                }
-            }
+                        }
+                    }
+                },
+            )
         }
     }
 }
@@ -280,63 +272,4 @@ internal fun rememberFieldReorder(documentKeys: List<Key>, list: LazyListState, 
     val state = remember(scope, list) { FieldReorder({ keys }, scope, list, { motion }) { k, f, t -> move(k, f, t) } }
     LaunchedEffect(documentKeys) { state.documentCaughtUp() }
     return state
-}
-
-/** `출생 · 날짜 · 연도 · 머리`: grip, name 15 bold, sub with the type in `ink2`, chevron. */
-@Composable
-private fun FieldSettingRowView(row: FieldSettingRow, modifier: Modifier, grip: Modifier, onClick: () -> Unit) {
-    val colors = CivilightTheme.colors
-    val type = CivilightTheme.type
-    val typePart = row.sub.substringBefore(CastCopy.SEP)
-    val rest = row.sub.removePrefix(typePart)
-    Row(
-        modifier
-            .fillMaxWidth()
-            .topHairline(colors.line)
-            .heightIn(min = 44.dp)
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            grip
-                .size(44.dp)
-                .semantics { contentDescription = row.gripLabel },
-            contentAlignment = Alignment.Center,
-        ) {
-            CivilightIcon(IconId.Grip, contentDescription = null, tint = colors.ink3)
-        }
-        Column(
-            Modifier
-                .weight(1f)
-                .pressable(onClick = onClick, scaleOnPress = false, onClickLabel = row.name),
-        ) {
-            CivilightText(row.name, type.itemTitleCompact, color = if (row.hidden) colors.ink3 else colors.ink, maxLines = 1)
-            val sub = buildAnnotatedString {
-                withStyle(SpanStyle(color = colors.ink2)) { append(typePart) }
-                append(rest)
-            }
-            androidx.compose.material3.Text(sub, style = type.small, color = colors.ink3, maxLines = 1)
-        }
-        CivilightIcon(IconId.Next, contentDescription = null, tint = colors.ink3)
-    }
-}
-
-/** `+ 항목` (plus icon, `항목` 600 14). */
-@Composable
-private fun AddRow(modifier: Modifier, onClick: () -> Unit) {
-    val colors = CivilightTheme.colors
-    Row(
-        modifier
-            .fillMaxWidth()
-            .topHairline(colors.line)
-            .pressable(onClick = onClick, scaleOnPress = false, onClickLabel = CastUiCopy.ADD_FIELD_TITLE)
-            .heightIn(min = 44.dp)
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CivilightIcon(IconId.Plus, contentDescription = null, tint = colors.ink2)
-        CivilightText(CastUiCopy.ADD_FIELD_ROW, CivilightTheme.type.label, Modifier.weight(1f), color = colors.ink)
-    }
 }

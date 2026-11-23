@@ -53,7 +53,7 @@ data class TagNameSheet(val projectKey: Key, val tagKey: Key? = null) : SheetKey
 
 /**
  * `TagSettings` (CST-12; no board): the project tags in order with how many characters carry each
- * (`주연 · 3`); a tag opens its name sheet (`이름`, `이 값 고치기`), `+ 태그` adds one (`넣기`). Names
+ * (`주연 · 3`); a tag opens its name sheet (`이름`, `저장`), `+ 태그` adds one (`넣기`). Names
  * stay unique per project. Deleting and reordering are not offered (no source defines them).
  */
 @Composable
@@ -106,7 +106,7 @@ private fun SheetScope.TagNameContent(key: TagNameSheet, doc: ProjectDoc, vm: Ta
     SheetHeader(current?.name ?: CastUiCopy.TAGS, onClose = ::close, closeLabel = CastUiCopy.BTN_CLOSE)
     CivilightTextField(name, { name = it }, Modifier.fillMaxWidth().padding(top = 14.dp), label = CastUiCopy.NAME)
     SheetActions {
-        val label = if (current != null) CastUiCopy.BTN_CORRECT else CastUiCopy.BTN_INSERT
+        val label = if (current != null) CastUiCopy.BTN_SAVE else CastUiCopy.BTN_INSERT
         CivilightButton(
             label,
             {

@@ -23,12 +23,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,6 +53,8 @@ import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.LayoutMetrics
+import io.github.lenticualrstone.civilight.designsystem.theme.OverlayGaps
+import androidx.compose.ui.platform.LocalConfiguration
 
 /**
  * A full-window dialog with the `shade` scrim drawn by us (the platform dim and window animations are turned
@@ -115,8 +114,13 @@ fun ScrimDialog(
                         } else Modifier,
                     ),
             )
+            // DS-66: a centred dialog sits in the band `[statusTop + 24, H − systemBottom − 24]`; a bottom dialog
+            // places itself ([FloatingDialog]).
+            val band = if (contentAlignment == Alignment.Center) {
+                Modifier.padding(top = statusTop() + OverlayGaps.dialogBand, bottom = rememberSystemBottom() + OverlayGaps.dialogBand)
+            } else Modifier
             Box(
-                Modifier.graphicsLayer {
+                band.graphicsLayer {
                     val p = progress.value
                     alpha = p
                     translationY = if (motion.reduced) 0f else (1f - p) * rise
@@ -128,6 +132,9 @@ fun ScrimDialog(
         }
     }
 }
+
+/** Window width from which [FloatingDialog] takes the inner-screen placement when not told. */
+private const val INNER_MIN_WIDTH_DP = 600
 
 /** How far a dialog's content rises while it opens (S8). */
 private val DIALOG_RISE = 12.dp
@@ -192,8 +199,9 @@ fun DialogCard(title: String, modifier: Modifier = Modifier, content: @Composabl
 }
 
 /**
- * DS-25 bottom floating dialog (`ErrBio`, system-auth style): 12 dp sides, 16 dp above the navigation
- * inset, radius 28, padding 26 · 22 · 18, `raise`, `line` inset, shadow. Centred column, 8 dp gaps:
+ * DS-25 bottom floating dialog (`ErrBio`, system-auth style): 12 dp sides on cover (centred, max 420 on the
+ * inner screen, [inner] defaults to a window 600 dp or wider), `systemBottom + 16` (inner 24; 8 over the
+ * keyboard) above the window bottom (DS-66), radius 28, padding 26 · 22 · 18, `raise`, `line` inset, shadow. Centred column, 8 dp gaps:
  * `small` [header], title 19 / 26 700, `small` 13 sp [subtitle], [icon] 48 `ink3`, buttons ghost + primary.
  */
 @Composable
@@ -207,15 +215,24 @@ fun FloatingDialog(
     subtitle: String? = null,
     icon: IconId? = null,
     cancelLabel: String = "취소",
+    inner: Boolean? = null,
 ) {
-    val nav = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val wide = inner ?: (LocalConfiguration.current.screenWidthDp >= INNER_MIN_WIDTH_DP)
+    // The activity's own bottom inset, in case the dialog window reports none.
+    val outside = systemBottomWithoutKeyboard()
     ScrimDialog(onDismissRequest, contentAlignment = Alignment.BottomCenter) {
+        // DS-66: `systemBottom + edge` (16 cover, 24 inner) above the window bottom, `+ 8` over the keyboard.
+        val y = OverlayGaps.floatingDialogY(wide, maxOf(outside, rememberSystemBottom()).value, keyboardUp())
         FloatingDialogCard(
             title = title,
             onCancel = onDismissRequest,
             primaryLabel = primaryLabel,
             onPrimary = onPrimary,
-            modifier = modifier.padding(start = 12.dp, end = 12.dp, bottom = 16.dp + nav),
+            modifier = modifier
+                .then(
+                    if (wide) Modifier.widthIn(max = OverlayGaps.floatingDialogMaxWidthInner) else Modifier.padding(horizontal = OverlayGaps.sideCompact),
+                )
+                .padding(bottom = y.dp),
             header = header,
             subtitle = subtitle,
             icon = icon,

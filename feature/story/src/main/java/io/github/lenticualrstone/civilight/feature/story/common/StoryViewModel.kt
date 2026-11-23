@@ -37,13 +37,15 @@ class StoryServices(
     val unlock: StateFlow<UnlockState>,
     /** The global recorder library (home's `시작해 볼 것` counts the records linked to the project). */
     val recorder: RecorderStore,
+    /** Whether a blob's file is on this device (home's cover falls back to the initial-letter card, U-08 LIB-88). */
+    val blobExists: (String) -> Boolean = { true },
 ) {
     /** One context per action: one clock read, one key source (DECISIONS §4). */
     fun actionContext(): ActionContext = ActionContext(now = clock.now(), zone = clock.zone, device = deviceId())
 }
 
 fun FeatureDeps.storyServices(): StoryServices =
-    StoryServices(projects, clock, { stores.deviceId.value }, toasts, appScope, unlock.state, stores.recorder)
+    StoryServices(projects, clock, { stores.deviceId.value }, toasts, appScope, unlock.state, stores.recorder, stores.blobs::contains)
 
 /**
  * Base of every story view model (the pattern later batches follow): a [ProjectViewModel] plus the

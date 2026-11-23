@@ -8,6 +8,7 @@ import io.github.lenticualrstone.civilight.domain.library.importing.ProjectImpor
 import io.github.lenticualrstone.civilight.domain.library.importing.RecorderMerge
 import io.github.lenticualrstone.civilight.domain.library.importing.SameProjectChoice
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.app.LibraryEntry
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
@@ -37,6 +38,9 @@ interface ImportPorts {
     suspend fun updateRecorder(transform: (RecorderLibrary) -> RecorderLibrary)
 
     suspend fun removeRecentsOf(key: Key)
+
+    /** Applies [transform] to the app-level 인물 템플릿 (restore merge, CST-63); fakes may ignore it. */
+    suspend fun updateTemplates(transform: (List<FieldTemplate>) -> List<FieldTemplate>) = Unit
 }
 
 /** The result of `열기`. */

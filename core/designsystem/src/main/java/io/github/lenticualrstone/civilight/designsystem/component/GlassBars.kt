@@ -25,8 +25,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
@@ -171,6 +174,11 @@ private fun TopBarRow(
  * padding already covers the navigation bar), with the consumption-aware `windowInsetsPadding`, so a
  * caller that already lifts it the same way (the script) is not lifted twice. [aboveKeyboard] = false
  * keeps it at the window bottom (a screen that hides the bar while typing).
+ *
+ * [inner] (DS-65, inner screen): the bar spans the frame; the **command row** ([leading] + [commandBar]) is
+ * centred, 24 dp from the sides, at most 720 dp wide, 20 dp above the navigation inset. [leading] (the scope
+ * switch of `목록 + 상세`) sits 8 dp before the command field. [paneRows] is drawn full width above the command
+ * row with no side padding, for rows confined to their pane's column (the frame places them itself).
  */
 @Composable
 fun BottomGlassBar(
@@ -178,10 +186,15 @@ fun BottomGlassBar(
     barHeight: Dp? = null,
     extraRow: (@Composable RowScope.() -> Unit)? = null,
     aboveKeyboard: Boolean = true,
+    inner: Boolean = false,
+    leading: (@Composable () -> Unit)? = null,
+    paneRows: (@Composable () -> Unit)? = null,
     commandBar: @Composable () -> Unit,
 ) {
     val inset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val height = barHeight ?: if (extraRow != null) LayoutMetrics.bottomBarWithRow else LayoutMetrics.bottomBar
+    val height = barHeight ?: if (extraRow != null || paneRows != null) LayoutMetrics.bottomBarWithRow else LayoutMetrics.bottomBar
+    val side = if (inner) LayoutMetrics.commandBarSideInner else LayoutMetrics.commandBarSide
+    val bottom = if (inner) LayoutMetrics.commandBarBottomInner else LayoutMetrics.commandBarBottom
     Box(
         modifier
             .then(if (aboveKeyboard) Modifier.windowInsetsPadding(KeyboardLift) else Modifier)
@@ -194,13 +207,32 @@ fun BottomGlassBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = LayoutMetrics.commandBarSide, end = LayoutMetrics.commandBarSide, bottom = LayoutMetrics.commandBarBottom + inset, top = 24.dp),
+                    .padding(bottom = bottom + inset, top = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (extraRow != null) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), content = extraRow)
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = side),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        content = extraRow,
+                    )
                 }
-                commandBar()
+                if (paneRows != null) Box(Modifier.fillMaxWidth()) { paneRows() }
+                val row = Modifier
+                    .padding(horizontal = side)
+                    .then(if (inner) Modifier.widthIn(max = LayoutMetrics.commandRowMaxInner) else Modifier)
+                    .fillMaxWidth()
+                if (leading == null) {
+                    // A column, as before, so a caller that draws more than one child keeps them stacked 8 dp apart.
+                    Column(row, verticalArrangement = Arrangement.spacedBy(8.dp)) { commandBar() }
+                } else {
+                    Row(row, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        leading()
+                        Box(Modifier.weight(1f)) { commandBar() }
+                    }
+                }
             }
         }
     }
@@ -222,15 +254,21 @@ fun GlassScaffold(
 ) {
     val source = rememberGlassSource()
     val bg = CivilightTheme.colors.bg
-    SubcomposeLayout(modifier.fillMaxSize()) { constraints ->
+    // U-02: fields in the content keep their caret line clear of the bars (and the keyboard) while typing.
+    val caretFrame = remember { CaretFrame() }
+    SubcomposeLayout(modifier.fillMaxSize().onPlaced { caretFrame.coords = it }) { constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val top = subcompose(Slot.Top) { CompositionLocalProvider(LocalGlassSource provides source) { topBar() } }.map { it.measure(loose) }
         val bottom = subcompose(Slot.Bottom) { CompositionLocalProvider(LocalGlassSource provides source) { bottomBar() } }.map { it.measure(loose) }
         val topH = top.maxOfOrNull { it.height } ?: 0
         val bottomH = bottom.maxOfOrNull { it.height } ?: 0
         val padding = PaddingValues(top = topH.toDp(), bottom = bottomH.toDp())
+        caretFrame.topBar = topH
+        caretFrame.bottomBar = bottomH
         val body = subcompose(Slot.Content) {
-            Box(Modifier.glassSource(source).background(bg)) { content(padding) }
+            CompositionLocalProvider(LocalCaretFrame provides caretFrame) {
+                Box(Modifier.glassSource(source).background(bg)) { content(padding) }
+            }
         }.map {
             // Fill the frame; in an unbounded parent (e.g. a scrolling preview) take the content's own height.
             it.measure(

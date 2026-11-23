@@ -1,6 +1,8 @@
 package io.github.lenticualrstone.civilight.shell
 
 import android.app.Activity
+import android.content.Context
+import android.view.accessibility.AccessibilityManager
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -15,14 +17,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
@@ -33,6 +38,9 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
 import io.github.lenticualrstone.civilight.ServiceLocator
+import io.github.lenticualrstone.civilight.designsystem.component.BottomChrome
+import io.github.lenticualrstone.civilight.designsystem.component.LocalBottomChrome
+import io.github.lenticualrstone.civilight.designsystem.component.LocalWindowToasts
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
@@ -57,7 +65,10 @@ import io.github.lenticualrstone.civilight.ui.nav.rememberEntryViewModelDecorato
 import io.github.lenticualrstone.civilight.ui.project.ProjectEntryFrame
 import io.github.lenticualrstone.civilight.ui.scaffold.LocalSheetRegistry
 import io.github.lenticualrstone.civilight.ui.scaffold.LocalToasts
+import io.github.lenticualrstone.civilight.ui.scaffold.LocalRelocked
+import io.github.lenticualrstone.civilight.ui.scaffold.NoticeRules
 import io.github.lenticualrstone.civilight.ui.scaffold.PlaceholderScreen
+import io.github.lenticualrstone.civilight.ui.scaffold.WindowToastHost
 import io.github.lenticualrstone.civilight.ui.security.AppLockScreen
 import io.github.lenticualrstone.civilight.ui.security.AuthCopy
 import io.github.lenticualrstone.civilight.ui.security.AuthRequest
@@ -115,6 +126,21 @@ fun CivilightRoot(
         val overlays = remember(backdrop) { OverlaySceneStrategy(backdrop) { motionState.value } }
         // A new strategy when the pane mode changes, so Nav3 recomputes the scenes on fold / unfold.
         val listDetail = remember(layout.twoPanes) { ListDetailSceneStrategy { layoutState.value.twoPanes } }
+        // DS-66 / DS-67: the window's bottom chrome (toast slot, popover limit) and its one toast host.
+        val bottomChrome = remember { BottomChrome() }
+        val toasts = deps.toasts
+        val context = LocalContext.current
+        remember(toasts, context) {
+            // A toast without its own project is tagged with the project on top, so it leaves with that project.
+            toasts.contextKey = { (backStack.lastOrNull() as? ProjectRoute)?.projectKey }
+            // The system accessibility timeout only lengthens a toast (DS-67).
+            val a11y = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+            toasts.recommendedTimeout = { base, hasAction ->
+                val flags = AccessibilityManager.FLAG_CONTENT_TEXT or (if (hasAction) AccessibilityManager.FLAG_CONTENT_CONTROLS else 0)
+                a11y?.getRecommendedTimeoutMillis(base.toInt(), flags)?.toLong() ?: base
+            }
+            true
+        }
         val paneSplits = remember(locator) {
             PaneSplitSource(locator.settings) { module, split -> locator.appScope.launch { locator.stores.settings.setPaneSplit(module, split) } }
         }
@@ -127,6 +153,8 @@ fun CivilightRoot(
             LocalSheetRegistry provides deps.sheets,
             LocalBackHandler provides { enabled, onBack -> BackHandler(enabled, onBack) },
             LocalPaneSplits provides paneSplits,
+            LocalBottomChrome provides bottomChrome,
+            LocalWindowToasts provides true,
         ) {
             // A file opened from outside waits until the app lock is passed (LIB-08).
             val unlock by deps.unlock.state.collectAsState()
@@ -164,6 +192,17 @@ fun CivilightRoot(
                 if (lockMode != null) lockAmount.snapTo(1f) else lockAmount.animateTo(0f, motion.spec(CivilightMotion.exit))
             }
             val shownLock = rememberLastNonNull(lockMode)
+            // DS-67: a toast never shows over a lock. The app lock, a hidden-project relock or `다시 잠그기` drops it in
+            // the same frame (not composed, then dismissed); so does its project leaving the back stack.
+            // Snapshot state, so the frame after a relock recomposes with `relocked` false again.
+            val lastUnlock = remember { mutableStateOf(unlock) }
+            val relocked = NoticeRules.locksTightened(lastUnlock.value, unlock)
+            val liveProjects = backStack.mapNotNullTo(HashSet()) { (it as? ProjectRoute)?.projectKey }
+            SideEffect {
+                if (lastUnlock.value != unlock) lastUnlock.value = unlock
+                if (lockMode != null || relocked) toasts.dismissNow()
+                toasts.dismissIfReleased(liveProjects)
+            }
             val lockLevel = { if (lockMode != null) 1f else lockAmount.value }
             val showContent = lockMode == null || (lockMode == LockScreenMode.BLURRED_CONTENT && lockBlurAvailable())
             val entryViewModels = rememberEntryViewModelDecorator<NavKey>()
@@ -177,6 +216,7 @@ fun CivilightRoot(
                             .then(rise)
                             .lockedContent(lockLevel, locked = lockMode != null),
                     ) {
+                        CompositionLocalProvider(LocalRelocked provides relocked) {
                         NavDisplay(
                             backStack = backStack,
                             modifier = Modifier.overlayBackdrop(backdrop) { motionState.value.reduced },
@@ -188,8 +228,10 @@ fun CivilightRoot(
                             predictivePopTransitionSpec = { sceneTransition(motion, forward = false) },
                             entryProvider = provider,
                         )
+                        }
                     }
                 }
+                WindowToastHost(toasts = toasts, hidden = lockMode != null || relocked, liveProjects = liveProjects)
                 if (lockMode != null) {
                     AppLock(lockMode, deps, onBack = { activity.moveTaskToBack(true) })
                 } else if (shownLock != null && lockAmount.value > 0f) {

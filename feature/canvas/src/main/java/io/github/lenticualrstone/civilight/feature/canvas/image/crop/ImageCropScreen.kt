@@ -113,7 +113,7 @@ fun ImageCropScreen(route: ImageCrop, deps: FeatureDeps) {
         start = { doc, size ->
             val existing = ImageEdits.use(doc, owner)
             val holo = handOff?.holo ?: HoloRules.initial(route.slot, existing, settings.holoDefaultForNewImages)
-            CropSession.start(route.slot, size, existing, route.blobHash, holo)
+            CropSession.start(route.slot, size, existing, route.blobHash, holo, handOff?.crops.orEmpty())
         },
         onCancel = { deps.navigator.pop() },
         onApply = { s ->

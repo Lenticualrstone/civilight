@@ -69,7 +69,7 @@ You receive it as the entries function's parameter. In composition it is also `L
 | `projects: ProjectSessions` | shared open project stores: `acquire`/`release`, `peek`, `peekDoc`. Normally use `ProjectViewModel` or `currentProjectStore` instead |
 | `unlock: UnlockController` | `state: StateFlow<UnlockState>` (`appLocked`, `hiddenGroupOpen`, `itemsOpen(projectKey)`, `recordsOpen`, `keptOpen`, `projectOpen(projectKey)`); `unlockHiddenGroup()`, `unlockItems(projectKey)`, `unlockRecords()`, `keepOpen(projectKey)` ("지금은 열린 채"), `relockNow()` (`다시 잠그기`), `lockHiddenGroup()`, `appLockDisabled()` |
 | `capture: CaptureGuard` | window protection requests. Prefer the `ProtectWindow(WindowProtection)` composable |
-| `toasts: ToastController` | `show(text, actionLabel = "되돌리기", onAction)`; one at a time; 6 s (LIB-40) |
+| `toasts: ToastController` | `show(text, actionLabel = "되돌리기", onAction)` (kind `ACTION` with an action, else `INFO`), `showError(text)` (`ERROR`), `showFor(projectKey, …)`; one at a time; 2.5 s info, 4 s action or error (DS-67, lengthened only by the system accessibility timeout). Drawn once per window by the shell (`WindowToastHost`); screens draw none |
 | `results: NavResults` | `send(requestKey, value)` / `consume(requestKey)` / `results(requestKey)` between screens (e.g. `PickOnMap`) |
 | `sheets: SheetRegistry` | `register<S : SheetKey> { sheet -> … }`; content of shared sheets |
 | `appScope: CoroutineScope` | main-thread scope that outlives screens |
@@ -202,7 +202,7 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
     - `MainActivity` sends lifecycle events; `CivilightApp` registers a screen-off receiver; `CivilightRoot` runs a 30 s tick for `연 지 5분 뒤`.
     - `ProjectEntryFrame`: hidden-project lock in place of content; cancel → 서재 with the group locked.
   - Tests: `LockRulesTest` L-01 … L-06, `RL-01 to RL-07 re-lock table`, `the controller applies the policy to lifecycle events`.
-- **LIB-40 toast host**: `ui/scaffold/ToastController.kt`, drawn by `CivilightScreen`. Test: `SessionsAndToastsTest.toasts replace each other and leave after their time`.
+- **LIB-40 / DS-67 toast**: `ui/scaffold/ToastController.kt` (`NoticeKind`, `NoticeRules`, pause and resume with the time left, `dismissNow`, `dismissIfReleased`), drawn once per window by `ui/scaffold/WindowToastHost.kt` from `CivilightRoot` (above `NavDisplay` and the sheets, below the lock). Tests: `SessionsAndToastsTest` (T-DS-40), DS `OverlayGapsTest` (T-DS-39).
 - **Common scaffold, sheets and placeholders**: `ui/scaffold/CivilightScreen.kt`, `SheetHost.kt` (saveable sheet stack via `RouteCodec`, registry lookup, placeholder sheet), `PlaceholderScreen.kt`.
 - **Theme from settings (DS requests, CNV-46 effects)**:
   - `ui/theme/ThemeBridge.kt`: theme mode; text step, where model 0 is DS step 2 (18 sp); reduced motion from `AnimationPref` plus the system animator scale; glass tier.
@@ -248,7 +248,7 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
 - **Prompts in flight**: while `AndroidBiometricGate` shows a prompt, `onStop` is not treated as leaving the app. The device-credential screen can be a separate activity, and that must not raise the app lock or re-lock what the prompt is opening.
 - **Item unlock prompt**: LIB-36 says "same prompt as LIB-32", so `지문으로 보기` on hidden rows uses the title `숨긴 프로젝트 보기`.
 - **Re-lock**: checked on background, screen off, return to the foreground and every 30 s. The app lock comes back after every background trip and every screen-off when it is on.
-- **Toasts**: 6 s; a new one replaces the old.
+- **Toasts** (DS-67, 2026-11-23): 2.5 s info, 4 s with an action or an error; a new one replaces the old. Slot `systemBottom + max(156, tallest bottom chrome + 6)`, read once when the toast appears; follows only the keyboard.
 - **Transitions**: push = slide in 1/8 width + fade over 320 ms emphasized decelerate; exit = fade 160 ms. Reduced motion = 120 ms crossfade. Overlay routes fade 220 ms.
 - **Text size**: `AppSettings.textSizeStep` 0 (`보통`) = DS `TextScale.forStep(2)` (18 sp). Steps −2 … +2 map to 16 / 17 / 18 / 20 / 22.
 - **Onboarding resume**: `OnboardingState.resumePage` values are an `OnboardingPage` name, `WALKTHROUGH_1` … `WALKTHROUGH_3`, `EXAMPLE` or `EXAMPLE_SCRIPT`. Anything else starts at the welcome page.
@@ -274,6 +274,10 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
 - **CNV-47 copy to confirm**: the handle's content description `화면 비율` and the popover title reuse the spec's `[PROPOSED]` name.
 - **Feature agents**: new routes or shared sheets go in core:navigation. Ask here, do not declare them in your module.
 - **DS-62 repo-wide copy lint** (designsystem request): left for CI. A core:ui test that scans every module's `strings.xml` would tie this module's build to other agents' work in progress.
+- **Copy needed (DS-65, Q-DS-24): `TODO_COPY_DS_COMMAND_SCOPE`**, the accessibility label of the scope switch in `목록 + 상세`. `CommandBarCopy.SCOPE_GROUP` stays null until it is given (each cell already reads its pane title); no prose was invented.
+- **feature:script (DS-65)**: `ScriptScreen` draws its own frame (`GlassScaffold` + `ScriptBars`), so `점검 센터 | 원고` keeps one bar per pane for now (`ListDetailPairs.detailDrawsOwnBar`: the frame bar is off for that pair). It should hand `ScriptCommandField` to the frame's host (`CivilightScreen(commandBar = …)` or a host registration), move the speaker row and `줄바꿈` to the extra row, and then be removed from `detailDrawsOwnBar`. Its own `ToastHost` call draws nothing inside the app now (`LocalWindowToasts`) and can be deleted.
+- **feature:cast (DS-65)**: `CharacterProfile` draws `common/RecordFrame.kt` (own `GlassScaffold` and bar), so `인물 | 프로필` keeps one bar per pane the same way until it registers with the host. Its `ToastHost` draws nothing inside the app now and can be deleted.
+- **feature:library (DS-67)**: failures that need nothing from the user (`IMPORT_FAILED`, `SAVE_FAILED`, `PARTLY_FAILED`, `SET_FAILED`) should use `toasts.showError(…)`; they are `INFO` (2.5 s) until then.
 - **FEATURES.md**: update the rows listed under Done and Partial (CNV-32 … CNV-36, CNV-38, CNV-46 effects, LIB-08, LIB-17 seed, LIB-26, LIB-29, LIB-32 … LIB-35, LIB-37, LIB-40, STO-13, STO-16, SCR-19 / SCR-55 picker parts). This module may not edit that file.
 
 ---
@@ -438,6 +442,13 @@ Core agent C, 2026-11-23: motion audit §3.3 rows for core:ui and app, CNV-47, g
   - QA #11: `search/SearchViewModel.kt:84` reads `val result = if (q.isBlank()) null else ProjectSearch(…).search(q, f)`. Change the gate to `if (q.isBlank() && f != SearchFilter.COMMAND) null`, so the `명령` chip lists the commands with no query.
   - Gallery hits: call `search(q, f, includeGallery = true)` once the screen draws a `갤러리` section from `SearchResult.gallery` (44 thumbnail from `source`, `match` with the whole sentence boxed, `label`). Tap → `Gallery(p, hit.ownerKind, hit.ownerKey, pickKey = hit.itemKey)`. Until then leave `includeGallery` off, or a gallery-only match shows an empty screen instead of `결과 없음`.
 - **feature:library**: the 서재 `목록 + 상세` gets the handle from the shell; nothing to do.
+
+### Shared layout rules (DS-65, DS-66, DS-67; user findings U-01, U-04, U-05, 2026-11-23)
+
+- **DS-65 one command bar per frame**: `ui/scaffold/CommandBarHost.kt` (`CommandScope.next`, `CommandBarRules.layout`, `CommandBarHost`, `CommandFrameBar`). In `목록 + 상세` a pane's `CivilightScreen` registers its `commandBar` / `bottomExtraRow` with the frame (keyed per screen, with its composition locals) and draws only a spacer of the frame bar's height; `ListDetailScene` draws one `BottomGlassBar(inner = true)` over both panes (glass source = both panes), with the scope switch (`OutlinedSegmented`, cells = pane titles, max 160) when both panes declare a bar. Scope: detail opened / replaced → detail, closed → list, or the user's pick; touches never move it. The bar steps aside while a pane shows a sheet (the sheet and its scrim are never under it). Inner single screens use the centred command row (24 sides, max 720, 20 above the navigation inset). Test: `CommandBarHostTest` (T-DS-36, T-DS-37).
+- **DS-66 overlay gaps**: DS `theme/OverlayGaps.kt` (tokens and pure placement), `component/OverlayInsets.kt` (`rememberSystemBottom`, `BottomChrome` / `ReportBottomChrome`, `LocalWindowToasts`). Applied in `Sheet.kt` (bottom padding `systemBottom + 24`, 16 over the keyboard; centred band), `Dialogs.kt` (centred band; `FloatingDialog` `systemBottom + 16/24`, `+ 8` over the keyboard), `Popover.kt` (sides 12/24, status + 8, above `systemBottom + edge` and 6 above the bar). Test: DS `OverlayGapsTest` (T-DS-38).
+- **DS-67 toast**: see Done. `MainActivity` pauses the timer on `onStop` and resumes on `onStart`.
+- Not done here: `DialogCard` body scroll with fixed buttons (DS-66 centred dialog); the frame bar is not hidden while typing outside the command field (DS-69, U-02 lane); a pane's own action bar (wizard, record buttons) lifted on the frame bar can be lifted twice with the keyboard up; the frame bar is not dimmed by a pane's module tour; pause on accessibility focus (Compose has no public accessibility-focus callback; the accessibility timeout lengthens the time instead); the toast is above the module tour dim (the tour is drawn inside the entry, DS-10 wants the dim above); the scope switch's hint swap is a crossfade of the whole command field, not a text `ValueSwap`; no emulator check (T-DS-41 one toast node, fold and unfold, gesture and 3-button navigation).
 
 ### Left (core:ui / app)
 

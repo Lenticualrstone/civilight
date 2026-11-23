@@ -354,7 +354,8 @@ class NewProjectTest {
         assertEquals("단편 · 씬 6개 · 인물 4 · 페이지 3", menu.sub)
         assertEquals(
             listOf(
-                "열기" to "마지막 위치", "이름 바꾸기" to null, "수위 등급" to "ALL(R-12) · R-15 · R-18 · 지금 ALL",
+                "열기" to "마지막 위치", "이름 바꾸기" to null, "표지 이미지" to "없음 · 첫 글자 카드",
+                "수위 등급" to "ALL(R-12) · R-15 · R-18 · 지금 ALL",
                 "프로젝트 숨기기" to "프로젝트 전체 · 지문 · PIN으로 열림", "백업 · 내보내기" to "Google Drive · 파일", "지우기" to "휴지통 · 30일 뒤 삭제",
             ),
             menu.rows.map { it.title to it.sub },

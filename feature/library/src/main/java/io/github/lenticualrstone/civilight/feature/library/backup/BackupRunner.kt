@@ -16,6 +16,7 @@ import io.github.lenticualrstone.civilight.model.app.BackupEntry
 import io.github.lenticualrstone.civilight.model.app.BackupKind
 import io.github.lenticualrstone.civilight.model.app.BackupRun
 import io.github.lenticualrstone.civilight.model.app.BackupState
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
 import io.github.lenticualrstone.civilight.model.app.LockKind
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.file.PackagePaths
@@ -43,6 +44,9 @@ interface BackupSources {
     fun audio(hash: String): ByteArray?
 
     suspend fun settings(): AppSettings
+
+    /** Every 인물 템플릿, live and trashed (CST-63); none in fakes that predate templates. */
+    suspend fun templates(): List<FieldTemplate> = emptyList()
 }
 
 /** How a run ended. */
@@ -135,6 +139,7 @@ class BackupRunner(
         }
         entries += uploadRecorder(recorder, settings, recovery, now)
         entries += uploadSettings(settings)
+        entries += uploadTemplates(settings, recovery, now)
         val run = BackupRun(
             runId = runId,
             startedAt = now,
@@ -171,6 +176,30 @@ class BackupRunner(
         val bytes = CivilightJson.encode(AppSettings.serializer(), settings.copy(driveAccountId = null)).toByteArray()
         val version = drive.upload(SETTINGS_FILE, JSON_MIME, bytes)
         return BackupEntry(BackupKind.SETTINGS, driveFileId = version.fileId, versionId = version.versionId, sizeBytes = version.sizeBytes, encrypted = false)
+    }
+
+    /**
+     * 인물 템플릿 (CST-63): visible ones as plain JSON; hidden ones in their own file, encrypted with
+     * the 복구 암호, only when one exists and `숨긴 것도 백업` is on (else left out, with the warning).
+     */
+    private suspend fun uploadTemplates(settings: AppSettings, recovery: RecoveryKey?, now: Timestamp): List<BackupEntry> {
+        val templates = sources.templates()
+        if (templates.isEmpty()) return emptyList()
+        val plan = TemplateBackup.plan(templates, settings, recovery != null)
+        val out = ArrayList<BackupEntry>()
+        if (plan.visible.isNotEmpty()) {
+            val version = drive.upload(TemplateBackup.FILE, JSON_MIME, TemplateBackup.encode(plan.visible))
+            out += BackupEntry(BackupKind.TEMPLATES, driveFileId = version.fileId, versionId = version.versionId, sizeBytes = version.sizeBytes, encrypted = false)
+        }
+        if (plan.hidden.isNotEmpty() && recovery != null) {
+            val bytes = PackageCrypto.encryptWithRecoveryKey(TemplateBackup.encode(plan.hidden), recovery, random, now, JSON_MIME)
+            val version = drive.upload(TemplateBackup.HIDDEN_FILE, JSON_MIME, bytes)
+            out += BackupEntry(
+                BackupKind.TEMPLATES, driveFileId = version.fileId, versionId = version.versionId, sizeBytes = version.sizeBytes,
+                encrypted = true, lockType = LockKind.RECOVERY, hidden = true,
+            )
+        }
+        return out
     }
 
     /** Book, prune, then the run index on Drive. */

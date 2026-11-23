@@ -10,6 +10,9 @@ object BackupCopy {
     const val LAST_BACKUP = "마지막 백업"
     const val HISTORY = "백업 기록"
     const val HISTORY_SUB = "30일 보관"
+
+    /** CST-63: hidden 인물 템플릿 left out of the backup (never a count). */
+    const val HIDDEN_TEMPLATES = "숨긴 템플릿 · 백업 안 됨"
     const val RECOVERY = "복구 암호"
     const val RECOVERY_SUB = "숨긴 프로젝트 백업용"
     const val RECOVERY_SET = "정해 둠"

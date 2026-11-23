@@ -8,6 +8,7 @@ import io.github.lenticualrstone.civilight.feature.cast.field.EditMode
 import io.github.lenticualrstone.civilight.feature.cast.field.SaveChoice
 import io.github.lenticualrstone.civilight.feature.cast.field.TimedEditModel
 import io.github.lenticualrstone.civilight.feature.cast.field.TimedSubject
+import io.github.lenticualrstone.civilight.feature.cast.field.label
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.cast.FieldPayload
 import io.github.lenticualrstone.civilight.model.cast.FieldValue
@@ -64,6 +65,9 @@ class TimedEditModelTest {
         val sheet = (view.mode as EditMode.TwoButtons).sheet
         assertEquals("등불 결사 · 1-3부터", sheet.currentLine)
         assertEquals("이 값 고치기", sheet.correctLabel)
+        // U-10: the lens labels stay on the two buttons of a value with history.
+        assertEquals("이 값 고치기", SaveChoice.CORRECT.label(view.mode))
+        assertEquals("여기서부터 바뀜 · 1-7", SaveChoice.FROM_HERE.label(view.mode))
         assertEquals("1-3 기록을 고침 · 1-3부터 새 값", sheet.correctSub)
         assertEquals("여기서부터 바뀜 · 1-7", sheet.changeLabel)
         assertEquals("새 ◆ · 집필 선 1-7 씬 3 뒤", sheet.changeSub)
@@ -71,9 +75,10 @@ class TimedEditModelTest {
     }
 
     @Test
-    fun `CST-09 a field without history at 최신 has one 이 값 고치기 that writes the base`() {
+    fun `CST-09 U-10 a field without history at 최신 has one 저장 that writes the base`() {
         val view = TimedEditModel.fieldView(doc, height, latest)!!
         assertEquals(EditMode.Plain, view.mode)
+        assertEquals("저장", SaveChoice.PLAIN.label(view.mode))
         val edited = TimedEditModel.saveField(doc, height, FieldValue.of(FieldPayload.Number("155")), SaveChoice.PLAIN, latest, CastFx.ctx())
         assertEquals(doc.changes.records.size, edited.changes.records.size)
         assertEquals("155 cm", valueAt(edited, height, latest))

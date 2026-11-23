@@ -33,13 +33,20 @@ import io.github.lenticualrstone.civilight.feature.cast.settings.FieldDefEditScr
 import io.github.lenticualrstone.civilight.navigation.FieldValueEditSheet
 import io.github.lenticualrstone.civilight.navigation.FieldSettings as FieldSettingsRoute
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
+import io.github.lenticualrstone.civilight.navigation.TemplateEdit
+import io.github.lenticualrstone.civilight.navigation.TemplateFieldEdit
+import io.github.lenticualrstone.civilight.navigation.TemplateList
+import io.github.lenticualrstone.civilight.feature.cast.templates.TemplateEditScreen
+import io.github.lenticualrstone.civilight.feature.cast.templates.TemplateFieldEditScreen
+import io.github.lenticualrstone.civilight.feature.cast.templates.TemplateListScreen
 
 /**
  * Entries of `:feature:cast` (shell.md §1). Routes: the `cast` row of shell.md §3; shared sheets:
  * those owned by CAST in shell.md §5. Only registrations happen here.
  *
  * Registered: every route of the `cast` row (`CastList`, `CharacterProfile`, `FieldSettings`,
- * `ArchiveDocEdit`, `FieldDefEdit`, `RelationKindSettings`, `RelationMap`, `TagSettings`) and every
+ * `ArchiveDocEdit`, `FieldDefEdit`, `RelationKindSettings`, `RelationMap`, `TagSettings`, and the app-level
+ * 인물 템플릿 routes `TemplateList`, `TemplateEdit`, `TemplateFieldEdit`) and every
  * CAST sheet (`FieldValueEditSheet`, `FieldHistorySheet`, `AddFieldSheet`, `RelationEditSheet`,
  * `DeleteImpactSheet`, `MergeItemsSheet`).
  */
@@ -52,6 +59,9 @@ fun EntryProviderScope<NavKey>.castEntries(deps: FeatureDeps) {
     entry<RelationKindSettings> { route -> RelationKindSettingsScreen(route, deps) }
     entry<RelationMap> { route -> RelationMapScreen(route, deps) }
     entry<TagSettings> { route -> TagSettingsScreen(route, deps) }
+    entry<TemplateList> { route -> TemplateListScreen(route, deps) }
+    entry<TemplateEdit> { route -> TemplateEditScreen(route, deps) }
+    entry<TemplateFieldEdit> { route -> TemplateFieldEditScreen(route, deps) }
 
     deps.sheets.register<FieldValueEditSheet> { sheet -> FieldValueSheetContent(sheet) }
     deps.sheets.register<FieldHistorySheet> { sheet -> FieldHistorySheetContent(sheet) }

@@ -41,7 +41,23 @@ object CastUiCopy {
     const val DISPLAY_NAME = "표시 이름"
     const val ONE_LINER = "한 줄 소개"
     const val TAGS = "태그"
-    const val BTN_CORRECT = "이 값 고치기"
+    /**
+     * The confirm of a plain edit sheet (U-10): a value with no `◆` history at the lens point, and
+     * every sheet that is not a lens edit (이름, 한 줄 소개, 태그, 태그 이름, 관계 종류 이름, 말투, 비밀,
+     * 보이스 대사, a field value without history at `최신`).
+     */
+    const val BTN_SAVE = "저장"
+
+    /**
+     * Lens edit only (CST-10, `domain:story` `LensEdit`): the primary of the two buttons beside
+     * `여기서부터 바뀜`, for a value with `◆` history at the lens point. The two-button sheets take the
+     * label from `TimedValues.editSheet`; this is its fallback. Never a plain save.
+     */
+    const val BTN_LENS_CORRECT = "이 값 고치기"
+
+    /** Kept for source compatibility (U-10): plain saves read [BTN_SAVE], the lens button [BTN_LENS_CORRECT]. */
+    @Deprecated("U-10: a plain save is BTN_SAVE; the lens edit button is BTN_LENS_CORRECT", ReplaceWith("CastUiCopy.BTN_SAVE"))
+    const val BTN_CORRECT = BTN_SAVE
     const val BTN_ADD_POINT = "시점 추가"
     const val HISTORY_OPEN = "변화 기록"
     const val SPEECH = "말투"

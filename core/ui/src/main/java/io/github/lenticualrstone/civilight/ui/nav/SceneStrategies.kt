@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -35,6 +37,12 @@ import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.Motion
 import io.github.lenticualrstone.civilight.navigation.OverlayRoute
+import io.github.lenticualrstone.civilight.ui.scaffold.CommandBarHost
+import io.github.lenticualrstone.civilight.ui.scaffold.CommandFrameBar
+import io.github.lenticualrstone.civilight.ui.scaffold.CommandScope
+import io.github.lenticualrstone.civilight.ui.scaffold.CommandScopeEvent
+import io.github.lenticualrstone.civilight.ui.scaffold.LocalCommandBarHost
+import io.github.lenticualrstone.civilight.ui.scaffold.LocalRelocked
 import io.github.lenticualrstone.civilight.ui.window.EmptyDetailPane
 import io.github.lenticualrstone.civilight.ui.window.ListDetailPanes
 
@@ -76,11 +84,25 @@ private class ListDetailScene(
     override val key: Any = list.contentKey
     override val entries: List<NavEntry<NavKey>> = listOfNotNull(list, detail)
     override val content: @Composable () -> Unit = {
-        ListDetailPanes(
-            list = { CompositionLocalProvider(LocalPaneRole provides PaneRole.LIST) { list.Content() } },
-            detail = { DetailSwap(detail) },
-            module = ListDetailPairs.moduleOf(list.route),
-        )
+        // DS-65: one command bar for the frame. The panes declare theirs to [host]; the scope follows the detail
+        // opening, being replaced or closing (and the user's pick on the scope switch), never a touch.
+        val detailKey = detail?.contentKey
+        val host = remember { CommandBarHost(if (detailKey != null) CommandScope.DETAIL else CommandScope.LIST) }
+        val seen = remember { DetailSeen(detailKey) }
+        SideEffect {
+            CommandScopeEvent.ofDetail(seen.key, detailKey)?.let(host::onEvent)
+            seen.key = detailKey
+        }
+        // A detail with its own frame (script, cast profile) keeps one bar per pane until it registers (Requests).
+        val frameHost = host.takeUnless { ListDetailPairs.detailDrawsOwnBar(detail?.route) }
+        CompositionLocalProvider(LocalCommandBarHost provides frameHost) {
+            ListDetailPanes(
+                list = { CompositionLocalProvider(LocalPaneRole provides PaneRole.LIST) { list.Content() } },
+                detail = { DetailSwap(detail) },
+                module = ListDetailPairs.moduleOf(list.route),
+                bottomBar = if (frameHost != null) ({ left -> CommandFrameBar(frameHost, left, hideTitles = LocalRelocked.current) }) else null,
+            )
+        }
     }
 
     override fun equals(other: Any?): Boolean =
@@ -88,6 +110,9 @@ private class ListDetailScene(
 
     override fun hashCode(): Int = (list.hashCode() * 31 + detail.hashCode()) * 31 + previousEntries.hashCode()
 }
+
+/** The detail key the frame last saw (a plain holder, read and written only in its side effect). */
+private class DetailSeen(var key: Any?)
 
 /**
  * The detail pane's swap (S3): another item crossfades in place (`standard` in, `exit` out); the first

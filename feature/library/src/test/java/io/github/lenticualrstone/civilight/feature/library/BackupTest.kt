@@ -33,6 +33,11 @@ import io.github.lenticualrstone.civilight.feature.library.openfile.ImportPorts
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.AppSettings
 import io.github.lenticualrstone.civilight.model.app.BackupKind
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
+import io.github.lenticualrstone.civilight.model.app.TemplateField
+import io.github.lenticualrstone.civilight.model.cast.EntityKind
+import io.github.lenticualrstone.civilight.model.cast.FieldType
+import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.app.LibraryEntry
 import io.github.lenticualrstone.civilight.model.app.LockKind
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
@@ -106,6 +111,10 @@ class BackupTest {
         override suspend fun recorder(): RecorderLibrary = library
         override fun audio(hash: String): ByteArray? = null
         override suspend fun settings(): AppSettings = settings
+
+        /** 인물 템플릿 on this device (CST-63). */
+        var templateList: List<FieldTemplate> = emptyList()
+        override suspend fun templates(): List<FieldTemplate> = templateList
     }
 
     /** A fresh device's stores. */
@@ -125,6 +134,10 @@ class BackupTest {
             recorder = transform(recorder)
         }
         override suspend fun removeRecentsOf(key: Key) = Unit
+        var templates: List<FieldTemplate> = emptyList()
+        override suspend fun updateTemplates(transform: (List<FieldTemplate>) -> List<FieldTemplate>) {
+            templates = transform(templates)
+        }
     }
 
     private var keys = 0
@@ -360,5 +373,51 @@ class BackupTest {
         RestoreRunner(drive, device, newKey).run(request, null, now, zone, "11월 22일") {}
         assertEquals(listOf(ashen.key), device.added.map { it.key })
         assertNull(RestoreModel.build(false, emptyList(), emptyMap(), RestorePicks(), zone).button)
+    }
+
+    private fun template(key: String, name: String, hidden: Boolean, field: String) = FieldTemplate(
+        key = key, name = name, hidden = hidden, order = "a$key",
+        fields = listOf(TemplateField(key = "f$key", origin = "tpl:f$key", entityKind = EntityKind.CHARACTER.open(), name = field, type = FieldType.SHORT_TEXT.open(), order = "a")),
+    )
+
+    @Test
+    fun `TC-F-46 a run uploads templates, hidden ones only locked, and a restore merges them`() = runTest {
+        val mine = template("T1", "내 기본", hidden = false, field = "특기")
+        val glass = template("H1", "유리 정원 인물", hidden = true, field = "유리 꽃")
+
+        // No 복구 암호: the visible file only; nothing uploaded names the hidden template.
+        val drive = MemoryDrive()
+        val sources = Sources(listOf(ashen), on, RecorderLibrary()).apply { templateList = listOf(mine, glass) }
+        val out = BackupRunner(sources, drive, MemoryBook(), { null }, "t").run(now, "run-1") as BackupOutcome.Done
+        val entries = out.run.entries.filter { it.kind == BackupKind.TEMPLATES }
+        assertEquals(1, entries.size)
+        assertFalse(entries.single().encrypted)
+        val plain = drive.files.getValue(entries.single().driveFileId).map { String(it, Charsets.UTF_8) }
+        assertTrue(plain.all { it.contains("내 기본") && !it.contains("유리") })
+        assertEquals(1, drive.files.values.sumOf { v -> v.count { String(it, Charsets.UTF_8).contains("\"templates\"") } })
+
+        // With a 복구 암호 and `숨긴 것도 백업`: the hidden file goes up locked.
+        val book = MemoryBook()
+        val ring = keyring(book)
+        val password = "등불지기의새벽1"
+        ring.set(password.toCharArray(), now)
+        val drive2 = MemoryDrive()
+        val locked = BackupRunner(Sources(listOf(ashen), on.copy(backupHidden = true), RecorderLibrary()).apply { templateList = listOf(mine, glass) }, drive2, book, ring::current, "t")
+            .run(now, "run-2") as BackupOutcome.Done
+        val tpl = locked.run.entries.filter { it.kind == BackupKind.TEMPLATES }
+        assertEquals(listOf(false, true), tpl.map { it.encrypted })
+        assertEquals(LockKind.RECOVERY, tpl.last().lockType)
+        assertTrue(drive2.files.getValue(tpl.last().driveFileId).none { String(it, Charsets.UTF_8).contains("유리") })
+
+        // A new device restores both and merges by key.
+        val request = RestoreModel.request(locked.run, RestorePicks())
+        assertEquals(2, request.templates.size)
+        assertTrue(request.needsPassword)
+        val device = Device().apply { templates = listOf(mine.copy(name = "더 새 이름", updatedAt = 99)) }
+        val result = RestoreRunner(drive2, device, newKey).run(request, password.toCharArray(), now, zone, "11월 22일") {}
+        assertEquals(0, result.failed)
+        assertEquals(listOf("T1", "H1"), device.templates.map { it.key })
+        assertEquals("더 새 이름", device.templates.first().name)
+        assertTrue(device.templates.last().hidden)
     }
 }

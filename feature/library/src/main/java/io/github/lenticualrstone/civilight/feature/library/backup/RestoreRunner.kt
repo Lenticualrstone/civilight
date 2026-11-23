@@ -61,7 +61,7 @@ class RestoreRunner(
      * 암호 keeps the sheet with its error (LIB-54 `ED`). Returns the downloaded bytes for reuse.
      */
     suspend fun checkPassword(request: RestoreRequest, password: CharArray): Map<BackupEntry, ByteArray> {
-        val locked = (request.projects + listOfNotNull(request.recorder)).firstOrNull { it.encrypted } ?: return emptyMap()
+        val locked = (request.projects + listOfNotNull(request.recorder) + request.templates).firstOrNull { it.encrypted } ?: return emptyMap()
         val bytes = drive.download(locked.driveFileId, locked.versionId) ?: return emptyMap()
         return when (PackageCrypto.decrypt(bytes, password)) {
             DecryptResult.WrongPassword -> throw WrongRecoveryPassword()
@@ -130,6 +130,13 @@ class RestoreRunner(
                 ports.updateRecorder { RecorderMerge.merge(it, content.library, newKey) }
                 merged = true
             }
+        }
+        // 인물 템플릿 (CST-63): merged by key; a newer `updatedAt` wins and nothing local is deleted.
+        for (entry in request.templates) {
+            val bytes = prefetched[entry] ?: drive.download(entry.driveFileId, entry.versionId)
+            done += entry.sizeBytes
+            val incoming = bytes?.let { TemplateBackup.decode(it, entry.encrypted, password) }
+            if (incoming == null) failed++ else ports.updateTemplates { TemplateBackup.merge(it, incoming) }
         }
         onStatus(status(if (request.hiddenCount > 0) 2 else 1))
         val last = status(0)

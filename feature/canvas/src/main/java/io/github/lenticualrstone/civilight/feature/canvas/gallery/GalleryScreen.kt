@@ -51,11 +51,20 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import io.github.lenticualrstone.civilight.designsystem.card.CardFit
+import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
+import io.github.lenticualrstone.civilight.designsystem.card.CardSize
 import io.github.lenticualrstone.civilight.designsystem.card.CardViewMotion
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ime
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
+import io.github.lenticualrstone.civilight.feature.canvas.image.ProvideHoloTilt
 import io.github.lenticualrstone.civilight.feature.canvas.image.CropSession
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageCopy
 import io.github.lenticualrstone.civilight.feature.canvas.image.crop.CropEditor
@@ -289,6 +298,8 @@ fun GalleryScreen(route: Gallery, deps: FeatureDeps) {
     SheetHostLayout(sheets, localSheets = { key ->
         if (key is GallerySortSheet) ({ SortSheetContent(sort, { s -> sortName = s.name }) { close() } }) else null
     }) {
+    // One rotation sensor for every holo image of the gallery (cards, tiles, rows, the viewer), CNV-30.
+    ProvideHoloTilt {
     SharedTransitionLayout {
         AnimatedContent(
             targetState = mode,
@@ -402,6 +413,7 @@ fun GalleryScreen(route: Gallery, deps: FeatureDeps) {
                 )
             }
         }
+    }
     }
     }
     }
@@ -637,27 +649,60 @@ private fun ItemsBody(
     // The bottom bar folds away (multi-pick, inner list + detail without it): then the gesture bar still needs room.
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val clear = PaddingValues(top = padding.calculateTopPadding(), bottom = maxOf(padding.calculateBottomPadding(), navBottom))
+    // Heights (px) of the rows above the cards, kept after they scroll away so the cards do not resize.
+    val heads = remember { mutableStateMapOf<String, Int>() }
+    /** The bottom bar's height (dp) while no keyboard is up; read for the card fit while one is. */
+    val bottomHold = remember { FloatHolder(clear.calculateBottomPadding().value) }
+    val density = LocalDensity.current
     val column = @Composable { withPanel: GalleryBodyState, modifier: Modifier ->
-        LazyColumn(
-            modifier.fillMaxSize(),
-            state = listState,
-            contentPadding = PaddingValues(top = clear.calculateTopPadding() + 8.dp, bottom = clear.calculateBottomPadding() + 24.dp),
-        ) {
-            item(key = "chips") { ChipsRow(v, withPanel.side, onFilter, civilightItem()) }
-            item(key = "orderLine") {
-                OrderLine(withPanel, sort = v.sort, sheets = sheets, route = route, rowState = rowStates[v.sections.first().id], onMulti = onMulti?.takeIf { !multi.active }?.let { set -> { set(MultiPick.start()) } }, modifier = civilightItem())
+      BoxWithConstraints(modifier.fillMaxSize()) {
+        val viewportH = maxHeight.value
+        val viewportW = maxWidth.value
+        val measured = heads["chips"] != null || heads["orderLine"] != null
+        val headDp = (
+            if (!measured) GalleryCardFit.HEAD_ESTIMATE_DP
+            else with(density) {
+                (listOf("chips", "orderLine").sumOf { heads[it] ?: 0 } + (if (v.unlockedBar != null) heads["unlocked"] ?: 0 else 0)).toDp().value
             }
-            v.unlockedBar?.let { bar -> item(key = "unlocked") { UnlockedBar(bar, withPanel.side, onRelock, civilightItem()) } }
+        ) + (if (v.grouped) GalleryCardFit.GROUP_HEADER_DP else 0f)
+        // The keyboard (a sheet's field over the gallery) raises the bottom padding: the cards keep the size
+        // they had before it opened instead of shrinking behind the sheet.
+        val imeOpen = WindowInsets.ime.getBottom(density) > 0
+        val shownBottom = clear.calculateBottomPadding().value
+        val fitBottom = if (imeOpen) bottomHold.value else shownBottom
+        SideEffect { if (!imeOpen) bottomHold.value = shownBottom }
+        val room = CardFit.room(
+            viewportHeight = viewportH,
+            barsTop = clear.calculateTopPadding().value + GalleryCardFit.TOP_GAP_DP,
+            barsBottom = fitBottom,
+            head = headDp,
+            rowExtra = GalleryCardFit.ROW_EXTRA_DP,
+        )
+        val fit = { spec: CardSize ->
+            CardFit.fit(spec, room, viewportW, CardMetrics.inset(withPanel.inner), CardMetrics.gap(withPanel.inner))
+        }
+        fun Modifier.head(key: String) = onSizeChanged { if (it.height > 0) heads[key] = it.height }
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(top = clear.calculateTopPadding() + GalleryCardFit.TOP_GAP_DP.dp, bottom = clear.calculateBottomPadding() + 24.dp),
+        ) {
+            item(key = "chips") { ChipsRow(v, withPanel.side, onFilter, civilightItem().head("chips")) }
+            item(key = "orderLine") {
+                OrderLine(withPanel, sort = v.sort, sheets = sheets, route = route, rowState = rowStates[v.sections.first().id], onMulti = onMulti?.takeIf { !multi.active }?.let { set -> { set(MultiPick.start()) } }, modifier = civilightItem().head("orderLine"))
+            }
+            v.unlockedBar?.let { bar -> item(key = "unlocked") { UnlockedBar(bar, withPanel.side, onRelock, civilightItem().head("unlocked")) } }
             if (v.filteredEmpty) {
                 item(key = "filteredEmpty") { FilteredEmpty(withPanel.side) { onFilter(GalleryFilter.All) } }
             } else {
                 when (viewKind) {
-                    GalleryViewKind.CARD -> cardRows(withPanel, { id -> rowStates.getValue(id) }) { _, _ -> handlers.backToPick() }
+                    GalleryViewKind.CARD -> cardRows(withPanel, { id -> rowStates.getValue(id) }, fit) { _, _ -> handlers.backToPick() }
                     GalleryViewKind.GRID -> gridRows(withPanel)
                     GalleryViewKind.LIST -> listRows(withPanel)
                 }
             }
         }
+      }
     }
     when (layout) {
         GalleryLayout.INNER_SPLIT -> SplitPanes(
@@ -909,3 +954,21 @@ private fun MultiBar(
         }
     }
 }
+
+/** The gallery's numbers for fitting the `카드` row between the bars (GAL-07, [CardFit]). */
+object GalleryCardFit {
+    /** The column's gap under the top bar (its content padding). */
+    const val TOP_GAP_DP = 8f
+
+    /** A card row's own room: 14 above (the picked card's 10 dp lift and ring), 12 below. */
+    const val ROW_EXTRA_DP = 26f
+
+    /** Chips + order line before they are measured (first frame), so the cards do not start large and pop. */
+    const val HEAD_ESTIMATE_DP = 92f
+
+    /** A group header above the first row of a grouped view (GAL-10): 12 above + one `sec` line. */
+    const val GROUP_HEADER_DP = 36f
+}
+
+/** A plain float kept across compositions (not state: written after composition, read on the next). */
+private class FloatHolder(var value: Float)

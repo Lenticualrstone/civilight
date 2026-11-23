@@ -1,6 +1,6 @@
 # 60 · 서재, 보호, 파일 (LIB)
 
-Implementation spec for the **library / protection / files** area of Civilight (Android, Jetpack Compose). Feature ids `LIB-01` … `LIB-72`. Engineers implement from this file alone; every Korean string in `code` style is UI copy and must be used verbatim.
+Implementation spec for the **library / protection / files** area of Civilight (Android, Jetpack Compose). Feature ids `LIB-01` … `LIB-72`, `LIB-80` … `LIB-90` (§7) and `LIB-91` … `LIB-97` (§8, 0.2.0). Engineers implement from this file alone; every Korean string in `code` style is UI copy and must be used verbatim.
 
 ## 0. Conventions
 
@@ -57,6 +57,8 @@ Implementation spec for the **library / protection / files** area of Civilight (
 #### LIB-01 · 서재 목록 (커버 화면)
 Priority **P0** · needsExternal **no**
 
+**(0.2.0)** No rating badge (LIB-92); the footer mic is removed (LIB-95); the head toggle follows LIB-93.
+
 The app's first screen after splash (and after the app-lock screen if on). One scroll column under the glass bars.
 
 - **Header** (`GlassBars` top): small label `Civilight`, title `서재`, right: `+` icon button → LIB-09 (새 프로젝트). While the hidden group is open (LIB-32) the right slot shows `다시 잠그기` (lock icon + label) instead of `+` (board `LibUnlocked`).
@@ -78,6 +80,8 @@ Sources: MAIN 서재 · 숨기기 · 수위 등급; R19 §3; boards `Library`, `
 
 #### LIB-02 · 프로젝트 ⋯ 메뉴
 Priority **P0** · needsExternal **no**
+
+**(0.2.0)** Row `수위 등급` and the badge in the sub are removed (LIB-92).
 
 Bottom sheet (`Sheet`) from a row's ⋯ (or a card's ⋯). Header: project name (h2) + `닫기`; sub: rating badge + `<format> · 씬 <s>개 · 인물 <c> · 페이지 <p>` (e.g. `단편 · 씬 6개 · 인물 4 · 페이지 3`). Rows (icon + title + sub), in this order:
 
@@ -112,6 +116,8 @@ Sources: MAIN 저장 · 백업 · 내보내기 (지우기); R20 §4 table row �
 #### LIB-04 · 목록 | 카드 보기 (서재)
 Priority **P1** · needsExternal **no**
 
+**(0.2.0)** Superseded by LIB-93 (서재 보기): the `목록 | 카드` toggle and the card row become the chosen 3D view and the list. No badge on cards (LIB-92).
+
 - `ViewToggle` in the header: segmented `목록` | `카드`; selected cell `pri` fill. The chosen view is remembered **per screen** (persist in AppSettings `viewByScreen["library"]`).
 - **Card view** (board `LibCards`, cover): section `프로젝트 · N · 숨김 M` with a page indicator (pager dots, one per card); one horizontal snapping row of `ProjectCard`s 3:4 (cover 236×296 on cover screen): cover image (or preset/initial-letter card), bottom dark gradient, rating badge, title, one meta line, ⋯ at the top-right; optional status chip (`쓰는 중`, and `홀로` when the cover's holo is on, joined: `쓰는 중 · 홀로`).
 - Hidden projects: one **lock card** at the end of the row: lock icon, `숨긴 프로젝트 <M>`, `이름 · 표지 가림`, button `지문으로 보기` (→ LIB-32). Never a per-project card while locked (R19 §1 row 가로 카드 줄 fixes `MCarousel`, which wrongly shows `R-18 · 검은 서약`).
@@ -124,6 +130,8 @@ Sources: MAIN 카드 보기 · 이미지; boards `LibCards`, `LibCardsWide`, `MC
 
 #### LIB-05 · 최근 연 파일
 Priority **P1** · needsExternal **no**
+
+**(0.2.0)** The masked label `R-18 프로젝트` becomes `TODO_COPY_LIB_MASKED_NAME` (LIB-92).
 
 - Records every open of a scene, character, page or term (and place/faction cards, `ED`) as a `RecentItem` (§3). Shown newest first in the card view (3 on cover, 4 on inner screen).
 - Masking (R19 §3 + §6):
@@ -149,6 +157,8 @@ Sources: MAIN 커버 화면과 펼친 화면; boards `TwoLibrary`, `ColLibrary`,
 
 #### LIB-07 · 모든 프로젝트에서 찾기 (범위 규칙)
 Priority **P1** · needsExternal **no**
+
+**(0.2.0)** Result rows carry no rating badge (LIB-92).
 
 The 서재 command bar searches across all projects (engine and result rendering: search area). This area defines **which projects/items are in scope**:
 
@@ -176,6 +186,8 @@ Four steps, cover screen full-screen pages with a 4-segment progress bar at the 
 
 #### LIB-09 · 1/4 이름과 형식
 Priority **P0** · needsExternal **no**
+
+**(0.2.0)** Row `수위 등급`, its picker and the R-18 block are removed; the project stores `rating: all` (LIB-92).
 
 - Title `이름과 형식`.
 - Field `이름` (required; `다음` disabled while blank after trim). Field `한 줄 소개 (선택)` (placeholder `—`).
@@ -212,6 +224,8 @@ Sources: MAIN 새 프로젝트, 연표; CF §6 (age calc per time mode); board `
 #### LIB-12 · 4/4 시작 재료
 Priority **P0** · needsExternal **no**
 
+**(0.2.0)** `이 프로젝트 숨기기` starts off (LIB-92).
+
 - Title `시작 재료`.
 - Field `주인공 (선택)` → on create, a character with that name is created (fixed field 이름; Cast area). Blank → none.
 - Field `첫 씬 제목 (선택)`, placeholder `비워 두면 ‘씬 1’` → title of the first scene. 형식 설정만 creates no scene (`ED`).
@@ -225,6 +239,8 @@ Sources: MAIN 새 프로젝트; R19 §2 table row 새 프로젝트; R23 §4 tabl
 
 #### LIB-13 · 만든 직후 · 시작해 볼 것
 Priority **P1** · needsExternal **no**
+
+**(0.2.0)** No rating badge in the summary line (LIB-92).
 
 The new project's home (Project home area) shows, on top, this block:
 
@@ -252,6 +268,8 @@ Three layers (MAIN 온보딩): first-run walkthrough, module tooltip tours on fi
 
 #### LIB-15 · 첫 실행 설정
 Priority **P1** · needsExternal **yes** (Drive sign-in, home-screen widget)
+
+**(0.2.0)** `OnbVoice` no longer offers `홈 화면 위젯 추가` (LIB-95).
 
 Shown once (OnboardingState). Pages:
 
@@ -302,6 +320,8 @@ Sources: MAIN 온보딩 ("‘온보딩 끝내기’를 누르면 예시 프로�
 #### LIB-19 · 모듈 안내 (툴팁 투어)
 Priority **P1** · needsExternal **no**
 
+**(0.2.0)** Steps and tours whose target is hidden are left out; `지도 만들기` and `인물 동선 · 장소와 때` tours and script steps 1/4 and 4/4 are out (LIB-96).
+
 Framework this area owns; each module's step content is given below from the boards (module areas supply the target anchors).
 
 - Trigger: first entry into a module (per module flag in OnboardingState). Shade over the screen with one cut-out hole around the target (6 px padding, 12 px radius, 1.5 px `acc` frame); a tooltip card (`raise`, radius 16) with a 3- or 4-segment bar, mono `<label> · k/n`, title, sub, `건너뛰기` (left, text) and `이전` (from step 2) · `다음` / `마치기` (last step).
@@ -333,6 +353,8 @@ Sources: MAIN 온보딩 (세 층); board `HelpReplay`.
 #### LIB-21 · 도움말 · 안내 다시 보기
 Priority **P1** · needsExternal **no**
 
+**(0.2.0)** Rows of tours with no visible step are hidden (LIB-96).
+
 Screen (head `설정` / `도움말 · 안내 다시 보기`):
 
 - Section `처음 안내`: row `워크스루` · `3단계 · 봤음|아직 안 봄` + tag `다시 보기` (replays LIB-16).
@@ -345,8 +367,12 @@ Sources: MAIN 다시 보기; board `HelpReplay` (`scr_decide.py help_replay`).
 
 ### 2.4 수위 등급과 보호
 
+**(0.2.0)** Rating surfaces are removed; hiding and the four protections stay (LIB-92).
+
 #### LIB-22 · 수위 등급 (값 · 배지 · 표기)
 Priority **P0** · needsExternal **no**
+
+**(0.2.0)** Superseded: the rating is not shown or set anywhere; the stored value is kept (LIB-92, 00 §13.3).
 
 - Values: `ALL` (gloss `12세 이하`; long form in menus `ALL(R-12)`), `R-15` (`15세 이상`), `R-18` (`성인`). Chosen at creation (LIB-09), changed later from 서재 ⋯ › 수위 등급 (LIB-02) or 프로젝트 설정 (LIB-25); both open the same sheet (LIB-24).
 - Badge (`Tag` rating badge): mono 10 px, small radius; ALL and R-15 = `ink2` outline; R-18 = `r18` red. Shown on 서재 rows/cards, project ⋯ sheet, project home line, new-project summary, export sheet subtitle.
@@ -356,6 +382,8 @@ Sources: MAIN 수위 등급 table; R19 §2 rule; DS README 숨기기 · 등급, 
 
 #### LIB-23 · 보호 값과 등급별 기본값 (설정 · 수위 등급)
 Priority **P0** · needsExternal **no**
+
+**(0.2.0)** The 설정 · 수위 등급 screen is removed from navigation; the four per-project protections stay (LIB-92).
 
 **Per-project protections** (stored on the project, §3 `Protections`):
 
@@ -382,6 +410,8 @@ Sources: MAIN 수위 등급 table; R19 §2 rule + table; boards `RatingSettings`
 
 #### LIB-24 · 등급 바꾸기 · `바뀌는 것` 시트
 Priority **P0** · needsExternal **no**
+
+**(0.2.0)** No entry point in 0.2.0 (LIB-92).
 
 Opened whenever the rating of an existing project is changed to a different value. Never applied silently. Built fresh every time (no memory of earlier choices).
 
@@ -413,6 +443,8 @@ Sources: R19 §2 (rule, example, table, 버린 안); boards `RHRatingSheet`, `RH
 #### LIB-25 · 프로젝트 설정 › 등급 · 숨기기
 Priority **P0** · needsExternal **no**
 
+**(0.2.0)** Section label `숨기기`; row `수위 등급` and the `기본과 다름` suffix removed; the four switches stay (LIB-92).
+
 Section `등급 · 숨기기` of 프로젝트 설정 (board `ProjSettings`):
 
 - `수위 등급` · `ALL · R-15 · R-18` · value `<rating> ›` → picker → LIB-24.
@@ -437,6 +469,8 @@ Sources: MAIN 수위 등급 (FLAG_SECURE in concept memory); R19 §3; board `Rec
 #### LIB-27 · 이름 가리기
 Priority **P0** · needsExternal **no** (the contract also binds widget code, which is external — Life Recorder area)
 
+**(0.2.0)** The masked label is `TODO_COPY_LIB_MASKED_NAME`, interim `이름 가림` (LIB-92).
+
 - Single function `displayProjectName(project, surface)` used by every surface outside the project itself:
 
 | Surface | hidden project (any rating) | not hidden, nameMask on | otherwise |
@@ -455,12 +489,16 @@ Sources: MAIN 수위 등급; R19 §3 table; board `Recents`.
 #### LIB-28 · 라이프 레코더 연결 가리기
 Priority **P1** · needsExternal **no**
 
+**(0.2.0)** The link shows `TODO_COPY_LIB_MASKED_NAME` instead of `R-18` (LIB-92).
+
 When on, every place in the Life Recorder (chips, 기록함 rows, 정리 중 screen) that shows a link to this project shows only the rating, `R-18` (drawn value), instead of the project/scene name — also while the project is open (R23 §6). Rendering is the Life Recorder area's job; this area provides `recorderLinkLabel(project)`.
 
 Sources: MAIN 수위 등급; R19 §2 example ("‘하르트가 등불을 싫어하는 이유’의 … 바로 ‘R-18’로 보인다"); R23 §6 table.
 
 #### LIB-29 · 시스템 최근 앱 미리 보기와 카드 이름
 Priority **P0** · needsExternal **no**
+
+**(0.2.0)** Task label `R-18 프로젝트` becomes `TODO_COPY_LIB_MASKED_NAME` (LIB-92).
 
 - Capture-blocked project content on screen → preview masked (FLAG_SECURE, LIB-26).
 - Hidden project content on screen (any rating, capture block off) → **recents preview only** is masked; screenshots follow that project's capture setting.
@@ -473,6 +511,8 @@ Sources: R19 §3 table rows 시스템 최근 앱; board `Recents` (`scr_rating.p
 
 #### LIB-30 · 알림 문구 가림
 Priority **P1** · needsExternal **no**
+
+**(0.2.0)** Masked names use `TODO_COPY_LIB_MASKED_NAME` (LIB-92).
 
 Notifications posted by this area (backup done, restore done, export done) never contain a hidden project's name; they count hidden projects as `숨긴 프로젝트 N` (number only); name-masked projects appear as `R-18 프로젝트`.
 
@@ -637,7 +677,7 @@ Sources: R20 §5; FMT §7; board `Trash`.
 #### LIB-40 · 되돌리기 알림 (Toast host)
 Priority **P0** · needsExternal **no**
 
-- `Toast` component: `ink` fill, `bg` text, one action. Position: above the bottom glass bar (156 px from the bottom on the script screen). One toast at a time; a new one replaces the old (`ED`); duration `ED` 6 s; tapping the action performs the undo and dismisses.
+- `Toast` component: `ink` fill, `bg` text, one action. One toast at a time; a new one replaces the old (`ED`); tapping the action performs the undo and dismisses. **Position, duration and dismissal follow DS-67** (80-design-system, 2026-11-23), which replaces the earlier "above the bottom glass bar" and `ED` 6 s: one window slot `systemBottom + max(156, tallest bottom chrome + 6)`; 2.5 s info, 4 s with `되돌리기` or an error; gone at once on a lock.
 - Messages come from owning areas; drawn/sourced examples: `블록 #043 지움 · ◆ 1개는 #044 자리로` + `되돌리기` (board `UndoToast`); `블록 5개 지움 · ◆ 2개 다음 자리로`; `씬 3 지움 · ◆ 3 · ◇ 1은 씬 4 처음으로`; `인물 노아 지움 · 참조 20 · 점검 센터 · 되돌리기`; `인물 노아 지움 · 되돌리기`; `시장 꼬마 → 노아 합침 · 참조 5 · 되돌리기`; `노아 되살림 · 다시 이어짐 · 대사 11 · @ 3 · 씬 등장 2 · 그대로 둔 것 · 대사 3`.
 - After the toast is gone, deleted content is still in 휴지통 (R12 §7: "되돌리기 알림, 휴지통 30일").
 
@@ -647,6 +687,8 @@ Sources: R12 §2, §7; R20 §4–§6; DS `Toast`; board `UndoToast`.
 
 #### LIB-41 · 내보내기 시트
 Priority **P0** · needsExternal **no**
+
+**(0.2.0)** With `게임 제작 도구` off only `대본 PDF` and `프로젝트 파일 .civilight` are offered (LIB-91); rating fragments leave the subs and the sheet sub (LIB-92); `.civilight` gains the versions row (LIB-97).
 
 Bottom sheet over the project (board `Export`, `scr_states.py export`), opened from 서재 ⋯ › `백업 · 내보내기` or the project's menus.
 
@@ -695,6 +737,8 @@ Sources: R19 §5; R23 §6.
 
 #### LIB-43 · 대본 PDF
 Priority **P1** · needsExternal **no**
+
+**(0.2.0)** No rating on the cover; `내보내기 표지에 등급 표시` is not shown (LIB-92).
 
 - Reading copy of the manuscript for the chosen range. Cover page with project name and rating (when `내보내기 표지에 등급 표시` is on — default on for all ratings).
 - Scene heads appear as title lines (R22 §6). Blocks rendered in manuscript order; speaker name above line (Nanum Myeongjo body, Noto Sans KR labels, embedded fonts).
@@ -749,6 +793,8 @@ Sources: MAIN 내보내기 (JSON 골격); R22 §6; CF §8; R19 §5; FMT §1.
 #### LIB-46 · 보이스 ID 고정 (내보낼 때)
 Priority **P1** · needsExternal **no**
 
+**(0.2.0)** Runs only for CSV and JSON, which are hidden while `게임 제작 도구` is off (LIB-91).
+
 - A dialogue block's voice ID is `자동` until it is first written into a CSV or JSON export; at that moment it becomes `고정` with the export date, and the app never changes it afterwards (R12 §6). The property panel (Script area) shows `HRT_0107_043 · 자동` / `HRT_0107_043 · 고정 · 11월 20일 내보냄`.
 - Only blocks actually written into the file are fixed (range and hidden-scene `빼기` respected). Whether hidden-but-excluded scenes get fixed: §6 Q20 (`ED`: not fixed, since they were not written).
 - PDF and `.civilight` exports never fix voice IDs.
@@ -758,6 +804,8 @@ Sources: R12 §6; FMT §6; R19 §7.
 
 #### LIB-47 · 프로젝트 파일 내보내기 (.civilight)
 Priority **P0** · needsExternal **no**
+
+**(0.2.0)** Always carries `gameTools` and all game data (LIB-91); versions only with the LIB-97 row.
 
 - Writes one project into one `.civilight` package (LIB-49) in the **latest** format version. Contents per FMT §6: manuscript, cast, world, maps, canvases, pages, change records — always; project settings and field definitions — always (app settings such as theme/layout never); original images and map bases — always; voice-ID states and discarded IDs — always; Life Recorder records linked to this project — text always, original audio optional (default off), hidden records only as in LIB-42; trash — not included unless `휴지통도 포함`; check `맞음` marks and term `아님`/`맞음` — always; derived values, search index, preview images — never, except one cover `preview.webp` (omitted for hidden projects).
 - Encryption per LIB-51 when the `암호` switch is on.
@@ -915,6 +963,8 @@ Sources: FMT §3.
 #### LIB-57 · Google Drive 자동 백업
 Priority **P1** · needsExternal **yes**
 
+**(0.2.0)** Backups always carry versions (LIB-97) and game data (LIB-91).
+
 - Toggle 설정 › 보관 `Google Drive 자동 백업` (and onboarding `연결`). Schedule: once a day, Wi-Fi only (`하루 한 번 · 와이파이 · 원본은 기기에`). Originals stay on the device.
 - Units: one `.civilight` per project, one `.civilight-recorder`, one app-settings file. Only projects changed since their last uploaded version are uploaded. 30 days of versions kept.
 - Hidden projects: encrypted with the 복구 암호 (`lockType: recovery`); if no 복구 암호 is set, or 설정 · 숨기기 `숨긴 것도 백업` is off, hidden projects are **excluded**, and 설정 and the backup screen show `숨긴 프로젝트 <n> · 백업 안 됨`.
@@ -984,6 +1034,8 @@ Sources: board `ErrBackup`, `Settings`; FMT §5; R19 §5.
 #### LIB-63 · 설정 (앱)
 Priority **P0** · needsExternal **no**
 
+**(0.2.0)** Section `화면` gains `서재 보기` and `카드 보기` (LIB-94).
+
 Root app-settings screen (head `Civilight` / `설정`, board `Settings`). App settings are separate from project settings.
 
 - Section `화면`: segmented `기기 설정` · `라이트` · `다크` (theme, applied live); `글자 크기` · `본문 18 · 행간 1.7` · `보통 ›` (LIB-65); `펼친 화면 배치` · `서재 · 인물 · 세계 · 연표 …` · `목록 + 상세 ›` (LIB-66); `움직임 · 투명도` · `애니메이션 줄이기 · 투명도 줄이기` · `기기 설정 ›` (LIB-67); `지도 · 이미지 · 연표` · `색면 · 홀로 · 생성 방식 · 이동 거리` · `›` (LIB-68).
@@ -995,6 +1047,8 @@ Sources: board `Settings` (`scr_tools.py settings`); concept memory ("app settin
 
 #### LIB-64 · 설정 · 숨기기
 Priority **P0** · needsExternal **no**
+
+**(0.2.0)** Row `수위 등급별 동작` is removed (LIB-92).
 
 Screen (head `설정` / `숨기기`, board `HideSettings`):
 
@@ -1042,6 +1096,8 @@ Sources: board `SettingsMore` (`scr_consist.py`).
 #### LIB-69 · 프로젝트 설정 (container)
 Priority **P0** · needsExternal **no**
 
+**(0.2.0)** `스크립트 추가 칸` starts with `게임 제작 도구`; `무대 위치` · `보이스 ID` · `ID 형식` hide while it is off (LIB-91). Section `등급 · 숨기기` reads `숨기기` (LIB-92).
+
 Screen (head `<project name>` / `프로젝트 설정`, board `ProjSettings`). This area owns the screen, section `구조` › `단계 이름` and `세계 시간`, and section `등급 · 숨기기` (LIB-25). Other rows are rendered here but specified by their areas:
 
 - `구조`: `단계 이름` · `장 › 에피소드 › 씬` · `바꾸기 ›` (edits Project.structure, same editor as LIB-10 직접 정하기; renaming keeps all data); `세계 시간` · `연도만 · 시작 1200년` · `연도만 ›` (time mode + start year; calendar editor: Timeline); `때 표기`, `이동 수단`, `하루 · 시간대` (Timeline / travel).
@@ -1056,6 +1112,8 @@ Sources: board `ProjSettings` (`scr_decide.py proj_settings`); concept memory (p
 
 #### LIB-70 · 빈 상태
 Priority **P1** · needsExternal **no**
+
+**(0.2.0)** `EmptyLr` sub becomes `TODO_COPY_LRC_EMPTY_SUB` (LIB-95).
 
 Shared pattern (`empty_block`): outlined card (radius 20), title (Nanum Myeongjo 800 22px), one sub line, a primary and an optional ghost button. Instances (hosts in brackets):
 
@@ -1297,6 +1355,8 @@ Always: project (with rating, protections, structure, time settings, field defin
 
 All cases are JVM unit tests against pure functions; signatures are `ED` suggestions. Injected clock `now = 2026-11-22T09:00+09:00`. Sample data: projects 「잿빛 새벽의 등불」 (R-15, visible, 2 chapters planned, 1-7 쓰는 중), 「유리 정원」 (ALL, 단편, 씬 6), 「검은 서약 (가제)」 (R-18, hidden, 설정만, 인물 5), 「외전 · 오웬의 시장」 (R-15, hidden, 씬 2). Factory RatingDefaults unless stated.
 
+**(0.2.0)** R19-01 … R19-10 stay only while the sheet code exists (no entry point); R19-11 … R19-15 are replaced by §8.3 R-02 and R-06.
+
 ### 4.1 Rating change sheet — `ratingSheet(from, to, current: Protections, defaults, recoverySet: Boolean, unencryptedBackups: Int, linkedRecords: Int): RatingSheet` and `applyRatingSheet(...)`
 
 | # | Given | When | Then |
@@ -1316,6 +1376,8 @@ All cases are JVM unit tests against pure functions; signatures are `ED` suggest
 | R19-13 | `newProjectProtections(R18, defaults with r18Hide=false, step4Hide = null)` | create | hidden false; step-4 toggle initial value false |
 | R19-14 | 잿빛 R-15, captureBlock turned on in 프로젝트 설정 (R-15 default off) | `projectSettingsRows(project, defaults)` | 화면 캡처 가리기 sub ends with `R-15 기본과 다름`; other rows have no marker; rating stays R15 |
 | R19-15 | 검은 서약 R-18, all protections on (= R-18 defaults) | projectSettingsRows | no `기본과 다름` marker on any row |
+
+**(0.2.0)** In §4.2 every expected `R-18 프로젝트` reads `TODO_COPY_LIB_MASKED_NAME` and no badge is expected (§8.3 R-03, R-04).
 
 ### 4.2 Masking surfaces — `projectSurface(surface, project, unlock): Presentation` (R19 §3)
 
@@ -1580,3 +1642,553 @@ Only real contradictions or gaps. Each states both sides and the default this sp
 28. **설정 · 숨기기 `가리는 곳` switches.** R19 §3 makes hidden projects always excluded from widgets/recents/search while locked and always masked in notifications, so turning these switches off has no defined meaning. Default: off never reveals hidden names; `검색 · 명령 결과` off = hidden content excluded even while open; the second switch is shown on and disabled until decided.
 29. **R-18 non-hidden auto backups.** Export encrypts R-18 files by default (FMT §5), but auto-backup encryption is defined only for hidden projects. Default: R-18 not hidden → unencrypted backup.
 30. **Library `+` while the hidden group is open.** `LibUnlocked` replaces `+` with `다시 잠그기`. Default: follow the board (new project via `+` after re-lock); confirm.
+
+## 7. 프로젝트 표지 (U-08, added 2026-11-23)
+
+Feature ids `LIB-80` … `LIB-90`. User request (U-08): "프로젝트 대표 이미지 설정이 불가능함". The user wants one image per project for the 서재 card and the home head, picked from the project gallery or added new, with a crop.
+
+**Word.** The UI word stays `표지`, the slot word that already exists (`프로젝트 표지`, `표지 이미지`, `표지로`, `지금 표지`, `이름 · 표지 가림`). `대표 이미지` is the user's description, not UI copy, under the one-word-per-meaning rule. `내보내기 표지에 등급 표시` (LIB-23) keeps its own meaning, the PDF cover page (§7.5 Q-CV-1).
+
+**What already exists, and what this section adds.** Most of the feature is built. What is missing is any way in, a way to remove the cover, and the home head.
+
+| Part | State before U-08 | Where |
+| --- | --- | --- |
+| Storage: one `ImageUse` row `(project, <project key>, projectCover)` with crops `r3x4` · `r1x1` and `holo` | exists | 00 §2.10, C-10; `core:model` `ImageUse` |
+| Blob kept while the cover row exists | exists (`BlobRefs.counts` counts every `imageUses` row) | 00 §12.2; `core:model` `BlobRefs` |
+| 서재 card 3:4 and list thumbnail 1:1, initial-letter card | exists | LIB-04, D6; `feature:library` `ShelfCards.cover` / `thumb`, `CoverArt` |
+| `preview.webp` from the 3:4 crop, none for hidden projects | exists | LIB-47, 00 §7.2; `feature:library` `CoverPreview` |
+| Picker `ImagePickSheet(p, PROJECT, p, PROJECT_COVER)` and crop route `ImageCrop` | exist, opened by nobody for the cover | CNV-27, CNV-28; `feature:canvas` `image/pick`, `image/crop` |
+| Gallery `⋯ › 표지로` | exists | GAL-14 |
+| Entry points (서재 ⋯, 프로젝트 설정, home head) | **new** | LIB-81, LIB-82, LIB-83 |
+| Cover mode of the picker: current-cover line, `갤러리` tab, `빼기` | **new** | LIB-84 … LIB-87 |
+| Cover on the home head | **new** | LIB-83 |
+| Masking and capture rules applied to the cover image | **new** (made explicit) | LIB-89 |
+
+Markers as in §0. `[PROPOSED]` = copy or behaviour chosen here because no board draws it; each one is listed in §7.5 with its default.
+
+### 7.1 Features
+
+#### LIB-80 · 표지 (what the cover is)
+Priority **P1** · needsExternal **no**
+
+- A project has **at most one** cover. It is the `ImageUse` with `ownerKind = project`, `ownerKey = Project.key`, `slot = projectCover` (00 §2.10, C-10). Its `source` is `preset:<id>` or a blob hash. `crops` holds `r3x4` (`카드 3:4`) and `r1x1` (`목록 1:1`), and `holo` is a Boolean (CNV-25, CNV-30).
+- No cover = no row. Then every surface draws the initial-letter card (CNV-24, LIB-88).
+- The `coverImage | ImageRef` row of §3.2 means this row. `Project` has no image column (C-10).
+- Every write (set, re-crop, holo, remove) is **one undo step** on the project's undo stack. It goes through `feature:canvas` `ImageEdits` (`placePreset`, `placeBlob`, `setHolo`, and the new `clear`, LIB-87). Neither `feature:library` nor `feature:story` writes `assets.imageUses` itself.
+- The read-only example project (LIB-17) cannot change its cover: there is no entry point (LIB-81 … LIB-83), and the picker refuses as it already does (`읽기 전용`).
+
+#### LIB-81 · 서재 ⋯ › 표지 이미지
+Priority **P1** · needsExternal **no**
+
+- The LIB-02 sheet gains a row right after `이름 바꾸기`:
+  - icon `Image`, title `표지 이미지`, sub `지금 <source word>` (`지금 사진` · `지금 파일` · `지금 등불`), or `없음 · 첫 글자 카드` when there is no cover. The source word follows LIB-84.
+  - Tap → closes the ⋯ sheet, opens the cover picker (LIB-84) over the 서재. The picker and the crop route run on the project's session opened from the 서재: `적용` and `취소` return to the 서재, the `표지 뺌` toast shows in the 서재's toast host, and the project's item lock is read as inside the project (locked unless the project's hidden items were opened). Build plan step 0 verifies this.
+- Row order: `열기` · `이름 바꾸기` · `표지 이미지` · `수위 등급` · `프로젝트 숨기기` or `숨김 풀기` · `백업 · 내보내기` · `지우기`. The example project still shows only `열기`.
+- A hidden project gets this row only while its group is open, since its ⋯ is reachable only then (LIB-31).
+
+#### LIB-82 · 프로젝트 설정 › 표지
+Priority **P1** · needsExternal **no**
+
+- New first section `표지` on 프로젝트 설정 (LIB-69), above `구조` `[PROPOSED]`. It holds one link row:
+  - title `표지 이미지`, sub `서재 카드 · 목록 썸네일 · 프로젝트 홈`.
+  - value `<source word> ›`, or `없음 ›` with no cover.
+  - Tap → the cover picker (LIB-84) over 프로젝트 설정.
+- Read-only example: the row is disabled, like every row there (LIB-69).
+
+#### LIB-83 · 프로젝트 홈 머리의 표지
+Priority **P1** · needsExternal **no** · drawn by `feature:story` (STO-01 hand-off, §7.4)
+
+- On 프로젝트 홈 (STO-01, boards `Home`, `TwoHome`, `ColHome`), the name item becomes a row:
+  - left: the cover, **3:4 crop**, 84 × 112 dp, radius 14 `[PROPOSED]`. No new ratio: the home head reuses `카드 3:4`.
+  - right, 16 dp gap: the existing name (`displayM`), the summary line, and the one-liner.
+  - The glass head (`‹ 서재 · …`, rating badge, lens chip) is unchanged. U-06 changes only the head copy.
+- The cover draws exactly as the 서재 card's image layer (`CoverArt`): image, preset art, or the initial-letter card. It has the static holo foil when `holo` is on, and no text on the image.
+- **Visible edit control** (no hidden tap target): a 24 dp round badge at the cover's bottom-right, inset 6. Its fill is `bg`, with a 1 dp `edge` outline and a 14 dp `Pencil` icon in `ink2`.
+  - The whole cover is the hit target (≥ 44 dp).
+  - Accessibility label: `표지 이미지 · 바꾸기`, or `표지 이미지 · 고르기` with no cover.
+  - Tap → the cover picker (LIB-84) over home.
+- Read-only example: no badge, not tappable, the cover is still drawn.
+- `NewReady` (LIB-13): the cover shows as well, with the initial-letter card for a new project, so the way in is visible from the first minute.
+- Inner `목록 + 상세`: the right-pane home shows the same row. The size is unchanged.
+
+#### LIB-84 · 표지 고르기 (the picker in cover mode)
+Priority **P1** · needsExternal **no** · drawn by `feature:canvas`
+
+The cover mode reuses the shared CNV-27 sheet `ImagePickSheet(p, PROJECT, p, PROJECT_COVER)`; there is no second picker. On top of CNV-27:
+
+- **Header** (exists): `표지 이미지` + `닫기`; sub `<project name> · 카드 3:4 · 목록 1:1`.
+- **Current line** (new, between header and tabs, height 64): a 48 dp thumbnail (1:1 crop, preset art or initial-letter card) and a text line.
+  - With a cover: `지금 표지 · <source word>`, then text buttons `자르기` (blob covers only) and `빼기`.
+  - Without one: `표지 없음 · 첫 글자 카드` and no buttons.
+- **Source word** `[PROPOSED]`, the GAL-25 pattern `<preset name or 사진>`: the preset's name (`등불`); `사진` when the blob's `source` is `gallery` (system photo picker); `파일` for every other blob source. The source word never names a gallery item, so a hidden item's title cannot leak.
+- **Tabs**, cover slot only:
+  - `갤러리 <N>` (new, LIB-85) · `기본 이미지 8` · `내 이미지 <M>`.
+  - Initial tab:
+    - the cover's source equals a gallery tile → `갤러리`
+    - preset → `기본 이미지`
+    - other blob → `내 이미지`
+    - no cover → `갤러리` when N ≥ 1, else `기본 이미지`
+- **Buttons**: `사진` · `파일` · `고르기`. The system-picker button reads `사진` in this picker too (55 §6 Q1: the word `갤러리` is the tab now).
+- **Holo row** (exists, CNV-27): its value is written with `고르기` or the crop's `적용`. With a cover and no new choice, flipping it writes `setHolo` at once (one undo step) `[PROPOSED]`.
+- The current tile is selected when the sheet opens (exists).
+- `고르기`:
+  - with the current blob selected → the crop editor (re-crop, exists)
+  - with another blob → the crop editor
+  - with a preset → placed at once, no crop (CNV-27, Q-IM-03 default)
+  - with a gallery tile → LIB-85
+
+#### LIB-85 · 갤러리에서 고르기
+Priority **P1** · needsExternal **no**
+
+- Tab `갤러리 <N>`: the **project's own** gallery items (GAL-10 `프로젝트`), live and visible, in gallery order (GAL-15). Character galleries are not in this tab; their originals stay reachable under `내 이미지`.
+  - Tiles: the item's `카드 3:4` crop (the 108 × 144 tile).
+  - Under each tile: the item title, or `제목 없음`.
+  - Chips: `표지` on the current one; `홀로` when the item's holo is on; `숨김` on hidden items while unlocked (GAL-19).
+- **Locked hidden items** are not tiles and are not counted in `<N>` (GAL-19). An empty tab shows the line `이미지 없음` `[PROPOSED]`.
+- `고르기` with a gallery tile:
+  - **Original** → the crop editor (CNV-28) for the cover slot, through the existing `CropHandOff`:
+    - Each ratio starts from **the item's own crop** `[PROPOSED]` (new: today `CropHandOff` carries only holo and the hidden note). The item's `r3x4` and `r1x1` are the same ratios as the cover's. A ratio the item has not cropped starts at the centred largest frame.
+    - The holo switch starts at the item's `holo`.
+    - A hidden item (unlocked) shows `숨긴 이미지 · 표지에서는 보임` above the crop buttons (GAL-14).
+    - `적용` writes the cover `ImageUse` (same source, the edited crops, holo): one undo step, the existing `적용` step.
+    - `취소` writes nothing.
+  - **Preset item** → placed at once with the item's holo (GAL-14 preset rule).
+- Nothing is copied: the cover row and the gallery item point at the same blob, each with its own crops. Re-cropping one never changes the other.
+- The gallery's `⋯ › 표지로` (GAL-14) writes the same row. It gains the same crop prefill (hand-off, §7.4), so both ways give the same result.
+
+#### LIB-86 · 사진에서 넣기 · 기본 이미지 · 내 이미지
+Priority **P1** · needsExternal **no**
+
+- `사진` (single `PickVisualMedia`) and `파일` (`OpenDocument`): the image is imported into the blob store (CNV-29, stored by hash), and then the crop editor opens on `카드 3:4` (CNV-27). `적용` sets the cover.
+  - The image is **not** added to the project gallery `[PROPOSED]`. The empty gallery already offers `표지 이미지도 넣기` (GAL-25).
+- `기본 이미지 8`: a preset is placed at once (exists).
+- `내 이미지 <M>`: as CNV-27. Originals that only hidden things use are left out while locked (`MyImages.visible`).
+- Re-crop: the current line's `자르기` opens the crop editor with the cover's stored crops (CNV-28 "언제든 다시").
+
+#### LIB-87 · 표지 빼기
+Priority **P1** · needsExternal **no**
+
+- The current line's `빼기` removes the cover `ImageUse` row, with no confirm, and closes the sheet. The toast `표지 뺌` + `되돌리기` (LIB-40) follows.
+- One undo step. `되돌리기` puts back the same row: source, both crops and holo.
+- Every surface then shows the initial-letter card (LIB-88).
+- The blob is **not** deleted at that moment. It is removed only by the blob sweep (`PurgeActions.runDue`), and only when `BlobRefs` across the app no longer references it (00 §5.3).
+- A gallery item with the same source is untouched; its `표지` chip simply goes away (derived, GAL-14).
+- Write path: new `ImageEdits.clear(doc, owner, ctx)` in `feature:canvas`; `ImagePickViewModel.clear` runs it as the undo step named `빼기`.
+
+#### LIB-88 · 보이는 곳 · 없을 때 · 등급 배지
+Priority **P1** · needsExternal **no**
+
+**(0.2.0)** The rating badge part no longer applies; no badge is drawn (LIB-92).
+
+| Surface | Crop | Size | Exists |
+| --- | --- | --- | --- |
+| 서재 list row thumbnail | `r1x1` | 48 dp, radius 10 | yes (D6) |
+| 서재 card view, cover | `r3x4` | 222 × 296 | yes (LIB-04) |
+| 서재 card view, inner (`LibCardsWide`) | `r3x4` | 236 × 336 | yes |
+| 프로젝트 홈 head | `r3x4` | 84 × 112 | **new** (LIB-83) |
+| Cover picker current line | `r1x1` | 48 dp | **new** (LIB-84) |
+| `.civilight` `preview.webp` | `r3x4` | 360 px wide | yes (LIB-47) |
+
+- **Not shown** (`ED`):
+  - 최근 연 파일 cards (they show the item's own image, Q-IM-09)
+  - 모든 프로젝트에서 찾기 rows
+  - 휴지통 project rows
+  - notifications, widgets and the system recents card
+  - the 내보내기 sheet
+- **No cover**: the initial-letter card (CNV-24): fill `tint` (list: `chip`), and the first grapheme of the project name in the serif face, `ink3`.
+  - Size of the letter: 20 sp in the 48 dp thumbnail, 40 sp on the home cover, 64 sp on the card.
+  - No `이미지 고르기` tag on these surfaces. The way in is the ⋯ row, the settings row and the home badge.
+- **Preset**: drawn with its real preset art (CNV-26 colours and shards), not a generic shard set. Today `feature:library` draws a generic `ShardArt`; the move request is in §7.6.
+- **Missing original** (the row names a blob whose file is not on this device, for example after an undo across a blob sweep): drawn as **no cover** (initial-letter card), with no crash and no empty box.
+  - The current line reads `표지 없음 · 첫 글자 카드` but keeps `빼기`, so the stale row can be cleared.
+  - `preview.webp` is left out.
+- **Rating badge**:
+  - On a card the badge stays in the text block on the bottom shade (CNV-23), over any cover: `R-18` in `#FF8A80`, others light. The shade is drawn whatever the cover, so the badge keeps ≥ 4.5:1 on bright covers (`설원`, white photos).
+  - The 48 dp thumbnail never carries a badge; the badge sits in the meta line (LIB-01).
+  - The home head keeps the badge in the glass head.
+  - Rating alone never hides or shows the cover. Only the protections do (LIB-22, LIB-89).
+- **Holo**: the card and home cover draw the foil and the card chip includes `홀로` (exists). The 48 dp thumbnail draws no foil (`ED`, too small).
+- **Motion**: no new motion. A cover change crossfades through the existing `BlobImage` (`motion.spec(CivilightMotion.standard)`). Sheets, tabs and the crop editor keep their CNV motions. Reduce motion follows the theme helpers. MotionLint applies.
+
+#### LIB-89 · 숨김 · 잠금 · 캡처 (masking of the cover)
+Priority **P0** · needsExternal **no**
+
+The cover is masked **exactly like the project name**. Wherever `displayProjectName` (LIB-27) does not return the real name, the cover is not drawn or decoded.
+
+- **Hidden project, group locked**:
+  - no row, no card, no thumbnail
+  - the lock card reads `이름 · 표지 가림` (exists)
+  - the cover blob is not decoded: `ShelfUi.cards` and `ShelfUi.rows` hold no `CoverUi` of a hidden project while locked
+  - no `preview.webp` in exports or Drive backups (exists)
+- **Hidden project, group open**: the row and card show the cover, like the name, and protect the window (exists for open rows and cards).
+- **Re-lock** (LIB-33):
+  - The cover picker of a hidden project closes. `ImagePickSheet` is a `ProjectSheet`, so `ShelfState.sheetsToClose` already covers it on the 서재.
+  - An open crop editor of that project goes under the lock screen (it is a `ProjectRoute`) and writes nothing.
+  - On return the 서재 shows the lock card only.
+- **`이름 가리기` on, not hidden** (R-18 default): the 서재 row and card show the cover with the real name and the red badge, as R19 §3 shows the name there. Surfaces where the name becomes `R-18 프로젝트` show no cover (none of them shows a cover today; keep it so).
+- **`화면 캡처 가리기`** `ED` `[PROPOSED]` (new): a 서재 row or card that draws a cover **blob image** of a project with `captureBlock` on protects the window (`ProtectWindow(WindowProtection.forProject(…))`), as open hidden rows do.
+  - Preset art and the initial-letter card do not.
+  - Inside the project (home, picker, crop) the project's own protection applies already (LIB-26).
+- **Hidden items as the source**:
+  - While locked, hidden gallery items and originals only hidden things use are not offered (LIB-85, LIB-86).
+  - While unlocked a hidden item may become the cover. The crop editor says `숨긴 이미지 · 표지에서는 보임`, and the image is then visible as the cover (GAL-14: an explicit choice).
+  - The source word never names the item (LIB-84).
+
+#### LIB-90 · 저장 · .civilight · 휴지통
+Priority **P1** · needsExternal **no**
+
+- **No new field, no format change.** The cover is the existing `ImageUse` row in `assets/index.json › imageUses` (00 §7.2, §7.8). Its original is `assets/<hash>.<ext>` with a metadata row in `assets/index.json › blobs`.
+  - `formatVersion` stays `"1.0"` and `minReaderVersion` stays `"1.0"`.
+  - No feature id and no upgrade step.
+  - Every 1.0 reader already reads it. A reader that does not know a slot value keeps the row through `OpenEnum` and writes it back (LIB-50).
+- **Package**:
+  - `preview.webp` comes from the `r3x4` crop. It is absent for hidden projects, preset covers and missing originals (LIB-88).
+  - In an encrypted file both sit inside the payload (LIB-51).
+- **Blob GC**: `BlobRefs.counts` counts the cover row like every `ImageUse` (00 §12.2). The cover keeps its original alive on its own, whatever happens to gallery items, portraits or `내 이미지`.
+- **Trash**:
+  - Deleting the gallery item the cover came from leaves the cover unchanged (GAL-20). Restoring that item brings its `표지` chip back (derived).
+  - Purging the item leaves the blob, because the cover row still references it.
+  - Project delete (LIB-03): the cover goes to the trash with the project and comes back on 되살리기 (LIB-38). Project purge drops the row; the blob goes when no project references it.
+- **App state**: decoded cover bitmaps stay in memory only, with no disk cache (`ED`). Nothing about the cover is written to `files/library.json`, so the 서재 index never holds a hidden project's picture.
+
+### 7.2 Copy
+
+All in the owners' `…Copy` objects, checked by `CopyLint`. `exists` = already a constant; `[PROPOSED]` = new, listed in §7.5.
+
+| Where | Copy | State |
+| --- | --- | --- |
+| ⋯ row title | `표지 이미지` | exists (`ImageCopy.PICK_TITLE_COVER`); new constant in `domain:library` `ProjectMenus` |
+| ⋯ row sub | `지금 <source word>` · `없음 · 첫 글자 카드` | `[PROPOSED]` |
+| 프로젝트 설정 section | `표지` | `[PROPOSED]` (`ImageCopy.SHORT_PROJECT_COVER` word) |
+| 프로젝트 설정 row | `표지 이미지` · `서재 카드 · 목록 썸네일 · 프로젝트 홈` · `<source word> ›` / `없음 ›` | `[PROPOSED]` |
+| Source words | `<preset name>` · `사진` · `파일` | exists (GAL-13, GAL-25) |
+| Picker current line | `지금 표지 · <source word>` · `자르기` · `빼기` | `[PROPOSED]` (`지금 표지` exists, `GalleryUiCopy.NOW_COVER`) |
+| Picker current line, none | `표지 없음 · 첫 글자 카드` | `[PROPOSED]` |
+| Picker tab | `갤러리 <N>` | `[PROPOSED]` |
+| Gallery tab empty | `이미지 없음` | `[PROPOSED]` |
+| Gallery tile caption | `<title>` · `제목 없음` | exists (GAL) |
+| Picker system button | `사진` | exists (55 §6 Q1) |
+| Crop note for a hidden item | `숨긴 이미지 · 표지에서는 보임` | exists (GAL-14) |
+| Toast | `표지 뺌` · `되돌리기` | `[PROPOSED]` |
+| Home cover accessibility | `표지 이미지 · 바꾸기` · `표지 이미지 · 고르기` | `[PROPOSED]` |
+| Lock card | `이름 · 표지 가림` | exists (LIB-04) |
+
+### 7.3 Rules as test cases
+
+Fixtures as §4: 「잿빛 새벽의 등불」 (R-15, visible), 「유리 정원」 (ALL), 「검은 서약 (가제)」 (R-18, hidden, captureBlock, nameMask). Fixture G0 of 55 §4 (리엔's gallery), extended with three **project-owned** gallery items: P1 `표지 시안` (blob `h1`, source `gallery`, crops r3x4 + r1x1, holo on), P2 (preset `lantern`) and PH (hidden, blob `h2`). The seams are `ED` suggestions.
+
+| # | Given | When | Then |
+| --- | --- | --- | --- |
+| CV-01 | 유리 정원 without a cover | `ProjectMenus.of(doc)` | rows `열기 · 이름 바꾸기 · 표지 이미지 · 수위 등급 · 프로젝트 숨기기 · 백업 · 내보내기 · 지우기`; cover sub `없음 · 첫 글자 카드` |
+| CV-02 | the example project | `ProjectMenus.of(doc, isExample = true)` | only `열기` |
+| CV-03 | 잿빛, cover = preset `lantern` | ⋯ sub; settings row value | `지금 등불`; `등불 ›` |
+| CV-04 | 잿빛, cover = blob of source `gallery` | ⋯ sub | `지금 사진` |
+| CV-05 | 잿빛, cover = PH's blob, project items locked | ⋯ sub and the picker's current line | `지금 사진` and `지금 표지 · 사진`: no title of PH anywhere |
+| CV-06 | 잿빛 with P1, P2, PH; locked | `ImagePickModel.build(cover slot, locked = true)` | tabs `갤러리 2 · 기본 이미지 8 · 내 이미지 <M>`; PH not a tile; `h2` not in `내 이미지` when only PH uses it |
+| CV-07 | same, unlocked | build | `갤러리 3`; PH tile with chip `숨김` |
+| CV-08 | no cover, gallery has items | build | initial tab `갤러리`; current line `표지 없음 · 첫 글자 카드` with no buttons |
+| CV-09 | no cover, gallery empty | build | initial tab `기본 이미지`; gallery tab body `이미지 없음` |
+| CV-10 | P1 tile chosen | `고르기` | crop hand-off for `PROJECT_COVER` with crops = P1's r3x4 and r1x1, holo on; nothing written yet |
+| CV-11 | CV-10, then `적용` unchanged | apply | one `ImageUse(project, 잿빛, projectCover)` with source `h1`, P1's crops, holo on; one undo step; P1 unchanged |
+| CV-12 | CV-10, then `취소` | — | `imageUses` unchanged |
+| CV-13 | P2 (preset item) chosen | `고르기` | cover = `preset:lantern` at once, no crop route |
+| CV-14 | cover from P1; re-crop the cover's r1x1 | apply | P1's crops unchanged |
+| CV-15 | cover set | `빼기` | no `projectCover` row; toast `표지 뺌` · `되돌리기`; undo restores source, crops and holo exactly |
+| CV-16 | cover `h1` only used by the cover | `빼기`, then `BlobRefs.of(doc)` | `h1` absent; the blob file still exists until `PurgeActions.runDue` |
+| CV-17 | cover from P1 | delete P1 (GAL-20) | cover still `h1`; `ShelfCards.cover` unchanged; `h1` in `BlobRefs.of` |
+| CV-18 | CV-17 | purge P1's trash entry | cover still `h1`; `h1` in `BlobRefs.of`; `PurgeRun.blobsToDelete` does not contain `h1` |
+| CV-19 | cover row names `h9`; `fileExists = { it != "h9" }` (the seam `ImagePickModel.build` already has, added to `ProjectCovers.cover` / `thumb` and `CoverPreview.source`) | cover, thumb, preview source, picker current line | initial-letter `CoverUi` (hash null); preview source null; current line `표지 없음 · 첫 글자 카드` with `빼기` |
+| CV-20 | 검은 서약 hidden, cover `h3`, group locked | `ShelfState.build(...)` | no row or card for 검은 서약; no `CoverUi` with hash `h3` in `rows`, `cards` or `openGroup`; lock card only |
+| CV-21 | CV-20, group open | build | its row thumb and card carry `h3`; card `hiddenOpen = true` |
+| CV-22 | CV-21 with the cover picker of 검은 서약 open, then re-lock | `ShelfState.sheetsToClose` | the `ImagePickSheet` closes; no write |
+| CV-23 | 검은 서약 hidden | `CoverPreview.source(doc)` | null |
+| CV-24 | 잿빛 raised to R-18 with hide checked (LIB-24); hidden group locked (no unlock session) | build after apply | 잿빛's cover leaves the 서재 at once (lock card) |
+| CV-25 | 잿빛 R-18, not hidden, nameMask and captureBlock on, cover `h1` | build; card protection | card shows `h1` + red `R-18` badge + real name; window protected while the card is shown (`ED`) |
+| CV-26 | CV-25 with a preset cover | card protection | not protected by the cover (preset) |
+| CV-27 | CV-25 | 최근 연 파일 card of 잿빛's scene | label `R-18 프로젝트`; no cover image |
+| CV-28 | 유리 정원, cover `h1` | `.civilight` export, then read back with a 1.0 reader | manifest `formatVersion "1.0"`, no new feature id; `assets/index.json` has the cover row; `preview.webp` present; round-trip equal |
+| CV-29 | file whose `imageUses` row has an unknown `slot` value | open, then export | row kept and written back unchanged |
+| CV-30 | home of 잿빛 (not the example) | `HomeModel` | cover with the edit badge and accessibility label `표지 이미지 · 바꾸기` (none: `표지 이미지 · 고르기`); the example: no badge, not tappable |
+| CV-31 | 프로젝트 설정 of 잿빛 | rows | first section `표지` with `표지 이미지` · `서재 카드 · 목록 썸네일 · 프로젝트 홈`; disabled for the example |
+| CV-32 | every new copy constant | `CopyLint` | no 해요체, no em dash, ` · ` separators only |
+
+### 7.4 Hand-offs and rows to fold in later
+
+- **STO-01** (`20-story-time.md`): the name item becomes cover + name (LIB-83). `feature:story` draws it and opens `ImagePickSheet(p, PROJECT, p, PROJECT_COVER)`.
+- **CNV-25** table, row `프로젝트 표지`: `Used in` becomes `서재 카드 · 목록 썸네일 · 프로젝트 홈`.
+- **CNV-27**:
+  - cover mode (current line, `갤러리` tab, `사진` button)
+  - Q-IM-03: `내 이미지` scope stays "this project"
+- **GAL-14**: `표지로` and LIB-85 write the same row; `표지로` (and `초상으로` · `배경으로`, same ratios only) start the crop from the item's crops (LIB-85 `[PROPOSED]`), which extends `CropHandOff` with initial crops.
+- **55 §6 Q1** now covers this picker too.
+- **LIB-02** table gains the `표지 이미지` row.
+- **LIB-69** gains the `표지` section.
+- **LIB-26** gains the cover-image capture rule (LIB-89).
+- **§3.2**: the `coverImage` row reads "derived: `ImageUse` slot `projectCover` (C-10); no column".
+- **Header line 3** of this file: `LIB-01 … LIB-90`.
+
+### 7.5 Open questions (each with the default used)
+
+1. **Q-CV-1 · Word.** `표지` (existing) or `대표 이미지` (the user's description). Default: `표지` everywhere. Renaming would touch every existing 표지 string; note that `내보내기 표지에 등급 표시` uses 표지 for the PDF cover page.
+2. **Q-CV-2 · Gallery tab scope.** The project's own items only, or also characters' items (GAL-10 `전체`). Default: project's own. Character originals stay under `내 이미지`.
+3. **Q-CV-3 · Add a photo-picked cover to the gallery too?** Default: no (no guessing). GAL-25 offers it explicitly.
+4. **Q-CV-4 · Capture protection for visible covers** of `captureBlock` projects (LIB-89, `ED`). Default: on for blob covers. Alternative: only inside the project, as today.
+5. **Q-CV-5 · Home cover size and side.** Default: 84 × 112, left of the name. Not drawn on any board.
+6. **Q-CV-6 · 프로젝트 설정 placement.** Default: a first section `표지`. Alternative: a row at the top of `구조`.
+7. **Q-CV-7 · Crop prefill from the gallery item.** Default: the cover crop starts from the item's `r3x4` / `r1x1`, and GAL-14 `표지로` does the same. Alternative: always start at the centred largest frame (today's GAL-14).
+8. **New copy** (§7.2 `[PROPOSED]` rows): confirm.
+
+### 7.6 Build plan (modules, files, tests)
+
+Order: step 0, then shared requests (orchestrator, between waves, DECISIONS §2), then three lanes in parallel. Each lane runs `tools/gw :<module>:compileDebugKotlin :<module>:testDebugUnitTest`.
+
+0. **Check first** (no code): open `ImagePickSheet(p, PROJECT, p, PROJECT_COVER)` from the 서재 and from 프로젝트 설정 in a debug run or a JVM host test. Confirm that `CanvasViewModel` gets the project session outside an open project, that `ImageCrop` pushed from there pops back to the opener, that the toast reaches the opener's host, and that item lock state is per project. If any part fails, the 서재 entry opens 프로젝트 홈 first and the picker there (fallback), and LIB-81 changes accordingly.
+
+1. **Requests (shared modules, frozen during lanes)**
+   - `core:model`: move the preset registry (ids, names, colours, shards) from `feature:canvas` `image/PresetImages.kt` to `core:model` `asset/Presets.kt`; canvas keeps a typealias or delegates.
+   - `core:ui`: new `image/ProjectCover.kt` with `CoverUi`, `ProjectCovers.cover(doc, name)` / `thumb(...)` (moved from `ShelfCards`, plus the missing-file rule), `CoverBitmaps`, `BlobImage`, `CoverArt`, `CoverThumb` and the real `PresetArt` painter. Then `feature:library` and `feature:story` draw the same cover without depending on each other.
+   - No `core:navigation` change: `ImagePickSheet` and `ImageCrop` exist. No `core:store` or format change.
+2. **`feature:canvas`** (owner of the picker and crop):
+   - `image/ImageEdits.kt` gains `clear(doc, owner, ctx)`.
+   - `image/pick/ImagePickModel.kt` gains the cover mode: `current` line model with the source word, `gallery` tiles from `GalleryActions.visibleItems(doc, project, locked)`, tab order and initial tab.
+   - `image/pick/ImagePickViewModel.kt`: `clear` (undo step `빼기`, toast), `pickGallery(item)` → `CropHandOff` with the item's crops and holo.
+   - `image/pick/ImagePickSheetContent.kt`: current line, third tab, `사진` label.
+   - `image/ImageCopy.kt`: new constants.
+   - Tests: `ImagePickAndMotionTest` (CV-05 … CV-13, CV-19 line), `CanvasEditsTest` (CV-14 … CV-16), `CanvasCopyLintTest`.
+3. **`feature:library`** (+ `domain:library`, additive):
+   - `domain:library` `newproject/ProjectMenu.kt`: `ProjectMenuAction.COVER` and the row with its sub; `CoverSummary.word(doc, locked)`.
+   - `feature:library`:
+     - `shelf/ShelfSheets.kt`: icon `Image`, action → `ImagePickSheet`.
+     - `projectsettings/ProjectSettingsRows.kt` and `ProjectSettingsScreen.kt`: section `표지`.
+     - `ProjectSettingsCopy.kt`.
+     - `shelf/CardShelf.kt` and `LibraryScreen.kt`: `ProtectWindow` for blob covers of `captureBlock` projects.
+     - Switch to the `core:ui` cover parts.
+   - Tests: `domain:library` `NewProjectTest` (CV-01 … CV-04 menu rows), `ProjectSettingsTest` (CV-31), `ShelfCardsTest` and `ShelfStateTest` (CV-19 … CV-22, CV-24 … CV-27), `CoverPreviewTest` (CV-19, CV-23), `domain:library` `PackageEdgeTest` (CV-28, CV-29), `LibraryCopyLintTest`.
+4. **`feature:story`**:
+   - `home/HomeModel.kt`: `HomeUi.cover: CoverUi` and `coverEditable`.
+   - `home/HomeScreen.kt`: name row with the cover and badge; tap → `sheets.open(ImagePickSheet(...))`.
+   - `home/HomeCopy.kt`: accessibility labels.
+   - Tests: `HomeModelTest` (CV-30), `StoryCopyLintTest`; MotionLint stays green, since no new motion is added.
+5. **Cross-lane checks** (`domain:actions` and `domain:trash` tests, no code change expected): CV-17, CV-18 in `GalleryActionsTest` / `PurgeActionsTest`.
+6. **Emulator pass** (orchestrator; release triage: a cover that leaks while locked is critical):
+   - set from each of the three entry points with each source
+   - `빼기` + undo
+   - re-lock with the picker open
+   - R-18 card screenshot blocked
+   - fold and unfold on home
+
+## 8. 0.2.0 changes (2026-11-24) (0.2.0)
+
+Feature ids `LIB-91` … `LIB-97`. Source: the frozen scope `docs/status/0.2.0-scope.md` (G-1 … G-7, S-4, S-8, S-9, U-16, N-29, §8, §9 D1, D6, D7, D15, D21, D34). Data model: `00-domain-model.md` §13. Where this section and §2 disagree, this section wins; each superseded block in §2 carries a one-line **(0.2.0)** note pointing here. Markers as in §0. Copy no source gives is a `TODO_COPY_LIB_…` constant (listed in §8.9) whose interim value, where one is given, is built only from existing copy and must be confirmed.
+
+**Rule for every hidden surface (scope §4.2).** "Hidden" means hidden everywhere: screens, settings rows, search results, `/` commands, tours, help rows and check-center chips. Hiding never deletes or rewrites stored data (scope §8 rule 1). When a surface's current choice becomes hidden while it is on screen (a selected chip, tab or format), it falls back to its first visible choice (`ED`); nothing is written.
+
+### 8.1 Features
+
+#### LIB-91 · 게임 제작 도구 (project switch)
+Priority **P0** · needsExternal **no** · scope G-1 … G-7, D6, D7
+
+- **Where**: 프로젝트 설정 (LIB-69), the **first row** of section `스크립트 추가 칸`. Row `게임 제작 도구` · sub `TODO_COPY_LIB_GAME_TOOLS_SUB` · switch. Read-only example project: disabled, like every row there.
+- **Value**: `Project.gameTools` (00 §13.2). New project: off. A 0.1.0 project (store or `.civilight`) with no stored value: on when `GameData.present` (D6), else off, decided once (G-3). After that the switch is the only writer.
+- **Toggle**: immediate, no confirmation, no toast, not an undo step (`ED`: same as the other 프로젝트 설정 switches). Nothing is deleted or regenerated either way (scope §8). Written through the project-settings write of `domain:library` (the same function LIB-25's switches use).
+- **Off hides** (G-2; each owner implements its part, this spec owns the switch and the list):
+
+| Surface | Owner (spec · module) |
+| --- | --- |
+| Block voice IDs (auto, fixed, discarded) on blocks, in the 속성 tab and the voice-ID preview sheet when moving an episode | SCR · `feature:script` |
+| 프로젝트 설정 rows `무대 위치` · `보이스 ID` · `ID 형식` (the `스크립트 추가 칸` section keeps `게임 제작 도구` and `전환 문구`) | this spec (LIB-69) |
+| Cue chips on 연출 blocks and in the 연출 input; the asset list and asset picker; asset creation in U-15 | SCR · `feature:script` |
+| Character tab `게임 텍스트` (voice lines, voice status, archive documents, unlock conditions): the profile shows 4 tabs `개요 · 말투 · 관계 · 비밀` | CST · `feature:cast` |
+| Head cell `보이스 18 / 24` | CST · `feature:cast` |
+| Checks `◇ 보이스 ID가 화자 · 에피소드와 다름`, `▲ 보이스 ID 겹침`, `보이스 비어 있음`, and the check-center chip `보이스` | STO · `domain:checks`, `feature:story` |
+| Export formats `대사 표 CSV` and `게임 엔진 JSON` (G-7: the sheet offers `대본 PDF` and `프로젝트 파일 .civilight` only) and the per-block display name's game-output side | this spec (LIB-41) · SCR |
+| Search results and `/` commands that open any of the above | STO · `feature:story` |
+| Tour steps and help rows about any of the above | LIB-96 |
+
+- **Always shown** (G-6): 연출 and 선택지 as plain text blocks, `낭독` (N-27; solid background without an asset, G-5), the per-block display name in the manuscript (N-43).
+- **`.civilight` and backups** (G-4): always carry `gameTools` and all game data, on or off.
+- **Export sheet while off** (G-7): the `형식` list has two cards, `대본 PDF` and `프로젝트 파일 .civilight`. The voice-ID fixation of LIB-46 never runs (only CSV and JSON fix IDs).
+
+#### LIB-92 · 등급 표시 없앰 (rating removed from the UI)
+Priority **P0** · needsExternal **no** · scope S-4, D34
+
+The rating badge (`ALL · R-15 · R-18`, DS-20), every rating picker and every rating setting leave the UI. Hiding and locking stay: each project's four protection switches stay in 프로젝트 설정. Stored data is kept (00 §13.3).
+
+| Old surface | 0.2.0 |
+| --- | --- |
+| Badge on 서재 rows (LIB-01), cards (LIB-04, LIB-88), ⋯ sheet sub (LIB-02), project home line, LIB-13 summary, export sheet sub (LIB-41), cross-project search rows (LIB-07) | not drawn. Meta lines keep their other fragments in the same order |
+| 서재 ⋯ row `수위 등급` (LIB-02) | removed |
+| New project step 1 row `수위 등급`, the 3-cell picker and the R-18 block (LIB-09) | removed. The project stores `rating: all` and the `전체` protections (all off) |
+| Step 4 `이 프로젝트 숨기기` initial value (LIB-12) | off (no rating to derive it from). The user's choice is final |
+| 설정 · 수위 등급 screen (LIB-23) and the row `수위 등급별 동작` on 설정 · 숨기기 (LIB-64) | removed from navigation. `RatingDefaults` is kept, not read |
+| Rating sheet `바뀌는 것` (LIB-24) | no entry point. Its pure functions and their tests (§4.1 R19-01 … R19-10) may stay while the code exists |
+| 프로젝트 설정 section `등급 · 숨기기` (LIB-25) | section label `숨기기`; row `수위 등급` removed; the four switches stay with their subs; the `<rating> 기본과 다름` suffix is not drawn (§4.1 R19-14, R19-15 no longer apply) |
+| `이름 가리기` sub `위젯 · 알림 · 최근 항목에 ‘R-18 프로젝트’` (LIB-23) | `TODO_COPY_LIB_NAME_MASK_SUB` (D34) |
+| Masked name `R-18 프로젝트` (LIB-05, LIB-27, LIB-29 task label, LIB-30) | `TODO_COPY_LIB_MASKED_NAME`, interim `이름 가림` (existing words of `이름 · 표지 가림`). A rating word shown as a mask while ratings are gone would mislead |
+| Recorder link mask label `R-18` (LIB-28, LRC-22) | the same `TODO_COPY_LIB_MASKED_NAME` |
+| PDF cover rating and `내보내기 표지에 등급 표시` (LIB-23, LIB-43) | not printed; the setting is not shown |
+| Format card subs (LIB-41): `대본 PDF` · `읽기용 · 표지에 등급`; `프로젝트 파일 .civilight` · `옮기기 · 보관 · 숨김 · R-18 · 숨긴 항목 있으면 암호` | `대본 PDF` · `읽기용`; `프로젝트 파일 .civilight` · `옮기기 · 보관 · 숨김 · 숨긴 항목 있으면 암호` (the rating fragments are dropped, nothing added) |
+| Rules keyed on a stored R-18 (export file name `civilight-내보내기-MMDD`, `PDF 암호` and `암호` defaults, recorder `숨기기` default, cloud-transcription exclusion) | keep working from the stored value (D34). A new project is `all`, so they apply only to 0.1.0 projects |
+| Board `RatingSettings`, `RHRatingSheet`, `RHRatingDown`, `NewNameR18` | not built |
+
+- **Capture rule** S-12 (§4.2) now reads "only the masked label `이름 가림`" for the same result.
+- 0.1.0 R-18 and R-15 projects keep every protection value; nothing is released automatically (scope §8 table).
+
+#### LIB-93 · 서재 보기 (3D views and list)
+Priority **P1** · needsExternal **no** · scope U-16, D1 · **supersedes LIB-04's `목록 | 카드` toggle and its card row**
+
+- **Choice**: `AppSettings.libraryStyle` (00 §13.4), set in 설정 (LIB-94). Values in settings order: `3D 책장` (default, D1, 확인 필요) · `표지 회전` · `원고 더미` · `서고 회랑` · `색인 카드 서랍` · `별자리` · `목록`.
+- **Head toggle** (DS-39 shape): two cells, `목록` (icon `list`) and the chosen 3D view (icon `Grid`, accessibility name = the style's label, e.g. `3D 책장`). Selected cell `pri` / `onpri`. It sits left of the `+` icon button (accessibility name `새 프로젝트`). When the setting is `목록`, no toggle is drawn. The shown view is `ShownView.of(libraryStyle, libraryToggle)` (00 §13.4); the last toggle position is remembered across restarts; an absent value shows the 3D view, so every install, upgraded or new, first opens on it. The 0.1.0 `viewByScreen["library"]` value is kept and not read.
+- **What every 3D view shows** (the visuals are the U-16 boards; these invariants are what every view must hold):
+  - The same projects as the list (LIB-01: visible, not hidden, not trashed), in the same order (last modified, newest first), each with its cover (LIB-80 … LIB-89) or initial-letter card, its name and the LIB-01 meta line without a badge.
+  - **Hidden projects**: never one item per hidden project while the group is locked. One lock item at the end, as LIB-04's lock card: lock icon, `숨긴 프로젝트 <M>`, `이름 · 표지 가림`, button `지문으로 보기` (b: icon `fingerprint` + text). While the group is open, hidden projects appear as items like the rest, and the head right slot shows `다시 잠그기` as LIB-01.
+  - **Capture**: LIB-89 applies in every view (blob covers of `captureBlock` projects turn on the window guard while drawn).
+  - **Picking**: a tap may first pick an item (the view brings it forward); a picked item shows its actions as text buttons (c) as the boards draw them (`열기` and the view's own pair, e.g. `꺼내기` · `제자리`). `열기` opens 프로젝트 홈. The ⋯ of a picked item opens LIB-02. No gesture in any view writes data.
+  - **New project**: the view's own `＋ 새 프로젝트` item (b: icon `plus` + `새 프로젝트`) where the board draws one, and always the head `+`.
+  - **0 projects**: no 3D view is drawn; the LIB-70 empty card shows, as in the list. With only hidden projects: the lock item alone.
+  - Under the view, `최근 연 파일` (LIB-05) and the library section (`라이프 레코더` row) follow as in LIB-04 (`ED`).
+- **Motion**: every motion goes through `CivilightMotion` (MotionLint). **Tilt** (parallax and light) follows the device's rotation-vector sensor while the view is visible and resumed; the listener is removed on pause and when the view leaves. Tilt stops (no listener) when `Tilt.follows(viewTilt, motion)` is false (00 §13.4: the LIB-94 switch is off, or motion is reduced), and on devices without the sensor. Tilt and parallax never move content outside the view's frame or over the head and the bars (U-11 rule). Reduced motion: view changes are the 120 ms fade (DS-14), no idle animation.
+- **Inner screen**: in `목록 + 상세` the view sits in the list pane; in `가운데 한 칸` in the 560 column. Fold and unfold keep the picked item and the toggle (CNV-34).
+- **Failure**: a view that cannot draw (for example a missing GPU feature) shows the list for that session, never a blank screen (`ED`).
+
+#### LIB-94 · 설정 › 서재 보기 · 카드 보기
+Priority **P1** · needsExternal **no** · scope U-16
+
+- LIB-63 section `화면` gains three rows after `펼친 화면 배치` (the third is the tilt switch below): `서재 보기` · value `<label>` › and `카드 보기` · value `<label>` › (DS-68 chevron). No sub-line.
+- Each opens a screen (head `설정` / `서재 보기` or `카드 보기`) with one radio list of the seven values (00 §13.4), the current one checked. Picking applies at once. Picking a 3D value also sets that screen's head toggle to the 3D view (`libraryToggle` or `castToggle` = `CARD`) so the choice is visible on return (`ED`); picking `목록` leaves the toggle as stored.
+- `카드 보기` drives the **character card list** (D2; behaviour CST hand-off, §8.7). The gallery card shelf (U-11) is separate and not affected.
+- Third row: `TODO_COPY_LIB_VIEW_TILT` + switch (`AppSettings.viewTilt`, default on). Off → no tilt in any 서재 or card view. On → tilt follows unless motion is reduced (LIB-67, CNV-46): `Tilt.follows(viewTilt, motion)`. The switch row stays enabled under reduced motion (`ED`); its effect is then nil until motion is no longer reduced.
+
+#### LIB-95 · 레코더 입구 (서재 and onboarding side)
+Priority **P1** · needsExternal **no** · scope S-8; recorder side LRC-48
+
+- 서재 bottom bar (LIB-01): the command bar keeps `모든 프로젝트에서 찾기`; the mic is removed.
+- 서재 library row `라이브러리 · 프로젝트 밖` › `라이프 레코더` stays: it opens the 기록함 list, not a recording (`ED`; the only way to records with no project open).
+- First run `OnbVoice` (LIB-15): the choice `홈 화면 위젯 추가` · `앱을 열지 않고 바로 녹음` is not shown; `마이크 허용` · `녹음할 때만 사용` stays.
+- Empty inbox `EmptyLr` (LIB-70) sub `명령 칸 마이크 · 홈 위젯 · 빠른 설정` names removed entry points: `TODO_COPY_LRC_EMPTY_SUB` (owner LRC-30).
+- `설정` keeps the row to 설정 · 라이프 레코더; its hidden rows are LRC-48.
+
+#### LIB-96 · 안내 · 도움말 follow what is shown
+Priority **P1** · needsExternal **no** · scope S-9, D15
+
+- Every tour step and every 도움말 row carries the feature it points at (`requires`: `GAME_TOOLS`, `MAP_TOOLS` (node · terrain · sketch maps, distance, routes), `ROUTES`, `SCRIPT_LENS`, `COMMAND_BAR_MIC`, `RECORDER_OUTSIDE`, `RATING`). `TourSteps.visible(steps, project, settings)` drops a step whose feature is hidden now; `k/n` counts visible steps only.
+- Left out in 0.2.0:
+  - module tour `지도 만들기` (target: the map tool bar with `영역 · 경로 · 라벨 · 레이어`, hidden by S-3) and its 도움말 row;
+  - module tour `인물 동선 · 장소와 때` (`장소와 때` · `직전 씬 기준 · 시간대 · 정확/대략 → 이동 점검`; routes hidden by S-3, travel check off by S-2) and its row;
+  - script tour 1/4 `명령 칸` · `이동 · 검색 · 블록 추가 · 마이크` (U-14 removes the bottom command bar and the mic) and 4/4 `시점 렌즈` (S-1: the script has no lens). New script steps for the U-14 input row are SCR's (`TODO_COPY_SCR_TOUR_*`).
+- A module whose visible step count is 0 runs no tour, and its 도움말 row is hidden. `모든 안내 처음부터` resets only visible tours.
+- Steps that stay: 인물 1/3 `시점 렌즈` (the lens chip stays on the cast head, S-1), 세계 · 연표 1/3, 레코더 2/3.
+
+#### LIB-97 · 지난 판 in files and backups
+Priority **P1** · needsExternal **no** · scope N-29, D21; model 00 §13.5 (supersedes D20)
+
+- Export sheet (LIB-41), format `프로젝트 파일 .civilight` only: new switch row `TODO_COPY_LIB_EXPORT_VERSIONS`, **default on** (`ED`: Drive backup, LIB-57, is still a `needsExternal` stub, so a file is the only way versions leave the device), shown only when the project has at least one version. On → `versions/` is written and the manifest lists feature `versions`; off → neither.
+- Drive automatic backup (LIB-57), once it runs, always writes `versions/`; restoring a backup brings every version back.
+- Import and open (LIB-52): `versions/` is read when present, also for `새 프로젝트로`.
+- PDF, CSV and engine JSON exports add one automatic version per exported numbering unit, named `<M>월 <D>일 · 내보낸 판` (D21; the date part follows the manual default `11월 23일 · 초고`). A `.civilight` export adds none.
+
+### 8.2 Notes on §2 blocks (what each **(0.2.0)** line means)
+
+| Block | Change | By |
+| --- | --- | --- |
+| LIB-01, LIB-02, LIB-04, LIB-07, LIB-13, LIB-88 | no rating badge | LIB-92 |
+| LIB-01 | footer mic removed | LIB-95 |
+| LIB-04 | toggle and card row replaced by the 서재 보기 views | LIB-93 |
+| LIB-09, LIB-12 | rating step removed; hide switch starts off | LIB-92 |
+| LIB-15 | widget choice hidden | LIB-95 |
+| LIB-19, LIB-21 | tours and rows follow what is shown | LIB-96 |
+| LIB-22 … LIB-25 | rating surfaces removed; protections stay | LIB-92 |
+| LIB-27, LIB-28, LIB-29, LIB-30, LIB-05 | masked label | LIB-92 |
+| LIB-41 | formats follow the switch; subs lose rating fragments; versions row | LIB-91, LIB-92, LIB-97 |
+| LIB-43 | no rating on the cover | LIB-92 |
+| LIB-47, LIB-57 | game data always; versions | LIB-91, LIB-97 |
+| LIB-63 | two view rows | LIB-94 |
+| LIB-64 | row `수위 등급별 동작` removed | LIB-92 |
+| LIB-69 | `게임 제작 도구` row; voice and stage rows hide when off; section `숨기기` | LIB-91, LIB-92 |
+| LIB-70 | `EmptyLr` sub | LIB-95 |
+
+### 8.3 Rules as test cases (JVM)
+
+Fixtures: 잿빛 (0.1.0, R-15, fixed voice IDs, no `gameTools`), 유리 정원 (0.1.0, ALL, no game data, no `gameTools`), 검은 서약 (0.1.0, R-18, hidden, all protections on), a new 0.2.0 project 새 글.
+
+| # | Given | When | Then |
+|---|---|---|---|
+| G-01 | 새 글 | create | `gameTools == false`; `rating == all`; protections all false |
+| G-02 | 잿빛 store unit | load | `gameTools == true`, unit rewritten with the property |
+| G-03 | 유리 정원 | load | `gameTools == false` |
+| G-04 | 잿빛 after G-02, user turns it off | reload | `false` (the upgrade never runs again) |
+| G-05 | a 0.1.0 `.civilight` of 잿빛 | import | `true`; same rule as the store |
+| G-06 | 잿빛 with `gameTools = false` | `exportFormats(project)` | `[PDF, PROJECT_FILE]`; with `true` → all four |
+| G-07 | 잿빛 with `gameTools = false` | `.civilight` export, then import | voice IDs, discarded IDs, cues, assets, voice lines, archive documents, stage values equal; `gameTools == false` |
+| G-08 | 잿빛 with `gameTools = false` | `projectSettingsRows(project)` | section `스크립트 추가 칸` rows = `게임 제작 도구`, `전환 문구` |
+| R-01 | any project | `projectMenuRows` (LIB-02) | no `수위 등급` row |
+| R-02 | 검은 서약 | `projectSettingsRows` | section label `숨기기`; four switches all on; no row `수위 등급`; no `기본과 다름` suffix |
+| R-03 | 검은 서약 not hidden, nameMask on | `projectSurface(RECENTS_LIST)` · `(NOTIFICATION)` · `(SYSTEM_RECENTS_LABEL)` | the `TODO_COPY_LIB_MASKED_NAME` value each time; never a string containing `R-18` |
+| R-04 | any project | `rowMeta(...)` and card models | no badge model (badge field absent or null) |
+| R-05 | 검은 서약 | export sheet defaults | file name `civilight-내보내기-<MMDD>`, `PDF 암호` on, `암호` on (stored R-18 still drives them, D34) |
+| R-06 | 새 글 | step-4 initial hide switch | off |
+| V-01 | `libraryStyle = BOOKSHELF`, no stored toggle | `shownLibraryView` | `BOOKSHELF`, toggle drawn |
+| V-02 | toggle tapped to `목록`, app restarted | `shownLibraryView` | list |
+| V-03 | `libraryStyle = LIST` | head model | no toggle cell |
+| V-04 | 2 visible + 검은 서약 hidden, group locked | `libraryItems(BOOKSHELF)` | 2 project items + 1 lock item `숨긴 프로젝트 1`; no item names 검은 서약 |
+| V-05 | 0 projects | `libraryItems(any 3D style)` | empty state model (LIB-70), no 3D items |
+| V-06 | picking `표지 회전` in 설정 › 서재 보기 while the toggle is `목록` | settings write | `libraryStyle = COVER_SPIN`, `libraryToggle = CARD` |
+| T-01 | tours with S-3 and S-1 active | `TourSteps.visible(script)` | only the drawn step `블록을 왼쪽으로` (old 2/4; 3/4 has no copy), shown as `1/1`; map and route tours empty → no 도움말 rows for them |
+| E-01 | a project with 2 versions | `.civilight` export with default options | `versions/` present, manifest lists `versions`; row turned off → neither |
+| E-02 | same project | backup writer output | `versions/` present |
+| V-07 | `viewTilt = false` | `Tilt.follows(viewTilt, NEVER_REDUCE)` | false; no sensor listener registered |
+| V-08 | 0.1.0 settings `viewByScreen = {library: LIST}`, no `libraryToggle` | `shownLibraryView` | `BOOKSHELF` (the old entry is not read) |
+
+### 8.4 Screens touched
+
+| Board | 0.2.0 |
+| --- | --- |
+| `Library`, `LibUnlocked`, `TwoLibrary`, `ColLibrary` | no badge, no footer mic, head toggle per LIB-93 |
+| `LibCards`, `LibCardsWide`, `MCardView`, `MCarousel` | replaced by the U-16 서재 views (`u16_lib_a`, `u16_lib_b`, `u16_lib_c`) |
+| `NewName`, `NewNameR18` | no rating row or block |
+| `RatingSettings`, `RHRatingSheet`, `RHRatingDown` | not built |
+| `ProjSettings` | `게임 제작 도구` row; section `숨기기` |
+| `Export` | two formats while off; no rating fragments; versions row |
+| `Settings` | `서재 보기`, `카드 보기` rows |
+| `HelpReplay` | rows for hidden tours left out |
+| `OnbVoice` | no widget choice |
+
+### 8.5 Icon buttons on this area's screens (DS-70)
+
+- 서재 head `+`: a, icon `plus`, accessibility `새 프로젝트`. Sheet heads `닫기`: a, `close`, `닫기`.
+- `지문으로 보기` · `잠금 풀기`: b, `fingerprint` + text (D31). `다시 잠그기`: b, `lock` + text (already).
+- Confirm buttons (`휴지통으로`, `바꾸기`, `만들기`, `열기`, `정하기`, `서재로`, `비우기`, `PIN 사용`, `기기 PIN 사용`, flow buttons `다음 · 이전 · 건너뛰기 · 완료`): c, text as now.
+
+### 8.6 Data safety (scope §8)
+
+- Nothing in this section removes or rewrites stored data. `rating`, `protections`, `RatingDefaults`, recorder widget/tile/lock-screen values, game data and the switch survive the in-place upgrade and every `.civilight` round trip (00 §13.8 DM-0.2-02 … DM-0.2-04).
+- The §8 upgrade check of the scope (emulator: 0.1.0 APK, then 0.2.0 over it) expects for a 0.1.0 project with game data and a 15 rating: same counts on every screen, switch on, every protection switch as before, no badge anywhere.
+
+### 8.7 Hand-offs
+
+- **CST (`30-cast.md`)**: the character card views of U-16 (`카드 보기` values, head toggle `castToggle` (00 §13.4), the same invariants as LIB-93: hidden characters never as cards while locked, 0 characters → `EmptyCast`, tilt rule, reduced motion); the `게임 텍스트` tab and `보이스 18 / 24` under the switch.
+- **SCR (`10-script.md`)**: voice IDs, extra fields, cue chips, asset list and picker under the switch; the U-14 script tour steps; N-29 `이 판 글로` on the compare screen.
+- **STO (`20-story-time.md`)**: check-center voice kinds and chip under the switch; search and `/` commands under the switch; N-29 episode ⋯ `판 남기기` · `지난 판`.
+- **LRC (`70-life-recorder.md`)**: LRC-48 (entry points), masked link label.
+
+### 8.8 Open questions (each with the default used)
+
+1. **Q-02-1 · `게임 제작 도구` row placement and sub.** Default: first row of `스크립트 추가 칸`, sub `TODO_COPY_LIB_GAME_TOOLS_SUB`.
+2. **Q-02-2 · Masked name without ratings.** Default `TODO_COPY_LIB_MASKED_NAME`, interim `이름 가림`. Alternative: keep `R-18 프로젝트` for stored-R-18 projects only.
+3. **Q-02-3 · 서재 library row as a way to the 기록함.** Default: it stays (it opens the list, not a recording). Alternative: remove it so the recorder is reachable only from 프로젝트 홈.
+4. **Q-02-4 · Versions in a manual `.civilight`.** Default: a row `TODO_COPY_LIB_EXPORT_VERSIONS`, **on** while Drive backup is a stub; Drive backup always includes them (supersedes D20, which put them in every file with no row).
+5. **Q-02-5 · Tilt switch.** Default: a switch `TODO_COPY_LIB_VIEW_TILT` in 설정 (on); tilt also stops with reduced motion. The frozen scope names only the reduced-motion stop; the switch comes from the computed task.
+6. **Q-02-6 · Picking a 3D style sets the toggle to the 3D view.** Default: yes.
+7. **Q-02-7 · Automatic version from which exports.** Default: PDF, CSV, engine JSON; not `.civilight`.
+
+### 8.9 Copy to confirm
+
+| Constant | Where | Interim |
+| --- | --- | --- |
+| `TODO_COPY_LIB_GAME_TOOLS_SUB` | LIB-91 row sub | `보이스 ID · 에셋 · 연출 큐 · 녹음 대본 CSV · 엔진 JSON` (words of the user's decision row `게임 제작 기능`) |
+| `TODO_COPY_LIB_NAME_MASK_SUB` | LIB-92, `이름 가리기` sub | `위젯 · 알림 · 최근 항목` (the LIB-25 sub, existing) |
+| `TODO_COPY_LIB_MASKED_NAME` | LIB-92 masked name and link label | `이름 가림` |
+| `TODO_COPY_LIB_VIEW_TILT` | LIB-94 tilt switch row | `기울이면 따라옴` (words of the U-16 decision row `기기를 기울이면 살짝 따라온다`) |
+| `TODO_COPY_LIB_EXPORT_VERSIONS` | LIB-97 export row | `지난 판도 포함` (pattern of `휴지통도 포함`; `지난 판` is N-29 copy) |
+| `TODO_COPY_LRC_EMPTY_SUB` | LIB-95 / LRC-30 `EmptyLr` sub | none (sub omitted) |
+| `TODO_COPY_SCR_TOUR_*` | LIB-96 script tour steps for U-14 | none (steps omitted) |

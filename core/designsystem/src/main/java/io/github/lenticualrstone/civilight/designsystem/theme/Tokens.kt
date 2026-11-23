@@ -106,6 +106,12 @@ object LayoutMetrics {
     val bottomBarOnboarding: Dp = 120.dp
     val commandBarSide: Dp = 12.dp
     val commandBarBottom: Dp = 18.dp
+    /** DS-65 inner screen: the command row's side inset, its bottom above the navigation inset, its max width. */
+    val commandBarSideInner: Dp = 24.dp
+    val commandBarBottomInner: Dp = 20.dp
+    val commandRowMaxInner: Dp = 720.dp
+    /** DS-65 scope switch: the widest cell (ellipsis beyond). */
+    val scopeCellMax: Dp = 160.dp
     val sheetTop: Dp = 10.dp
     val sheetSide: Dp = 20.dp
     val sheetSidePicker: Dp = 16.dp

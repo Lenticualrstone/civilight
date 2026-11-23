@@ -4,6 +4,11 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.MotionToken
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.model.asset.ImageUse
+import kotlin.math.asin
+import kotlin.math.atan2
+
+/** The device's pitch and roll in degrees on the screen's axes (see [HoloRules.anglesFromGravity]). */
+data class DeviceAngles(val pitch: Float, val roll: Float)
 
 /** A tilt, each axis −1 … 1 (the DS `holoFoil` input). */
 data class Tilt(val x: Float, val y: Float) {
@@ -67,6 +72,53 @@ object HoloRules {
         ((rollDeg - baseRollDeg) / FULL_TILT_DEG).coerceIn(-1f, 1f),
         ((pitchDeg - basePitchDeg) / FULL_TILT_DEG).coerceIn(-1f, 1f),
     )
+
+    /**
+     * The device's lean and pitch (degrees) on the screen's axes, from the gravity row of the rotation matrix
+     * (`R[6]`, `R[7]`, `R[8]`: the world's up in device axes) and the display [rotation] (0…3, quarter turns
+     * like `Surface.ROTATION_*`). Unlike `SensorManager.getOrientation`, whose roll swings through ±180° as the
+     * device nears upright (the usual way a phone is held), these stay smooth at every holding angle:
+     * lean = `-asin(x)` (side to side), pitch = `-atan2(y, z)` (towards or away from the viewer). Near flat they
+     * equal `getOrientation`'s roll and pitch, so [fromDevice] reads them with the same signs as before.
+     */
+    fun anglesFromGravity(gx: Float, gy: Float, gz: Float, rotation: Int = 0): DeviceAngles {
+        val (sx, sy) = screenAxes(gx, gy, rotation)
+        val lean = -Math.toDegrees(asin(sx.coerceIn(-1f, 1f).toDouble())).toFloat()
+        val pitch = -Math.toDegrees(atan2(sy.toDouble(), gz.toDouble())).toFloat()
+        return DeviceAngles(pitch = pitch, roll = lean)
+    }
+
+    /** A device-axes vector's x and y on the screen's axes for the display [rotation] (quarter turns). */
+    fun screenAxes(x: Float, y: Float, rotation: Int): Pair<Float, Float> = when (Math.floorMod(rotation, 4)) {
+        1 -> y to -x
+        2 -> -x to -y
+        3 -> -y to x
+        else -> x to y
+    }
+
+    /** [b] − [a] in degrees, wrapped into −180…180 (a pitch that crosses ±180° does not jump a whole turn). */
+    fun angleDelta(a: Float, b: Float): Float {
+        var d = (b - a) % 360f
+        if (d > 180f) d -= 360f
+        if (d < -180f) d += 360f
+        return d
+    }
+
+    /** Tilt from [now] relative to [base], each ±[FULL_TILT_DEG] = a full turn of the foil. */
+    fun fromAngles(now: DeviceAngles, base: DeviceAngles): Tilt = Tilt(
+        (angleDelta(base.roll, now.roll) / FULL_TILT_DEG).coerceIn(-1f, 1f),
+        (angleDelta(base.pitch, now.pitch) / FULL_TILT_DEG).coerceIn(-1f, 1f),
+    )
+
+    /**
+     * The sweep trigger of a surface that shows one item: raised by one when the item's holo goes from off to
+     * on while the same item is shown ([wasOn] = its value at the last composition, [sameItem] = the surface
+     * still shows that item). It never goes down: the surface's sweep fires on any change of the trigger, so
+     * another item taking the place (viewer `이전` · `다음`, a re-sort) keeps it as it is. The first
+     * composition and a restore start from the item's own value and do not raise it.
+     */
+    fun toggleTrigger(wasOn: Boolean, on: Boolean, trigger: Int, sameItem: Boolean = true): Int =
+        if (sameItem && on && !wasOn) trigger + 1 else trigger
 
     /** Tilt from a drag of ([dx], [dy]) px over a surface of [width] × [height] (no gyro). */
     fun fromDrag(start: Tilt, dx: Float, dy: Float, width: Float, height: Float): Tilt = Tilt(

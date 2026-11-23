@@ -40,7 +40,7 @@ import java.lang.reflect.Modifier
 
 /** DECISIONS §3: every value of this module's copy objects passes the design-system copy lint. */
 class LibraryCopyLintTest {
-    private val objects: List<Any> = listOf(ShelfCopy, NewProjectCopy, RatingCopy, ProtectionCopy, ProjectSettingsCopy, TrashScreenCopy, ExportCopy, SettingsCopy, OpenFileCopy, OnboardingCopy, HelpCopy, BackupCopy, RecoveryCopy, RestoreCopy, LayoutSettingsCopy, MotionSettingsCopy, MoreSettingsCopy)
+    private val objects: List<Any> = listOf(ShelfCopy, NewProjectCopy, RatingCopy, ProtectionCopy, ProjectSettingsCopy, TrashScreenCopy, ExportCopy, SettingsCopy, OpenFileCopy, OnboardingCopy, HelpCopy, BackupCopy, RecoveryCopy, RestoreCopy, LayoutSettingsCopy, MotionSettingsCopy, MoreSettingsCopy, io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary)
 
     /** `Object.FIELD` → string value, for every constant of every copy object. */
     private fun values(): Map<String, String> = objects.flatMap { obj ->
@@ -60,6 +60,8 @@ class LibraryCopyLintTest {
         }
         Rating.entries.forEach { add(RatingSettingsState.applyTitle(it, 2)) }
         add(TrashScreenCopy.restored("유리 정원"))
+        // U-08: the cover words (LIB-81 `지금 등불`, LIB-82, CV-32).
+        io.github.lenticualrstone.civilight.model.asset.Presets.NAMES.forEach { add("${io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary.NOW} $it") }
         (1..3).forEach { add(OnboardingCopy.setupLine(it)) }
         add(OnboardingCopy.exploreLine(OnboardingCopy.EXPLORE_SCRIPT, "1-7 씬 3"))
         add(HelpCopy.stepsLine(3, seen = true))

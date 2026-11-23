@@ -218,8 +218,8 @@ class CaptureHubTest {
         f.startFromScript()
         val key = f.hub.state.value.session!!.recordKey
         wait(2_000)
-        f.hub.back()
-        assertEquals("back only minimises", CaptureStage.RECORDING, f.hub.state.value.stage)
+        // The app went to the background (home, LRC-09): the take goes on; back would save it (U-13, MicReleaseTest).
+        assertEquals(CaptureStage.RECORDING, f.hub.state.value.stage)
         f.hub.begin(EntryContext(surface = EntrySurface.LIBRARY), startTyped = false, micGranted = true)
         assertEquals(key, f.hub.state.value.session!!.recordKey)
         assertEquals(1, f.engine.starts)
@@ -231,7 +231,7 @@ class CaptureHubTest {
         f.startFromScript()
         val key = f.hub.state.value.session!!.recordKey
         f.engine.confirm("등불")
-        f.hub.back()
+        // Left in the background (LRC-09), not with back.
         assertFalse(f.hub.openMemo(EntryContext(surface = EntrySurface.PROJECT_HOME, projectKey = Fx.P1)))
         assertEquals(CaptureStage.RECORDING, f.hub.state.value.stage)
         assertEquals(key, f.hub.state.value.session!!.recordKey)

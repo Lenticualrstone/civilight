@@ -28,8 +28,13 @@ interface SpeechEngine {
 
     fun start(listener: SpeechListener)
 
+    /**
+     * `일시정지`: stops listening and releases any audio input the engine opened itself (a platform
+     * recognizer is cancelled, not only muted), so a paused take holds no microphone (U-13).
+     */
     fun pause()
 
+    /** Listens again into the same transcript after [pause]. */
     fun resume()
 
     /** Ends listening; the remaining text arrives as one final result, then [SpeechListener.onFinished]. */

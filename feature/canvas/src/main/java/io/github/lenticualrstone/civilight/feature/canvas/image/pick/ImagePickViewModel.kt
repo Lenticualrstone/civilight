@@ -41,6 +41,19 @@ class ImagePickViewModel(
     fun placePreset(owner: ImageOwner, presetId: String, holo: Boolean, then: (EditResult) -> Unit) =
         act(ImageCopy.BTN_PICK, then = then) { doc, ctx -> ImageEdits.placePreset(doc, owner, presetId, holo, ctx) }
 
+    /** `빼기` (U-08 LIB-87): the slot's row goes, as one undo step named `빼기`; the original stays for the blob sweep. */
+    fun clear(owner: ImageOwner, then: (EditResult) -> Unit) =
+        act(ImageCopy.BTN_CLEAR, then = then) { doc, ctx -> ImageEdits.clear(doc, owner, ctx) }
+
+    /** The holo row with the cover kept (LIB-84 `[PROPOSED]`): written at once, one undo step. */
+    fun setHolo(owner: ImageOwner, holo: Boolean, then: (EditResult) -> Unit = {}) =
+        act(ImageCopy.HOLO, then = then) { doc, ctx -> ImageEdits.setHolo(doc, owner, holo, ctx) }
+
+    /** `되돌리기` of the `표지 뺌` toast. */
+    fun undoLast() {
+        viewModelScope.launch { undo() }
+    }
+
     /**
      * Copies the picked image into the blob store (stored once by content hash) and lists it under
      * `내 이미지`, as one undo step named by the button. A read-only project imports nothing.

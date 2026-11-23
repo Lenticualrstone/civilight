@@ -47,7 +47,7 @@ data class OneLinerEditSheet(val projectKey: Key, val characterKey: Key) : Sheet
 @Serializable
 data class TagsEditSheet(val projectKey: Key, val characterKey: Key) : SheetKey
 
-/** One text line and `이 값 고치기` (fields without history, CST-09). */
+/** One text line and `저장` (fields without history, CST-09). */
 @Composable
 private fun SheetScope.TextValueSheet(
     title: String,
@@ -63,7 +63,7 @@ private fun SheetScope.TextValueSheet(
     CivilightTextField(text, { text = it }, Modifier.fillMaxWidth().padding(top = 14.dp), singleLine = singleLine, enabled = !readOnly)
     if (!readOnly) {
         SheetActions {
-            CivilightButton(CastUiCopy.BTN_CORRECT, {
+            CivilightButton(CastUiCopy.BTN_SAVE, {
                 onSave(text)
                 host.close()
             }, Modifier.weight(1f), enabled = canSave(text))
@@ -81,7 +81,7 @@ fun SheetScope.NameSheetContent(sheet: NameEditSheet) {
         return
     }
     TextValueSheet(CastUiCopy.NAME, current, singleLine = true, canSave = { FixedFieldEdits.canRename(it, current) }) { name ->
-        editor.act(CastUiCopy.BTN_CORRECT) { d, ctx -> FixedFieldEdits.rename(d, sheet.characterKey, name, ctx) }
+        editor.act(CastUiCopy.BTN_SAVE) { d, ctx -> FixedFieldEdits.rename(d, sheet.characterKey, name, ctx) }
     }
 }
 
@@ -96,7 +96,7 @@ fun SheetScope.OneLinerSheetContent(sheet: OneLinerEditSheet) {
     }
     val current = c.oneLiner.orEmpty()
     TextValueSheet(CastUiCopy.ONE_LINER, current, singleLine = false, canSave = { it.trim() != current }) { text ->
-        editor.act(CastUiCopy.BTN_CORRECT) { d, ctx -> FixedFieldEdits.setOneLiner(d, sheet.characterKey, text, ctx) }
+        editor.act(CastUiCopy.BTN_SAVE) { d, ctx -> FixedFieldEdits.setOneLiner(d, sheet.characterKey, text, ctx) }
     }
 }
 
@@ -142,9 +142,9 @@ fun SheetScope.TagsSheetContent(sheet: TagsEditSheet) {
     }
     if (editable) {
         SheetActions {
-            CivilightButton(CastUiCopy.BTN_CORRECT, {
+            CivilightButton(CastUiCopy.BTN_SAVE, {
                 val saved = picks
-                editor.act(CastUiCopy.BTN_CORRECT) { d, ctx -> FixedFieldEdits.apply(d, sheet.characterKey, saved, ctx) }
+                editor.act(CastUiCopy.BTN_SAVE) { d, ctx -> FixedFieldEdits.apply(d, sheet.characterKey, saved, ctx) }
                 host.close()
             }, Modifier.weight(1f), enabled = picks != initial)
         }

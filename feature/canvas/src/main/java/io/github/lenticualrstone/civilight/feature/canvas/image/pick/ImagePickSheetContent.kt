@@ -1,5 +1,13 @@
 package io.github.lenticualrstone.civilight.feature.canvas.image.pick
 
+import io.github.lenticualrstone.civilight.ui.image.CoverThumb
+import io.github.lenticualrstone.civilight.model.asset.Ratio
+import io.github.lenticualrstone.civilight.model.asset.Crop
+import io.github.lenticualrstone.civilight.feature.canvas.image.BlobImage
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
+import io.github.lenticualrstone.civilight.designsystem.component.ImageStatusChip
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.heightIn
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -100,10 +108,30 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
 
     fun sayReadOnly() = deps.toasts.show(ImageCopy.READ_ONLY, actionLabel = null)
 
-    fun toCrop(hash: String, tile: Rect?, thumb: ImageBitmap?) {
-        CropHandOff.put(CropHandOff(owner.key, owner.slot, hash, tile, holo, thumb))
+    fun toCrop(
+        hash: String,
+        tile: Rect?,
+        thumb: ImageBitmap?,
+        holoStart: Boolean = holo,
+        crops: Map<Ratio, Crop> = emptyMap(),
+        note: String? = null,
+    ) {
+        CropHandOff.put(CropHandOff(owner.key, owner.slot, hash, tile, holoStart, thumb, note = note, crops = crops))
         close()
         deps.navigator.push(ImageCrop(sheet.projectKey, owner.kind, owner.key, owner.slot, hash))
+    }
+
+    /** `빼기` (U-08 LIB-87): no confirm, the sheet closes, `표지 뺌` · `되돌리기` follows. */
+    fun clearSlot() {
+        if (readOnly) return sayReadOnly()
+        vm.clear(owner) { r ->
+            if (r == EditResult.READ_ONLY) {
+                sayReadOnly()
+            } else {
+                closeSheet()
+                deps.toasts.show(ImageCopy.TOAST_COVER_CLEARED, actionLabel = ImageCopy.UNDO, onAction = { vm.undoLast() })
+            }
+        }
     }
 
     val onImported: (ImportResult) -> Unit = { r ->
@@ -121,15 +149,22 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
     }
 
     SheetHeader(view.title, onClose = ::close, subtitle = view.subtitle, closeLabel = ImageCopy.BTN_CLOSE)
+    view.coverLine?.let { line ->
+        CoverCurrentLine(
+            line = line,
+            onCrop = line.cropHash?.let { hash -> { if (readOnly) sayReadOnly() else toCrop(hash, null, null) } },
+            onClear = if (line.canClear) ({ clearSlot() }) else null,
+        )
+    }
     CivilightTabs(view.tabs, tab, { tab = it }, Modifier.padding(top = 6.dp))
     SheetScrollBody(Modifier.padding(top = 12.dp)) {
         // The tabs swap their tile grids with a crossfade (audit §4 canvas 9, P3).
         ContentSwap(tab, label = "imagePickTab") { shownTab ->
-            val tiles = if (shownTab == ImagePickModel.TAB_PRESETS) view.presets else view.mine
+            val tiles = view.tilesOf(shownTab)
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (tiles.isEmpty()) {
                     CivilightText(
-                        ImageCopy.MY_IMAGES_EMPTY,
+                        view.emptyOf(shownTab),
                         CivilightTheme.type.small,
                         Modifier.padding(vertical = 24.dp),
                         color = CivilightTheme.colors.ink3,
@@ -150,7 +185,14 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
                                 // The holo row previews on the selected tile; switching it on sweeps once (CNV-45).
                                 Box(Modifier.matchParentSize().holoSurface(holo && selected == tile.source, sweepTrigger = holoSweep)) {
                                     tile.preset?.let { PresetArt(it) }
-                                    tile.blob?.let { blob -> MineThumb(blob.hash) { thumbs[tile.source] = it } }
+                                    val item = tile.item
+                                    if (item != null) {
+                                        // A gallery tile shows the item's own `카드 3:4` crop (LIB-85).
+                                        tile.blob?.let { blob -> BlobImage(blob.hash, item.cropFor(Ratio.R3X4), GALLERY_TILE_SIDE, null) { } }
+                                        tile.chip?.let { ImageStatusChip(it, Modifier.align(Alignment.TopStart).padding(6.dp)) }
+                                    } else {
+                                        tile.blob?.let { blob -> MineThumb(blob.hash) { thumbs[tile.source] = it } }
+                                    }
                                 }
                             }
                         }
@@ -166,6 +208,8 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
                 onCheckedChange = {
                     holoChoice = it
                     if (it) holoSweep++
+                    // Cover kept, no new choice: the switch writes at once (U-08 LIB-84 `[PROPOSED]`).
+                    if (view.coverLine != null && view.current != null && selected == view.initialSource && !readOnly) vm.setHolo(owner, it)
                 },
                 subtitle = ImageCopy.HOLO_SUB,
                 modifier = Modifier.padding(top = 12.dp),
@@ -195,10 +239,46 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
                         if (r == EditResult.READ_ONLY) sayReadOnly() else closeSheet()
                     }
                     is PickAction.Crop -> if (readOnly) sayReadOnly() else toCrop(action.blobHash, bounds[action.blobHash], thumbs[action.blobHash])
+                    is PickAction.FromGallery -> {
+                        val item = view.gallery.firstOrNull { it.item?.key == action.itemKey }?.item
+                        when {
+                            item == null -> Unit
+                            readOnly -> sayReadOnly()
+                            else -> when (val pick = ImagePickModel.galleryPick(item)) {
+                                is GalleryPick.Preset -> vm.placePreset(owner, pick.presetId, holoChoice ?: pick.holo) { r ->
+                                    if (r == EditResult.READ_ONLY) sayReadOnly() else closeSheet()
+                                }
+                                // Nothing is copied: the cover points at the same original with its own crops (LIB-85).
+                                is GalleryPick.Original -> toCrop(pick.blobHash, null, null, holoChoice ?: pick.holo, pick.crops, pick.hiddenNote)
+                            }
+                        }
+                    }
                 }
             },
             variant = ButtonVariant.PRIMARY,
             enabled = selected != null,
         )
+    }
+}
+
+/** Decode size of a gallery tile's 3:4 crop in the cover picker. */
+private const val GALLERY_TILE_SIDE = 360
+
+/**
+ * The cover picker's current line (U-08 LIB-84, height 64): the 48 dp 1:1 thumbnail, `지금 표지 · <word>`
+ * (or `표지 없음 · 첫 글자 카드`), then `자르기` (originals) and `빼기` as visible text buttons.
+ */
+@Composable
+private fun CoverCurrentLine(line: CoverLine, onCrop: (() -> Unit)?, onClear: (() -> Unit)?) {
+    val colors = CivilightTheme.colors
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(top = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CoverThumb(line.thumb)
+        CivilightText(line.text, CivilightTheme.type.small, Modifier.weight(1f), color = colors.ink2, maxLines = 1)
+        onCrop?.let { TextAction(ImageCopy.BTN_CROP, it) }
+        onClear?.let { TextAction(ImageCopy.BTN_CLEAR, it) }
     }
 }

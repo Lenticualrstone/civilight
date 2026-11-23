@@ -98,4 +98,40 @@ class HomeStartModelTest {
         // A project that never had the block still has the (empty) slot.
         assertTrue("start" in HomeModel.slots(ui(Fx.doc().copy(app = HomeStartModel.dismiss(Fx.doc().app)))).map { it.key })
     }
+
+    /** QA 0.1.1 backlog: a 1-level home kept its `k/n 씬` line hidden while `시작해 볼 것` was open. */
+    @Test
+    fun oneLevelNewReadyShowsOnlyTheSceneProgress() {
+        fun ui(doc: io.github.lenticualrstone.civilight.model.doc.ProjectDoc) =
+            HomeModel.build(doc, readOnly = false, locked = false, today = Fx.today, zone = Fx.zone)
+                .copy(start = HomeStartModel.build(doc, RecorderLibrary(), readOnly = false))
+        val oneLevel = Fx.mini(listOf("씬"), node("A1"), node("A2"), node("A3"))
+        val open = ui(oneLevel)
+        assertTrue(open.newReady)
+        assertEquals(listOf("name", "stats", "start"), HomeModel.slots(open).map { it.key }.take(3))
+        assertEquals(listOf("0/3" to "씬"), HomeModel.shownStats(open).map { it.value to it.label })
+
+        // Closed: board `Home`, every stat again.
+        val closed = ui(oneLevel.copy(app = HomeStartModel.dismiss(oneLevel.app)))
+        assertFalse(closed.newReady)
+        assertEquals(closed.stats, HomeModel.shownStats(closed))
+        assertEquals("0/3" to "씬", HomeModel.shownStats(closed).first().let { it.value to it.label })
+        assertEquals(listOf("name", "stats", "start"), HomeModel.slots(closed).map { it.key }.take(3))
+
+        // Deeper structures keep the board's `NewReady`: no stats.
+        val deep = ui(fresh)
+        assertTrue(deep.newReady)
+        assertTrue(HomeModel.shownStats(deep).isEmpty())
+        assertFalse("stats" in HomeModel.slots(deep).map { it.key })
+    }
+
+    /** QA U-06: the head names the project in every state; the model carries the name even on `NewReady`. */
+    @Test
+    fun newReadyStillCarriesTheProjectName() {
+        val doc = fresh.copy(project = fresh.project.copy(name = "등불 연대기"))
+        val ui = HomeModel.build(doc, readOnly = false, locked = false, today = Fx.today, zone = Fx.zone)
+            .copy(start = HomeStartModel.build(doc, RecorderLibrary(), readOnly = false))
+        assertTrue(ui.newReady)
+        assertEquals("등불 연대기", ui.name)
+    }
 }

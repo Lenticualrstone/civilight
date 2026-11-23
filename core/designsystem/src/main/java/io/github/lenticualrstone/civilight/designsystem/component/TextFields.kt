@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -86,6 +87,11 @@ fun CivilightTextField(
     val outlineWidth = animatedAlpha(outline.width.value, label = "fieldOutlineWidth")
     val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
     val shape = RoundedCornerShape(12.dp)
+    // U-02: a multi-line field keeps its caret line in view while it grows.
+    val caret = rememberCaretFollow(value, focused, enabled = !singleLine && enabled) {
+        if (visualTransformation === VisualTransformation.None) it.selection.end
+        else visualTransformation.filter(AnnotatedString(it.text)).offsetMapping.originalToTransformed(it.selection.end)
+    }
     Column(modifier.graphicsLayer { alpha = enabledAlpha.value }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (label != null) CivilightText(label, type.label, color = colors.ink2)
         BasicTextField(
@@ -100,6 +106,7 @@ fun CivilightTextField(
             visualTransformation = visualTransformation,
             interactionSource = source,
             modifier = Modifier.fillMaxWidth(),
+            onTextLayout = caret::onTextLayout,
             decorationBox = { inner ->
                 Row(
                     modifier = Modifier
@@ -116,7 +123,7 @@ fun CivilightTextField(
                         if (value.text.isEmpty() && placeholder != null) {
                             CivilightText(placeholder, textStyle, color = colors.ink3, maxLines = 1)
                         }
-                        inner()
+                        Box(Modifier.caretFollow(caret)) { inner() }
                     }
                     if (unit != null) CivilightText(unit, type.small, color = colors.ink3, maxLines = 1)
                 }

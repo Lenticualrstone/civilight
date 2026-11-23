@@ -62,7 +62,7 @@ object RelationKindModel {
         pairName = shape.pairName.takeIf { shape.isPair },
     ).first
 
-    /** The names changed (`이 값 고치기` enabled). */
+    /** The names changed (`저장` enabled). */
     fun namesChanged(before: KindShape, after: KindShape): Boolean =
         after.name.trim().nfc() != before.name || (before.isPair && after.pairName.trim().nfc() != before.pairName)
 

@@ -59,7 +59,7 @@ fun TwoButtonHead(mode: EditMode.TwoButtons, onLatest: () -> Unit) {
 }
 
 /**
- * Save buttons of a value sheet: one primary `이 값 고치기` ([EditMode.Plain]) or the two stacked
+ * Save buttons of a value sheet: one primary `저장` ([EditMode.Plain], no history) or the two stacked
  * buttons with their second lines (`이 값 고치기` primary, `여기서부터 바뀜 · 1-7` ghost).
  */
 @Composable
@@ -67,7 +67,7 @@ fun SaveButtons(mode: EditMode, enabled: Boolean, onSave: (SaveChoice) -> Unit) 
     val colors = CivilightTheme.colors
     when (mode) {
         EditMode.Plain -> Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-            CivilightButton(CastUiCopy.BTN_CORRECT, { onSave(SaveChoice.PLAIN) }, Modifier.weight(1f), enabled = enabled)
+            CivilightButton(CastUiCopy.BTN_SAVE, { onSave(SaveChoice.PLAIN) }, Modifier.weight(1f), enabled = enabled)
         }
         is EditMode.TwoButtons -> Column(Modifier.fillMaxWidth().padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val sheet = mode.sheet

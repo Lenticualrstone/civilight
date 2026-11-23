@@ -115,8 +115,10 @@ class FakeRecorder(library: RecorderLibrary = RecorderLibrary(), var trash: List
 }
 
 /**
- * Microphone takes the test drives: a started segment counts as captured when [finish]ed (unless
- * [captures] is false); [level] is what [sample] reports. Takes are kept per record by segment count.
+ * Microphone takes the test drives: a started run counts as captured when [finish]ed (unless
+ * [captures] is false); [level] is what [sample] reports. Takes are kept per record by run count.
+ * The microphone is modelled as the platform takes hold it (U-13): open while a run records, closed
+ * by [pause], [finish] and [drop]; [opens] and [closes] count it.
  */
 class FakeTakes(var captures: Boolean = true, var level: Float = 0.5f) : AudioTakes {
     private var segmentKey: Key? = null
@@ -125,35 +127,60 @@ class FakeTakes(var captures: Boolean = true, var level: Float = 0.5f) : AudioTa
     val recovered = mutableListOf<Key>()
     var pruneKept: Set<Key>? = null
     var paused = false
+    var micOpen = false
+        private set
+    var opens = 0
+        private set
+    var closes = 0
+        private set
 
-    override val capturing: Boolean get() = segmentKey != null
+    override val capturing: Boolean get() = micOpen
+
+    private fun openMic() {
+        micOpen = true
+        opens++
+    }
+
+    private fun closeMic() {
+        if (!micOpen) return
+        micOpen = false
+        closes++
+    }
 
     override fun start(recordKey: Key): Boolean {
         if (!captures) return false
+        closeMic()
         segmentKey = recordKey
         paused = false
+        openMic()
         return true
     }
 
     override fun pause() {
         paused = true
+        closeMic()
     }
 
     override fun resume() {
         paused = false
+        if (segmentKey != null && !micOpen) openMic()
     }
 
     override fun sample(): Float = if (capturing) level else 0f
 
     override fun finish(recordKey: Key): Boolean {
         if (segmentKey != recordKey) return false
+        closeMic()
         segmentKey = null
         segments[recordKey] = (segments[recordKey] ?: 0) + 1
         return true
     }
 
     override fun drop(recordKey: Key) {
-        if (segmentKey == recordKey) segmentKey = null
+        if (segmentKey == recordKey) {
+            closeMic()
+            segmentKey = null
+        }
     }
 
     override fun take(recordKey: Key): TakeFile? {

@@ -59,6 +59,10 @@ class CanvasCopyLintTest {
         CardCopy.statusChip("쓰는 중", true)?.let(::add)
         add(ImageCopy.tab(ImageCopy.TAB_PRESETS, 8))
         add(ImageCopy.tab(ImageCopy.TAB_MINE, 3))
+        // U-08 cover mode (CV-32).
+        add(ImageCopy.tab(ImageCopy.TAB_GALLERY, 3))
+        add(ImageCopy.coverNow("사진"))
+        add(ImageCopy.coverNow("잿빛 새벽"))
         add(ImageCopy.pickSubtitle("유리 정원", ImageSlots.spec(io.github.lenticualrstone.civilight.model.asset.ImageSlot.PROJECT_COVER).chips))
         add(ImageCopy.cropHeader("유리 정원", ImageCopy.SHORT_PROJECT_COVER))
         add(ImageCopy.readout(2160, 2880, 3024, 4032))

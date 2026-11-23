@@ -45,7 +45,9 @@ import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
 import io.github.lenticualrstone.civilight.ui.tour.TourHold
 import io.github.lenticualrstone.civilight.ui.tour.tourRunning
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
+import io.github.lenticualrstone.civilight.feature.recorder.RecorderUiCopy
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /** The activity behind [this] context (the device-unlock request needs it). */
 tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
@@ -65,8 +67,10 @@ fun micGranted(context: Context): Boolean =
  *
  * The start is consumed once ([rememberSaveable]): a back stack restored after process death never
  * turns the mic on by itself; it closes when no capture is running. The route closes when the
- * capture goes idle. System back on `녹음 중` only leaves the screen (the recording keeps running and
- * the mic reopens it, LRC-01); elsewhere it acts like the screen's own close.
+ * capture goes idle. Leaving `녹음 중` inside the app (system back, another screen) saves the take as
+ * `정리 안 됨` and releases the microphone at once ([CaptureHub.leave], U-13); the app going to the
+ * background keeps a running take (LRC-09, the service's notification). Elsewhere back acts like the
+ * screen's own close.
  */
 @Composable
 fun RecordingRoute(route: Recording, deps: FeatureDeps) {
@@ -114,8 +118,18 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    BackHandler(enabled = state.stage != CaptureStage.RECORDING && state.stage != CaptureStage.IDLE) {
-        hub.launch { back() }
+    // U-13: leaving the recorder saves the take (`정리 안 됨`) and releases the microphone before anything else runs.
+    val leaveNow: () -> Unit = {
+        hub.leave()?.let { save ->
+            deps.appScope.launch {
+                save.join()
+                if (!save.isCancelled) deps.toasts.show(RecorderUiCopy.LEFT_SAVED, actionLabel = null)
+            }
+        }
+    }
+
+    BackHandler(enabled = state.stage != CaptureStage.IDLE) {
+        if (state.stage == CaptureStage.RECORDING) leaveNow() else hub.launch { back() }
     }
 
     ProtectWindow(CaptureProtection.of(state.env, CaptureProtection.projectsShown(state)))
@@ -128,6 +142,18 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
     DisposableEffect(touring, state.stage) {
         if (touring) hub.holdForTour()
         onDispose { if (touring) hub.releaseTour() }
+    }
+
+    // U-13: the route left while a take records or is paused (popped, another screen on top, the app closed).
+    // Declared after the tour hold so it is disposed first: the take is saved before a tour release could resume it.
+    // Not on a configuration change, and not when the system tears the screen down in the background (LRC-09).
+    val activity = remember(context) { context.findActivity() }
+    DisposableEffect(hub) {
+        onDispose {
+            val inApp = activity?.isChangingConfigurations != true &&
+                (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) || activity?.isFinishing == true)
+            if (inApp && deps.navigator.backStack.none { it is Recording }) leaveNow()
+        }
     }
 
     val inner = LocalWindowLayout.current.isInner

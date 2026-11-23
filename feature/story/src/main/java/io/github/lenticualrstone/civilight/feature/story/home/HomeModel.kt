@@ -24,6 +24,8 @@ import io.github.lenticualrstone.civilight.navigation.Timeline
 import io.github.lenticualrstone.civilight.navigation.World
 import io.github.lenticualrstone.civilight.ui.lens.LensChipLabel
 import io.github.lenticualrstone.civilight.ui.lens.LensRules
+import io.github.lenticualrstone.civilight.ui.image.CoverUi
+import io.github.lenticualrstone.civilight.ui.image.ProjectCovers
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
@@ -51,7 +53,8 @@ data class HomeRow(
 
 /**
  * The `작업` shortcuts (STO-01, GAL-03): `스토리 · 인물 · 세계 · 연표 · 캔버스 · 갤러리 · 페이지 · 점검 센터 · 설정`;
- * `설정` is drawn `ink3` and keeps its own last row ([HomeModel.shortcutRows]). `페이지` (CNV-14) and
+ * `설정` keeps the last place. Home draws them as DS list rows with `›` (QA U-07); [dim] and
+ * [HomeModel.shortcutRows] describe the former text grid and are no longer drawn. `페이지` (CNV-14) and
  * `점검 센터` (CNV-17) are the entry points QA 2026-11-23 found missing.
  */
 enum class HomeShortcut(val label: String, val dim: Boolean = false) {
@@ -97,10 +100,23 @@ data class HomeUi(
     val readOnly: Boolean,
     /** The 만든 직후 block (LIB-13) while it is not closed. */
     val start: HomeStart? = null,
-) {
     /**
-     * Board `NewReady` (head `새 프로젝트`, summary line, no stats, no `이어 쓰기`, no lens chip) while
-     * the block shows and nothing has been written yet. Once there is an `이어 쓰기` target, home is
+     * The stats `NewReady` still draws: the `k/n 씬` progress of a 1-level project (QA 0.1.1 backlog: it
+     * was hidden while `시작해 볼 것` was open); empty for deeper structures, as the board draws no stats.
+     */
+    val newReadyStats: List<HomeStat> = emptyList(),
+    /** The project cover left of the name (U-08 LIB-83): 3:4 crop, a preset, or the initial-letter card. */
+    val cover: CoverUi = CoverUi(null, null, null, "", holo = false),
+    /** The cover opens the cover picker and draws the pencil badge; never for the read-only example. */
+    val coverEditable: Boolean = false,
+) {
+    /** `표지 이미지 · 바꾸기` while a cover is drawn, `표지 이미지 · 고르기` on the initial-letter card. */
+    val coverLabel: String get() = if (cover.hash != null || cover.presetId != null) HomeCopy.COVER_CHANGE else HomeCopy.COVER_PICK
+
+    /**
+     * Board `NewReady` (summary line, no stats but [newReadyStats], no `이어 쓰기`, no lens chip) while
+     * the block shows and nothing has been written yet. The head reads the project's name in every state
+     * (QA U-06; the board's `새 프로젝트` head is not followed). Once there is an `이어 쓰기` target, home is
      * board `Home` again and the block sits above the chapter list (LIB-13 "on top", STO-01).
      */
     val newReady: Boolean get() = start != null && resume == null
@@ -132,15 +148,13 @@ sealed interface HomeSlot {
  */
 object HomeModel {
     /**
-     * The items of home for [ui]: name, then (board `Home` only) stats and `이어 쓰기`, the start slot (always;
-     * empty while there is no block), the chapter list, `작업`.
+     * The items of home for [ui]: name, stats when [shownStats] has any, `이어 쓰기` (board `Home` only), the
+     * start slot (always; empty while there is no block), the chapter list, `작업`.
      */
     fun slots(ui: HomeUi): List<HomeSlot> = buildList {
         add(HomeSlot.Name)
-        if (!ui.newReady) {
-            add(HomeSlot.Stats)
-            if (ui.resume != null) add(HomeSlot.Resume)
-        }
+        if (shownStats(ui).isNotEmpty()) add(HomeSlot.Stats)
+        if (!ui.newReady && ui.resume != null) add(HomeSlot.Resume)
         add(HomeSlot.Start)
         if (ui.rows.isNotEmpty()) {
             add(HomeSlot.ListHeader)
@@ -148,6 +162,9 @@ object HomeModel {
         }
         add(HomeSlot.Work)
     }
+
+    /** The stats home draws: all of them on board `Home`; only [HomeUi.newReadyStats] on `NewReady`. */
+    fun shownStats(ui: HomeUi): List<HomeStat> = if (ui.newReady) ui.newReadyStats else ui.stats
 
     /**
      * The episode the right pane shows (`TwoHome`, STO-43): the `StoryStructure` right above this home on
@@ -159,7 +176,15 @@ object HomeModel {
         return top.focusUnitKey.takeIf { below.projectKey == projectKey && top.projectKey == projectKey }
     }
 
-    fun build(doc: ProjectDoc, readOnly: Boolean, locked: Boolean, today: LocalDate, zone: ZoneId): HomeUi {
+    /** [fileExists]: whether a cover original is on this device; a missing one draws the initial-letter card (LIB-88). */
+    fun build(
+        doc: ProjectDoc,
+        readOnly: Boolean,
+        locked: Boolean,
+        today: LocalDate,
+        zone: ZoneId,
+        fileExists: (String) -> Boolean = { true },
+    ): HomeUi {
         val view = StoryOverview(doc, locked = locked)
         val levels = doc.project.structure.levels.size
         val resume = view.resumeTarget()?.let { HomeResume(it.where, it.quote, it.blockKey) }
@@ -171,8 +196,9 @@ object HomeModel {
             levels == 2 -> null to view.chapters.map { episodeRow(view, it) }
             else -> null to view.chapters.map { sceneRow(view, it) }
         }
+        val progress = progressStat(view, levels)
         val stats = listOfNotNull(
-            progressStat(view, levels),
+            progress,
             HomeStat(number(StructureEdit.todayChars(doc, today, zone)), HomeCopy.STAT_TODAY),
             HomeStat(number(view.characterCount), HomeCopy.STAT_CAST),
         )
@@ -189,6 +215,9 @@ object HomeModel {
             shortcuts = shortcuts(doc),
             commandHint = CommandBar.placeholder(CommandScreen.HOME),
             readOnly = readOnly,
+            newReadyStats = if (levels <= 1) listOfNotNull(progress) else emptyList(),
+            cover = ProjectCovers.cover(doc, doc.project.name, fileExists),
+            coverEditable = !readOnly,
         )
     }
 

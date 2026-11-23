@@ -57,6 +57,7 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
             loaded = library.loaded,
             showCards = ShelfCards.showCards(settings),
             recentItems = recents.items,
+            fileExists = stores.blobs::contains,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, ShelfUi())
 
@@ -92,6 +93,21 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
                 .distinctUntilChanged()
                 .collectLatest { route -> if (route != null) recorder.onTop(route) }
         }
+    }
+
+    /** The cover picker's per-project view model stores (U-08 LIB-81; see [CoverPickerStores]). */
+    val coverPickers = CoverPickerStores()
+
+    init {
+        // A project the 서재 stops showing (trash, re-locked hidden group) lets its picker go at once.
+        viewModelScope.launch {
+            state.collect { ui -> if (ui.loaded) coverPickers.retain(ui.exportable.toSet()) }
+        }
+    }
+
+    override fun onCleared() {
+        coverPickers.clearAll()
+        super.onCleared()
     }
 
     /** `목록 | 카드` (LIB-04): remembered for the 서재 in `AppSettings.viewByScreen`. */

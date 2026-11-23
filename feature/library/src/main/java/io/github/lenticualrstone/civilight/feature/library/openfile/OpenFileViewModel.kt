@@ -9,6 +9,7 @@ import io.github.lenticualrstone.civilight.domain.library.importing.OpenDecision
 import io.github.lenticualrstone.civilight.domain.library.importing.SameProjectChoice
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
 import io.github.lenticualrstone.civilight.model.Keys
 import io.github.lenticualrstone.civilight.model.app.LibraryEntry
 import io.github.lenticualrstone.civilight.model.asset.BlobSource
@@ -213,6 +214,11 @@ internal class StoreImportPorts(private val deps: FeatureDeps) : ImportPorts {
     override suspend fun updateRecorder(transform: (RecorderLibrary) -> RecorderLibrary) {
         stores.recorder.ensureLoaded()
         stores.recorder.updateLibrary(transform)
+    }
+
+    override suspend fun updateTemplates(transform: (List<FieldTemplate>) -> List<FieldTemplate>) {
+        stores.fieldTemplates.ensureLoaded()
+        stores.fieldTemplates.update { it.copy(templates = transform(it.templates)) }
     }
 
     override suspend fun removeRecentsOf(key: Key) {

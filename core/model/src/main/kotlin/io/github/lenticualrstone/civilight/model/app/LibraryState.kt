@@ -103,7 +103,8 @@ data class BackupEntry(
 
 @Serializable(with = BackupKind.Codec::class)
 enum class BackupKind {
-    PROJECT, RECORDER, SETTINGS;
+    /** [TEMPLATES]: the app-level 인물 템플릿 file (CST-63); a hidden-templates entry has `hidden`. */
+    PROJECT, RECORDER, SETTINGS, TEMPLATES;
 
     object Codec : LowerCamelEnumSerializer<BackupKind>("BackupKind", entries, PROJECT)
 }

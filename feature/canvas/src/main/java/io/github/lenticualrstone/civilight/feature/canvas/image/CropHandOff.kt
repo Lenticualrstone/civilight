@@ -3,7 +3,9 @@ package io.github.lenticualrstone.civilight.feature.canvas.image
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.asset.Crop
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
+import io.github.lenticualrstone.civilight.model.asset.Ratio
 
 /**
  * What the picker hands to the crop editor beyond the route's arguments (CNV-45 `고르기 → 자르기`): the
@@ -22,6 +24,11 @@ data class CropHandOff(
     val tileBitmap: ImageBitmap? = null,
     /** A line shown above the crop controls: `숨긴 이미지 · 초상에서는 보임` when a hidden gallery image becomes a main image (GAL-14). */
     val note: String? = null,
+    /**
+     * Starting crops per ratio (U-08 LIB-85: a gallery item becoming the cover starts from the item's own
+     * `r3x4` · `r1x1`); ratios not listed start at the largest centred frame.
+     */
+    val crops: Map<Ratio, Crop> = emptyMap(),
 ) {
     companion object {
         @Volatile private var pending: CropHandOff? = null

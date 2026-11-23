@@ -31,7 +31,7 @@ sealed interface RelationSave {
      */
     data class FromStart(val label: String) : RelationSave
 
-    /** The slot has a value: `이 값 고치기`, or the two buttons of CST-10 when it has history. */
+    /** The slot has a value: `저장` when it has no history, or the two buttons of CST-10 when it has history. */
     data class Edit(val mode: EditMode) : RelationSave
 }
 

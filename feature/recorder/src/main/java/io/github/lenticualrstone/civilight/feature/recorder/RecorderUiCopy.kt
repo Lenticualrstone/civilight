@@ -30,6 +30,12 @@ object RecorderUiCopy {
     const val WIDGET_TITLE = "떠오른 생각"
     const val WIDGET_SUB = "눌러서 바로 녹음"
 
+    /**
+     * Toast after the recorder was left with a take recording or paused (U-13): the take is saved as
+     * `정리 안 됨` in the 기록함 (`ED`, the `기록함에 두기` button's own words). No name or text in it.
+     */
+    const val LEFT_SAVED = "기록함에 둠"
+
     // 기록함 (LRC-25 … LRC-27).
     const val BACK = "뒤로"
 

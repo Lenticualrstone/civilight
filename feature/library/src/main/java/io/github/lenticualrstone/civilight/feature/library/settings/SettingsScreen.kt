@@ -41,6 +41,9 @@ internal fun SettingsScreen(services: LibraryServices) {
         SwitchSettingRow(ui.appLock, vm::setAppLock)
         LinkRow(ui.hiding) { open(SettingsRootRow.HIDING) }
 
+        SettingsSection(SettingsCopy.SECTION_CAST)
+        LinkRow(ui.templates) { open(SettingsRootRow.TEMPLATES) }
+
         Spacer(Modifier.height(22.dp))
         SettingsRow(title = SettingsCopy.TRASH, onClick = { open(SettingsRootRow.TRASH) })
         SettingsRow(title = SettingsCopy.RECORDER, onClick = { open(SettingsRootRow.RECORDER) })

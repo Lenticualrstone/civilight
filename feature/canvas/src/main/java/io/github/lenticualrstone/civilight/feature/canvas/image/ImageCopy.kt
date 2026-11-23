@@ -19,7 +19,7 @@ object ImageCopy {
     const val SLOT_GALLERY = "갤러리"
     const val USED_GALLERY = "갤러리 카드 · 목록 썸네일 · 보기는 원본"
 
-    const val USED_PROJECT_COVER = "서재 카드 · 목록 썸네일"
+    const val USED_PROJECT_COVER = "서재 카드 · 목록 썸네일 · 프로젝트 홈"
     const val USED_CHARACTER_PORTRAIT = "인물 카드 · 아바타"
     const val USED_CHARACTER_BACKGROUND = "프로필 위 · 아래로 흐려짐"
     const val USED_CARD_REFERENCE = "카드 참고 이미지"
@@ -73,6 +73,26 @@ object ImageCopy {
     const val BTN_FILE = "파일"
     const val BTN_PICK = "고르기"
     const val BTN_CLOSE = "닫기"
+
+    // Cover mode of the picker (U-08 LIB-84 … LIB-87, 60 §7.2; `[PROPOSED]` rows there).
+    const val TAB_GALLERY = "갤러리"
+    const val COVER_NOW = "지금 표지"
+    const val COVER_NONE = "표지 없음 · 첫 글자 카드"
+    const val BTN_CROP = "자르기"
+    const val BTN_CLEAR = "빼기"
+    const val GALLERY_EMPTY = "이미지 없음"
+    const val GALLERY_UNTITLED = "제목 없음"
+    const val CHIP_COVER = "표지"
+    const val CHIP_HOLO = "홀로"
+    const val CHIP_HIDDEN = "숨김"
+    const val TOAST_COVER_CLEARED = "표지 뺌"
+    const val UNDO = "되돌리기"
+
+    /** `숨긴 이미지 · 표지에서는 보임` above the crop controls when a hidden gallery item becomes the cover (GAL-14). */
+    const val HIDDEN_SHOWN_IN_COVER = "숨긴 이미지 · 표지에서는 보임"
+
+    /** `지금 표지 · 사진`: the picker's current line (LIB-84); the word never names a gallery item. */
+    fun coverNow(word: String): String = "$COVER_NOW · $word"
 
     // Crop editor (board `ImageCrop`).
     const val BTN_CANCEL = "취소"

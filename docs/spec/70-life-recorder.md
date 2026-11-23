@@ -1,6 +1,6 @@
 # 70 · 라이프 레코더 (Life Recorder) — feature prefix `LRC`
 
-Implementation spec for the Life Recorder area of Civilight (Android, Jetpack Compose). Feature ids `LRC-01` … `LRC-47`. Engineers implement from this file alone; every Korean string in `code` style is UI copy and must be used verbatim.
+Implementation spec for the Life Recorder area of Civilight (Android, Jetpack Compose). Feature ids `LRC-01` … `LRC-47` and `LRC-48` … `LRC-50` (§7, 0.2.0). Engineers implement from this file alone; every Korean string in `code` style is UI copy and must be used verbatim.
 
 ## 0. Conventions
 
@@ -70,6 +70,8 @@ The Life Recorder (`라이프 레코더`) is a capture tool for sudden ideas, by
 #### LRC-01 · 명령 칸 마이크 (command-bar mic)
 **Priority** P0 · **needsExternal** no · **Boards** `Main`, `LrEntry`, `LrRecord`; DS `CommandBar` · **Sources** MAIN 라이프 레코더 (들어가는 곳: 모든 명령 칸의 마이크; 녹음: 누르면 바로 시작); DS CommandBar README; rule 23 §2 (보던 곳 table)
 
+**(0.2.0)** mic only on 프로젝트 홈; every other command bar has none (LRC-48).
+
 - Every `CommandBar` (every screen that has one: script, project home, cast, world, timeline, map, 서재, inbox excepted — the inbox has its own bottom buttons) has on its right a 32 px circular mic button, fill `pri`, icon `onpri`, `aria-label="라이프 레코더"`.
 - Tap → **recording starts at once** (no intermediate screen, no confirmation) and the recording screen (LRC-07) opens over the current screen. The current screen becomes the **entry context** (보던 곳) for the pre-filled link (LRC-19).
 - If the microphone permission is not granted → LRC-06 instead of recording.
@@ -78,6 +80,8 @@ The Life Recorder (`라이프 레코더`) is a capture tool for sudden ideas, by
 
 #### LRC-02 · 홈 화면 위젯 (home-screen widget)
 **Priority** P1 · **needsExternal** yes (Android app widget) · **Boards** `LrEntry`, `OnbVoice`, `EmptyLr` · **Sources** MAIN 들어가는 곳; `LrEntry` panel; `OnbVoice` choice; rule 23 §2 table
+
+**(0.2.0)** Not offered in 0.2.0 (LRC-48, N-73 `안 함`).
 
 - A home-screen widget showing the mic in a `pri` circle and two lines: `떠오른 생각` (title) / `눌러서 바로 녹음` (sub). Panel label on `LrEntry`: `홈 화면 위젯` · `앱을 열지 않고 바로 녹음`.
 - Tap → recording starts immediately in a recording surface that does not open the app's normal screens (`앱을 열지 않고`): `ED` a translucent, task-isolated activity that hosts only LRC-07/LRC-13 and finishes back to the launcher after `기록함에 두기` or `취소`.
@@ -88,6 +92,8 @@ The Life Recorder (`라이프 레코더`) is a capture tool for sudden ideas, by
 #### LRC-03 · 빠른 설정 타일 (quick-settings tile)
 **Priority** P1 · **needsExternal** yes (TileService) · **Boards** `LrEntry` · **Sources** MAIN 들어가는 곳; `LrEntry` panel `빠른 설정 타일` · `알림창에서 한 번 · 잠금 화면에선 녹음만`; rule 23 §2
 
+**(0.2.0)** Not offered in 0.2.0 (LRC-48).
+
 - A quick-settings tile with the mic icon. Tile label: copy: not in sources (`TODO_COPY_LRC_01`; `ED` use the app-wide name `라이프 레코더`, which is existing copy, until decided).
 - One tap starts recording immediately (`알림창에서 한 번`).
 - From the lock screen it records only (LRC-05): `잠금 화면에선 녹음만`.
@@ -96,6 +102,8 @@ The Life Recorder (`라이프 레코더`) is a capture tool for sudden ideas, by
 #### LRC-04 · 커버 화면 위젯 (cover-screen widget) and unfold continuation
 **Priority** P1 · **needsExternal** yes (launcher/cover-screen widget host of the foldable) · **Boards** `LrEntry` · **Sources** MAIN 들어가는 곳 (커버 화면); `LrEntry` panel `커버 화면` · `접은 채 위젯으로 · 펼치면 이어서`; rule 23 §2 table (`커버 화면 위젯` → 없음)
 
+**(0.2.0)** Not offered in 0.2.0 (LRC-48).
+
 - The same widget as LRC-02 placed on the cover screen. Tap while folded → recording starts on the cover screen.
 - **Unfolding during recording continues the same recording** on the inner screen without a gap: same timer, same transcript, same links, same audio file (`펼치면 이어서`). The fold rule "만지던 것은 제자리" applies: the transcript's last line keeps its screen height.
 - `ED` On devices whose cover screen is a normal launcher (Fold class) this is the LRC-02 widget; devices with a vendor-only cover widget host are out of scope until the main device model is decided (planning 남은 확인 "주 기기 모델").
@@ -103,6 +111,8 @@ The Life Recorder (`라이프 레코더`) is a capture tool for sudden ideas, by
 
 #### LRC-05 · 잠금 화면 녹음 (lock-screen recording)
 **Priority** P1 · **needsExternal** yes (show-when-locked activity, keyguard) · **Boards** `LrSettings`, `LrEntry` · **Sources** MAIN 들어가는 곳 (잠금 화면(새 녹음만)); concept memory (lock-screen recording allowed, new recording only, inbox needs unlock); `LrSettings` row `잠금 화면에서 녹음` · `새 녹음만 · 기록함은 잠금 해제 후`; rule 23 §2 (잠금 화면 → 없음 · `+ 연결`만), §2 버린 안 (잠금 화면 녹음이 원고를 바꾸면 안 됨)
+
+**(0.2.0)** Not offered in 0.2.0; the setting row is hidden, its value kept (LRC-48).
 
 - When setting `잠금 화면에서 녹음` is on (default on), the tile (and any lock-screen shortcut the OS offers) starts a recording **without unlocking the device**.
 - On the lock screen only these are available: LRC-07 (record, pause, `취소`, `멈추고 저장`), LRC-13 with `이어서 말하기` and `기록함에 두기`. Not available: `글로 쓰기` [PROPOSED: typing on the keyguard is allowed by the OS, but the text sheet's `@` search would list project items], `여기 넣기`, the inbox, any 넣기.
@@ -125,6 +135,8 @@ The Life Recorder (`라이프 레코더`) is a capture tool for sudden ideas, by
 
 #### LRC-07 · 녹음 중 (recording screen)
 **Priority** P0 · **needsExternal** yes (speech-to-text, LRC-11/12) · **Boards** `LrRecord`, `TourLr` (owned by LIB-19), `Walk3` · **Sources** MAIN 녹음; concept memory (live transcript, unconfirmed tail dimmed, band glow, no rings); rule 23 §7 row 녹음 중 (`연결 · 1-7 씬 3 · + 연결`); `scr_lr.py record()`
+
+**(0.2.0)** Pause releases the mic and resume opens a new segment; back saves the take as `정리 안 됨` (LRC-49 replaces the pause line and the `[PROPOSED]` back rule below).
 
 Layout (cover, 390×844; full window):
 - Background: the screen the user was on, blurred 3 px, under a full-window glass layer (`.glass`).
@@ -155,6 +167,8 @@ Inner (unfolded): same content full-window over the blurred current screen; the 
 
 #### LRC-09 · 녹음 계속 (background continuity, interruptions)
 **Priority** P1 · **needsExternal** yes (foreground service `microphone` type, notification) · **Boards** — · **Sources** LRC-08 rule; rule 19 §3 (notifications never show hidden names); `LrEntry` (`펼치면 이어서`)
+
+**(0.2.0)** In-app leave saves and releases (LRC-49); the background case below stays (D32).
 
 - Leaving the recording screen (home, other app, screen off, fold/unfold) does not stop the recording (consequence of LRC-08). `ED` run capture in a foreground service with `foregroundServiceType="microphone"` started while the recording screen is visible.
 - Ongoing notification: copy: not in sources (`TODO_COPY_LRC_04`). It must contain no transcript text and no link label (a link may point to a hidden or R-18 project; rule 19 §3 notifications show only `숨긴 프로젝트 N` / `R-18 프로젝트`). Tapping it returns to LRC-07.
@@ -290,6 +304,8 @@ Behaviour:
 #### LRC-19 · 보던 곳 연결 (pre-filled link from the entry context)
 **Priority** P0 · **needsExternal** no · **Boards** `LrRecord`, `LrText`, `LrSettings` · **Sources** rule 23 §2 (보던 곳 · 보던 곳이 없는 입구 table), §7 row 설정; `LrSettings` row `보던 곳 연결` · `시작한 곳을 칩으로 · 언제든 빼기`
 
+**(0.2.0)** Only the 프로젝트 홈 mic and the inbox buttons remain as entries (LRC-48).
+
 - When setting `보던 곳 연결` is on (default on), a new recording or text memo starts with **one** link chip for the entry context:
 
 | Entry | Pre-filled link |
@@ -329,6 +345,8 @@ Behaviour:
 
 #### LRC-22 · 연결 가림 (masking: R-18, hidden project, hidden item)
 **Priority** P1 · **needsExternal** no · **Boards** `RHRatingSheet`, `RHRatingDown`, `RatingSettings`, `ProjSettings`, `LrInbox` · **Sources** rule 23 §6 (가림 table, R-18 확정, 열어 둔 동안에도 같게); rule 19 §2 (example: 바로 ‘R-18’), §3 (휴지통 · 기록함 위치: 숨긴 프로젝트), §6 table (기록함 연결 · 숨긴 항목); LIB-28 `recorderLinkLabel(project)`; LIB-26 capture guard
+
+**(0.2.0)** The `R-18` label becomes the masked-name constant (LRC-50).
 
 Every place in this area that shows a link label (chips, inbox link rows, LrHide meta, picker, `넣은 곳` lists, project filter) uses:
 
@@ -500,6 +518,8 @@ Bottom sheet (cover) / popover (inner):
 #### LRC-30 · 빈 기록함 (empty inbox)
 **Priority** P1 · **needsExternal** no · **Boards** `EmptyLr`, `OnbEmpty` (서재 row `기록 0`) · **Sources** MAIN 상태 화면 (기록함 비어 있음); `scr_states.py e_lr()`
 
+**(0.2.0)** Sub becomes `TODO_COPY_LRC_EMPTY_SUB` (LRC-48).
+
 - When the library has zero records (trash not counted): header as LRC-25 without the right icon; chip `전체 0`; outlined block (margin-top 18, padding 26 20, radius 20, inset `edge`): title `기록 없음` (22/30, 800), sub `명령 칸 마이크 · 홈 위젯 · 빠른 설정` (13 px), buttons `말로 기록` (primary, flex 1) · `글로` (ghost, flex 1). No bottom bar.
 - `말로 기록` → LRC-07; `글로` → LRC-15 (entry context inbox, no filter → no pre-filled link).
 - 서재 row then reads `기록 0` (LIB-01).
@@ -655,6 +675,8 @@ Bottom sheet (cover) / popover (inner):
 #### LRC-44 · 설정 · 라이프 레코더 (settings screen)
 **Priority** P1 · **needsExternal** no · **Boards** `LrSettings`, `ReduceSettings` (shared glow row) · **Sources** MAIN 설정 (받아쓰기 방식, 잠금 화면 녹음, 원본 음성 보관, 녹음 중 빛 띠, 연결); rule 23 §7 row 설정 (`보던 곳 연결 · 시작한 곳을 칩으로 · 언제든 빼기`); `scr_decide.py lr_settings()`
 
+**(0.2.0)** Row `잠금 화면에서 녹음` is hidden; its value is kept (LRC-48).
+
 Screen: header small `설정`, title `라이프 레코더`; reached from 설정 (LIB-63 row, `ED`).
 
 | Section | Row | Sub | Control | Default |
@@ -690,6 +712,8 @@ Screen: header small `설정`, title `라이프 레코더`; reached from 설정 
 
 #### LRC-47 · 다른 화면의 레코더 고리 (hooks used by other areas)
 **Priority** P1 · **needsExternal** no · **Boards** `Library`, `OnbEmpty`, `NewStart`, `NewReady`, `EmptyCast`, `OnbVoice`, `HelpReplay`, `TourLr`, `RCDeleteImpact`, `CSheetMods`, `WideMods`, `Profile` · **Sources** rule 23 §4 table (시작 재료 · 만든 직후 · 빈 상태 · 인물), §7; LIB-01/12/13/15/19/21; CST-49
+
+**(0.2.0)** `OnbVoice` `홈 화면 위젯 추가` is hidden; the rating-sheet hook has no caller (LRC-48, LIB-92).
 
 This area exposes these functions/screens; the named areas draw them:
 
@@ -1102,3 +1126,65 @@ Each item names both sides. `ED` is the default this spec uses until decided.
 22. **Recorder module tour.** MAIN and `HelpReplay` give the recorder tour 3 steps; only step 2/3 (`TourLr`) is drawn. Steps 1 and 3 are undefined (owned by LIB-19, listed here because they describe this area).
 23. **Where the record is created.** No source says whether a record exists before `기록함에 두기`. `ED` created at `멈추고 저장` (the button says 저장), so leaving `정리 중` any way keeps it.
 24. **Project tag on inbox rows.** Rule 23 §5 shows R2's chips as `연결 · 잿빛 새벽의 등불 · 오웬 · 세라 @`; rule 23 §3 table and `LrInbox` show the same record's link row as `오웬 · 세라`. `ED` (LRC-21): the inbox row omits a project tag when a link inside that project exists; capture and record screens show all chips.
+
+---
+
+## 7. 0.2.0 changes (2026-11-24) (0.2.0)
+
+Feature ids `LRC-48` … `LRC-50`. Source: the frozen scope `docs/status/0.2.0-scope.md` (S-8, U-13, N-13, S-4, D8, D32, D34; §7 row N-73 `안 함`) and the decision row `레코더 입구` (2026-11-24): "앱 안에서는 홈에서만 연다. 앱 밖 입구(홈 화면 위젯 · 빠른 설정 타일 · 잠금 화면 녹음)는 `그 뒤`로 미루고, 자리만 있던 설정 항목도 감춘다. 명세 70의 진입점을 이렇게 고친다." Where this section and §2 disagree, this section wins; each superseded block carries a **(0.2.0)** line. Stored values are never removed (scope §8).
+
+#### LRC-48 · 입구는 홈에서만 (entry points in 0.2.0)
+**Priority** P0 · **needsExternal** no · scope S-8, D4
+
+| Entry (0.1.0) | 0.2.0 |
+| --- | --- |
+| `CommandBar` mic on 프로젝트 홈 | **kept**: the only in-app mic. Entry context = that project (LRC-19 row `Project home`) |
+| `CommandBar` mic on every other screen (script, cast, world, timeline, map, 서재, canvas, pages, gallery, check center, structure, assets, track screen) | **removed** (the bar draws no mic, DS-75) |
+| 기록함 `말로 기록` · `글로 쓰기` (LRC-25, LRC-30) | kept: they are inside the recorder. Entry context = the inbox's project filter (LRC-19) |
+| 서재 row `라이브러리 · 프로젝트 밖` › `라이프 레코더` (LIB-01) | kept: it opens the 기록함 list, not a recording (`ED`, LIB §8.8 Q-02-3) |
+| Home-screen widget (LRC-02), quick-settings tile (LRC-03), cover-screen widget (LRC-04), lock-screen recording (LRC-05) | **not offered** (N-73 `안 함`). 0.1.0 declared `RecorderTileService` and `RecorderWidgetProvider` in `feature:recorder`'s manifest; 0.2.0 removes both declarations, so the system drops any placed tile or widget on upgrade (`ED`). No show-when-locked activity is declared. Records made through them in 0.1.0 stay in the 기록함 |
+| `OnbVoice` `홈 화면 위젯 추가` (LRC-47) | hidden (LIB-95) |
+| 설정 · 라이프 레코더 row `잠금 화면에서 녹음` (LRC-44) and any widget or tile row | hidden; the stored value is kept and not read (00 §13.7) |
+| `EmptyLr` sub `명령 칸 마이크 · 홈 위젯 · 빠른 설정` (LRC-30) | `TODO_COPY_LRC_EMPTY_SUB` (none drawn until given) |
+| Recorder records in search (`/` and the search sheet) | not searched (N-13; DS-73 has no recorder chip). The inbox's own search stays (LRC-25) |
+
+- Rows of LRC-19's entry table for removed entries no longer occur; the rule for the remaining entries is unchanged.
+- Tours and help rows that name removed entries are left out (LIB-96).
+
+#### LRC-49 · 일시정지 · 나가기 (pause and leaving, U-13)
+**Priority** P0 · **needsExternal** no · scope U-13, D8, D32 · **supersedes the `[PROPOSED]` back rule of LRC-07 and the pause line of LRC-07**
+
+Owner of the behaviour: lane 1 (`feature:recorder`, `domain:recorder`); this block records the rule so the spec matches it.
+
+- `일시정지` releases the microphone, audio focus and the speech engine's input. The timer stops. Resume starts a **new segment** of the same take (same record key, same links). `멈추고 저장` joins the segments in order into one audio and one transcript.
+- **Leaving the recorder inside the app** (system back, or moving to another screen) while recording or paused: the take is saved as `정리 안 됨` (no data loss) and every mic holder is released once; toast `기록함에 둠` (DS-67 info). Nothing is discarded; `취소` stays the only discard.
+- **App to the background** (home button, another app, screen off) while recording: the take keeps recording with its visible notification (LRC-09, D32). Removing the task from recents saves the take and releases the mic.
+- Tests (`MicReleaseTest`, scope U-13): a paused take holds no recorder and no audio focus; leave → one save and one release per holder; two segments joined in order.
+
+#### LRC-50 · 연결 가림 without ratings (S-4)
+**Priority** P1 · **needsExternal** no · scope S-4, D34
+
+- A link into a project whose `라이프 레코더 연결 가리기` is on shows `TODO_COPY_LIB_MASKED_NAME` (interim `이름 가림`, LIB-92) instead of `R-18`. Several masked links of one project collapse into one chip with that label.
+- The switch stays in 프로젝트 설정 › `숨기기` (LIB-25 note). The LRC-42 `숨기기` default and the cloud-transcription exclusion keep keying on a stored `r18` rating (D34); a new 0.2.0 project is `all`, so they never fire for it.
+- §6 Q17 (two identical `R-18` entries in `프로젝트 ▾`) now reads with the masked label; default unchanged.
+
+### 7.1 Notes on §2 blocks
+
+| Block | **(0.2.0)** |
+| --- | --- |
+| LRC-01 | mic only on 프로젝트 홈 (LRC-48) |
+| LRC-02 … LRC-05 | not offered (LRC-48, N-73 `안 함`) |
+| LRC-07 | pause and back rules replaced by LRC-49 |
+| LRC-09 | background keeps recording (D32); in-app leave saves (LRC-49) |
+| LRC-19 | only home and inbox entries remain |
+| LRC-22, LRC-28 hook | masked label per LRC-50 |
+| LRC-30 | `EmptyLr` sub `TODO_COPY_LRC_EMPTY_SUB` |
+| LRC-44 | `잠금 화면에서 녹음` row hidden |
+| LRC-47 | `OnbVoice` widget choice hidden; rating-sheet hook unused |
+
+### 7.2 Tests (JVM)
+
+- **LRC-0.2-01** `entryPoints(screen)`: `HOME` → mic present; `SCRIPT`, `CAST`, `WORLD`, `LIBRARY`, `CANVAS`, `PAGE`, `GALLERY`, `CHECKS`, `MAP`, `TIMELINE` → no mic.
+- **LRC-0.2-02** `recorderSettingsRows()` → no `잠금 화면에서 녹음` row; `RecorderSettings.lockScreenRecording` keeps its stored value after a settings write.
+- **LRC-0.2-03** a project with `recorderLinkMask = true` → `recorderLinkLabel(project)` equals the masked-name constant and contains no `R-18`.
+- **LRC-0.2-04** `MicReleaseTest` as LRC-49.

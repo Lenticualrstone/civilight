@@ -183,6 +183,8 @@ Columns: **Class** = storage class (§1.6) · **Owner** = area that defines the 
 
 `WorldCalendar` = `{ months: List<{ name: String, days: Int }>, weekdays: List<String>, storyStart: { month: Int, day: Int }?, storyStartWeekday: Int? }` (WLD-30).
 
+**(0.2.0)** `rating` is kept and written but no longer shown or set by the UI (§13.3). New optional property `gameTools: Boolean?` (absent ≠ false, §13.2).
+
 App-DB-only project columns (A): `id: Long` (local surrogate, §6), `deletedAt`/`trashEntryKey` (trash), `isExample`, `readOnly` (last-opened time and position live in `ProjectActivity`, §2.13). They are never written to the file (`isExample` is a property of the bundled asset, LIB-17).
 
 ### 2.2 Story structure and scenes — owner STO (scene memo and transition fields: SCR)
@@ -494,6 +496,8 @@ Runtime and drafts (RT/A): `EntryContext`, `RecordingSession` (crash-recovery fi
 | `UnlockSession` | RT | `appUnlocked, hiddenGroupUnlockedAt?, itemsUnlocked: Map<projectId, Instant>, recordsUnlockedAt?, lastBackgroundAt?, lastScreenOffAt?` | LIB-32/33, LRC-41 |
 | Canvas viewport, map viewport, remembered world tab | A | — | CNV, WLD |
 
+**(0.2.0)** `AppSettings` gains `libraryStyle`, `castCardStyle`, `libraryToggle`, `castToggle` and `viewTilt`; `viewByScreen` keys `library` and `cast` are kept but no longer read (§13.4). `ProjectActivity` gains `lastCanvasKey` (§13.6). `RatingDefaults` is kept but unused (§13.3).
+
 ### 2.14 Code-only values and derived values
 
 - **C (code-only, `core/designsystem` and registries):** `CivilightColors`, `FixedColors`, `CivilightType`, `TextScale`, spacing/shape/size/blur/elevation tokens, `CivilightMotion`, `HapticToken`, `MarkerKind`, `MarkerLine`, `InlineDecoration`, `BadgeSurface`, `ButtonVariant`, `LensChipState`, `IconId` (DS §3), `PresetImage` registry, check-type registry, feature-id → Korean name table (LIB-53). Nothing from DS is stored.
@@ -734,6 +738,8 @@ Feature ids written by format 1.0 (a reader refuses a file whose `required` list
 | `recorder.audio` | optional | audio blobs referenced by `recorder.json` | `원본 음성 포함` |
 
 The app keeps a feature id → Korean name table for the newer-file sheet (LIB-53).
+
+**(0.2.0)** New optional feature `versions` (`versions/<unit key>.json`, §13.5); the format stays 1.0 (§13.1).
 
 ### 7.4 `project.json` and `story/`
 
@@ -1080,3 +1086,140 @@ GalleryFile = { ownerKind, ownerKey, items: GalleryItem[] }   // one file unit p
 - §2.11 `TrashEntry.kind` gains `galleryItem`.
 - §7.3 feature table gains `gallery` · optional · `gallery/` · any gallery item.
 - §10 conflict row C-33 · gallery: new trash kind `galleryItem`, feature id `gallery` (format 1.0), `ViewMode.GRID`, one blob reference function · resolution as §12.2–12.4.
+
+## 13. Addendum (2026-11-24) · 0.2.0 (0.2.0)
+
+Source: the frozen scope `docs/status/0.2.0-scope.md` (G-1 … G-7, S-4, S-8, U-16, N-29, N-58, §8 data safety, defaults D6, D20, D21, D29, D34). Additive only: no field above is removed, renamed or given a new meaning, and every 0.1.0 store and `.civilight` file opens unchanged (scope §8 rule 2). Rows to fold into the body later are in §13.9.
+
+### 13.1 Format version (D29)
+
+- `.civilight` stays **format 1.0** (`formatVersion "1.0"`, `minReaderVersion "1.0"`). This deviates from §8.1's "adding a property or a file → minor" on purpose (D29): every 0.2.0 addition is either an optional property, which a 1.0 reader keeps in `ext` and writes back (§8.3), or a file under a new **optional** feature id, which a 1.0 reader skips and keeps as an `UnknownFile` (§8.3). No upgrade step is needed, so the version does not move. `writtenBy` reads `Civilight 0.2.0 (Android)`.
+- The working store's `storeVersion` (§8.2) also stays; the one-time G-3 step (§13.2) keys on an absent property, not on a version number.
+- If a later 0.2.x change needs an upgrade step, the version moves to 1.1 then, and 0.1.0 files must still open (D29).
+
+### 13.2 `Project.gameTools` · `게임 제작 도구` (G-1, G-3, G-4; owner LIB-91)
+
+| Field | Type | Class · file | Meaning |
+| --- | --- | --- | --- |
+| `gameTools` | `Boolean?` | P · `project.json › gameTools` | `true` = 게임 제작 도구 on. **Absent and `false` differ**: absent means "written by 0.1.0, not decided yet". Never encoded as a default: a 0.2.0 writer always writes `true` or `false` |
+
+- **New project** (`NewProject.create`): writes `gameTools: false` (G-1).
+- **One-time upgrade** (G-3): when a project is loaded from the working store **or** read from a `.civilight` (import, open, restore) and `gameTools` is absent, set `gameTools = GameData.present(doc, exportRecords)` and save that unit at once. It runs only while the property is absent; after that the stored value is the user's (a project turned off in 0.2.0 stays off when reopened). The same pure function serves both paths.
+- **`GameData.present(doc, exportRecords): Boolean`** (`core:model`, pure, D6) is `true` when any of these exists, live **or in the trash** (trash files included):
+  1. a `Block` or `ChoiceOption` with `voice.mode == fixed`, a non-null `voice.manualId`, or a non-null `voice.lastExport`;
+  2. a `DiscardedVoiceId` row;
+  3. a `direction` block with a non-empty `cues` list;
+  4. a `ScriptAsset` row;
+  5. a `VoiceLine` or an `ArchiveDoc` row (`게임 텍스트`);
+  6. a `dialogue` block with a non-null `stage` (무대 위치 value);
+  7. an `ExportRecord` (§2.13, class A) with format CSV or engine JSON. This input exists only on the device that exported; an imported 0.1.0 file has no export records, but every block such an export wrote carries a fixed ID (item 1), so the result is the same.
+  - Auto voice IDs alone never count (every 0.1.0 project has them). `voice.manualId` counts because a hand-typed ID is not automatic (`ED`, extends D6's "fixed or discarded").
+- **Example project** (D7): same rule.
+- **Export and backup** (G-4): `.civilight` and Drive backups always carry `gameTools` and every piece of game data, on or off. Nothing is stripped on write; nothing is reset on read.
+- **Hiding never deletes** (scope §8 rule 1): turning the switch off changes only what is shown. No row listed above is removed, rewritten or regenerated. Auto voice IDs stay derived exactly as in 0.1.0, so turning it on shows what 0.1.0 would.
+- Pure helper for every surface: `GameTools.on(project) = project.gameTools == true`. An absent value is never read by UI code; the load step above always resolves it first.
+
+### 13.3 Rating without badges (S-4, D34; owner LIB-92)
+
+- `Project.rating`, `Project.protections`, `AppSettings.ratingDefaults` and the manifest's `project.rating` are **kept and written as stored**. No UI shows or changes the rating in 0.2.0.
+- A **new project** stores `rating: all` and the `전체` protections (all four `false`); the step-4 `이 프로젝트 숨기기` switch is the user's only protection choice at creation (LIB-09, LIB-12 notes).
+- A 0.1.0 `r15` or `r18` project keeps its stored rating and switches. Rules keyed on a stored `r18` keep working from that value (D34): the recorder `숨기기` row default (LRC-42), the cloud-transcription exclusion, and the export defaults keyed on R-18 (file name, `PDF 암호`, `암호`, LIB-41).
+- `RatingDefaults` is no longer read for new projects; its values are kept for a later version.
+
+### 13.4 View settings (U-16; owner LIB-93, LIB-94, CST hand-off)
+
+New `AppSettings` fields (class S, DataStore; never in `.civilight`):
+
+| Field | Type | Default | Values (UI label) |
+| --- | --- | --- | --- |
+| `libraryStyle` | `LibraryStyle` | `BOOKSHELF` (D1) | `BOOKSHELF` `3D 책장` · `COVER_SPIN` `표지 회전` · `MANUSCRIPT_STACK` `원고 더미` · `ARCHIVE_HALL` `서고 회랑` · `INDEX_DRAWER` `색인 카드 서랍` · `CONSTELLATION` `별자리` · `LIST` `목록` |
+| `castCardStyle` | `CardStyle` | `FAN_DECK` (D1) | `FAN_DECK` `부채꼴 덱` · `CAROUSEL` `회전 목마` · `STACK` `겹친 더미` · `TAROT` `타로 펼침` · `TILTED_WALL` `기울어진 벽` · `ROLODEX` `롤로덱스` · `LIST` `목록` |
+| `libraryToggle` | `ViewMode?` | absent | head toggle on 서재: `LIST` = the list, `CARD` = the chosen 3D style; **absent = `CARD`** |
+| `castToggle` | `ViewMode?` | absent | head toggle on the cast list, same meaning |
+| `viewTilt` | `Boolean` | `true` | tilt follow switch (LIB-94) |
+
+- Enum order is the settings list order above. Unknown stored values decode to the default (`BOOKSHELF`, `FAN_DECK`), never to `LIST`, so a newer value never hides the chosen 3D view silently.
+
+- **Why new toggle fields** instead of `viewByScreen["library"]` / `["cast"]`: the settings codec writes with `encodeDefaults = false`, so 0.1.0 persisted the seeded `library → LIST` whenever any other `viewByScreen` entry changed; a stored `LIST` therefore does not mean the user chose the list. And 0.1.0's `CARD` meant the old card carousel, which 0.2.0 replaces. The old entries are kept and no longer read (scope §8: settings kept). Every install, upgraded or new, first shows the chosen 3D view (decision U-16: "화려한 보기가 기본"); from then on the last toggle position is remembered. `ViewMode.GRID` stays gallery-only (§12.4); a `GRID` read here decodes as `CARD`.
+- **`ShownView.of(style, toggle)`** (pure, `core:model`): `style == LIST` → list, and the toggle is not drawn; `toggle == LIST` → list; otherwise (absent or `CARD`) → `style`.
+- **Tilt** (parallax and light): `Tilt.follows(viewTilt, motion) = viewTilt && motion != REDUCED`, where `motion` is the resolved motion mode of CNV-46 (`설정 · 움직임 · 투명도` `애니메이션` with the system flag).
+
+### 13.5 Episode versions `판` (N-29; owners STO and SCR for behaviour, LIB-97 for files) · **supersedes D20**
+
+The computed task for this pass chose the working store plus a `.civilight` export option over scope D20 ("stored in the project document"). This section follows that choice. Because Drive backup (LIB-57) is still a `needsExternal` stub, the export option defaults to **on**, so moving a project by file keeps its versions unless the user turns the row off.
+
+**`EpisodeVersion`** · P (optional in manual export) · working store `files/projects/<projectKey>/versions/<unitKey>.json` · package `versions/<unitKey>.json` (feature `versions`)
+
+```ts
+versions/<unitKey>.json = {
+  unitKey: Key,                         // the numbering unit (episode level; the project key for 1-level projects, §4.1)
+  versions: EpisodeVersion[]            // oldest first
+}
+EpisodeVersion = {
+  key: Key,
+  name: string,                         // `11월 23일 · 초고` (manual default) or `11월 24일 · 내보낸 판` (D21)
+  origin: "manual" | "export",
+  createdAt: Instant, createdBy: DeviceId,
+  scenes: { key: Key, title?: string }[],          // scene order of the unit at that moment (scene keys, titles as shown)
+  blocks: VersionBlock[],               // every live block of the unit's scenes, in manuscript order
+  ext?: object
+}
+VersionBlock = {
+  key: Key,                             // the block's permanent key; `이 판 글로` matches on it
+  sceneKey: Key, number: Int, kind: BlockKind, speakerKey?: Key,
+  runs: TextRun[],                      // text as it was (link runs keep their targets)
+  options?: { key: Key, runs: TextRun[] }[]     // choice lines
+}
+```
+
+- **What a version holds**: text, kind, speaker, number and order only. ◆ records, voice IDs, cues, stage values and acknowledgements are **not** copied and are never changed by a version (decision N-29: "◆ · 번호 · 보이스 ID는 건드리지 않습니다").
+- **Writes**: `판 남기기` (manual), and one automatic version per exported numbering unit when a PDF, CSV or engine JSON export covers it (D21; `origin: export`). A `.civilight` export or a backup creates no version. The write path is one pure function in `domain:script` (`EpisodeVersions.capture(doc, unitKey, name, origin, ctx)`), called by `feature:story` (episode ⋯) and by `domain:actions` `ExportActions.run`.
+- **`이 판 글로`** writes the version's `runs` (and choice `options[].runs` by option key) into the live block with the same key, as one undo step through `domain:script`. Nothing else of the block changes. A block that is no longer live (trashed or purged) shows no `이 판 글로` (`ED`; no whole-episode revert in 0.2.0, D20).
+- **No cap** on the number of versions (`ED`). Each version is a few KB of text.
+- **Hidden content**: a version holds the blocks of hidden scenes like the live file does. While the hidden scene is locked, its rows on the compare screen are masked exactly as the scene is in the script (rule 19 §6). The file's encryption default already counts hidden items (LIB-51).
+- **Deletes**: trashing the unit hides its versions with it (not live by derivation, §5.1); restoring brings them back; purging the unit or the project deletes `versions/<unitKey>.json`. Deleting a single version is not in 0.2.0 scope (`ED`: no delete action).
+- **Leaving the device**:
+
+| Path | Versions written? |
+| --- | --- |
+| Drive automatic backup (LIB-57) | **always** (a restore must not lose them) |
+| Manual `.civilight` export (LIB-41) | when the export row `TODO_COPY_LIB_EXPORT_VERSIONS` is on; **default on** (`ED`: Drive backup is still a `needsExternal` stub in this build, so a manual file is the only way versions leave the device; the row keeps it a choice as the computed task asks) |
+| `.civilight-recorder` | never |
+| PDF, CSV, engine JSON | never (they only trigger the automatic version) |
+
+- **Reading**: restore and import read `versions/` whenever present (feature `versions` is optional, so a 1.0 reader skips it and keeps it as unknown files). Import as a new project (`새 프로젝트로`, re-keyed per §6) keeps the versions; their `key`s are kept and their block keys follow the re-keying map. A file without `versions/` opens with no versions.
+- Manifest feature id (§7.3): `versions` · optional · covers `versions/` · present when the file holds any version.
+
+### 13.6 Several canvases (N-58; owner CNV, D25)
+
+- The model already stores canvases as a map (`canvas/<key>.json`, `ProjectDoc.canvases`), each with `order` and `name`; 0.2.0 adds no project data.
+- New class A field `ProjectActivity.lastCanvasKey: Key?` (`_app/activity.json`): written when a canvas is opened. Home `캔버스` opens it when live, else the first live canvas by `order`, else creates one (`ED`, same as 0.1.0's first open).
+- Create, rename, reorder, delete and restore a canvas: trash kind `canvas` (C-20) through `domain:trash`; a canvas's nodes and edges go and come back with it (§5.1). Node and edge rules are unchanged (D25).
+
+### 13.7 Recorder settings that are hidden (S-8)
+
+- `RecorderSettings.lockScreenRecording` (and any widget or tile value) stays stored with its 0.1.0 value; no 0.2.0 code reads it. The rows are hidden (LRC-48).
+
+### 13.8 Data-safety tests (JVM)
+
+- **DM-0.2-01** `GameData.present`: empty project → false; one block with `voice.mode = fixed` → true; the same block in the trash only → true; one `ScriptAsset` → true; one `VoiceLine` → true; one dialogue block with `stage = left` → true; one `DiscardedVoiceId` → true; a direction block with one cue → true; only auto voice IDs → false; only an `ExportRecord` with format CSV → true; with format PDF → false.
+- **DM-0.2-02** Upgrade: a store unit without `gameTools` and with a fixed voice ID → loads `true` and the unit is rewritten with `gameTools: true`; without game data → `false`; a unit with `gameTools: false` and a fixed voice ID → stays `false`.
+- **DM-0.2-03** Round trip: `gameTools: false` with voice IDs, cues, assets, voice lines and stage values → export `.civilight` → import → every row equal and `gameTools` still `false` (G-4).
+- **DM-0.2-04** 0.1.0 fixture (written by the `v0.1.0` tag's code, scope §8): load, save through 0.2.0 `core:store`, reload → every 0.1.0 field equal; `rating` and `protections` unchanged; `RatingDefaults` unchanged.
+- **DM-0.2-05** `ShownView.of`: `(BOOKSHELF, absent)` → BOOKSHELF; `(BOOKSHELF, LIST)` → list; `(LIST, CARD)` → list and no toggle; unknown stored style string → `BOOKSHELF`. A 0.1.0 settings record with `viewByScreen = {library: LIST, cast: CARD}` and no new fields → 서재 shows `BOOKSHELF`, the cast list `FAN_DECK`; the old map is written back unchanged.
+- **DM-0.2-06** `Tilt.follows(viewTilt, motion)`: `(true, FOLLOW_SYSTEM + system reduce on)` → false; `(true, FOLLOW_SYSTEM + system reduce off)` → true; `(true, ALWAYS_REDUCE)` → false; `(true, NEVER_REDUCE + system reduce on)` → true (CNV-46 resolution); `(false, any)` → false.
+- **DM-0.2-07** Versions: capture a unit of 5 blocks → 5 `VersionBlock`s in manuscript order; edit block 3 and trash block 4; `이 판 글로` on block 3 → its runs equal the version's and its key, number, `voice`, ◆ records are unchanged; block 4 offers no `이 판 글로`; one undo restores block 3's edited text.
+- **DM-0.2-08** Versions and files: manual export with default options contains `versions/<unitKey>.json` and the manifest lists `versions`; with the row off neither is present; the backup writer's output always contains them; import of a file without `versions/` → no versions, no error.
+- **DM-0.2-09** Export creates a version: a CSV export of `1장 전체` with episodes 1-1 … 1-3 adds exactly one `origin: export` version to each of those three units, named `<M>월 <D>일 · 내보낸 판`; a `.civilight` export adds none.
+
+### 13.9 Rows to fold into the body later
+
+- §1.7 glossary: `EpisodeVersion` · 판 · — · `UndoStep` (undo is session-only).
+- §2.1 `Project` table gains `gameTools`; §7.4 `project.json` gains `gameTools?: boolean`.
+- §2.13 `AppSettings` gains `libraryStyle`, `castCardStyle`, `libraryToggle`, `castToggle`, `viewTilt`; `ProjectActivity` gains `lastCanvasKey`.
+- §7.2 layout gains `versions/<unit key>.json` (feature `versions`); §7.3 feature table gains `versions` · optional.
+- §9 store mapping gains `versions/<unitKey>.json`.
+- §10 conflict rows:
+  - **C-34** N-29 storage: scope D20 (project document, travels in every `.civilight`) vs the computed task (working store, `.civilight` only when chosen). Resolution §13.5: working store, Drive backup always, manual export as a row that defaults on while Drive is a stub.
+  - **C-35** `viewByScreen["library"]` seeded `LIST` (0.1.0 code, persisted by `encodeDefaults = false` whenever the map changed) vs U-16 (3D view default). Resolution §13.4: new fields `libraryToggle`, `castToggle` (absent = 3D); the old entries are kept and not read.
+  - **C-36** Format version rule §8.1 (minor on any addition) vs D29 (move only when the upgrade chain needs it). Resolution §13.1: stay 1.0.

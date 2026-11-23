@@ -25,7 +25,7 @@ class HomeViewModel(projectKey: Key, services: StoryServices) : StoryViewModel(p
 
     val ui: StateFlow<HomeUi?> = combine(state, services.unlock, services.recorder.state) { load, unlock, recorder ->
         (load as? ProjectLoad.Ready)?.let {
-            HomeModel.build(it.doc, it.readOnly, itemsLocked(unlock), services.clock.today(), services.clock.zone)
+            HomeModel.build(it.doc, it.readOnly, itemsLocked(unlock), services.clock.today(), services.clock.zone, services.blobExists)
                 .copy(start = HomeStartModel.build(it.doc, recorder.library, it.readOnly))
         }
     }

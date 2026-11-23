@@ -34,7 +34,7 @@ data class VoiceLineSheet(val projectKey: Key, val characterKey: Key, val lineKe
 
 /**
  * One voice line: its slot name (`이름`: `임명 · 대화 1 …`) and its text with `@` links (shared
- * rich editor). `넣기` adds a new line, `이 값 고치기` saves an existing one. The state label is
+ * rich editor). `넣기` adds a new line, `저장` saves an existing one. The state label is
  * toggled on the tab itself. Removing a line is not offered (no source draws it; a plain removal
  * would bypass the trash).
  */
@@ -65,7 +65,7 @@ fun SheetScope.VoiceLineContent(sheet: VoiceLineSheet) {
     }
     if (store.readOnly) return
     SheetActions {
-        val label = if (line == null) CastUiCopy.BTN_INSERT else CastUiCopy.BTN_CORRECT
+        val label = if (line == null) CastUiCopy.BTN_INSERT else CastUiCopy.BTN_SAVE
         val changed = line == null || title.trim() != line.title || text.changed
         CivilightButton(label, {
             val savedTitle = title

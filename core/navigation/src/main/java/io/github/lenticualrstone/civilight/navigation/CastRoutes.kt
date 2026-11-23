@@ -43,3 +43,15 @@ data class TagSettings(override val projectKey: Key) : CastRoute, ProjectRoute
 /** 아카이브 문서 editor (CST-17); [docKey] null = new document. */
 @Serializable
 data class ArchiveDocEdit(override val projectKey: Key, val characterKey: Key, val docKey: Key? = null) : CastRoute, ProjectRoute
+
+/** 설정 › 인물 템플릿 (CST-58; S32): app-level template list, `지운 템플릿` when [trash]. */
+@Serializable
+data class TemplateList(val trash: Boolean = false) : CastRoute
+
+/** 템플릿 고치기 (CST-59; S34) for one app-level template. */
+@Serializable
+data class TemplateEdit(val templateKey: Key) : CastRoute
+
+/** 템플릿 항목 고치기 (CST-59; S35): one field of a template. */
+@Serializable
+data class TemplateFieldEdit(val templateKey: Key, val fieldKey: Key) : CastRoute

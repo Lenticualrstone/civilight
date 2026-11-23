@@ -36,6 +36,10 @@ data class FieldSettingsScreen(
     val bundleTitle: String,
     val bundleSub: String,
     val bundleAction: String,
+    /** CST-54: the section label's trailing button `순서 바꾸기` (order mode). */
+    val reorderAction: String = FieldSettings.REORDER_ACTION,
+    /** CST-54: the order-mode note `끌기 · 앞으로 · 뒤로`. */
+    val orderModeNote: String = FieldSettings.ORDER_NOTE,
 )
 
 /** Settings screen of the field engine (CST-19). */
@@ -44,6 +48,8 @@ object FieldSettings {
     const val TITLE = "인물 항목"
     val TABS = listOf("인물", "장소", "용어", "세력")
     const val HIDDEN_MARK = "숨김"
+    const val REORDER_ACTION = "순서 바꾸기"
+    const val ORDER_NOTE = "끌기 · 앞으로 · 뒤로"
 
     /** The fixed fields of a character: they cannot be deleted. */
     val FIXED_CHARACTER = listOf("이름", "표시 이름", "한 줄 소개", "이미지", "태그", "첫 등장", "보이스 진행")
@@ -60,7 +66,7 @@ object FieldSettings {
     /** The type-specific part of a row's sub (`연도`, `출생에서`, `세력`, `cm`, `보기 3`, `여러 개`). */
     fun detail(doc: ProjectDoc, def: FieldDef): String? = when (def.type.known) {
         FieldType.DATE -> def.datePrecision?.known?.let(FieldTypes::precisionLabel)
-        FieldType.CALC -> def.calc?.sourceFieldDefKey?.let { doc.index.fieldDef(it)?.name }?.let { "${it}에서" }
+        FieldType.CALC -> FieldReader.liveCalcSource(doc, def)?.name?.let { "${it}에서" }
         FieldType.LINK -> def.linkTargetKind?.known?.label
         FieldType.NUMBER -> def.unit?.takeIf { it.isNotBlank() }
         FieldType.CHOICE, FieldType.MULTI_CHOICE -> "보기 ${def.options.orEmpty().size}"

@@ -29,6 +29,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.CommandBar
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.LensChip
+import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.RatingBadge
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.foundation.bottomHairline
@@ -45,6 +46,9 @@ import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.feature.story.common.ChapterHeaderText
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.common.storyServices
+import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
+import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
+import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.navigation.Library
 import io.github.lenticualrstone.civilight.navigation.LensSheet
 import io.github.lenticualrstone.civilight.navigation.ProjectHome
@@ -75,7 +79,8 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
     val inDetailPane = LocalPaneRole.current == PaneRole.DETAIL
     CenterColumn {
         CivilightScreen(
-            title = if (ui?.newReady == true) HomeCopy.NEW_PROJECT else HomeCopy.PROJECT,
+            // The head always names the project (QA U-06), also right after the wizard; empty only while loading.
+            title = ui?.name.orEmpty(),
             smallLine = HomeCopy.LIBRARY,
             back = if (inDetailPane) null else IconAction(HomeCopy.LIBRARY) { if (!navigator.popTo(Library)) navigator.resetTo(Library) },
             actions = {
@@ -117,6 +122,8 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
                         onStartRoute = { navigator.push(it) },
                         onDismissStart = { vm.dismissStart() },
                         selectedKey = HomeModel.selectedKey(navigator.backStack, route.projectKey),
+                        // U-08 LIB-83: the head cover opens the shared cover picker over home.
+                        onCover = { sheets.open(ImagePickSheet(u.projectKey, ImageOwnerKind.PROJECT, u.projectKey, ImageSlot.PROJECT_COVER)) },
                     )
                 }
             }
@@ -134,6 +141,7 @@ private fun HomeContent(
     onStartRoute: (Route) -> Unit,
     onDismissStart: () -> Unit,
     selectedKey: String? = null,
+    onCover: () -> Unit = {},
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -145,13 +153,17 @@ private fun HomeContent(
         HomeModel.slots(ui).forEach { slot ->
             item(key = slot.key) {
                 when (slot) {
-                    HomeSlot.Name -> Column(civilightItem()) {
-                        CivilightText(ui.name, type.displayM, color = colors.ink)
-                        // The summary line and the one-liner fold, so the name item changes height smoothly
-                        // when `NewReady` ends (`목록 닫기`).
-                        FoldRevealValue(start?.takeIf { ui.newReady }, label = "startSummary") { s -> StartSummary(ui, s) }
-                        FoldRevealValue(ui.oneLiner?.takeIf { !ui.newReady }, label = "oneLiner") { line ->
-                            CivilightText(line, type.leadCompact, Modifier.padding(top = 12.dp), color = colors.ink2)
+                    // U-08 LIB-83: the cover (3:4, 84 × 112) left of the name, 16 apart.
+                    HomeSlot.Name -> Row(civilightItem(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        HomeCoverImage(ui, onCover)
+                        Column(Modifier.weight(1f)) {
+                            CivilightText(ui.name, type.displayM, color = colors.ink)
+                            // The summary line and the one-liner fold, so the name item changes height smoothly
+                            // when `NewReady` ends (`목록 닫기`).
+                            FoldRevealValue(start?.takeIf { ui.newReady }, label = "startSummary") { s -> StartSummary(ui, s) }
+                            FoldRevealValue(ui.oneLiner?.takeIf { !ui.newReady }, label = "oneLiner") { line ->
+                                CivilightText(line, type.leadCompact, Modifier.padding(top = 12.dp), color = colors.ink2)
+                            }
                         }
                     }
                     HomeSlot.Stats -> HomeStats(ui, civilightItem())
@@ -167,7 +179,7 @@ private fun HomeContent(
                     is HomeSlot.Episode -> EpisodeLine(slot.row, onEpisode, selected = slot.row.key == selectedKey, modifier = civilightItem())
                     HomeSlot.Work -> Column(civilightItem().padding(top = 28.dp)) {
                         SectionLabel(HomeCopy.WORK)
-                        ShortcutGrid(ui.shortcuts, onShortcut, Modifier.padding(top = 4.dp))
+                        ShortcutList(ui.shortcuts, onShortcut, Modifier.padding(top = 4.dp))
                     }
                 }
             }
@@ -181,13 +193,13 @@ private fun ChapterHeaderLabel(text: String) {
     ChapterHeaderText(text, CivilightTheme.type.sec, color = CivilightTheme.colors.ink3)
 }
 
-/** The stats row of board `Home`; not drawn in the `NewReady` state. */
+/** The stats row of board `Home`; on `NewReady` only a 1-level project's `k/n 씬` ([HomeModel.shownStats]). */
 @Composable
 private fun HomeStats(ui: HomeUi, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-        ui.stats.forEach { stat ->
+        HomeModel.shownStats(ui).forEach { stat ->
             Column {
                 ValueSwap(stat.value, type.stat, color = colors.ink)
                 ValueSwap(stat.label, type.small, color = colors.ink3)
@@ -244,26 +256,21 @@ private fun EpisodeLine(row: HomeRow, onEpisode: (HomeRow) -> Unit, selected: Bo
     }
 }
 
+/**
+ * The `작업` shortcuts as DS list rows (QA U-07: the old text grid read as plain text): one row each, with
+ * the hairline, a pressed state and the trailing `›` the `시작해 볼 것` rows use. `설정` stays the last row.
+ */
 @Composable
-private fun ShortcutGrid(shortcuts: List<HomeShortcut>, onShortcut: (HomeShortcut) -> Unit, modifier: Modifier = Modifier) {
+private fun ShortcutList(shortcuts: List<HomeShortcut>, onShortcut: (HomeShortcut) -> Unit, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
-    val style = CivilightTheme.type.itemTitle.merge(TextStyle(fontWeight = FontWeight.Normal))
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(0.dp)) {
-        HomeModel.shortcutRows(shortcuts).forEach { line ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                line.forEach { shortcut ->
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .heightIn(min = 44.dp)
-                            .pressable(onClick = { onShortcut(shortcut) }, scaleOnPress = false),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        CivilightText(shortcut.label, style, color = if (shortcut.dim) colors.ink3 else colors.ink, maxLines = 1)
-                    }
-                }
-                repeat(3 - line.size) { Spacer(Modifier.weight(1f)) }
-            }
+    Column(modifier) {
+        shortcuts.forEach { shortcut ->
+            ListRow(
+                title = shortcut.label,
+                onClick = { onShortcut(shortcut) },
+                compact = true,
+                trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = colors.ink3) },
+            )
         }
     }
 }

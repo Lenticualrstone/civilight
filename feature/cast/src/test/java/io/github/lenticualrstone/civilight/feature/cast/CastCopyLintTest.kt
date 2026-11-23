@@ -73,6 +73,32 @@ class CastCopyLintTest {
     }
 
     @Test
+    fun `U-10 a plain save reads 저장, 이 값 고치기 is the lens button only`() {
+        assertEquals("저장", CastUiCopy.BTN_SAVE)
+        assertEquals("이 값 고치기", CastUiCopy.BTN_LENS_CORRECT)
+        // The lens wording lives in one constant, and no copy says `이 값으로 고치기`.
+        val lensWording = values().filter { (_, texts) -> texts.any { it.contains("값 고치기") || it.contains("값으로 고치기") } }.keys
+        assertEquals(setOf("BTN_LENS_CORRECT"), lensWording)
+    }
+
+    @Test
+    fun `U-10 no sheet saves with the lens label`() {
+        val sources = File("src/main").walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        assertTrue("the module sources are found", sources.isNotEmpty())
+        val stripComments = Regex("""/\*[\s\S]*?\*/|//[^\n]*""")
+        val findings = sources.flatMap { file ->
+            val code = stripComments.replace(file.readText(), "")
+            buildList {
+                if (file.name != "CastUiCopy.kt" && Regex("""\bBTN_CORRECT\b""").containsMatchIn(code)) add("${file.name}: BTN_CORRECT")
+                if (file.name != "CastUiCopy.kt" && code.contains("\"이 값 고치기\"")) add("${file.name}: literal 이 값 고치기")
+                // Only the two-button fallback of a lens edit (`SaveChoice.label`) may name the lens constant.
+                if (file.name !in setOf("CastUiCopy.kt", "FieldValueSheet.kt") && code.contains("BTN_LENS_CORRECT")) add("${file.name}: BTN_LENS_CORRECT")
+            }
+        }
+        assertEquals(emptyList<String>(), findings)
+    }
+
+    @Test
     fun `no TODO copy can reach the screen`() {
         assertTrue(values().keys.none { it.startsWith("TODO_COPY_") })
     }

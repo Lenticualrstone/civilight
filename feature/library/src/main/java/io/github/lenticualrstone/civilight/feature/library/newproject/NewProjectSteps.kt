@@ -279,7 +279,7 @@ internal fun ColumnScope.StartStep(
         }
       }
     }
-    val (title, sub, value) = FieldBundles.newProjectRow(form.bundle)
+    val (title, sub, value) = NewProjectRules.bundleRow(form, inputs.templates, inputs.hiddenUnlocked)
     val sourceName = form.bundleSourceKey?.let { key -> inputs.bundleSources.firstOrNull { it.key == key }?.name }
     Row(
         Modifier

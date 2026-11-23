@@ -47,6 +47,14 @@ object SettingsCopy {
     const val HIDDEN_PROJECTS = "숨긴 프로젝트"
     const val RELOCK_WHEN = "다시 잠그는 때"
 
+    // 인물 (CST-58): the app-level 인물 템플릿 list.
+    const val SECTION_CAST = "인물"
+    const val TEMPLATES_TITLE = "인물 템플릿"
+    const val TEMPLATES_NONE = "없음"
+
+    /** `템플릿 3` (visible live templates only, CST-62), `없음` when none. */
+    fun templatesSub(n: Int): String = if (n == 0) TEMPLATES_NONE else "템플릿 $n"
+
     // Rows the board does not draw (§6 Q27 `ED`): those screens' own titles.
     const val TRASH = "휴지통"
     const val RECORDER = "라이프 레코더"

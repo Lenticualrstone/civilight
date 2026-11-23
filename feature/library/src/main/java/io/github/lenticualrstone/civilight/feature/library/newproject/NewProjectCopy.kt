@@ -66,4 +66,11 @@ object NewProjectCopy {
     const val HIDE = "이 프로젝트 숨기기"
     const val HIDE_SUB = "지문 · PIN으로 열림"
     const val CLOSE = "닫기"
+
+    // 인물 템플릿 at step 4 (CST-61).
+    const val TEMPLATE_SECTION = "템플릿"
+    const val TEMPLATE_GONE = "◇ 템플릿 없음 · 기본으로"
+
+    /** `템플릿 · 3`. */
+    fun templateSection(n: Int): String = "$TEMPLATE_SECTION · $n"
 }

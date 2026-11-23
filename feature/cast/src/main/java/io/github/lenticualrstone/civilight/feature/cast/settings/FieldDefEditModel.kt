@@ -45,6 +45,11 @@ data class FieldDefView(
     val characterOnly: Boolean,
     /** `값이 있는 인물 12명` (TC-F-12). */
     val deleteSummary: String,
+    /**
+     * The delete confirm lines (CST-55, TC-F-30): `값이 있는 인물 12명` · `◆ 변화 기록 5` ·
+     * `계산 항목 나이 · 직접 넣기로` · `필터에서 빠짐` (lines with nothing to say are left out).
+     */
+    val deleteLines: List<String> = listOf(deleteSummary),
 )
 
 /**
@@ -77,6 +82,7 @@ object FieldDefEditModel {
             hidden = def.definitionHidden,
             characterOnly = def.scopeCharacterKey != null,
             deleteSummary = FieldDefinitions.deleteSummary(doc, def.key),
+            deleteLines = FieldDefinitions.deleteImpact(doc, def.key).lines(),
         )
     }
 

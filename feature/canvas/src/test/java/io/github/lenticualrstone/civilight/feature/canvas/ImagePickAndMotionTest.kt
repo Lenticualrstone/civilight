@@ -31,12 +31,14 @@ class ImagePickAndMotionTest {
         val v = ImagePickModel.build(CanvasFx.s0(), cover, holoDefaultForNewImages = false)
         assertEquals("표지 이미지", v.title)
         assertEquals("잿빛 새벽의 등불 · 카드 3:4 · 목록 1:1", v.subtitle)
-        assertEquals(listOf("기본 이미지 8", "내 이미지 0"), v.tabs)
+        // U-08 LIB-84: the cover slot adds `갤러리` first (the example has no project gallery items).
+        assertEquals(listOf("갤러리 0", "기본 이미지 8", "내 이미지 0"), v.tabs)
         assertEquals(8, v.presets.size)
         assertTrue(v.holoVisible)
         // The example's cover is the preset 잿빛 새벽: selected on the presets tab.
         assertEquals("preset:ash-dawn", v.initialSource)
-        assertEquals(ImagePickModel.TAB_PRESETS, v.initialTab)
+        assertEquals(1, v.initialTab)
+        assertEquals("지금 표지 · 잿빛 새벽", v.coverLine?.text)
     }
 
     @Test

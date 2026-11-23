@@ -64,10 +64,11 @@ internal class BackupSettingsViewModel(private val services: LibraryServices) : 
         viewModelScope.launch { storage.value = runCatching { backups.storage.read() }.getOrNull() }
         viewModelScope.launch {
             backups.book.ensureLoaded()
-            combine(deps.settings, deps.stores.library.state, backups.book.state) { s, _, b -> s to (b.recovery != null) }
-                .collect { (settings, recoverySet) ->
+            deps.stores.fieldTemplates.ensureLoaded()
+            combine(deps.settings, deps.stores.library.state, backups.book.state, deps.stores.fieldTemplates.state) { s, _, b, t -> Triple(s, b.recovery != null, t.templates) }
+                .collect { (settings, recoverySet, templates) ->
                     val docs = withContext(Dispatchers.IO) { StoreBackupSources(deps).projects().map { it.doc } }
-                    warnings.value = BackupSettingsState.warnings(docs, settings, recoverySet)
+                    warnings.value = BackupSettingsState.warnings(docs, settings, recoverySet, templates)
                 }
         }
     }

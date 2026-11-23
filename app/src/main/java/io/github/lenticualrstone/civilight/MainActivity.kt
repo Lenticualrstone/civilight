@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.splashscreen.SplashScreenViewProvider
 import androidx.fragment.app.FragmentActivity
+import io.github.lenticualrstone.civilight.ui.scaffold.ToastHold
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.navigation.OpenFile
 import io.github.lenticualrstone.civilight.navigation.Route
@@ -84,6 +85,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // DS-67: a shown toast's timer stands still while the app is not visible.
+        locator.toasts.resume(ToastHold.APP_STOPPED)
         if (wentToBackground) {
             wentToBackground = false
             locator.unlock.onForeground()
@@ -98,6 +101,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
+        locator.toasts.pause(ToastHold.APP_STOPPED)
         // The device-credential prompt can stop this activity; that is not leaving the app.
         if (!isChangingConfigurations && !biometric.isPrompting) {
             wentToBackground = true

@@ -47,11 +47,13 @@ data class RestoreRequest(
     /** The Life Recorder library file of the run (merged by key, R23 §6), or null. */
     val recorder: BackupEntry?,
     val choice: SameProjectChoice,
+    /** The 인물 템플릿 files of the run (merged by key, CST-63); the hidden one only with the hidden projects. */
+    val templates: List<BackupEntry> = emptyList(),
 ) {
     /** Locked files need the 복구 암호, asked once (LIB-59). */
-    val needsPassword: Boolean get() = projects.any { it.encrypted } || recorder?.encrypted == true
+    val needsPassword: Boolean get() = projects.any { it.encrypted } || recorder?.encrypted == true || templates.any { it.encrypted }
 
-    val totalBytes: Long get() = projects.sumOf { it.sizeBytes } + (recorder?.sizeBytes ?: 0)
+    val totalBytes: Long get() = projects.sumOf { it.sizeBytes } + (recorder?.sizeBytes ?: 0) + templates.sumOf { it.sizeBytes }
 
     val hiddenCount: Int get() = projects.count { it.hidden }
 }
@@ -83,7 +85,7 @@ object RestoreModel {
             projects = projects,
             choice = picks.choice,
             button = run?.let { RestoreRunRow.of(it, zone).button },
-            canRestore = connected && request != null && (request.projects.isNotEmpty() || request.recorder != null),
+            canRestore = connected && request != null && (request.projects.isNotEmpty() || request.recorder != null || request.templates.isNotEmpty()),
         )
     }
 
@@ -101,7 +103,8 @@ object RestoreModel {
         val projects = BackupPlanner.projectEntries(run).filter { e ->
             if (e.hidden) !picks.hiddenUnchecked else e.projectKey !in picks.unchecked
         }
-        return RestoreRequest(run, projects, run.entries.firstOrNull { it.kind == BackupKind.RECORDER }, picks.choice)
+        val templates = run.entries.filter { it.kind == BackupKind.TEMPLATES && (!it.hidden || !picks.hiddenUnchecked) }
+        return RestoreRequest(run, projects, run.entries.firstOrNull { it.kind == BackupKind.RECORDER }, picks.choice, templates)
     }
 
     /** Taps on the checklist. */

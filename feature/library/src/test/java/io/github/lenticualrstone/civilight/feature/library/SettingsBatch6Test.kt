@@ -11,6 +11,7 @@ import io.github.lenticualrstone.civilight.feature.library.projectsettings.route
 import io.github.lenticualrstone.civilight.feature.library.settings.DisplaySettingsState
 import io.github.lenticualrstone.civilight.feature.library.settings.MoreValue
 import io.github.lenticualrstone.civilight.feature.library.settings.SettingsRootRow
+import io.github.lenticualrstone.civilight.navigation.TemplateList
 import io.github.lenticualrstone.civilight.feature.library.settings.SettingsRoutes
 import io.github.lenticualrstone.civilight.model.app.AnimationPref
 import io.github.lenticualrstone.civilight.model.app.AppSettings
@@ -180,6 +181,7 @@ class SettingsBatch6Test {
             SettingsRootRow.TRASH to Trash(),
             SettingsRootRow.RECORDER to RecorderSettings,
             SettingsRootRow.HELP to HelpReplay,
+            SettingsRootRow.TEMPLATES to TemplateList(),
         )
         assertEquals(SettingsRootRow.entries.toSet(), expected.keys)
         expected.forEach { (row, route) -> assertEquals(row.name, route, SettingsRoutes.routeOf(row)) }

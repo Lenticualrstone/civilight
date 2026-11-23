@@ -45,6 +45,8 @@ import io.github.lenticualrstone.civilight.domain.cast.label
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.feature.cast.field.rememberCastEditor
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
+import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.cast.FieldType
 import io.github.lenticualrstone.civilight.navigation.AddFieldSheet
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
@@ -63,21 +65,31 @@ private val DraftSaver: Saver<AddFieldDraft, String> = Saver(
  */
 @Composable
 fun SheetScope.AddFieldSheetContent(sheet: AddFieldSheet) {
-    val host = this
     val store = currentProjectStore
     val doc by store.doc.collectAsState()
     val editor = rememberCastEditor(sheet.projectKey)
-    val kind = sheet.kind
-    val character = sheet.entityKey?.takeIf { kind == EntityKind.CHARACTER }?.let(doc.index::character)
-    val fromRecord = sheet.entityKey != null
-    var draft by rememberSaveable(sheet, stateSaver = DraftSaver) { mutableStateOf(AddFieldDraft()) }
-    var typesOpen by rememberSaveable(sheet) { mutableStateOf(false) }
-    val check = remember(doc, draft, kind) { AddFieldModel.check(doc, draft, kind) }
-    val focus = remember { FocusRequester() }
     if (store.readOnly) {
         LaunchedEffect(Unit) { close() }
         return
     }
+    AddFieldForm(sheet, doc, sheet.kind, sheet.entityKey) { saved ->
+        editor.act(CastUiCopy.ADD_FIELD_TITLE) { d, ctx -> AddFieldModel.add(d, saved, sheet.kind, sheet.entityKey, ctx) }
+    }
+}
+
+/**
+ * The `항목 넣기` form over [doc] (a project, or a template's field-only document in `템플릿 고치기`,
+ * CST-59, where [entityKey] is null): [onAdd] gets the draft when `넣기` is pressed; the sheet closes.
+ */
+@Composable
+internal fun SheetScope.AddFieldForm(saveKey: Any, doc: ProjectDoc, kind: EntityKind, entityKey: Key?, onAdd: (AddFieldDraft) -> Unit) {
+    val host = this
+    val character = entityKey?.takeIf { kind == EntityKind.CHARACTER }?.let(doc.index::character)
+    val fromRecord = entityKey != null
+    var draft by rememberSaveable(saveKey, stateSaver = DraftSaver) { mutableStateOf(AddFieldDraft()) }
+    var typesOpen by rememberSaveable(saveKey) { mutableStateOf(false) }
+    val check = remember(doc, draft, kind) { AddFieldModel.check(doc, draft, kind) }
+    val focus = remember { FocusRequester() }
     val sub = if (character != null) CastUiCopy.recordSub(character.name, character.recordNo) else CastUiCopy.addFieldSub(kind)
     SheetHeader(CastUiCopy.ADD_FIELD_TITLE, onClose = ::close, subtitle = sub, closeLabel = CastUiCopy.BTN_CLOSE)
     SheetScrollBody(Modifier.padding(top = 14.dp)) {
@@ -122,8 +134,7 @@ fun SheetScope.AddFieldSheetContent(sheet: AddFieldSheet) {
     }
     SheetActions {
         CivilightButton(CastUiCopy.BTN_INSERT, {
-            val saved = draft
-            editor.act(CastUiCopy.ADD_FIELD_TITLE) { d, ctx -> AddFieldModel.add(d, saved, kind, sheet.entityKey, ctx) }
+            onAdd(draft)
             host.close()
         }, Modifier.weight(1f), enabled = check.canSave)
     }

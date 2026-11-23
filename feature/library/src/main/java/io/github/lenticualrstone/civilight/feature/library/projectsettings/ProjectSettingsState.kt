@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.projectsettings
 
+import io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary
 import io.github.lenticualrstone.civilight.domain.library.rating.ProjectProtectionSettings
 import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
 import io.github.lenticualrstone.civilight.model.app.RatingDefaults
@@ -17,15 +18,23 @@ data class ProjectSettingsUi(
     val cast: List<ProjectLinkRow>,
     val protection: ProjectProtectionSettings,
     val script: ScriptSectionUi,
+    /** `표지` (U-08 LIB-82), the first section. */
+    val cover: CoverSettingsRow = CoverSettingsRow(ProjectSettingsCopy.COVER, ProjectSettingsCopy.COVER_SUB, CoverSummary.NONE),
 )
 
 object ProjectSettingsState {
-    fun build(doc: ProjectDoc, readOnly: Boolean, defaults: RatingDefaults): ProjectSettingsUi = ProjectSettingsUi(
+    fun build(
+        doc: ProjectDoc,
+        readOnly: Boolean,
+        defaults: RatingDefaults,
+        fileExists: (String) -> Boolean = { true },
+    ): ProjectSettingsUi = ProjectSettingsUi(
         projectName = doc.project.name,
         readOnly = readOnly,
         structure = ProjectSettingsRows.structure(doc),
         cast = ProjectSettingsRows.cast(doc),
         protection = ProjectProtectionSettings.of(RatingLabels.effective(doc.project.rating), doc.project.protections, defaults),
         script = ProjectSettingsRows.script(doc),
+        cover = ProjectSettingsRows.cover(doc, fileExists),
     )
 }

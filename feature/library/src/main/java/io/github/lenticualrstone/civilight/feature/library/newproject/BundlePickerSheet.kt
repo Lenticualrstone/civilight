@@ -14,6 +14,10 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldBundles
+import io.github.lenticualrstone.civilight.domain.cast.field.FieldTemplates
+import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
+import io.github.lenticualrstone.civilight.ui.security.TaskLabel
 import io.github.lenticualrstone.civilight.domain.library.masking.ProjectProfile
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.project.FieldBundle
@@ -37,6 +41,8 @@ internal fun SheetScope.BundlePickerContent(
     form: NewProjectForm,
     sources: List<ProjectProfile>,
     onPick: (FieldBundle, Key?) -> Unit,
+    templates: List<FieldTemplate> = emptyList(),
+    onPickTemplate: (Key) -> Unit = {},
 ) {
     val scope = this
     var showSources by rememberSaveable { mutableStateOf(form.bundle == FieldBundle.FROM_PROJECT) }
@@ -74,6 +80,22 @@ internal fun SheetScope.BundlePickerContent(
                 )
             }
           }
+        }
+        // CST-61: user templates after the built-in rows (visible ones only; the default stays `기본`).
+        if (templates.isNotEmpty()) {
+            SectionLabel(NewProjectCopy.templateSection(templates.size), Modifier.padding(top = 16.dp, bottom = 4.dp))
+            templates.forEach { t ->
+                if (t.hidden) ProtectWindow(WindowProtection(secure = true, hideRecentsPreview = true, taskLabel = TaskLabel.APP_NAME))
+                RadioRow(
+                    title = t.name,
+                    selected = form.bundle == FieldBundle.TEMPLATE && form.bundleTemplateKey == t.key,
+                    onClick = {
+                        onPickTemplate(t.key)
+                        scope.close()
+                    },
+                    subtitle = FieldTemplates.kindCounts(t),
+                )
+            }
         }
     }
 }

@@ -21,6 +21,7 @@ Implementation spec for the **design system** of Civilight ("야간 원고" · N
 - **Component preview copy older than the rules.** `Toast` preview `블록 #043 삭제` → vocabulary `블록 #043 지움`. `LensChip` README `1-5 시점 값 수정 중` → `1-5 시점 값 고치는 중` (README, main tab, board `LensEdit`). `LensChip` preview `시점 · 최신` → rule 11: chip text is `최신 · 1-7` (label text owned by STO). `TravelBar` preview `2.5일` · `약 11시간` → rule 18 never shows `2.5일`; durations read `2일 4시간` / `9시간 40분` (copy owned by STO). `붙일 곳` → `연결` (rule 23).
 - **R-18 colour on buttons.** Memory 2026-11-22: the R-18 rating's raise button stays `pri`; `r18` is only for the badge, the R-18 choice cell, and hard-to-undo confirm buttons.
 - **Dotted rule.** Rule 20 and the DS README (2026-11-22): names get a dotted underline, `◆`/`◇` marks get a dotted outline, colour unchanged. Same meaning as rule 12's `근거 지워짐`.
+- **Shared layout rules (DS-65 … DS-69, user findings 2026-11-23).** They replace: the `Two*` boards' two bottom bars side by side and DS-21 / DS-29 "every screen draws its bar" in `목록 + 상세` (→ DS-65, one bar per frame); DS-09's toast row and DS-27's position "6 dp above the top edge of the bottom glass bar" (→ DS-67 window slot `systemBottom + max(156, chrome + 6)`); DS-23's sheet bottom padding `navigation inset + 16` (→ DS-66 `systemBottom + 24`, 16 above the keyboard); DS-25's floating dialog `bottom 16` without the keyboard (→ DS-66); the popover's 12 dp window margin that ignores the system bars (→ DS-66); LIB-40's `ED` 6 s for every toast (→ DS-67: 2.5 s info, 4 s with action or error); DS-30's 8 % ghost pressed layer (→ DS-68: 6 %, as built); DS-40's settings-row ` ›` text and DS-23's plain-text `닫기` (→ DS-68 cues). BottomGlassBar riding on the keyboard while a content field is typed in (shell core pass, IME item 1) is replaced by DS-69: the bar is not drawn while typing outside the command field.
 
 ---
 
@@ -40,6 +41,8 @@ Implementation spec for the **design system** of Civilight ("야간 원고" · N
 10. **Content pieces**: list rows and section labels, lock row, script block typesetting, scene head, swipe button row, search hit, avatar, empty / error / progress blocks, tooltip card, node card (DS-40 … DS-50).
 11. **Card, image and map / time components'** visual anatomy: cards, image tile, crop frame, holo material, map tool bar and map marks, map style colours, when picker, condition row, travel bar, recorder glow band (DS-51 … DS-61).
 12. **UI copy rules and vocabulary**, enforced by a string lint over all string resources (DS-62, DS-63), and **accessibility semantics** shared by all components (DS-64).
+13. **Shared layout rules** from the user's 2026-11-23 findings: one command bar per frame (DS-65), overlay gaps (DS-66), toast timing, anchoring and motion (DS-67, which overrides LIB-40's timing and position), tappable-element cues (DS-68), and keeping the caret line in view (DS-69).
+14. **0.2.0 rules** (2026-11-24, section K): icon-button classes and the r2 icon set (DS-70, DS-71), the shared create card (DS-72), the search chip row (DS-73), 3D view primitives and tilt (DS-74), and notes on earlier blocks (DS-75).
 
 ### 1.2 Hand-offs to other areas
 
@@ -351,6 +354,8 @@ Three groups from the DS: **원고** (manuscript: dialogue, body, names, titles)
 
 #### DS-12 · 아이콘 (icon set) — P0 · needsExternal: no
 
+**(0.2.0)** The r2 set (DS-71) adds ids and replaces the paths of `Check`, `Search`, `X`, `List`, `File`, `Split` and `Merge`; where a button shows only an icon or an icon with text is DS-70.
+
 - Style: outline icons on a 24 × 24 grid, `stroke = currentColor`, stroke width **1.6** (in grid units, so it scales with the drawn size: 20 dp icon → 1.33 dp), round caps and joins, no fill. Default drawn size 20 dp; default colour `ink2` in icon buttons. No filled or two-tone icons; no circles as decoration.
 - Implement each as an `ImageVector` from the SVG path data below. Names are code names; the Korean label is the accessibility label used on the boards where one exists.
 
@@ -511,6 +516,8 @@ Code constants in `CivilightMotion`; the registry of where each is used, reduce-
 
 #### DS-20 · 등급 배지 (rating badge) — P1 · needsExternal: no
 
+**(0.2.0)** Not drawn anywhere: the rating leaves the UI (S-4, LIB-92, DS-75). The text below describes 0.1.0.
+
 "프로젝트 만들 때 수위 등급 하나: ALL(R-12) · R-15 · R-18. R-18은 빨간 배지." (DS README 숨기기 · 등급)
 
 - Text `ALL`, `R-15` or `R-18` in the `badge` role (10 / 18, 600, `tnum`), height 18, padding 0 × 6, radius `radius-xs` 5, 1 dp inside outline, 6 dp right margin, raised 1 dp on the baseline (`vertical-align: 1px`).
@@ -619,6 +626,8 @@ Two drawn forms; both sit above the `shade` scrim.
 
 #### DS-29 · 명령 칸 (CommandBar) — P0 · needsExternal: no
 
+**(0.2.0)** The mic is drawn only on 프로젝트 홈 (S-8, DS-75, LRC-48). The script has no bottom command bar (U-14).
+
 "모든 화면 아래의 명령 칸. 탭 막대 대신 이 칸 하나로 인물 · 블록 · 장면 이동과 검색을 한다." (DS `CommandBar`; behaviour STO)
 
 - Height `cmd-h` 52; radius 14 (§6 Q-DS-08); fill `tint`; 1 dp `edge` inset; row with gap 10, padding 0 × 14; text `command` role (14 / 20, `ink3`).
@@ -652,6 +661,8 @@ Two drawn forms; both sit above the `shade` scrim.
 *Sources:* DS `Buttons` README / preview; `bundle.css` `.btn`, `.btn.ghost`; `scr_new_time.py` `.btn2`; `scr_onb.py` `shell`, `a_welcome`; `scr_states.py`; `scr_decide.py` `tip`; DS README 문구; memory (R-18 raise button stays pri).
 
 #### DS-31 · 아이콘 버튼 · 알약 · 키보드 도구 (icon buttons, pills, keyboard tools) — P0 · needsExternal: no
+
+**(0.2.0)** Which buttons are icon only, icon + text or text: DS-70. The `줄바꿈` primary pill is gone with U-14.
 
 - **Icon button** (`.ib`): 44 × 44, icon 20 `ink2` centred, no fill. Header back uses `Back`; display layers `Layers` (`연출 · 메모 표시`); `⋯` uses `More`.
 - **Glass round button** (profile over art): 44 × 44, radius 22, glass; icon `Back`. **Glass pill** next to it: height 44, padding 0 × 16, radius 22, glass, 500 12 / 16 `ink` (`시점 · 1-5`).
@@ -741,6 +752,8 @@ Two drawn forms; both sit above the `shade` scrim.
 *Sources:* DS `LensChip` README / preview; `bundle.css` `.lens`; `nmlib.py` `LENS`, `SCENE_AT`; `scr_story.py` `lens`; `scr_decide.py` `lens_edit`; DS README 시점 렌즈; memory rules-time.
 
 #### DS-39 · 목록 | 카드 전환 (ViewToggle) — P1 · needsExternal: no
+
+**(0.2.0)** On 서재 and the cast list the second cell is the chosen 3D view, and no toggle is drawn when the setting is `목록` (DS-74, LIB-93).
 
 - The outlined segmented control (DS-33) in the header's right slot: 2 cells 44 wide, height 36, icons `List` and `Grid` 18 dp; selected cell `pri` / `onpri`; others `ink3`; accessibility group `보기`, cells `목록`, `카드`.
 - Mechanics (per-screen memory, default, switching motion) are CNV-21 / CNV-45.
@@ -1061,6 +1074,336 @@ From memory `civilight-vocabulary.md` (applied 2026-11-21; Claude's picks, user 
 
 *Sources:* boards' `aria-label` attributes (`gen_nm.py`, `scr_lr.py`, `scr_new_cast.py`, `scr_map.py`, `scr_cards.py`, `scr_mapgen.py`, `scr_new_scene.py`); planning 접근성; research §4, §5.
 
+### J. Shared layout rules (user findings 2026-11-23)
+
+These rules come from the user's 0.1.0 emulator findings U-01, U-02, U-04, U-05 and U-07 (2026-11-23). The user's findings are the source; the values below were chosen to make them testable and are listed for confirmation in §6 (Q-DS-24 … Q-DS-29). Where they disagree with an earlier statement in this file or in LIB-40, these rules win (see *Superseded statements*). Every rule has JVM tests in §4 (T-DS-36 … T-DS-45) against pure helpers: `CommandBarHost.layout`, `CommandScope.next`, `OverlayGaps.*`, `NoticeRules.*`, `Affordance.of`, `CaretInView.delta`.
+
+**Terms used below.**
+- **Frame**: the area the shell gives one scene. Single screen: the whole window. `목록 + 상세`: the whole window (both panes). `가운데 한 칸`: the 560 dp column. A docked side panel (DS-24, script and map card) is not a pane; it is cut off the frame's right side.
+- **`systemBottom`**: the bottom obstruction from the system, in dp from the window bottom: `max(navigationBars.bottom, mandatorySystemGestures.bottom, ime.bottom)`. It is the lowest line any app-drawn touch target or overlay may reach.
+- **Bottom chrome**: what an app screen draws at the bottom of the frame: the bottom glass bar (DS-21), a pane's extra row, a keyboard toolbar, a wizard or settings bottom button. Its height is measured from the window bottom including the navigation inset padding it carries.
+- **Compact / inner**: `WindowLayout.isInner` false / true.
+
+#### DS-65 · 명령 칸은 창마다 하나 (one command bar per frame) — P0 · needsExternal: no · user finding U-01
+
+**Rule.** A frame draws **exactly one** DS-29 command bar, in **one** bottom glass bar that spans the **full frame width**. In `목록 + 상세` neither pane draws its own bottom glass bar or command bar; the shell draws one for the frame. The command bar's target (hint, search scope, mic context) is the **scope pane**, chosen with a visible scope switch, never by guessing from touches.
+
+1. **Who draws it.** A screen still declares its command bar through `CivilightScreen(commandBar = …, bottomExtraRow = …)`. When `LocalPaneRole` is `LIST` or `DETAIL`, `CivilightScreen` does not draw `BottomGlassBar`; it hands its declaration to the frame's `CommandBarHost`, which draws the single bar. In `SINGLE` the screen's own bar is the frame's bar (unchanged on cover screens).
+2. **Geometry.**
+   - Cover: unchanged (DS-21, DS-29): bar height 130 (150 with an extra row), command field 52 tall, 12 dp side insets, 18 dp above the navigation inset.
+   - Inner, single screen and `목록 + 상세`: the bar spans the frame width. The **command row** (scope switch + command field) is centred, side insets 24 dp, max width 720 dp; command field 52 tall, flex 1; bottom 20 dp above the navigation inset (DS-09 inner script value).
+   - Inner with a docked side panel: the bar spans the frame minus the panel (DS-21 script rule, now general).
+3. **Scope switch** (inner, only when **both** panes declare a command bar): the outlined segmented control of DS-33 (`.seg`: 36 dp drawn, 44 dp touch, radius 12, 1 dp `edge` inset) at the start of the command row, 8 dp before the command field. Two cells, left pane then right pane; each cell label is **exactly the title that pane's top bar shows** (existing copy, e.g. `서재` · `잿빛 새벽의 등불`), `chip` role 600 12 / 16, padding 0 × 12, max cell width 160 dp with ellipsis. Selected cell `pri` / `onpri`, other `ink3`. Accessibility: a `RadioGroup` whose label is `TODO_COPY_DS_COMMAND_SCOPE` (no source gives one; listed under Requests). With only one pane declaring a command bar, no switch is drawn and the bar is that pane's.
+4. **Which pane is the scope** (`CommandScope.next(current, event)`):
+   - A detail opens or is replaced (a list row tapped, `openDetail`): scope = `DETAIL`.
+   - The detail closes (back, `EmptyDetailPane` shown): scope = `LIST`.
+   - The user taps a scope-switch cell: scope = that pane, until the next open / replace / close.
+   - Touching, scrolling or typing inside a pane **never** changes the scope.
+   - A fold to cover resets nothing; on cover only one screen shows and its own bar is used.
+5. **Content of the bar** = the scope pane's declaration: its hint text (per-screen hints of STO / LIB, e.g. `모든 프로젝트에서 찾기` on 서재, `명령 또는 검색 · 인물 · 용어 · 대사` on 홈), its search target, and the mic's recorder context. When the scope changes the hint swaps with `ValueSwap` (CNV-42, `standard` 200 ms; reduced: 120 ms crossfade). The bar itself never moves, resizes or fades on a scope change.
+6. **Extra rows** (`bottomExtraRow`: script speaker row and `줄바꿈`, record tabs) stay with their pane: they are drawn inside the frame's bar, 8 dp above the command row, horizontally confined to their pane's column with 12 dp insets from the pane edges and the divider. The bar is 150 tall when any pane has an extra row, else 130. Pane-local action bars that are not command bars (wizard `이전 · 다음`, settings bottom button, keyboard toolbar) stay inside their pane and sit on the frame's bar top (or on the keyboard, DS-69).
+7. **Locked content.** A pane that shows a lock, or a hidden project / item that is locked, declares **no** command bar and contributes **no** scope cell; its masked title is never placed in the scope switch or in the bar's accessibility tree (LIB rule 19). If the scope pane locks, the scope moves to the other pane.
+8. **Content padding.** Both panes receive the same bottom padding = the frame bar's height (or the keyboard, DS-69), so a scope change never reflows either pane.
+9. **Toasts and banners.** Toasts are window-level (DS-67), never per pane. Banners (DS-28) stay with their pane.
+
+*Why full width and not "under the focused pane":* there is no focus state the user can see today (shell: "last-touched pane stays" is not built), and a bar that jumps between panes on touch is a guessing interaction (memory `feedback-no-guessing-interactions`). A fixed full-width bar keeps one position for the bar, the toast slot (DS-67) and the overlay gaps (DS-66), and the scope switch makes the target visible and explicit.
+
+#### DS-66 · 떠 있는 것의 아래 간격 (overlay gaps above bars, gesture bar and keyboard) — P0 · needsExternal: no · user finding U-04
+
+**Tokens** (`OverlayGaps`, dp):
+
+| Token | Compact | Inner | Between |
+| --- | --- | --- | --- |
+| `edge` | 16 | 24 | an overlay's bottom edge and `systemBottom` when no app chrome is below it |
+| `aboveBar` | 6 | 6 | an overlay's bottom edge and the top edge of the bottom glass bar (incl. its fade) |
+| `aboveKeyboard` | 8 | 8 | an overlay's bottom edge and the keyboard top when nothing rides on the keyboard |
+| `sheetBottom` | 24 | 24 | a bottom sheet's last content and `systemBottom` (keyboard hidden) |
+| `sheetBottomIme` | 16 | 16 | a bottom sheet's last content and the keyboard top (the sheet rides on the keyboard) |
+| `side` | 12 | 24 | a popover / menu / tooltip and the frame's side edges |
+| `top` | 8 | 8 | any overlay's top edge and the status-bar inset |
+| `dialogBand` | 24 | 24 | a centred dialog's band to the status inset and to `systemBottom` |
+| `toastLiftMin` | 156 | 156 | the toast slot above `systemBottom` (DS-67) |
+
+**Placement per overlay** (`y` = distance of the overlay's bottom edge from the window bottom):
+
+| Overlay | Keyboard hidden | Keyboard up |
+| --- | --- | --- |
+| Bottom sheet (DS-23) | attached to the window bottom; content bottom padding `systemBottom + sheetBottom` (cover 24 + 24 on a 24 dp gesture bar = 48) | sheet sits on the keyboard; content bottom padding `sheetBottomIme` 16; max height shrinks by the keyboard |
+| Centred sheet (DS-23 inner) | centred in the band `[statusTop + 24, H − systemBottom − 24]`, 24 dp side margins, max width 560 | same band with the keyboard in `systemBottom` |
+| Centred dialog (DS-25) | centred in the same band; max height = band height, body scrolls, buttons stay | same |
+| Bottom floating dialog (`ErrBio`) | `y = systemBottom + edge` (cover 16, inner 24); sides 12 (cover) / centred max width 420 (inner) | `y = systemBottom + aboveKeyboard` |
+| Popover, menu, tooltip card (DS-26, DS-49) | below its anchor with 6 dp gap if its bottom stays `≤ H − max(systemBottom + edge, barTop + aboveBar)`; otherwise above the anchor with 6 dp gap; never above `statusTop + top`; sides ≥ `side` | same limits with the keyboard in `systemBottom` |
+| Toast (DS-27, DS-67) | the window slot of DS-67 | the slot follows the keyboard |
+
+- `barTop` is the top edge of the frame's bottom glass bar (incl. its fade) when one is drawn; with no bar the `edge` term alone applies.
+- No overlay's touch target lies below `H − systemBottom` (inside the gesture bar or 3-button navigation bar).
+- Sheets, dialogs and popovers sit above the scrim; the toast is above sheets (z 5 > 4, DS-10) and is never covered by a scrim.
+
+#### DS-67 · 알림의 시간 · 자리 · 움직임 (toast and notice rules) — P0 · needsExternal: no · user finding U-05
+
+**Kinds and durations** (`NoticeRules.durationMs(kind)`; the shown time is then passed through Android's `AccessibilityManager.getRecommendedTimeoutMillis(base, FLAG_CONTENT_TEXT | FLAG_CONTENT_CONTROLS when it has an action)`, which only lengthens it):
+
+| Kind | What | Base duration | Example |
+| --- | --- | --- | --- |
+| `INFO` | a fact, nothing to do (`actionLabel = null`) | **2 500 ms** | `Drive 연결 준비 중`, `내보냄` (owner copy), first-use tips (LIB-20) |
+| `ACTION` | one action, normally `되돌리기` | **4 000 ms** | `블록 #043 지움 · ◆ 1개는 #044 자리로` + `되돌리기` |
+| `ERROR` | something failed and needs nothing from the user now | **4 000 ms** | `IMPORT_FAILED`, `SAVE_FAILED` (owner copy) |
+
+- **No toast stays until dismissed.** A failure that needs the user to act (backup failed, Drive login expired, mic off) is never a toast; it is a banner (DS-28) or an error block (DS-47) that stays until resolved (LIB-61 already does this). A sticky toast would need its own close control and would cover the slot above the command bar indefinitely.
+- The timer **pauses** while a finger is down on the toast, while accessibility focus is on it, and while the app is not resumed (`ON_STOP`); it resumes with the remaining time.
+- A new toast replaces the shown one at once (LIB-40); it starts its own full duration.
+
+**Anchoring: the toast belongs to the window.** One `WindowToastHost` is drawn by the shell above `NavDisplay` and the sheet hosts and below the lock and the tour dim. Screens and panes draw no toast host of their own.
+- *Why not "dismiss on leaving":* 되돌리기 toasts are often raised together with a navigation (page delete then `pop`, `PageDocScreen`), so dismissing on leaving would remove the undo the user needs. A window toast also cannot appear twice (today each pane of `목록 + 상세` draws the same toast) or jump between screens (today a settings screen without a bar puts it 6 dp above the window edge, and the next screen re-draws it 6 dp above a 130 dp bar).
+- **Position.** Horizontally: compact 16 dp from both sides; inner centred on the window, width `min(W − 48, 560)`. Vertically: the toast's bottom edge sits at `systemBottom + lift`, with `lift = max(toastLiftMin 156, tallestBottomChrome + 6)`, where `tallestBottomChrome` is read **once when the toast appears** (above `systemBottom`, so 130 or 150 for glass bars) and then frozen for that toast. While shown, the toast moves only with the keyboard (`systemBottom` changes), never because the screen behind changes, a sheet opens, or a pane's scope changes.
+- **Dismissed** by: its action (runs, then dismisses), the timer, a replacing toast, and **at once** (same frame, no exit motion) when the app lock or a hidden-project lock appears, when `다시 잠그기` / a relock runs, or when the project an `ACTION` toast acts on leaves the back stack (its session is released). A toast is never drawn over a lock screen, so no name in its text can show while locked.
+- **Motion** (helpers in `theme/Motion.kt`, tokens `CivilightMotion`, MotionLint-clean): enter = `motion.enter(CivilightMotion.enter, rise = 8.dp)` (fade + 8 dp rise, 320 ms); exit = `motion.exit(CivilightMotion.exit)` (fade, 160 ms); replace = `motion.swap(enter = CivilightMotion.enter)` with `animateContentSize(motion.move(CivilightMotion.standard))`; following the keyboard uses the system inset animation (API ≥ 30) or `rememberKeyboardBottom()` on `standard` (API 29). Screen transitions do not animate the toast (it lives outside the scenes). Reduced motion: 120 ms fades, no rise, size snaps.
+
+#### DS-68 · 누르는 것은 누르는 것처럼 (affordance: what is tappable) — P0 · needsExternal: no · user finding U-07
+
+**Rule.** Every tappable element shows **at least one** of the cues below; plain text in `ink` / `ink2` / `ink3` with none of them is **never** tappable. Conversely the chevron (cue B) is **never** drawn on something that is not tappable.
+
+| Cue | Look | Used by |
+| --- | --- | --- |
+| A · container | a fill (`pri`, `tint`, `bg` on toast) or a 1 dp `edge` / `line` outline around the touch shape | buttons (DS-30), chips (DS-36), segmented (DS-33), lens chip (DS-38), **link tiles** (below), sheet header `닫기` (below) |
+| B · chevron | `IconId.Next` 16 dp, `ink3`, vertically centred, 4 dp after the last trailing text (value), 0 dp from the row's end padding | every tappable **row** that opens a screen, sheet or picker and has no control at its end: settings rows, list rows (서재, 인물, 세계, 연표, 기록함, 점검), home episode rows, `이어 쓰기` |
+| C · control | a switch, radio or checkbox at the row end; the whole row toggles (DS-32) | settings switches, choice rows |
+| D · icon button | a 44 dp icon button glyph (DS-31) with an accessibility label | header icons, mic, `⋯` |
+| E · inline link | `acc` text + `IconId.Next` 14 dp in `acc`, 2 dp gap | a link sharing a section label's baseline (`레코더 · 정리 안 됨 1`), a link in an empty or error block |
+| F · text decoration | DS-19 decorations inside prose (term link underline, `@` link) | manuscript and rich text |
+
+- **Settings rows**: the trailing ` ›` text of DS-40 becomes cue B (`보통` + 4 dp + `Next` 16).
+- **Sheet and side-panel header `닫기`** (DS-23, DS-24): the compact ghost button of DS-30 (36 dp drawn, `tint` fill, 12 sp 600, padding 0 × 12, touch 44) instead of plain `ink2` text.
+- **Picker rows** inside a sheet whose title is a `… 고르기` picker (speaker picker, `@` picker, event picker) are exempt from cue B: the whole sheet is one choice list; the current choice shows `sel` + 2 dp `acc` bar (DS-40).
+- **Link tile** (new; replaces the plain-text `작업` grid on 프로젝트 홈): height 48, radius 12 (`radius-sm`), fill `tint`, padding 0 × 14; label `itemTitle` at weight 500, 15 / 22, `ink`, one line, ellipsis; trailing `Next` 16 `ink3`, 8 dp gap. Grid: 3 columns when the content width ≥ 336 dp, else 2; gaps 8 dp both ways; tiles share the row width equally. A dimmed shortcut (`설정`) uses label `ink2` and the same tile.
+- **Field-table rows, key–value lines, section labels, stats, sub-lines** (DS-40 `.row`, `.rk`, `.sec`) are not tappable and never carry cue B.
+
+**States** (one table for every tappable; values from `foundation/Pressable.kt`, which this supersedes DS-30's 8 % with):
+
+| State | Rows, tiles, inline links | Buttons, chips, segmented, icon buttons |
+| --- | --- | --- |
+| pressed | `ink` overlay at 6 % over the element's shape, no scale; `CivilightMotion.press` (100 ms, `standard` curve) in and out | scale 0.94 on `press`, no overlay |
+| disabled | whole element (incl. chevron and label) at 38 % opacity; no press feedback; semantics `disabled`, still announced | same |
+| focused (keyboard / D-pad) | 2 dp `acc` ring, 2 dp outside the shape (full-width rows: drawn on the row bounds, inset 0) | 2 dp `acc` ring, 2 dp outside |
+| selected (rows) | `sel` fill + 2 dp `acc` start bar (DS-40); chevron unchanged | `pri` fill (DS-33, DS-36) |
+
+Reduced motion: no scale; the overlay fades in 120 ms linear (colour change, kept).
+
+#### DS-69 · 커서 줄은 늘 보인다 (caret line stays in view) — P0 · needsExternal: no · user finding U-02
+
+**Rule.** While a text field or editor has focus, the **caret line** is always fully inside the **visible band**. This holds for single-line and multi-line fields, the rich editor (`core:ui` `RichTextEditor`), the script editor, page documents, and fields in sheets, side panels and dialogs.
+
+- **Caret line box**: from `getLineTop(line)` to `getLineBottom(line)` of the line holding the caret (`selection.end`; while a selection handle is dragged, the dragged end), in window coordinates. An empty field uses its first line.
+- **Visible band** of the field's nearest vertical scroll container:
+  - top = bottom of the top chrome over that container (top glass bar, sheet title row if pinned, banner) **+ 8 dp**;
+  - bottom = the highest of: keyboard top, keyboard toolbar top, the bottom glass bar's top edge when drawn, a sheet's pinned action row top, `H − systemBottom`; then **− 16 dp**.
+- **Correction** (`CaretInView.delta(lineTop, lineBottom, bandTop, bandBottom)`):
+  - line inside the band: no scroll;
+  - line below the band: scroll the content up by `lineBottom − bandBottom`;
+  - line above the band: scroll the content down by `bandTop − lineTop`;
+  - line taller than the band: align `lineTop` to `bandTop`.
+  - The scroll is the **minimum** and **snaps** in the same frame as the change (no animation), so the line being typed keeps its place (DS-14 "never moves", SCR-14 fixed writing line).
+- **When it runs**: on focus, every text change, caret move, the field growing or shrinking, the keyboard opening / closing / resizing, a sheet changing height, a bar appearing or leaving, fold / unfold. It does **not** run while the user is dragging or flinging the container (the user's scroll wins until the next text change or caret move).
+- **Nested scroll**: a field with its own scroll (fixed max height) first scrolls itself so the caret line is inside the field's viewport, then the outer container applies the band rule to the caret line box.
+- **Single-line fields** scroll horizontally so the caret stays inside the field's text area with 4 dp to spare.
+- **Bottom glass bar while typing**: while a field that is **not** the command field has focus and the keyboard is up, the bottom glass bar is not drawn; the screen's keyboard toolbar (script) or nothing takes its place, and the band bottom is the keyboard (or toolbar) top − 16. The bar comes back when the keyboard closes. (The script already does this; it becomes the rule for every screen.)
+- **Sheets**: the sheet rides on the keyboard (DS-66); if the band inside the sheet is shorter than the caret line box + 24 dp, the sheet first grows to its maximum height, then the band rule applies.
+
+### K. 0.2.0 rules (2026-11-24) (0.2.0)
+
+Source: the frozen scope `docs/status/0.2.0-scope.md` (ICON, U-15, N-13, U-16, S-4, D17, D28, D31) and the planning icon list (`icon-buttons.md`, 89 rows: a 15 · b 33 · c 41, with its icon set `icons_set.py`). The list lives outside the repository, so every row a test needs is copied here. Where this section and an earlier block disagree, this section wins; each superseded block carries a **(0.2.0)** line. Pure helpers with JVM tests (T-DS-46 … T-DS-53): `IconButtons.classOf`, `IconButtons.nameOf`, `IconId.forKey`, `CreateCard.canCreate`, `CreateCard.buttons`, `SearchChips.row`, `Tilt.offset`.
+
+#### DS-70 · 아이콘 버튼 규칙 (icon buttons: a · b · c) — P0 · needsExternal: no · scope ICON
+
+**Rule** (user decision 2026-11-24: "텍스트가 꼭 필요한 곳에서는 텍스트를 남겨두도록 해").
+
+| Class | Shape | When | Accessibility name |
+| --- | --- | --- | --- |
+| **a** · icon only | DS-31 icon button: 44 × 44 touch, icon 20, stroke 1.6 (grid units), `ink2` | a universal meaning (send, search, close, previous, next, edit, undo) | the board's existing label first; else the **full old text** |
+| **b** · icon + short text | icon 16 … 18 before the label, gap 6; button or pill height ≥ 44 | the picture alone is not universal | the **full old text**, even when the visible label is shortened |
+| **c** · text as now | unchanged | confirm and delete actions, chips that show a picked value, flow buttons, anything ambiguous | the text |
+
+- **When unsure, keep the text** (c). A row the list marks as an open question keeps its text until the user answers (D28).
+- **Scope override**: the input row's send slot while editing (`고치기`) keeps its **text** (c), although the list draws icon `check`.
+- Every a-class button exposes `contentDescription` = its accessibility name and `Role.Button`; a toggle-like b button (`설명`, `뒤집기`) exposes its on/off state (`stateDescription`).
+- Long press on an a-class button shows its accessibility name as a tooltip (`[PROPOSED]`, DS-49 tooltip card without buttons, 1.5 s).
+- Not changed (already icon-only or icon + text, accessibility name checked only): `back`, `⋯` (`More`, name `더 보기` `[PROPOSED]` where no board name exists), the recorder mic (`라이프 레코더`), record pause (`일시정지`), the U-16 view toggle cells, the card prev / next round buttons, menu rows, settings rows, map tool bar cells.
+
+**a · icon only** (15 rows):
+
+| # | Screen · button | Old text | Icon key | Accessibility name |
+| --- | --- | --- | --- | --- |
+| A1 | Script input row · send | `보내기` | `send` | `보내기` |
+| A2 | Script input row · send while editing | `고치기` | — | **kept as text (c)**, scope ICON |
+| A3 | Head (cover and inner) · search | `찾기` | `search` | `찾기 · 명령` |
+| A4 | Head (inner) · display layers | `표시` | `layers` | `연출 · 메모 표시` |
+| A5 | Search field and inner panel · close | `닫기` | `close` | `찾기 닫기` |
+| A6 | Sheet and panel heads, about 30 places (블록 추가 · 표시 · 패널 · 렌즈 · 선 라벨 · 장소 · 관계 · 서재 · 지도 · 한꺼번에 · 갤러리) | `닫기` | `close` | `닫기` |
+| A7 | 서재 head `+` | (none) | `plus` | `새 프로젝트` |
+| A8 | Gallery viewer bottom row | `이전` · `다음` | `prev` · `next` | `이전` · `다음` |
+| A9 | Gallery viewer caption panel | `고치기` | `edit` | `고치기` |
+| A10 | Picked card caption panel | `보기` · `고치기` | `expand` · `edit` | `보기` · `고치기` |
+| A11 | Map drawing tool bar | `되돌리기` | `undo` | `되돌리기` |
+| A12 | Motion area drawing | `되돌리기` | `undo` | `되돌리기` (surface hidden in 0.2.0, S-3) |
+| A13 | 프로젝트 홈 head left | `‹ 서재` | `back` | `서재로` |
+| A14 | 롤로덱스 · previous / next | `이전` · `다음` | `up` · `down` | `이전 카드` · `다음 카드` |
+| A15 | 롤로덱스 · opened card | `닫기` | `close` | `닫기` |
+
+**b · icon + text** (33 rows; "same" = the accessibility name equals the visible text):
+
+| # | Screen · button | Visible text | Icon key | Accessibility name |
+| --- | --- | --- | --- | --- |
+| B1 | Editing mark · right of the insert place | `나누기` · `합치기` | `split` · `merge` | `나누기` · `합치기`; disabled: `합치기 · 꺼짐 · <reason>` (`화자 다름` · `종류 다름`) |
+| B2 | Above the input · next to the insert place | `다음 씬` | `next_scene` | `다음 씬 만들기` |
+| B3 | Right swipe, 5 buttons | `고치기` · `이 뒤에` · `종류` · `씬 나누기` · `지우기` | `edit` · `insert_after` · `kind` · `scene_cut` · `trash` | same |
+| B4 | Left swipe | `◆ 시간` · `참고` · `속성` | `◆` glyph · `note_ref` · `props` | same |
+| B5 | Toast after a delete | `되돌리기` | `undo` | same |
+| B6 | Left swipe, older boards | `참고` · `속성` | `note_ref` · `props` | same |
+| B7 | Block selection tool row | `복사` · `잘라내기` · `옮기기` · `지우기` | `copy` · `cut` · `move` · `trash` | same |
+| B8 | List head create row (인물 · 세계 · 연표 · 에셋) | `새 인물` (per list: `새 장소` · `새 용어` · `새 세력` …) | `plus` | same (U-15) |
+| B9 | Story bottom row | `새 씬` | `plus` | same |
+| B10 | Cast list view switch | `목록` · `관계도` | `list` · `graph` | same |
+| B11 | Membership record sheet | `시점` | `plus` | `시점 추가` |
+| B12 | Character record · add field | `항목` | `plus` | `항목 넣기` |
+| B13 | Gallery viewer centre | `설명` | `caption` | `설명` (with on/off state) |
+| B14 | Gallery sort row | `고르기` | `select_box` | `여러 장 고르기` |
+| B15 | Gallery reorder | `맨 앞` · `맨 뒤` | `to_top` · `to_bottom` | same |
+| B16 | Add and hidden cells | `사진` · `파일` · `다시 잠그기` | `image` · `file` · `lock` | same |
+| B17 | Image pick | `갤러리` · `파일` | `image` · `file` | same |
+| B18 | Card off screen | `고른 카드로` | `prev` | same |
+| B19 | Profile gallery cell | `넣기` | `plus` | same |
+| B20 | Crop tools | `90° 회전` · `좌우 반전` · `처음대로` | `rotate` · `mirror` · `reset` | same |
+| B21 | Hidden or locked cell | `지문으로 보기` · `잠금 풀기` | `fingerprint` | same (D31) |
+| B22 | Life recorder | `말로 기록` · `글로 쓰기` | `mic` · `write` | same |
+| B23 | Map generator | `다른 후보 3` | `dice` | same (surface hidden, S-3) |
+| B24 | Empty inbox · mic off | `말로 기록` · `글로 쓰기` (`글로` becomes `글로 쓰기`) | `mic` · `write` | same |
+| B25 | Map generator tools | `새 후보` · `강만 다시` · `강 고정` · `새 지역` · `조건` | `dice` · `lock` · `plus` | same (hidden, S-3) |
+| B26 | Map generator step palette | `해안선` · `산` · `강` · `한 칸` · `채우기` · `되돌리기` … | terrain glyphs | same (hidden, S-3) |
+| B27 | 원고 더미 tools | `들어 보기` · `내려놓기` · `모으기` · `펼치기` | `lift` · `drop` · `gather` · `fan` | same |
+| B28 | New project cell in a 서재 view | `새 프로젝트` | `plus` | same |
+| B29 | 부채꼴 덱 · under the card | `뒤집기` | `flip` | same (with on/off state) |
+| B30 | Card open | `열기` | `open_out` · `expand` | same |
+| B31 | 타로 펼침 tools | `모두 뒤집기` · `다시 펼치기` | `flip` · `redeal` | same |
+| B32 | 롤로덱스 head `+` | `새 인물` | `plus` | same (D31: U-15 wins over the narrow head) |
+| B33 | Card wall · new card cell | `새 카드` | `plus` | same |
+
+**c · text as now** (41 rows, by kind): speaker and kind chips (`리엔 ▾` · `대사 ▾`), the scene chip `이 씬 · 1-7`, every filter chip, tab and segmented cell; confirm and delete actions (`취소`, `완료`, `합치기`, `바꾸기`, `휴지통으로`, `비우기`, `나누기` · `합치기` · `옮기기` · `기록` · `적용` · `고르기` · `정하기` · `넣기` on sheet bottoms, `기록 지우기` · `다른 블록에 잇기` · `이대로 두기`); flow buttons (`다음` · `이전` · `건너뛰기` · `완료`, `시작하기`, `예시 홈으로` · `온보딩 끝내기`); inline text links (`바꾸기 ›` · `쓰기 ›` · `기본 ›` · `전체 보기 ›` …); screen primary actions (`인물 추가`, `PDF 만들기`, `설명 쓰기`, `멈추고 저장` · `이어서 말하기`, `기록함에 두기`, `여기 넣기 · #044 뒤`); the U-16 picked-item buttons (`열기` · `만들기` · `꺼내기` · `앞으로` · `제자리` · `돌려놓기`) and card primary buttons (`인물 페이지` …); lock alternatives `PIN 사용` · `기기 PIN 사용`. The rating board's `바꾸기` is gone with the rating (S-4).
+
+*Sources:* scope ICON, D28, D31; decision row `아이콘` (2026-11-24); planning `icon-buttons.md`.
+
+#### DS-71 · 아이콘 세트 r2 (icon set additions) — P0 · needsExternal: no
+
+- The r2 set (2026-11-24) is newer than DS-12 and **wins for every key it defines**. Same drawing rule as DS-12 (24 grid, stroke 1.6, round caps and joins, no fill). `IconId.forKey(key)` maps each r2 key to one `IconId`; existing ids are kept (none renamed or removed) and take the r2 path where the r2 set draws the same meaning.
+
+| r2 key | `IconId` | Path data | Note |
+| --- | --- | --- | --- |
+| `send` | `Send` **new** | `M12 19V6M6.5 11.5L12 6l5.5 5.5` | |
+| `check` | `Check` | `M5 12.5l4.5 4.5L19 7.5` | replaces DS-12 path |
+| `search` | `Search` | `M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM20 20l-4.5-4.5` | replaces DS-12 path (the r2 set restores the `gen_nm.py` shape) |
+| `layers` | `Layers` | `M12 4l9 5-9 5-9-5zM3 14l9 5 9-5` | same |
+| `close` | `X` | `M6.5 6.5l11 11M17.5 6.5l-11 11` | replaces DS-12 path; chip remove uses it too |
+| `split` | `Split` | `M12 4v16M4 12h5M6.5 9.5L4 12l2.5 2.5M20 12h-5M17.5 9.5L20 12l-2.5 2.5` | replaces DS-12 path |
+| `merge` | `Merge` | `M12 4v16M3 12h5M5.5 9.5L8 12l-2.5 2.5M21 12h-5M18.5 9.5L16 12l2.5 2.5` | replaces DS-12 path |
+| `next_scene` | `NextScene` **new** | `M4 6h12M4 10h12M4 14h7M17 13v7M13.5 16.5h7` | |
+| `edit` | `Edit` **new** | `M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4` | |
+| `insert_after` | `InsertAfter` **new** | `M5 6h14M5 11h14M12 14v6M9 17h6` | |
+| `kind` | `Kind` **new** | `M4 7h10M4 12h16M4 17h7M17 4l3 3-3 3` | |
+| `scene_cut` | `SceneCut` **new** | `M4 5h16M4 19h16M4 12h3M10.5 12h3M17 12h3` | |
+| `trash` | `Trash` | `M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12` | same |
+| `note_ref` | `Paper` | `M5 5h14v10h-8l-4 3.5V15H5z` | same |
+| `props` | `Props` | `M4 7h16M4 12h16M4 17h10` | same |
+| `copy` | `Copy` **new** | `M8 8h11v11H8zM5 16V5h11` | |
+| `cut` | `Cut` **new** | `M6 7a2.5 2.5 0 1 0 0 .01M6 17a2.5 2.5 0 1 0 0 .01M8 8.5L19 18M8 15.5L19 6` | |
+| `move` | `MoveBlock` **new** | `M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4` | DS-12 `Move` stays the map pan tool |
+| `undo` | `Undo` | `M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3` | same |
+| `plus` | `Plus` | `M12 5v14M5 12h14` | same |
+| `list` | `List` | `M4 7h16M4 12h16M4 17h16` | replaces DS-12 path |
+| `graph` | `Graph` **new** | `M8.5 6.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM20.5 9a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM12.5 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM8.4 7.1l7.2 1.4M6.6 8.9l2.6 6.8M16.4 10.8l-4.6 5.4` | |
+| `back` | `Back` | `M15 5l-7 7 7 7` | same; head left only |
+| `prev` | `Prev` **new** | `M15 5l-7 7 7 7` | same shape as `back`, used in bottom rows and card controls (D31) |
+| `next` | `Next` | `M9 5l7 7-7 7` | same |
+| `up` · `down` | `Up` · `Down` **new** | `M5 15l7-7 7 7` · `M5 9l7 7 7-7` | |
+| `to_top` · `to_bottom` | `ToTop` · `ToBottom` **new** | `M5 4.5h14M12 20V9M7 14l5-5 5 5` · `M5 19.5h14M12 4v11M7 10l5 5 5-5` | |
+| `select_box` | `SelectBox` **new** | `M5 5h14v14H5zM8.5 12l2.5 2.5 4.5-5` | |
+| `more` | `More` | `M5 12h.01M12 12h.01M19 12h.01` | same |
+| `caption` | `Caption` **new** | `M5 6h14M5 11h14M5 16h9` | |
+| `expand` | `Expand` **new** | `M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5` | |
+| `image` | `Image` | `M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4` | same |
+| `file` | `File` | `M6 3h8l4 4v14H6zM14 3v4h4` | replaces DS-12 path |
+| `rotate` · `reset` | `Rotate` · `Reset` | as DS-12 | same |
+| `mirror` | `Flip` | `M12 3v18M8 7l-4 5 4 5M16 7l4 5-4 5` | DS-12 `Flip` **is** the r2 `mirror` (crop `좌우 반전`) |
+| `flip` | `CardFlip` **new** | `M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4` | card `뒤집기`; not the crop mirror |
+| `lock` · `fingerprint` · `mic` · `pause` · `dice` | `Lock` · `Fingerprint` · `Mic` · `Pause` · `Dice` | as DS-12 | same |
+| `write` | `Text` | `M5 6h14M12 6v12M9 18h6` | same (`글로 쓰기`) |
+| `redeal` | `Redeal` **new** | `M4 12a8 8 0 1 0 2.4-5.7M4 4.5v4h4` | |
+| `open_out` | `OpenOut` **new** | `M14 5h5v5M19 5l-8 8M10 6H6a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-4` | |
+| `fan` · `gather` | `Fan` · `Gather` **new** | `M12 20L5 7M12 20l7-13M12 20V5` · `M5 9l7-4 7 4-7 4zM5 13l7 4 7-4M5 17l7 4 7-4` | |
+| `lift` · `drop` | `Lift` · `Drop` **new** | `M4 17h16M4 20.5h16M7 6.5h10v6H7zM9.5 4L12 2l2.5 2` · `M4 17h16M4 20.5h16M7 8h10v5.5H7zM9.5 3L12 5l2.5-2` | |
+
+- Look-alikes that stay apart because each sits next to its own text (b): `rotate` · `reset` · `redeal`; `props` · `caption`; `gather` · `layers`. No two a-class icons share a shape except `back` / `prev`, which are split by place (D31).
+
+#### DS-72 · 만들기 카드 (create card overlay) — P0 · needsExternal: no · scope U-15, D17
+
+One shared overlay in `core:designsystem`; each feature supplies its title, its fields and the write. Behaviour of each kind (field sets, what is created) is the feature's (U-15.5, U-15.7, U-15.9).
+
+- **Where it opens**: from a list's create row (`＋ 새 인물` …) and from a picker sheet's create row. The screen under it does not change (U-15.2).
+- **Shape** (cover and inner alike, U-15.8): a centred floating card over the `shade` scrim. Fill `raise`, radius `card` 20, 1 dp `line` inset, shadow `shadow-float`; width = window − 2 × 16 on cover, max 420 on inner; padding 20. It matches the character card view's look (same radius, fill and image slot as the profile card head).
+- **Anatomy**, top to bottom: title (`dialogTitle` role), then the fields (each with a **visible label** above it, never a placeholder alone), then the button row. Title and button row are pinned; the field area scrolls when it does not fit.
+- **Title**: `새 <kind word>` from the create row (`새 인물`, `새 장소`, `새 용어`, `새 세력`; and by the same pattern `새 사건`, `새 에셋`, `새 태그`, `새 관계 종류`, `새 페이지`, `새 캔버스`, listed to confirm in §6 Q-DS-30).
+- **Keyboard** (U-15.8): the card's bottom stays ≥ 8 dp above the keyboard top (DS-66 `aboveKeyboard`), and ≥ `systemBottom + 16` without it. When the card is taller than the space, the field area shrinks and scrolls, and DS-69 keeps the caret line visible. No field is ever under the keyboard.
+- **Focus**: on open the first text field (the name) has focus and the keyboard opens (`[PROPOSED]`); in a picker with a query the name is prefilled with the query (U-15.3) and the caret sits at its end.
+- **Buttons** (`CreateCard.buttons(mode)`, c-class text): list mode `취소` (ghost) · `만들고 열기` (ghost) · `만들기` (primary); picker mode `취소` · `만들기`. `만들기` and `만들고 열기` are enabled only while the required field (the name) is non-blank after trim (`CreateCard.canCreate`).
+- **After a create**: list mode `만들기` closes the card, keeps the list where it was, and highlights the new row for 1 200 ms (`hl` fill fading out through `CivilightMotion.standard`; reduced: no fade, removed after the same time). If the new row is outside the visible part of the list, the list scrolls the minimum to show it first (`[PROPOSED]`). `만들고 열기` closes the card and opens the new item. Picker mode `만들기` closes the card and the picker, with the new item picked (U-15.3, U-15.6).
+- **Dismiss**: `취소` and system back close the card and discard what was typed (explicit acts). A scrim tap closes it only while every field is empty; with typed content a scrim tap does nothing (`[PROPOSED]`: no silent loss, no confirm dialog). The list's scroll position is unchanged (U-15.2).
+- **Write**: one call to the feature's write (through its `DECISIONS.md` §1 path), one undo step; no spinner (writes are under 100 ms).
+- **Motion**: enter `CivilightMotion.enter` (fade + scale 0.96 → 1), exit `CivilightMotion.exit` (fade); scrim fades with them; reduced: 120 ms fades. MotionLint applies.
+- **Accessibility**: dialog semantics with the title as pane title; focus stays inside the card; on close focus returns to the create row that opened it.
+- **Read-only**: create rows are not drawn in read-only projects (U-15.10); the overlay is never opened there.
+- **Create row** (list top and picker top, U-15.1, U-15.3): a list row 48 tall under the search field and filter chips, b-class: icon `plus` 18 + label (`새 인물`, or in a picker with an unmatched query `‘세라’ 새 인물`; the quote marks follow the app's `‘…’` style). Label and icon `acc`; pressed state per DS-68; no chevron. Accessibility name = the label.
+
+#### DS-73 · 찾기 칩 줄 (search chip row) — P1 · needsExternal: no · scope N-13
+
+- Row (STO search sheet, behaviour STO): chips `전체 · 인물 · 용어 · 대사 · 씬 · 명령` (single choice) followed by the **dropdown chip** `그 밖 ▾`. When `대사` is selected a second dropdown chip `화자 ▾` appears directly after `대사`.
+- **Layout**: the row **wraps** (flow row, chip gap 6, line gap 6); it never scrolls sideways (N-13 acceptance at cover width). DS-36 chip shape; dropdown chips add ` ▾` to their text.
+- **`그 밖 ▾`**: tap opens a popover (DS-26; on cover a small sheet when it would cover the field) listing `장소 · 세력 · 사건 · 페이지`, single choice. Picking one selects that kind for the whole row (the other chips deselect) and the chip shows the picked value, `장소 ▾` (c: a chip that shows a picked value). Picking any of the six chips returns it to `그 밖 ▾`, unselected.
+- **`화자 ▾`**: tap opens the speaker picker sheet (same rows as `화자 고르기`; hidden characters left out while locked) with a first row `전체`. Picking a character shows `<name> ▾` (display name rules of CST) and limits results to that speaker's lines; `전체` clears it. Leaving `대사` removes the chip and clears the speaker.
+- `SearchChips.row(selected, extraKind, speaker)` returns the chip models in order with their text and selection. No recorder kind exists in the row (N-13: records are not searched).
+- Accessibility: dropdown chips read their visible text and expose "opens a list" (`Role.DropdownList`).
+
+#### DS-74 · 3D 보기의 바탕 (3D view primitives and tilt) — P1 · needsExternal: no · scope U-16
+
+- Shared pieces for the six 서재 views (LIB-93) and the six character card views (CST): `rememberTilt(enabled)`, `Modifier.parallax(tilt, depth)`, `Modifier.sheen(tilt)`, and the view-toggle cell model.
+- **Tilt source**: the rotation-vector sensor, registered only while `enabled` and the host is resumed and visible; unregistered on pause. Output `(tx, ty)` in −1 … 1, from device pitch and roll relative to the pose when the view appeared, clamped at ±12°, low-pass filtered (time constant 120 ms) `[PROPOSED]`. `enabled = Tilt.follows(viewTilt, motion)` (00 §13.4: the LIB-94 switch on and motion not reduced); when false no sensor is registered and the output is `(0, 0)`.
+- **Parallax**: `Tilt.offset(tilt, depth) = (tx × depth, ty × depth)`, depth ≤ 8 dp (LIB-04's 8 % image parallax rule, `[PROPOSED]` value). **Light**: a sheen band offset by the same tilt (the holo material's rule, DS-54).
+- **Frame**: every transform is clipped to the view's frame; nothing moves over the head, the bars or the list below (U-11 rule).
+- **Motion**: transitions between views and items use `CivilightMotion` tokens only (MotionLint); reduced motion → 120 ms fades, no idle motion, no tilt; the LIB-94 tilt switch off → no tilt, other motion unchanged.
+- **Toggle cell**: DS-39 with the second cell's icon `Grid` and accessibility name = the chosen view's label (`3D 책장` …).
+
+#### DS-75 · 0.2.0 notes on earlier blocks — P1 · needsExternal: no
+
+- **DS-20 rating badge**: not drawn anywhere in 0.2.0 (S-4, LIB-92). `RatingBadge` and `BadgeSurface` stay in code, unused. The `r18` colour keeps its other uses (hard-to-undo confirm buttons, error marks per Q-DS-05).
+- **DS-29 command bar mic**: the mic is drawn only on 프로젝트 홈's command bar (S-8, LRC-48). Every other command bar omits it; the command field takes the freed width.
+- **DS-39 ViewToggle**: on 서재 and the cast list it switches between the chosen 3D view and the list (DS-74).
+- **DS-12 icons**: the r2 paths of DS-71 replace the listed DS-12 paths.
+
+### Tests (0.2.0)
+
+**T-DS-46 · icon classes (DS-70).** For each A-row (except A2) `IconButtons.classOf(id) = A`, `nameOf(id)` equals the table's accessibility name and is non-blank; A2 (`고치기` send) is `C`. For each B-row the accessibility name equals the table's (for B11 `시점 추가` although the text is `시점`; for B14 `여러 장 고르기` although the text is `고르기`).
+
+**T-DS-47 · icon set (DS-71).** `IconId.forKey` is defined for all 51 r2 keys; `forKey("mirror") = Flip`; `forKey("flip") = CardFlip`; `forKey("move") = MoveBlock`; `forKey("close") = X`; `forKey("prev").pathData == forKey("back").pathData`; `Check.pathData = "M5 12.5l4.5 4.5L19 7.5"`; every `IconId` path parses with `PathParser`.
+
+**T-DS-48 · touch targets (DS-70).** Every a-class button model has a touch area ≥ 44 × 44 and icon size 20; every b-class icon is 16 … 18.
+
+**T-DS-49 · create card buttons (DS-72).** `CreateCard.buttons(LIST) = [취소, 만들고 열기, 만들기]`; `buttons(PICKER) = [취소, 만들기]`; `canCreate(name = "  ") = false`; `canCreate("세라") = true`.
+
+**T-DS-50 · create card gap (DS-72).** Window 844, keyboard top 520: card bottom ≤ 512; card height 600 → field area height = available − title − buttons, and the title and button rows stay inside `[top + 8, 512]`.
+
+**T-DS-51 · search chips (DS-73).** `row(selected = 전체)` → 7 chips, last `그 밖 ▾`; `row(selected = 대사)` → 8 chips, `화자 ▾` at index 4; `row(extraKind = 장소)` → last chip text `장소 ▾`, selected, and none of the six selected; `row(selected = 대사, speaker = 리엔)` → chip text `리엔 ▾`.
+
+**T-DS-52 · tilt (DS-74).** `Tilt.offset((0.5, −1.0), depth = 8) = (4, −8)`; a 20° pitch is clamped to `ty = ±1`; with `enabled = false` the source registers no listener and returns `(0, 0)`; `Tilt.follows(false, NEVER_REDUCE) = false`, `Tilt.follows(true, ALWAYS_REDUCE) = false`, `Tilt.follows(true, NEVER_REDUCE) = true`.
+
+**T-DS-53 · no badge (DS-75).** No 0.2.0 screen model (서재 row, card, home head, export sheet) carries a rating badge model.
+
 ---
 
 ## 3. Data
@@ -1088,7 +1431,17 @@ The design system **persists nothing**. It owns code-level value types (in `core
 | `BadgeSurface` | enum | `PLAIN`, `ON_IMAGE` | DS-20 |
 | `ButtonVariant` | enum | `PRIMARY, GHOST, DANGER, PRIMARY_LARGE, COMPACT_PRIMARY, COMPACT_GHOST, TWO_LINE, TWO_LINE_GHOST, ON_TOAST, ON_IMAGE` | DS-30 |
 | `LensChipState` | enum | `LATEST`, `PAST`, `SCRIPT_POSITION` | DS-38 |
-| `IconId` | enum | every id of DS-12 | DS-12 |
+| `IconId` | enum | every id of DS-12, plus the **new** ids of DS-71 (0.2.0); `forKey(r2Key)` | DS-12, DS-71 |
+| `IconClass` | enum + `IconButtons.classOf` · `nameOf` (0.2.0) | `A`, `B`, `C` per DS-70 table rows | DS-70 |
+| `CreateCardMode` | enum (0.2.0) | `LIST`, `PICKER`; `CreateCard.buttons(mode)`, `canCreate(name)` | DS-72 |
+| `Tilt` | value + object (0.2.0) | `tx, ty: Float` in −1 … 1; `follows(viewTilt, motion)`, `offset(tilt, depth)` | DS-74 |
+| `CommandScope` | enum + pure reducer | `LIST`, `DETAIL`; `next(current, event)` with events `DETAIL_OPENED`, `DETAIL_REPLACED`, `DETAIL_CLOSED`, `PICKED(scope)`, `PANE_LOCKED(scope)`, `TOUCHED_IN(scope)` | DS-65 |
+| `CommandBarHost` | state holder (core:ui) | per pane: `declared: Boolean`, `title: String?` (masked as shown), `hasExtraRow: Boolean`, `locked: Boolean`; `layout(...)` → `barCount`, `showsSwitch`, `cells`, `barHeight` | DS-65 |
+| `OverlayGaps` | object (`Dp`) | `edgeCompact = 16, edgeInner = 24, aboveBar = 6, aboveKeyboard = 8, sheetBottom = 24, sheetBottomIme = 16, sideCompact = 12, sideInner = 24, top = 8, dialogBand = 24, toastLiftMin = 156`; pure `toastBottom`, `sheetBottomPadding`, `popoverY`, `dialogBand` | DS-66, DS-67 |
+| `NoticeKind` | enum | `INFO`, `ACTION`, `ERROR` | DS-67 |
+| `NoticeRules` | object | `durationMs(kind)`: 2 500 / 4 000 / 4 000; `dismissOn(event)` | DS-67 |
+| `Affordance` | enum + pure `of(element)` | `CONTAINER`, `CHEVRON`, `CONTROL`, `ICON_BUTTON`, `INLINE_LINK`, `DECORATION`, `NONE` | DS-68 |
+| `CaretInView` | object | `delta(lineTop, lineBottom, bandTop, bandBottom): Float`, `MARGIN_TOP = 8`, `MARGIN_BOTTOM = 16` (dp) | DS-69 |
 
 **Inputs read (owned elsewhere):** `AppSettings.theme: ThemeMode {SYSTEM, LIGHT, DARK}` and `AppSettings.textSizeStep` (LIB-65); `AppPrefs.animation`, `AppPrefs.reduceTransparency`, `AppPrefs.recorderGlow` and the resolved `GlassMode {BLUR, BLUR_COSTLY, SCRIM, OPAQUE}` / motion mode (CNV-46); the system dark-mode flag and API level.
 
@@ -1114,6 +1467,8 @@ Nothing from this area is stored in `.civilight`. Theme, text size, motion and t
 ---
 
 ## 4. Rules as test cases
+
+**(0.2.0)** Tests T-DS-46 … T-DS-53 for section K sit at the end of section K.
 
 All tests are JVM unit tests against the token objects and pure helper functions (`resolveTheme`, `contrast`, `hitArea`, `markerStyle`, `badgeStyle`, `lensChipStyle`, `speakerLabelParts`, `searchHitRuns`, `travelBarFraction`, `avatarGlyphSp`, `iconStrokeDp`, `lintString`). Contrast uses WCAG 2.x relative luminance; alpha tokens are composited over `bg` with the alpha rounding of the Units convention; ratios are compared at two decimals unless stated.
 
@@ -1186,6 +1541,43 @@ All tests are JVM unit tests against the token objects and pure helper functions
 **T-DS-34 · glass rendering by mode.** For `GlassMode.OPAQUE`: fill `raise`, blur 0, no edge mask, top bar bottom border 1 dp `line`, bottom bar top border 1 dp `line`. For `GlassMode.BLUR`: fill `glass`, blur 36 dp, saturation 1.4, top-bar mask opaque to 0.72 then fading, bottom-bar mask opaque to 0.70 then fading. (Mode selection: T-CNV-56.)
 
 **T-DS-35 · selection fill.** A selected row or block: background `sel`, left bar 2 dp `acc`; the speaker name of a selected block is `ink`. A search box uses `hl`, never `sel`.
+
+**T-DS-36 · one command bar per frame (DS-65).** `CommandBarHost.layout` on an inner window 800 dp wide:
+- 서재 alone (`LIST`, declared, title `서재`, detail = none): `barCount = 1`, `showsSwitch = false`, hint = 서재's `모든 프로젝트에서 찾기`, bar width 800, command row width `min(800 − 48, 720) = 720`.
+- 서재 | 홈 of 「잿빛 새벽의 등불」 (both declared): `barCount = 1` (never 2), `showsSwitch = true`, `cells = ["서재", "잿빛 새벽의 등불"]`, selected = `DETAIL`, hint = 홈's `명령 또는 검색 · 인물 · 용어 · 대사`.
+- 점검 센터 | Script (both declared; Script has an extra row): `barCount = 1`, `barHeight = 150`, the extra row lies inside the Script pane's column only.
+- A pane whose `locked = true` (hidden project 「검은 서약」 locked): `cells` has one entry or none, and no string of `cells` equals `검은 서약`.
+- Cover window (390): `barCount = 1`, `showsSwitch = false` in every case.
+
+**T-DS-37 · scope changes only by explicit acts (DS-65).** `CommandScope.next`: `(LIST, DETAIL_OPENED) = DETAIL`; `(LIST, PICKED(LIST)) = LIST`; `(DETAIL, PICKED(LIST)) = LIST`; `(LIST, DETAIL_REPLACED) = DETAIL`; `(DETAIL, DETAIL_CLOSED) = LIST`; `(LIST, TOUCHED_IN(DETAIL)) = LIST` and `(DETAIL, TOUCHED_IN(LIST)) = DETAIL` (touch never moves it); `(DETAIL, PANE_LOCKED(DETAIL)) = LIST`.
+
+**T-DS-38 · overlay gaps (DS-66).** With a cover window `H = 844`, gesture bar `systemBottom = 24`, keyboard hidden:
+- `sheetBottomPadding(systemBottom = 24, ime = false) = 48`; with the keyboard up (`ime = true`): `16`.
+- `floatingDialogY(compact, systemBottom = 24) = 40`; inner: `48`; keyboard up with `systemBottom = 300`: `308`.
+- `dialogBand(statusTop = 24, H = 844, systemBottom = 24) = [48, 796]`.
+- `popoverY`: anchor bottom 600, popover height 200, bar top at `844 − 154 = 690` → limit `min(844 − 24 − 16, 690 − 6) = 684`; `600 + 6 + 200 = 806 > 684` → placed above: top = anchor top − 6 − 200. Anchor bottom 300 → below at 306.
+- No overlay rectangle returned by these helpers extends below `H − systemBottom`.
+
+**T-DS-39 · toast slot (DS-67).** `toastBottom(systemBottom = 24, tallestChrome = 130) = 24 + 156 = 180`; `(24, 150) = 180`; `(24, 0)` (settings screen, no bar) `= 180`; `(24, 170) = 24 + 176 = 200`; keyboard up `(300, 130) = 456`. Moving from a screen with no bar to one with a 130 dp bar while the toast shows: its bottom stays 180. Horizontal: compact width `W − 32`; inner `W = 800` → width 560, left 120.
+
+**T-DS-40 · toast durations and dismissal (DS-67).** `durationMs(INFO) = 2500`; `durationMs(ACTION) = 4000`; `durationMs(ERROR) = 4000`; no kind returns "until dismissed". `ToastController.show("Drive 연결 준비 중", actionLabel = null)` → kind `INFO`, gone after 2 500 ms of resumed time; a press held 1 000 ms in the middle → gone after 3 500 ms. `show("블록 #043 지움 · ◆ 1개는 #044 자리로", "되돌리기") {…}` → kind `ACTION`, 4 000 ms. While shown: app lock → `current == null` in the same frame; `relockNow()` → `null`; the project it acts on released → `null`; a `pop()` of the screen that raised it → still shown.
+
+**T-DS-41 · one toast host (DS-67).** In `목록 + 상세` with a toast shown, exactly one toast node exists in the semantics tree (not one per pane), and it is above the sheet scrim (z 5 > 4).
+
+**T-DS-42 · affordance cues (DS-68).** `Affordance.of`: `ListRow(onClick != null, trailing = none)` → `CHEVRON`; `ListRow(onClick = null)` → `NONE` and no `Next` icon drawn; field-table `.row` → `NONE`; settings row `보통` → `CHEVRON` (value + 4 dp + `Next` 16 `ink3`, no ` ›` text); switch row → `CONTROL`; `CivilightButton` → `CONTAINER`; link tile `인물` → `CONTAINER` (tile height 48, radius 12, fill `tint`, trailing `Next` 16); picker row in `화자 고르기` → exempt (no chevron, current `sel`); sheet header `닫기` → `CONTAINER` (compact ghost, 36 drawn, touch 44). For any element with `Affordance == NONE`, `onClick == null`.
+
+**T-DS-43 · home 작업 grid (DS-68).** On 프로젝트 홈 with content width 342 (cover 390 − 2 × 24): 3 columns, tiles `(342 − 2 × 8) / 3 = 108.67` wide, 48 tall, 8 dp gaps; rows `스토리 · 인물 · 세계`, `연표 · 캔버스 · 갤러리`, `페이지 · 점검 센터`, `설정` (last row, label `ink2`). Content width 300 (a 1:2 list pane): 2 columns.
+
+**T-DS-44 · pressed and disabled (DS-68).** A pressed row draws an `ink` overlay at alpha 0.06 and scale 1.0; a pressed button scales to 0.94 with no overlay; `press` = 100 ms. Disabled: alpha 0.38 for label, fill and chevron; no overlay or scale when pressed. Focus ring 2 dp `acc`.
+
+**T-DS-45 · caret line in view (DS-69).** `CaretInView.delta` with `bandTop = 120`, `bandBottom = 484` (cover: top chrome ends 112, + 8; keyboard top 544, toolbar 44 → 500, − 16):
+- line 300–328 → `0`;
+- line 470–498 → `+14` (content scrolls up 14);
+- line 100–128 → `−20`;
+- line 100–600 (taller than the band) → `−20` (top aligned).
+- A field growing by one 28 dp line whose new caret line is 480–508 → `+24`, applied in the same frame (no animation): after it the line's top is at 456 on screen.
+- While a drag is in progress, the correction is not applied (`delta` is not called); the next text change applies it.
+- While a content field has focus and the keyboard is up, the bottom glass bar is not drawn (`BottomGlassBar` absent from the tree); after the keyboard closes it is drawn again.
 
 ---
 
@@ -1293,3 +1685,27 @@ The design system has no app screens of its own; it supplies the parts every scr
 **Q-DS-22 · Circles.** The user dislikes circle / ring decoration (memory 2026-11-20/21), yet avatars, the mic button, radio buttons and some glass buttons are circular on every board. They are functional, not decorative; confirm they stay round.
 
 **Q-DS-23 · Vocabulary words the newest boards still use.** The vocabulary says `고치기` not `수정` and `고르기` not `선택`, yet the boards (and sibling specs CNV, LIB, CST) carry `마지막 수정 11월 20일 · 연결 4` (page list, `scr_tools.py`), `서재 · 씬 32 · 오늘 08:12 수정` (open-from-file, `scr_new_safe.py`, 2026-11-22), `(선택)` as an "optional" marker (`주인공 (선택)`, `첫 씬 제목 (선택)`, `한 줄 소개 (선택)`, `설명 (선택)`), and `선택` / `홀로 선택` meaning "optional" in the image-slot table. These are different meanings (last edited, optional) from the banned ones (edit, select), so DS-63 allowlists them; confirm or give replacement words.
+
+**Q-DS-24 · Where the single command bar sits on the inner screen (DS-65).** Chosen: one bar across the full frame with a visible scope switch (pane titles), scope = detail when one opens, list when it closes, or the cell the user taps. Alternative: the bar sits only under the pane the user last touched (moves between panes, no switch). The scope switch also needs an accessibility label: `TODO_COPY_DS_COMMAND_SCOPE`.
+
+**Q-DS-25 · Toast durations (DS-67).** Chosen: info 2.5 s, with action (`되돌리기`) 4 s, error 4 s, lengthened only by the system accessibility timeout; LIB-40's engineering default was 6 s for all. Deleted items stay in 휴지통 for 30 days after the undo toast is gone. Confirm 4 s for undo, or keep 6 s for `ACTION` only.
+
+**Q-DS-26 · Toast slot height (DS-67).** Chosen: one window slot 156 dp above the system bottom on every screen (the tallest standard bottom bar 150 + 6), so a toast never jumps. On screens without a bar (settings) it now floats higher than today's 6 dp.
+
+**Q-DS-27 · Bottom bar hidden while typing (DS-69).** Chosen: while a field other than the command field is being typed in, the bottom glass bar is not drawn (as the script already does), to give the caret line room above the keyboard. The command bar and mic come back when the keyboard closes.
+
+**Q-DS-28 · Chevron on every tappable row (DS-68).** Chosen: every row that opens something shows `Next` 16 dp `ink3` at its end (서재, 인물, 세계, 연표, 기록함, 점검 lists, home episode rows, settings rows), and picker rows in `… 고르기` sheets are exempt. The boards draw most list rows without a chevron.
+
+**Q-DS-29 · `작업` on 프로젝트 홈 as tiles (DS-68).** Chosen: `tint` link tiles 48 tall in a 3-column grid with a chevron each. Alternative: one list row per shortcut with a chevron (9 rows, longer page).
+
+**Q-DS-30 · Create card titles (DS-72), 0.2.0.** Sourced: `새 인물`, `새 장소`, `새 용어`, `새 세력` (U-15.1). Built by the same pattern, to confirm: `새 사건`, `새 에셋`, `새 태그`, `새 관계 종류`, `새 페이지`, `새 캔버스`.
+
+**Q-DS-31 · Create card dismiss with typed text (DS-72).** Chosen: `취소` and back discard; a scrim tap does nothing while any field has content. Alternative: a discard confirm.
+
+**Q-DS-32 · Create card focus (DS-72).** Chosen: the name field has focus and the keyboard opens. Alternative: no focus until a tap (the character card starts with the image slot).
+
+**Q-DS-33 · `⋯` accessibility name where no board gives one (DS-70).** Chosen: `더 보기` `[PROPOSED]`; confirm or give the word.
+
+**Q-DS-34 · Tilt values (DS-74).** ±12° clamp, 120 ms low-pass and 8 dp depth are `[PROPOSED]`; check on a device. Tilt stops with the LIB-94 switch (`TODO_COPY_LIB_VIEW_TILT`, default on) or with reduced motion.
+
+**Q-DS-35 · Open rows of the icon list kept as text (D28).** The input row's `고치기` send slot (scope keeps text); `지문으로 보기` · `잠금 풀기` stay b (D31).

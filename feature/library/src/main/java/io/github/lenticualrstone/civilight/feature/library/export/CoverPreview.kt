@@ -2,7 +2,7 @@ package io.github.lenticualrstone.civilight.feature.library.export
 
 import android.graphics.Bitmap
 import android.os.Build
-import io.github.lenticualrstone.civilight.feature.library.shelf.CoverBitmaps
+import io.github.lenticualrstone.civilight.ui.image.CoverBitmaps
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.asset.Crop
 import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
@@ -24,12 +24,14 @@ object CoverPreview {
 
     /**
      * The project's own cover picture (`PROJECT_COVER`, 3:4 crop), or null: a hidden project, no
-     * cover, or a built-in preset (the reader draws presets itself, so no file is needed).
+     * cover, a built-in preset (the reader draws presets itself, so no file is needed), or an original
+     * whose file is not on this device ([fileExists], U-08 LIB-88 · LIB-90).
      */
-    fun source(doc: ProjectDoc): CoverSource? {
+    fun source(doc: ProjectDoc, fileExists: (String) -> Boolean = { true }): CoverSource? {
         if (doc.project.protections.hidden) return null
         val use = doc.index.imageUse(ImageOwnerKind.PROJECT, doc.key, ImageSlot.PROJECT_COVER) ?: return null
         val hash = use.blobHash ?: return null
+        if (!fileExists(hash)) return null
         return CoverSource(hash, use.cropFor(Ratio.R3X4))
     }
 }
@@ -42,7 +44,7 @@ fun interface PreviewRenderer {
 /** [PreviewRenderer] over the blob store: decode, crop, scale to [CoverPreview.WIDTH], WebP. */
 internal class AndroidCoverPreview(private val blobs: BlobStore) : PreviewRenderer {
     override fun render(doc: ProjectDoc): ByteArray? {
-        val source = CoverPreview.source(doc) ?: return null
+        val source = CoverPreview.source(doc, blobs::contains) ?: return null
         val file = blobs.fileOf(source.blobHash) ?: return null
         val bitmap = runCatching { CoverBitmaps.decode(file, source.crop, CoverPreview.WIDTH) }.getOrNull() ?: return null
         val height = (bitmap.height.toLong() * CoverPreview.WIDTH / bitmap.width.coerceAtLeast(1)).toInt().coerceAtLeast(1)

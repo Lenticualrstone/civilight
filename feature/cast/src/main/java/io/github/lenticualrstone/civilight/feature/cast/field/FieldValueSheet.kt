@@ -132,9 +132,9 @@ fun SheetScope.FieldValueSheetContent(sheet: FieldValueEditSheet) {
 
 /** The undo label of a save: the pressed button's label (UI copy). */
 internal fun SaveChoice.label(mode: EditMode): String = when (this) {
-    SaveChoice.PLAIN -> CastUiCopy.BTN_CORRECT
-    SaveChoice.CORRECT -> (mode as? EditMode.TwoButtons)?.sheet?.correctLabel ?: CastUiCopy.BTN_CORRECT
-    SaveChoice.FROM_HERE -> (mode as? EditMode.TwoButtons)?.sheet?.changeLabel ?: CastUiCopy.BTN_CORRECT
+    SaveChoice.PLAIN -> CastUiCopy.BTN_SAVE
+    SaveChoice.CORRECT -> (mode as? EditMode.TwoButtons)?.sheet?.correctLabel ?: CastUiCopy.BTN_LENS_CORRECT
+    SaveChoice.FROM_HERE -> (mode as? EditMode.TwoButtons)?.sheet?.changeLabel ?: CastUiCopy.BTN_LENS_CORRECT
 }
 
 /** `표시 이름` value sheet (CST-11) of a character; feature-local (the shared key names a field). */

@@ -4,7 +4,10 @@ import io.github.lenticualrstone.civilight.domain.library.newproject.NewProjectD
 import io.github.lenticualrstone.civilight.domain.library.newproject.NewProjectFlow
 import io.github.lenticualrstone.civilight.domain.library.rating.NewProjectProtections
 import io.github.lenticualrstone.civilight.domain.library.rating.R18DefaultsBlock
+import io.github.lenticualrstone.civilight.domain.cast.field.FieldBundles
+import io.github.lenticualrstone.civilight.domain.cast.field.FieldTemplates
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
 import io.github.lenticualrstone.civilight.model.app.RatingDefaults
 import io.github.lenticualrstone.civilight.model.project.FieldBundle
 import io.github.lenticualrstone.civilight.model.project.ProjectFormat
@@ -37,6 +40,8 @@ data class NewProjectForm(
     val bundle: FieldBundle = FieldBundle.BASIC,
     /** The project whose field set `다른 프로젝트에서` copies. */
     val bundleSourceKey: Key? = null,
+    /** The 인물 템플릿 picked at step 4 when [bundle] is `TEMPLATE` (CST-61); the key only, never its name. */
+    val bundleTemplateKey: Key? = null,
     /** Step-4 switch as left by the author; null = untouched (follows the rating's default). */
     val step4Hide: Boolean? = null,
     /** True once the author changed the step-2 structure by hand; until then it follows the 형식 ([NewProjectRules.withFormat]). */
@@ -141,6 +146,19 @@ object NewProjectRules {
     fun preview(form: NewProjectForm): List<Pair<Int, String>> {
         val levels = levels(form)
         return if (NewProjectFlow.levelsValid(levels)) NewProjectFlow.previewTree(levels) else emptyList()
+    }
+
+    /**
+     * The step-4 `인물 항목` row (CST-61, TC-F-39, TC-F-42): a built-in bundle's row, or for a template
+     * `인물 항목 | 인물 10 · 장소 1 | 내 기본 ›`; a hidden template while the group is locked reads
+     * `인물 항목 | 숨긴 템플릿 ›` with no counts; a template that is gone reads as `기본`.
+     */
+    fun bundleRow(form: NewProjectForm, templates: List<FieldTemplate>, hiddenUnlocked: Boolean): Triple<String, String, String> {
+        if (form.bundle != FieldBundle.TEMPLATE) return FieldBundles.newProjectRow(form.bundle)
+        val t = templates.firstOrNull { it.key == form.bundleTemplateKey && it.deletedAt == null }
+            ?: return FieldBundles.newProjectRow(FieldBundles.DEFAULT)
+        if (t.hidden && !hiddenUnlocked) return Triple(FieldBundles.ROW_TITLE, "", "${FieldTemplates.HIDDEN_NAME} ›")
+        return Triple(FieldBundles.ROW_TITLE, FieldTemplates.kindCounts(t), "${t.name} ›")
     }
 
     /** The domain draft for `만들기`; record links are made by the recorder path, so none here. */

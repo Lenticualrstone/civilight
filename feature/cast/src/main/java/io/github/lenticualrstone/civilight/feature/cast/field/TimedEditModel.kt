@@ -30,7 +30,7 @@ import kotlinx.serialization.builtins.serializer
 
 /** How a value sheet saves (CST-09, CST-10). */
 sealed interface EditMode {
-    /** No history at `최신` ([LensEdit] `Plain`): one primary `이 값 고치기` that writes the base value. */
+    /** No history at `최신` ([LensEdit] `Plain`): one primary `저장` (U-10) that writes the base value. */
     data object Plain : EditMode
 
     /** The two stacked buttons of `RTEditTwo` / `LensEdit`, with their copy from `TimedValues.editSheet`. */

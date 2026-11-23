@@ -15,7 +15,17 @@ Implementation spec for the world area of Civilight. Engineers implement from th
 - Markers: `◆` change (`acc`), `◇` first reveal / soft notice (`ink3`), `▲` warning (`warn`, amber; tapping a `▲` opens the check center). Dotted underline / dotted outline = attached to something deleted (rules 12, 20).
 - Points in story order use the episode form `1-7`, scene form `1-7 씬 3`, block form `#044`; chapters `2장`. "Lens" = 시점 렌즈. "집필 선" = end of the furthest scene that has content (rule 11-1).
 - Words: `씬` (never 장면 in UI), `지우기` (to trash) vs `삭제` (permanent), `되살리기`, `고르기`, `바꾸기`, `고치기`, `건너뛰기`, `넣기` (apply), `제안 받기`. A scene's location is `장소` (a pin's place) or `지역` (a map region, called `영역` inside the map editor). Ordinary phrases `쓰인 곳`, `이곳의 시간` stay.
-- Sample project: 「잿빛 새벽의 등불」 (R-15). People 리엔 (출생 1183, 등불 결사), 하르트 (표시 이름 ??? until 1-9, 나이 알 수 없음), 세라 (기록관), 오웬 (밀수상), 노아, 마르타. Terms 오리지늄 등불 (별칭 오리지늄 · 빛돌, 첫 공개 1-7 씬 3 #044), 대정전 (첫 공개 1-4), 등불 결사 (첫 공개 1-1), 잿불의 서약 (공개 예정 2-5), 상층 송전망 (공개 예정 2장). Places 하층 거리 · 결사의 문 · 잿더미 시장 · 상층 관문 · 송전탑 폐허 · 하층 구역 (sub-map). Factions 등불 결사 · 상층 경비대. World events 대정전 (1195), 상층 송전망 사고 (1201). Story starts 1200; 집필 선 = 1-7 씬 3.
+- **0.2.0 (frozen scope `docs/status/0.2.0-scope.md`, 2026-11-24).** Sections that change for app version 0.2.0 carry `(0.2.0)` in their heading or on the changed line. Existing IDs keep their numbers. New features are WLD-70 … WLD-76, placed at the end of their section, and new tests are WLD-T73 onward. Old behaviour that 0.2.0 replaces stays readable, marked `Superseded (0.2.0):`; hidden features keep their text because their data and domain code stay (hiding is never deleting, scope §8).
+  - What changes:
+    - create in place, U-15: WLD-70 (places, terms, factions, place picker) and WLD-74 (연표 events);
+    - lens chip default `최신`, S-1: WLD-71;
+    - automatic first reveal, S-5: WLD-72;
+    - candidate setting, list, underline and the `참고` row, S-5: WLD-73;
+    - simplified map and the travel check off by default, S-3 and S-2: WLD-75;
+    - what the `게임 제작 도구` switch hides, G-2: WLD-76.
+  - U-16 does not touch this area: the world lists keep their `목록 | 카드` view (WLD-05, D2).
+  - Copy that no source gives is a `TODO_COPY_WORLD_<NAME>` constant, listed in WLD-76's copy table. It is never invented here.
+- Sample project: 「잿빛 새벽의 등불」 (R-15; stored, not shown from 0.2.0, S-4). People 리엔 (출생 1183, 등불 결사), 하르트 (표시 이름 ??? until 1-9, 나이 알 수 없음), 세라 (기록관), 오웬 (밀수상), 노아, 마르타. Terms 오리지늄 등불 (별칭 오리지늄 · 빛돌, 첫 공개 1-7 씬 3 #044), 대정전 (첫 공개 1-4), 등불 결사 (첫 공개 1-1), 잿불의 서약 (공개 예정 2-5), 상층 송전망 (공개 예정 2장). Places 하층 거리 · 결사의 문 · 잿더미 시장 · 상층 관문 · 송전탑 폐허 · 하층 구역 (sub-map). Factions 등불 결사 · 상층 경비대. World events 대정전 (1195), 상층 송전망 사고 (1201). Story starts 1200; 집필 선 = 1-7 씬 3.
 
 ---
 
@@ -64,19 +74,20 @@ Each feature: priority (P0 core · P1 planned for v1 · P2 later), `needsExterna
 
 ### A. 세계 모듈 · 목록
 
-#### WLD-01 · 세계 화면 틀 — P0 · needsExternal: no
+#### WLD-01 · 세계 화면 틀 — P0 · needsExternal: no (0.2.0)
 
 - Entry: project home shortcut `세계` (home row `스토리 · 인물 · 세계 · 연표 · 캔버스 · 설정`), the command bar, links from cards. The timeline is a separate module entered from `연표` (WLD-31).
 - Header (glass bar): small line `잿빛 새벽의 등불` (project name), title `세계`, right: lens chip (e.g. `최신 · 1-7`; `acc` outline when not 최신) and `+` button. `+` opens the create sheet for the current tab (WLD-11; on `지도` it opens `새 지도`, WLD-36).
+  - **Superseded (0.2.0):** the `+` button is removed. Each tab's list starts with its create row: `＋ 새 장소 · ＋ 새 용어 · ＋ 새 세력` (WLD-70), and on `지도`, `＋ 새 지도` (WLD-75). The lens chip is the small chip of WLD-71, and the project opens at `최신`.
 - Segmented tabs under the header: `장소 · 용어 · 세력 · 지도`. The chosen tab is remembered per project `[PROPOSED]`.
 - Hint line under tabs on the `용어` tab: `공개 시점 전 사용 → 점검 센터`. Tapping it opens the check center filtered to `용어 공개` `[PROPOSED]`.
-- Command bar at the bottom with placeholder `장소 · 용어 · 세력 찾기` (search area owns results). On a node map the placeholder is `장소 · 노드 찾기`.
+- Command bar at the bottom with placeholder `장소 · 용어 · 세력 찾기` (search area owns results). On a node map the placeholder is `장소 · 노드 찾기`. **(0.2.0)** At most one command bar per frame (U-01, DS-65), with no mic (S-8).
 - Lens: list sections and card values follow the lens (rule 11-4: lens chip only on screens whose content changes with it; the world screens are on that list).
 - Inner layouts (list modules rule): A `목록 + 상세` (default; list pane 390 | detail pane 409; the selected item opens on the right, e.g. term list | term card) and B `가운데 한 칸` (single 560 reading column). Chosen in `설정 › 화면 › 펼친 화면 배치` (owned by settings). On unfold the selected item opens in the right pane; on fold the last-touched pane stays on the cover.
 - `ViewToggle` `목록 | 카드` in the header right for the place, term and faction lists (WLD-05).
 - Sources: planning 세계 · 연표 · 지도, 프로젝트 홈; rule 11 §3; boards `World`, `TwoWorld`, `ColWorld`, `TourWorld`, `Home`; DS `ViewToggle`, `LensChip`.
 
-#### WLD-02 · 용어 목록 — P0 · needsExternal: no
+#### WLD-02 · 용어 목록 — P0 · needsExternal: no (0.2.0)
 
 - Two sections, in this order:
   1. `공개됨 · <lens label>` (e.g. `공개됨 · 최신 · 1-7`): terms whose `첫 공개` position is at or before the lens point (at 최신: at or before the 집필 선).
@@ -89,36 +100,89 @@ Each feature: priority (P0 core · P1 planned for v1 · P2 later), `needsExterna
 - Hidden terms while locked: one `LockRow` `숨긴 용어 N` with `지문으로 보기` (WLD-13).
 - Tap row → term card (WLD-08); inner layout A shows it in the right pane.
 - Empty state (no terms) `[PROPOSED]`: section headers hidden; one line `용어 없음` and primary button `용어 만들기` (opens WLD-11). Copy follows the empty-state pattern of `EmptyCast`.
+- **(0.2.0)**
+  - The first row is `＋ 새 용어` (WLD-70), present with 0 terms and with many. **Superseded:** the empty-state button `용어 만들기` (the empty line `용어 없음` stays under the create row).
+  - `첫 공개` means the **effective** reveal of WLD-72: the hand-set record, else the first `@` link in manuscript order. A term with no hand-set record and no manuscript link is `첫 공개 없음` in `아직 공개 전` (Q-08 default kept).
+  - ` · ◇ 후보 N` is appended only while the project's `용어 후보` setting is on (WLD-73).
+  - The candidate list of S-5 is the last section of this tab (WLD-73).
 - Sample (lens 최신 · 1-7): 공개됨 → 오리지늄 등불 (`첫 공개 1-7 · ◇ 후보 1`, `▲ 앞에서 1회 사용`), 대정전 (`첫 공개 1-4`), 등불 결사 (`첫 공개 1-1`); 아직 공개 전 → 잿불의 서약 (`공개 예정 2-5`), 상층 송전망 (`공개 예정 2장`).
 - Sources: planning 용어 공개 시점; rule 21 §2, §8; rule 11 §1; boards `World`, `TwoWorld`, `ColWorld`, `TourWorld`.
 
-#### WLD-03 · 장소 목록 — P0 · needsExternal: no
+#### WLD-03 · 장소 목록 — P0 · needsExternal: no (0.2.0)
 
 - Not drawn. `[PROPOSED]` minimal list by analogy with the term list: rows title = place name, fragment = first line of description, right = `등장 1-2 · 1-7 외 4` (same derived value as the place card), grouped by `지역` (parent place, WLD-09) with an ungrouped section first. Hidden places while locked collapse into `숨긴 장소 N` (WLD-13).
 - Tap row → place card (WLD-09). Long lists must work with 100+ entries (virtualized list).
+- **(0.2.0)** The first row is `＋ 새 장소` (WLD-70).
 - Sources: planning 세계 모듈 (장소 카드); rule 19 §6 (place hiding); boards `World` (tab exists); Q-09.
 
-#### WLD-04 · 세력 목록 — P0 · needsExternal: no
+#### WLD-04 · 세력 목록 — P0 · needsExternal: no (0.2.0)
 
 - Not drawn. `[PROPOSED]` rows: title = faction name, fragment = first line of description, right = number of characters whose `연결` field points to the faction (e.g. `인물 4`).
 - Hidden factions while locked collapse into `숨긴 세력 N` (WLD-13).
+- **(0.2.0)** The first row is `＋ 새 세력` (WLD-70).
 - Sources: planning 세계 모듈; 인물 항목 §2 (`연결` · 상대 카드에 ‘이 항목으로 잇는 인물’); rule 19; Q-09.
 
-#### WLD-05 · 목록 | 카드 보기 — P1 · needsExternal: no
+#### WLD-05 · 목록 | 카드 보기 — P1 · needsExternal: no (0.2.0: unchanged by U-16)
 
 - Header `ViewToggle` `목록 | 카드` on place, term and faction lists; the chosen view is remembered per screen.
 - Card view: horizontal rows of cards with the item image in its fixed 16:9 crop (preset image or initial-letter card when none), name and the right-column label of the list row. One row per list section (용어: `공개됨` row and `아직 공개 전` row) `[PROPOSED]`.
 - Motion: thumbnails grow into cards in place (decelerate 360 ms), list text exits first (accelerate 160 ms); carousel snaps to the nearest card (320 ms) with 8 % image parallax and a haptic tick; reduce motion → 120 ms fade, no parallax.
+- **(0.2.0)** Unchanged. U-16's 3D card views are for the character list only (D2, CST-67). The board `scr_u16_cards_b.py` draws 타로 펼침 with world cards, but 0.2.0 does not build it here. In card view the `＋ 새 <kind>` row of WLD-70 stays above the card rows.
 - Sources: planning 카드 보기 · 이미지; DS `ViewToggle`, `ImageTile`; boards `MCardView`, `MCarousel`, `ImageSlots`.
+
+#### WLD-70 · 그 자리에서 만들기 · 장소 · 용어 · 세력 (create in place) — P0 (0.2.0, U-15)
+Replaces WLD-11's `+` sheet. The overlay is DS-72's shared create card (D17): shape, focus, keyboard, buttons, highlight, dismiss and motion are defined there. This feature gives the world field sets and rows. `＋` before a label stands for the icon `plus`; the visible text is the label (CST conventions, DS-72).
+- **List rows (U-15.1).** The first row of each tab's list, under the tabs and the `용어` hint line and above the first section and any `LockRow`, is icon `plus` + `새 장소` / `새 용어` / `새 세력` (ICON class b; accessibility name the same text). It is present with 0 items and with many.
+- **Card title** is the row text (`새 장소` …). The screen stays on the list (U-15.2).
+- **Field sets (U-15.7).** Only `이름` is required (trimmed, NFC).
+
+| Kind | Fields, in order | Stored as |
+| --- | --- | --- |
+| 장소 | `이미지 · 이름 · 상위 지역 · 한 줄 설명` | `image` (16:9 slot, WLD-07) · `name` · `parentPlaceKey` (a live place picked from the place list picker; the field's own picker has no create row, so no nested card) · `description` (one line) |
+| 용어 | `이름 · 다른 이름 · 한 줄 설명` | `name` · `aliases` (`다른 이름` is the card's word for `별칭`. It is one optional alias, validated as in WLD-16, and the text is never split. More aliases are added on the card with WLD-16's list editor) · `description` |
+| 세력 | `이미지 · 이름 · 한 줄 설명` | `image` · `name` · `description` |
+
+- **Buttons (U-15.6):** `취소 · 만들고 열기 · 만들기`, disabled while `이름` is blank.
+  - `만들기` closes the card, stays on the list and briefly highlights the new row (through `CivilightMotion`). The list scrolls only if the row is out of view.
+  - `만들고 열기` opens the new card (cover: full screen; inner layout A: right pane).
+  - `취소` and back write nothing. A tap on the dimmed back closes the card only while every field is empty (DS-72).
+- **Write.** One edit, one undo step, through `domain:world` `WorldItems.createTerm` / `createPlace` / `createFaction`. They gain the additive arguments `image`, `aliases` (terms) and `parentPlaceKey` (places already have it).
+  - A new term or alias triggers the WLD-26 rescan of that term, if `용어 후보` is on.
+  - Same-name items are allowed (WLD-11 rule kept).
+- **Pickers (U-15.3).** Every sheet that picks one of these kinds has the same top row:
+  - the place picker of WLD-52 (scene `장소와 때`, bulk `장소 정하기`, event place). Its row `새 장소 · 지도에 핀을 꽂으며 만들기` is **superseded** by `＋ 새 장소`; a pin for the new place is placed later with the map `핀` tool;
+  - the `@` link picker (terms, places, factions; script area);
+  - the term card's `관련` picker;
+  - the `연결` field picker for 세력 · 장소 · 용어 (cast field engine).
+  - The row label is `새 장소`. When the query matches nothing it is `‘<query>’ 새 장소` (likewise `새 용어`, `새 세력`; quote style DS-72), and the query fills `이름`.
+  - In a picker the card shows `취소 · 만들기`, and the created item is returned as the pick.
+  - The `@` picker, which mixes kinds, shows one create row, for the kind in view (SCR-55, the owner).
+  - The merge target picker (WLD-15) has no create row.
+- **Read-only (U-15.10).** Every create row and the empty-state button are hidden in a read-only project (the example). A hidden project, once unlocked, shows them.
+- Other creation paths of WLD-11 are unchanged: the map `핀` tool's `새 장소`, and the recorder (creates nothing). Hex `장소 만들기` and stamp `장소 연결` are unreachable in 0.2.0 (WLD-75).
+- Sources: `u15-create-in-place.md` rows 1–3, 6–8, 10 (planning); scope U-15.1 … U-15.3, U-15.6 … U-15.8, U-15.10, D17; `icon-buttons.md` row 60 (planning).
+
+#### WLD-71 · 시점 렌즈 칩 · 세계 머리 (lens chip on world heads) — P0 (0.2.0, S-1)
+- The small lens chip (CST-70) is shown only on these world heads:
+  - the `세계` list head (all four tabs);
+  - the term, place and faction card heads, including the place card's `이곳의 시간` tab.
+- A project opens at `최신` (D9). A point picked here is the same lens state as on the cast heads and lasts until the project is closed.
+- **Superseded (0.2.0)**, with the chip removed from these heads (each reads at `최신`):
+  - 연표 (WLD-31), 연표 + 지도 (WLD-64);
+  - map view and map edit (WLD-37, WLD-40);
+  - node map (WLD-50), detailed terrain edit (WLD-60), 인물 동선 (WLD-62).
+  - The `시점별 공개` view (WLD-49) keeps its own point scrubber; it is a view of reveal points, not the lens.
+- WLD-12 is otherwise unchanged: cards and lists read their values at the head's lens.
+- Sources: decisions row `단순화 · 시점 렌즈` (planning); scope S-1, D9.
 
 ### B. 카드
 
-#### WLD-06 · 카드 공통 · 고정 칸과 프로젝트 항목 — P0 · needsExternal: no
+#### WLD-06 · 카드 공통 · 고정 칸과 프로젝트 항목 — P0 · needsExternal: no (0.2.0)
 
 - Places, terms and factions use the same project-field mechanism as characters (인물 항목 rule 5, confirmed): `프로젝트 설정 › 인물 항목` has tabs `인물 · 장소 · 용어 · 세력`; each tab lists `고정 항목` (greyed, not deletable) and `프로젝트 항목 · N` with drag handles (`끌어서 순서`), `+ 항목` sheet (`항목 넣기`: 이름 → 종류 nine radios `짧은 글 · 긴 글 · 숫자 · 고르기 · 여러 개 고르기 · 날짜 · 기념일 · 연결 · 계산` → per-type options → `보이는 곳 · 머리 · 목록 · 필터` → `비밀 항목` toggle → `넣기`). The field engine (types, conversion rules, `알 수 없음(??)`, `빈 항목 N · 보기`, rename keeps values, `+ 항목` on a card with `모든 … 에 / 이 … 만`) is owned by the cast area and reused unchanged.
 - Fixed fields per type (from the sources; anything else is a project field):
   - 용어: 이름 · 설명 · 참고 이미지 · 별칭 · 첫 공개 · 관련 · 글자 찾기 (on/off). `쓰인 곳` is derived.
-  - 장소: 이름 · 설명 · 이미지 · 지역 (parent place). `등장`, `배경 에셋`, `이곳의 시간` are derived.
+  - 장소: 이름 · 설명 · 이미지 · 지역 (parent place). `등장`, `배경 에셋`, `이곳의 시간` are derived. **(0.2.0)** `배경 에셋` is shown only with `게임 제작 도구` on (WLD-76). The create card (WLD-70) calls 지역 `상위 지역` and the term's 별칭 `다른 이름`, as U-15 decision 7 words them; they are the same fields.
   - 세력: 이름 · 설명 · 이미지 `[PROPOSED]` (no source lists faction fixed fields; Q-10).
 - Examples of project fields the sources give: 장소 `기후 · 인구`, `상태` (with ◆, e.g. 하층 구역 · 상태 `빛 있음 → 대정전 이후`); 세력 `수장 · 규모`.
 - Every non-derived field may carry `◆` history (rule 11-2 two buttons `이 값 고치기 · 여기서부터 바뀜`; past-lens edit banner), engine owned by cast/lens areas.
@@ -131,7 +195,7 @@ Each feature: priority (P0 core · P1 planned for v1 · P2 later), `needsExterna
 - Engine owned by the image area; this area only hosts the slot.
 - Sources: planning 카드 보기 · 이미지 (table row `장소 · 용어 · 세력 · 16:9 · 선택`); boards `ImageSlots`, `ImagePick`, `ImageCrop`, `SettingsMore`.
 
-#### WLD-08 · 용어 카드 — P0 · needsExternal: no
+#### WLD-08 · 용어 카드 — P0 · needsExternal: no (0.2.0)
 
 - Header: small `세계 · 용어`, title = term name, lens chip. Command bar placeholder `명령 또는 검색`.
 - Body, top to bottom:
@@ -141,12 +205,16 @@ Each feature: priority (P0 core · P1 planned for v1 · P2 later), `needsExterna
   4. `쓰인 곳` section (WLD-19): header `쓰인 곳 · 2 · 후보 1` (the `· 후보 N` part only when N ≥ 1); groups `쓰인 곳 · N`, `후보 · N · 확인 안 함` with right action `모두 잇기 · 모두 아님`, `원고 밖 · 메모 · N`. Each row: location (mono small, e.g. `1-4 씬 2`) + the whole sentence in Myeongjo with the linked or matched span boxed inline (`SearchHit`, never split onto its own line). Marker lines under a row: `▲ 공개(1-7) 전 사용` (warn), `◇ 첫 공개`, `◇ 후보 · 끊김 · 잇기 · 아님`, tag `선택지`, tag `게임 텍스트`, location label for out-of-manuscript rows (`인물 · 세라`, `페이지 · 하층 구역의 빛`).
 - Tap a row → opens the manuscript at that block (or the page/card) `[PROPOSED]` (same as the check center's `원고로 가기`).
 - Special states: 1-syllable name and aliases → under the header `1음절 · 글자 찾기 안 함` (only links counted); `글자 찾기` off → `글자 찾기 꺼짐 · 켜기`; more than 10 `아님` → chip `글자 찾기 끄기` (WLD-25); no reveal → `첫 공개 없음 · 쓰인 곳 3` plus chip `1-2 씬 1을 첫 공개로` (WLD-18).
+- **(0.2.0)**
+  - The `첫 공개` row shows the effective reveal (WLD-72). **Superseded:** the `첫 공개 없음 · 쓰인 곳 3` state and its chip `… 첫 공개로`. With automatic reveal, a term that has manuscript links always has a reveal.
+  - The `· 후보 N` part of the header, the `후보` group, the `글자 찾기` states and chip, and `⋯ › 아님으로 둔 것` are shown only while the project's `용어 후보` setting is on (WLD-73).
+  - Rows tagged `게임 텍스트` are shown and counted only with `게임 제작 도구` on (WLD-76).
 - Lens: when the lens is in the past (e.g. 1-5), rows located after the lens point are dimmed; numbers do not change (rule 21 §5).
 - `⋯` menu: `아님으로 둔 것` (list of rejections with `되돌리기` each), `지우기`, `합치기` (rule 20 §7), `숨기기` (WLD-13) `[PROPOSED order]`.
 - Edit: tapping a field row edits it (fixed fields inline; project fields through the field engine).
 - Sources: planning 용어 공개 시점 (카드 항목: 설명, 참고 이미지, 관련 항목, 쓰인 곳); rule 21 §2, §3, §5, §6, §8; rule 20 §7 (⋯ › 지우기 · 합치기); boards `Term` (2026-11-22), `TwoWorld`, `RTLinkAll`; Q-01 (groups vs single list).
 
-#### WLD-09 · 장소 카드 — P0 · needsExternal: no
+#### WLD-09 · 장소 카드 — P0 · needsExternal: no (0.2.0)
 
 - Two shapes of the same element (fold rule: `장소 시트 ↔ 장소 카드`, same element changes shape, keeps tab and scroll):
   - Summary on the map: cover = bottom sheet with eyebrow `장소 · 하층 구역`, name + `닫기`, description, rows `등장 | 1-2 · 1-7 외 4`, `배경 에셋 | 2`, buttons `핀 옮기기 · 장소 카드 열기`. Inner = side card (270 wide, top right over the map) with eyebrow `장소`, name, description, rows `등장`, `지역 | 하층 구역`, `배경 에셋 | 2`, buttons `장소 카드 · 핀 옮기기`.
@@ -157,6 +225,7 @@ Each feature: priority (P0 core · P1 planned for v1 · P2 later), `needsExterna
 - Derived rows: `등장` = episodes whose scenes use this place (or a region that is this place's region `[PROPOSED]`), shown as first two episodes + `외 N` (e.g. `1-2 · 1-7 외 4`); `배경 에셋` = count of background assets linked to the place (asset → place link owned by the script asset list).
 - `지역` (parent place): authored; prefilled from map nesting when the place is created by a pin on a sub-map whose parent pin belongs to place P `[PROPOSED]`. Label conflict `소속` vs `지역` → Q-03.
 - `핀 옮기기`: WLD-41.
+- **(0.2.0)** The `배경 에셋` row (sheet, side card, card) is shown only with `게임 제작 도구` on (WLD-76). The card's `지도` tab lists every map holding a pin of the place, including 0.1.0 node, generated and sketch maps, which open for viewing (WLD-75). `핀 옮기기` is offered only on image maps.
 - Sources: planning 지도 (핀 → 장소 카드 설명 · 등장 에피소드 · 소속 · 배경 에셋), 접기 · 펼치기; boards `Map`, `MapC`, `MapSoft`, `MapSoftC`, `PlaceTime`, `MFoldMap`.
 
 #### WLD-10 · 세력 카드 — P0 · needsExternal: no
@@ -168,9 +237,10 @@ Each feature: priority (P0 core · P1 planned for v1 · P2 later), `needsExterna
 - Faction-to-faction relationships: WLD-69 (P2).
 - Sources: planning 세계 모듈 (세력 카드); 인물 항목 §2, decision 5; rule 13 memory (faction relations later); boards `MapEdit` (`연결 | 세력 · 상층 경비대`), `MapPoly` (`연결 세력`), `TimelineMap`; Q-10.
 
-#### WLD-11 · 항목 만들기 · 이름 바꾸기 — P0 · needsExternal: no
+#### WLD-11 · 항목 만들기 · 이름 바꾸기 — P0 · needsExternal: no (0.2.0: `+` sheet superseded by WLD-70)
 
 - `+` in the world header opens a sheet for the current tab `[PROPOSED]`: `이름` input (required, NFC-normalised, trimmed), `설명` (optional), primary button `만들기`; the new card opens.
+  - **Superseded (0.2.0):** this sheet is replaced by the create rows and card of WLD-70.
 - Other creation paths from the sources:
   - Map `핀` tool → tap the map → pick an existing place or create a new one by name (WLD-41).
   - Hex cell `장소 만들기` (WLD-58); stamp `장소 연결` (WLD-60) may create a place.
@@ -180,11 +250,12 @@ Each feature: priority (P0 core · P1 planned for v1 · P2 later), `needsExterna
 - Renaming a term or alias triggers a candidate rescan of that term (WLD-26). Renaming never rewrites manuscript text: link runs keep their written text (rule 21 §2).
 - Sources: rule 20 §6 (`같은 이름 2`), rule 21 §2–§3, §7; boards `MapHex` (`장소 만들기`), `BulkPlace` (`새 장소`), `MapDetail` (`장소 연결`).
 
-#### WLD-12 · 시점 렌즈와 세계 값의 변화 — P0 · needsExternal: no
+#### WLD-12 · 시점 렌즈와 세계 값의 변화 — P0 · needsExternal: no (0.2.0)
 
 - All world cards, lists, maps and the timeline read values at the lens point (rule 11: 최신 = up to 집필 선; past lens = state after that unit ends).
 - Values with `◆` history show `◆` on the row; editing at 최신 or a past lens offers `이 값 고치기 · 여기서부터 바뀜` (engine owned by lens/cast).
 - What follows the lens in this area: term reveal sections (WLD-02), dimmed usage rows (WLD-08), map item visibility (WLD-49), region shapes (WLD-65), place-time rows (WLD-63), track position (WLD-62), timeline rows (WLD-31).
+- **(0.2.0, S-1)** Only screens with the chip follow a picked point (WLD-71): the world lists and cards, including `이곳의 시간`. Map view, 연표 and 연표 + 지도 read at `최신`. Track position is unreachable (WLD-75).
 - Sources: rule 11 §1–§4; planning 공통 개념 (시점 렌즈); boards `Lens`, `RTEditTwo`, `RTPlanned`.
 
 #### WLD-13 · 숨기기 (용어 · 장소 · 세력) — P1 · needsExternal: no
@@ -251,19 +322,25 @@ Rule 21 in one paragraph: only `@` links are usage (fact). Text matches are `후
 - Unlinking (removing the link, text stays) deletes any `맞음` on that link.
 - Sources: rule 21 §2, §4, §6; file format §4 (`@리엔은 연결 조각(키)`); planning 공통 개념 (@ 링크).
 
-#### WLD-18 · 첫 공개 기록 — P0 · needsExternal: no
+#### WLD-18 · 첫 공개 기록 — P0 · needsExternal: no (0.2.0: now the hand-set reveal; see WLD-72)
 
+- **(0.2.0)** Everything below now describes the **hand-set** reveal: a stored `◇ 첫 공개` record, from 0.1.0 or set in 0.2.0 with `공개 시점 옮기기`. When a term has no stored record, its reveal is the automatic one of WLD-72, which is derived and never stored.
+  - **Superseded:** "the app never infers it from the earliest link" and the suggestion chip `<first link location>을 첫 공개로`.
+  - A stored record always wins over the automatic one (D12).
 - One `◇ 첫 공개` record per term at most. It is an author record; the app never infers it from the earliest link.
 - Anchor kinds (rule 12 §1 `자리`):
   - `BLOCK(blockKey)` — "from this block, inclusive". Displayed `1-7 씬 3 · #044`. Created from a manuscript block (SCR's block panel) or from the term card.
   - `POINT(unitKey)` — "from the start of that chapter / episode / scene". Used for `공개 예정 2-5`, `공개 예정 2장`. The manuscript panel shows a line above the unit's first block `◇ 2-5부터 · 근거 블록 없음` with `블록에 잇기` `[PROPOSED, by analogy with rule 12's ◆ 1-5부터 · 근거 블록 없음]`.
 - Not allowed on a choice option line (`#045-1`): the option is disabled with the reason `선택지 보기 줄에는 첫 공개를 걸 수 없음` `[PROPOSED copy]`. Whether the whole choice block may carry it → Q-06.
 - Setting / moving from the term card: tap the `첫 공개` row → sheet `공개 시점 옮기기` `[PROPOSED title, reusing the check-center button]` listing (a) the term's manuscript links in order (`1-2 씬 1 · 리엔 · “…”`), (b) `원고에서 고르기` (opens the script in block-pick mode), (c) `에피소드 · 장으로` (point picker). Choosing applies immediately with undo toast.
+  - **(0.2.0)** While a stored record exists, the sheet has one more row, `TODO_COPY_WORLD_REVEAL_AUTO`. It deletes the stored record (undo toast), and the term returns to the automatic reveal (WLD-72).
+  - Choosing (a), (b) or (c) on a term that had no stored record writes one: from then on the term is hand-set.
+  - The sheet header shows the automatic location when there is no stored record, e.g. `첫 공개 | 1-4 씬 2 · #012` followed by `TODO_COPY_WORLD_REVEAL_AUTO_MARK` (the mark that says the value is automatic).
 - Suggestion when there is none: chip `<first link location>을 첫 공개로` (e.g. `1-2 씬 1을 첫 공개로`), placed on the card and in the check center row; nothing changes until tapped.
 - Lifecycle (engine owned by SCR / rule 12): deleting the anchor block moves the record to the next surviving block (same scene → next scene → next episode → `예정`) with dotted `◇` `근거 지워짐` and actions `다른 블록에 잇기 · 이대로 두기 · 기록 지우기`; restoring the block re-attaches. Moving the block moves the record; the toast adds the `▲` delta: `◇ 첫 공개 <old> → <new> · ▲ 새로 N` (N recomputed under links-only). Scene split keeps the record on its block (`첫 공개 | 오리지늄 등불 · 씬 3 #044 그대로`). Deleting the term trashes the record with it (WLD-14).
 - Sources: rule 21 §5; rule 12 §1–§3 (◇ 용어 첫 공개 · 저장 · 같이 옮겨짐); rule 22 split sheet; boards `RSOrphan`, `RSSplit`, `Check`, `CSheetTime`.
 
-#### WLD-19 · 쓰인 곳 판정 · 세 무리 — P0 · needsExternal: no
+#### WLD-19 · 쓰인 곳 판정 · 세 무리 — P0 · needsExternal: no (0.2.0)
 
 - Usage of term T = every link run targeting T that is not inside a trashed block / trashed scene. Grouped:
 
@@ -280,14 +357,22 @@ Rule 21 in one paragraph: only `@` links are usage (fact). Text matches are `후
 | Block in trash | no | no | no | none (returns when restored) |
 | Direct `전환 문구` (rule 22) | yes | yes `[PROPOSED]` | yes if it holds a link | `쓰인 곳` `[PROPOSED]`; Q-05 |
 
+- **(0.2.0)**
+  - "Game output" in this table is a property of the text kind, not of the `게임 제작 도구` switch. Dialogue, narration, system text and choice lines yield usage, `▲` and candidates whether the switch is on or off.
+  - Only the row "Character profile game text" depends on the switch: while it is off, those links are not listed under `원고 밖` and not counted (WLD-76, CST-74).
+  - Direction blocks are plain text with the switch off (U-14.11); they stay `원고 밖 · 메모`.
 - Counts: `쓰인 곳 · N` = links in game-output manuscript text = the term's usage count. `후보 · N · 확인 안 함` = current candidates of T (WLD-21) after `아님` filtering. `원고 밖 · 메모 · N` = links elsewhere.
 - Card header string: `쓰인 곳 · <usage>` + (` · 후보 <candidates>` if > 0).
 - Row order inside a group: manuscript order (chapter › episode › scene › position; a scene's `전환 문구` sits before its first block); out-of-manuscript rows by kind then name `[PROPOSED]`.
 - Each row shows the whole sentence with the span boxed (search-highlight rule); the location label is small mono.
 - Sources: rule 21 §2, §4 (table), §8; feedback search-highlight.
 
-#### WLD-20 · ▲ 공개 전 사용 — P0 · needsExternal: no
+#### WLD-20 · ▲ 공개 전 사용 — P0 · needsExternal: no (0.2.0)
 
+- **(0.2.0)** R below is the **effective** reveal (WLD-72).
+  - With the automatic reveal, R is the block of T's first link, so no link of T comes before R and T has no `▲`.
+  - `▲ 공개 전 사용`, `맞음` and the `잇기 시 ▲ …` lines therefore arise only for a term with a stored (hand-set) reveal: a 0.1.0 record, a point reveal beyond the 집필 선, or one set with `공개 시점 옮기기`.
+  - The rules below are unchanged for that case.
 - For each link L of T in game-output manuscript text, with reveal R of T:
   - R = `BLOCK(b)`: L is `▲ 공개 전 사용` iff position(L) < position(b) in manuscript order. A link inside block b itself is after (rule 11-2 `X부터` includes the block). A link in an option line of the choice block b counts as inside b.
   - R = `POINT(u)`: L is `▲` iff position(L) < position(first block of u). If u lies beyond the 집필 선, every manuscript link is `▲`.
@@ -327,9 +412,15 @@ Pending decisions (implement the proposed default behind a single matcher option
 - Output per candidate: `{termKey, containerKey (blockKey or sceneKey for 전환 문구), optionIndex?, start, end (offsets in the original segment), matchedText (NFC), kind: FULL | CUT_OFF, occurrence (0-based index among candidates of the same term with the same matchedText in the same container)}`.
 - Sources: rule 21 §3 (live tab and draft), §4, §7; board `RTCandidate`, `RTLinkAll`.
 
-#### WLD-22 · 후보 확인 · 잇기 · 아님 — P1 · needsExternal: no
+#### WLD-22 · 후보 확인 · 잇기 · 아님 — P1 · needsExternal: no (0.2.0)
 
 - Where candidates appear: the card's `후보` group (`◇ 후보 · 끊김 · 잇기 · 아님` under the sentence), the check center (`◇ 공개 전 후보` rows only), and the manuscript when the display toggle `용어 후보` is on (dotted underline; tap → small popover).
+- **(0.2.0)** Every place above exists only while the project setting `용어 후보` is on (WLD-73). The manuscript part changes:
+  - the underline is always drawn while the setting is on (no display toggle);
+  - a block tap only selects (U-14.4), so the underline is not tappable;
+  - the actions are in the block's `참고` tab, reached by a left swipe, as the row `용어 후보 · 등불 · 잇기 · 아님` (WLD-73).
+  - **Superseded:** the manuscript popover below and its tap-to-open.
+  - `잇기` and `아님` keep the meaning and records given here.
 - Manuscript popover (cover and inner): title = term name (Myeongjo 16) + small `후보 · 끊김` (or `후보`), line `첫 공개 1-7 · 잇기 시 ▲ 공개 전 사용` (the `▲` clause only when linking would create a `▲`), buttons `잇기` (primary) · `아님` (ghost). No other dismissal than tapping outside; nothing happens on swipe.
 - `잇기`: wraps exactly the candidate span in a new link run to the term (even when it differs from the name, e.g. `오리지`); usage and `▲` update immediately; undo available (toast `되돌리기` `[PROPOSED]`). In the check center the same row turns into `▲ 공개 전 사용` with `원고로 가기 · 공개 시점 옮기기 · 맞음` when pre-reveal.
 - `아님`: stores a rejection `{containerKey, termKey, matchedText, occurrence}`; the candidate disappears everywhere. Undo via toast and via the card `⋯ › 아님으로 둔 것` list (`되돌리기` per row).
@@ -351,13 +442,16 @@ Pending decisions (implement the proposed default behind a single matcher option
 - Counting: see Q-07 (proposed: a `맞음` link is excluded from `▲` counts, `▲ 앞에서 N회 사용`, and the module badge; the card still lists the link under `쓰인 곳` with a small `맞음` tag).
 - Sources: rule 21 §6; rule 18 §5; planning 점검 센터.
 
-#### WLD-25 · 글자 찾기 켬 · 끔 — P1 · needsExternal: no
+#### WLD-25 · 글자 찾기 켬 · 끔 — P1 · needsExternal: no (0.2.0)
 
 - Per-term fixed field, default on. Turning off clears the term's candidate index; `아님` records are kept; the card shows `글자 찾기 꺼짐 · 켜기` (tap `켜기` to re-enable; candidates are recomputed and old `아님` apply again).
 - When a term has more than 10 `아님` records, the card shows chip `글자 찾기 끄기`; nothing changes until tapped.
+- **(0.2.0)** This per-term switch sits under the project setting `용어 후보` (WLD-73).
+  - While the setting is off, no term is scanned and this row and its chip are hidden. The stored per-term values are kept.
+  - Turning the setting on again restores each term's own value.
 - Sources: rule 21 §3 (동음이의 row), §7 (table).
 
-#### WLD-26 · 후보 색인과 다시 훑는 때 — P1 · needsExternal: no
+#### WLD-26 · 후보 색인과 다시 훑는 때 — P1 · needsExternal: no (0.2.0)
 
 - One multi-pattern automaton (Aho–Corasick trie, 21 draft) over all patterns of all searchable terms; plus prefix detection for `끊김` (walk the same trie from each word start until a cut-off mark).
 - Index lives in the app DB (derived, never written to `.civilight`).
@@ -369,10 +463,11 @@ Pending decisions (implement the proposed default behind a single matcher option
 | Project opened or restored from file | full scan in background | check center `점검 중`; numbers dim until done |
 | `글자 찾기` turned off | drop that term's candidates; keep `아님` | card `글자 찾기 꺼짐 · 켜기` |
 
+- **(0.2.0)** While the project setting `용어 후보` is off, the index is neither built nor updated, and the scheduler does nothing. Turning it on runs the "project opened" full scan.
 - Expected scale: 150 terms × 3 aliases ≈ 450 patterns, 20,000 blocks; a full scan is linear in text length and should finish within a few seconds (real-device check item). Usage and `▲` never wait for this.
 - Sources: rule 21 §7.
 
-#### WLD-27 · 원고 표시 계약 (연결 · 후보 · 공개 전 연결) — P1 · needsExternal: no
+#### WLD-27 · 원고 표시 계약 (연결 · 후보 · 공개 전 연결) — P1 · needsExternal: no (0.2.0: superseded in part, WLD-73)
 
 - SCR renders; WLD provides per container: link spans with `isPreReveal`, candidate spans with `{termName, kind}`, and the popover actions.
 
@@ -383,9 +478,14 @@ Pending decisions (implement the proposed default behind a single matcher option
 | Pre-reveal link | link shape + amber `▲` in the margin | always |
 
 - When `용어 후보` is on, the script header shows a chip `표시 · 용어 후보 켬`.
+- **Superseded (0.2.0, S-5):** the `Candidate` row and the header chip. The contract is now:
+  - **Candidate:** a faint dotted underline, drawn whenever the project setting `용어 후보` is on (default on). It is not tappable; the actions are in `참고` (WLD-73). The `표시` sheet has no `용어 후보` toggle and the head has no chip.
+  - **Link** and **pre-reveal link:** unchanged.
+  - The underline style (board `scr_u14_input.py` `CAND_ST`): dotted, colour `ink3` at 75 %, thickness 1.5 px, offset 6 px, the text keeping its own colour. It must look lighter than the dotted underline for "attached to something deleted" (DS-18) and differ from the link's solid 1 px `ink3` line (D13).
+  - WLD gives the script, per block, the candidate spans `{termKey, termName, matchedText, kind, start, end, optionIndex?}` in text order.
 - Sources: rule 21 §2 (원고 표시 table), §8; board `RTCandidate`.
 
-#### WLD-28 · 점검 센터 ‘용어 공개’ 줄 — P0 · needsExternal: no
+#### WLD-28 · 점검 센터 ‘용어 공개’ 줄 — P0 · needsExternal: no (0.2.0)
 
 Rows this area emits under the check-center filter `용어 공개` (shell, filters, `전체`, `맞음` store and the `지운 항목` filter are the check center's). Ordering inside the filter: `▲` rows first (manuscript order), then `◇ 공개 전 후보`, then `◇ 첫 공개 없음` `[PROPOSED order for the last two]`.
 
@@ -399,12 +499,71 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 | Hidden term (locked) | `▲ 숨긴 항목 관련 N · 지문으로 보기` | `지문으로 보기` |
 
 - Source note: the board `Check` draws only `잇기 · 아님` on the `◇ 공개 전 후보` row; rule 21 §5 gives `원고로 가기 · 잇기 · 아님` and wins.
+- **(0.2.0, D33)** The three term kinds stay in the check center and are compared with the effective reveal (WLD-72).
+  - `▲` rows come only from terms with a stored reveal (WLD-20).
+  - `◇ 공개 전 후보` rows appear only while `용어 후보` is on.
+  - `◇ 첫 공개 없음` keeps its trigger, a term with usage N ≥ 1 and no reveal. The automatic reveal makes that impossible, so the row no longer shows. No new trigger is added.
+  - **Superseded:** the chip `<location>을 첫 공개로` on that row.
 - Post-reveal candidates never appear in the check center (card only).
 - `전체` count includes `◇` rows (rule 21 §8); the script module badge counts only `▲`.
 - After `잇기` on a `◇` row the row is replaced in place by the `▲` row.
 - `공개 시점 옮기기` opens the WLD-18 sheet.
 - The check center has no lens (rule 11-4).
 - Sources: rule 21 §5, §8; rule 11 §3; planning 점검 센터 table; boards `Check`, `TwoCheck`, `ColCheck`.
+
+#### WLD-72 · 첫 공개 자동 (automatic first reveal) — P0 · needsExternal: no (0.2.0, S-5)
+
+- **Effective reveal.** For term T: `effectiveReveal(T) = stored(T) ?: auto(T)`.
+  - `stored(T)` is the live `◇ 첫 공개` record of WLD-18: from 0.1.0, or written in 0.2.0 by `공개 시점 옮기기`. A stored record always wins (D12).
+  - `auto(T)` is the position of T's first live link in manuscript order (chapter › episode › scene › block position; a scene's `전환 문구` sits before its first block, Q-05) among the `쓰인 곳` text kinds of WLD-19: dialogue, narration, system text, choice option lines, and direct `전환 문구` if it holds links.
+    - Links in memos, direction blocks, pages, cards, profiles and the recorder never count.
+    - Links in trashed blocks or scenes do not count.
+    - Links in hidden scenes count, but nothing shows them while locked (WLD-13).
+    - A link in a choice option line makes the reveal that **choice block**. The option-line ban of WLD-18 is for stored records only.
+    - With no such link, `auto(T)` is none.
+- **Derived, never stored.**
+  - `auto(T)` is recomputed from the link index whenever links, blocks or their order change. It is never written to `changes.json` or anywhere else, so a stored `firstReveal` record always means hand-set and 0.2.0 adds no data (scope §8).
+  - Deleting, moving or splitting the block of an automatic reveal just recomputes it: there is no `근거 지워짐`, no `◇ 첫 공개 … → … · ▲ 새로 N` toast and no `기록 지우기`. Those stay for stored records (WLD-18).
+- **Display.**
+  - The term card row `첫 공개 | 1-4 씬 2 · #012` gets the automatic mark `TODO_COPY_WORLD_REVEAL_AUTO_MARK` after it.
+  - The list's `첫 공개 1-4` (WLD-02) and the script `시간` tab row `◇ #012 · 용어 첫 공개` show the effective reveal with no mark.
+  - With no effective reveal: `첫 공개 없음` (WLD-02, WLD-08).
+- **Hidden scenes.** `auto(T)` counts links in hidden scenes whatever the lock state, so the reveal, `▲` and candidate comparisons never change with the lock.
+  - While the hidden lock is closed and the effective reveal's block (automatic or stored) is in a locked hidden scene, the card row reads `첫 공개 | <episode> · 숨긴 씬`. The scene and block are not named; `숨긴 씬` is WLD-13's word.
+  - The list label keeps the episode only (`첫 공개 1-4`), as it already does.
+  - The script `시간` row is inside the hidden scene and is not drawn while locked.
+- **Consequences.**
+  - Without a stored record a term has no `▲ 공개 전 사용`.
+  - `◇ 공개 전 후보` still compares candidates with the effective reveal, so a cut-off word before the first link is a pre-reveal candidate (TC WLD-T73).
+- **Hand-set in 0.2.0.** The term card's `첫 공개` row and the check center's `공개 시점 옮기기` open the WLD-18 sheet. Picking writes a stored record, and `TODO_COPY_WORLD_REVEAL_AUTO` removes it.
+- **Domain.** `domain:world` `TermReveals.effective(doc, termKey, isLive): EffectiveReveal(kind: STORED | AUTO, anchor)` is additive. The existing `TermReveals.record` stays the stored record. Every reader of "the reveal" (lists, card, `▲`, candidates, check rows, the 시간 tab) uses `effective`.
+- **Upgrade.** A 0.1.0 project keeps every stored record and its `▲` rows. Its terms without a record get the automatic reveal at once.
+- Sources: decisions rows `단순화 · 용어 첫 공개 · 후보` (planning); scope S-5, D12, D33.
+
+#### WLD-73 · 용어 후보 설정 · 목록 · 밑줄 · 참고 줄 (candidate check) — P1 · needsExternal: no (0.2.0, S-5)
+
+- **Setting.** Project setting `용어 후보` (switch, default **on**), with sub `TODO_COPY_WORLD_CANDIDATES_SUB`.
+  - It sits in `프로젝트 설정` in the world group and belongs to the `feature:library` settings screen.
+  - It is stored as the additive project field `termCandidates: Boolean = true` (with the other project settings; it travels in `.civilight`).
+  - It is one switch for the whole candidate check (rule 21 §3–§7): the matcher, the index, the per-term `글자 찾기` and every candidate surface.
+- **While on:**
+  1. **List in the 용어 tab.** The last section of the 용어 list (after `아직 공개 전`) is `.sec` `용어 후보 · N`, where N is the number of terms that have at least one candidate.
+     - One row per such term, in term list order: title = term name; fragment `후보 3` (all of that term's candidates after `아님`, pre- and post-reveal); right column `◇ 공개 전 후보 1` when some come before the reveal.
+     - Tapping a row opens the term card scrolled to its `후보` group, where `잇기 · 아님` per row and `모두 잇기 · 모두 아님` (WLD-22, WLD-23) do the work.
+     - No candidate in the project hides the section. Locked hidden terms are left out (WLD-13).
+  2. **Underline in the manuscript:** WLD-27 (0.2.0).
+  3. **`참고` row.** For a selected block (left swipe → `참고`, script area), the top of the tab shows one row per candidate in that block, in text order: `용어 후보 · <matchedText> · 잇기 · 아님`, e.g. `용어 후보 · 등불 · 잇기 · 아님` (board `scr_core.py` `cand_row`).
+     - `잇기` and `아님` stay text, 44 px targets.
+     - `잇기` and `아님` act exactly as in WLD-22 (one undo step each); the row then leaves.
+     - In a read-only project the `참고` tab opens for reading (U-14.15), and the row shows without `잇기 · 아님`.
+  4. The card's `후보` group, the list's `· ◇ 후보 N` and the check center's `◇ 공개 전 후보` rows, as before.
+- **While off:**
+  - no underline, no `참고` row, no `용어 후보` section, no `· ◇ 후보 N`, no card `후보` group, no `◇ 공개 전 후보` check rows (D33);
+  - no scan (WLD-26);
+  - the per-term `글자 찾기` row is hidden.
+  - Stored `아님` records and per-term `글자 찾기` values are kept.
+  - Links, usage, `▲` and the automatic reveal do not depend on this setting.
+- Sources: decisions rows `단순화 · 용어 첫 공개 · 후보` and `단순화 · 용어 후보 표시 (2026-11-24)` (planning); scope S-5, D13, D33; boards `scr_core.py` (`cand_row`), `scr_u14_input.py` (`CAND_ST`).
 
 ### D. 연표
 
@@ -426,9 +585,10 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Birthdays (`기념일` fields) use this calendar's months; ages in calendar mode use 만 나이 when the scene/event date is known (cast owns ages; WLD-35 supplies dates).
 - Sources: planning 연표; 인물 항목 §6; rule 11 §6; Q-13.
 
-#### WLD-31 · 연표 화면 — P0 · needsExternal: no
+#### WLD-31 · 연표 화면 — P0 · needsExternal: no (0.2.0)
 
 - Header: small `세계 시간과 이야기 시간`, title `연표`, lens chip, `+` (new event, WLD-32). Command bar placeholder `사건 · 연도 찾기` (in the anchor view `사건 · 때 찾기`).
+  - **Superseded (0.2.0):** no lens chip (S-1, WLD-71); the timeline reads at `최신`, so the current-lens dot is the 집필 선. No `+`: the first row of the list is `＋ 새 사건` (WLD-74).
 - Info line: `달력: 연도만 · 프로젝트 설정에서 월 · 일 달력 추가` (calendar mode shows the calendar name/months instead `[PROPOSED]`) and right `나이 자동 계산`.
 - View chips `에피소드 기준 · 이야기 시작부터 · 기준 사건` (WLD-34).
 - A vertical line list in time order with diamond dots (current-lens row dot in `acc`):
@@ -443,8 +603,9 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Mode `시간 없이`: module hidden.
 - Sources: planning 연표; boards `Timeline`, `TwoTimeline`, `ColTimeline`, `TimelineAnchor`; Q-14 (which characters' ages appear), Q-15 (story events vs scenes).
 
-#### WLD-32 · 사건 만들기 · 고치기 — P0 · needsExternal: no
+#### WLD-32 · 사건 만들기 · 고치기 — P0 · needsExternal: no (0.2.0: create superseded by WLD-74)
 
+- **Superseded (0.2.0):** creation is the create card of WLD-74 (`이름 · 때 · 관련 인물`). The fuller sheet below is no longer a create flow. Its other fields (`종류`, `설명`, `장소`, `관련 용어`, `공개 시점`) are set afterwards in the event detail (WLD-33), each by tapping its row, and `종류` follows `때` (WLD-74).
 - `+` opens the event sheet `[PROPOSED layout; fields from boards]`: `종류` (`세계 사건 · 이야기 사건`), `이름`, `설명`, time (world event: year, plus month/day in calendar mode; story event: `씬 고르기` — time comes from the scene), `장소` (place or region via WLD-52; e.g. `하층 구역` region), `관련 용어` (multi-pick), `공개 시점` (optional point, e.g. `2장`), primary `넣기`.
 - Editing: tap a field in the detail.
 - Delete: `⋯ › 지우기` (to trash, undo toast; flashback scenes based on this event keep their stored time and show `◇` base deleted `[PROPOSED, by analogy with rule 20]`).
@@ -455,6 +616,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Pane title `연표 · 세계 사건` (or `연표 · 이야기 사건` `[PROPOSED]`), name (e.g. `대정전`), time (`1195`), description, rows `장소 | 하층 구역`, `그때 나이 | 리엔 12세 · 세라 16세`, `원고 | 1-4 씬 2 · 회상`, `관련 용어 | 오리지늄 등불`.
 - Section `이 사건에서 바뀐 것`: `◆` records anchored on this event (rule 12 `세계 사건` anchor: applies from before the story start), each `<item> · <field> | <old> → <new>` (e.g. `리엔 · 소속 | 없음 → 하층 구역의 고아`, `하층 구역 · 상태 | 빛 있음 → 대정전 이후`). `+ 변화` `[PROPOSED]` opens the shared ◆ creation flow with anchor = this event.
 - Cover: full-screen detail; inner A: right pane.
+- **(0.2.0)** Adds the row `관련 인물 | 리엔 · 세라` (WLD-74), placed after `장소`. The detail is where `종류`, `설명`, `장소`, `관련 용어` and `공개 시점` are set after an event is created in place.
 - Sources: board `TwoTimeline`; rule 12 §1 (자리 · 세계 사건).
 
 #### WLD-34 · 연표 보기 셋 — P1 · needsExternal: no
@@ -473,9 +635,25 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Shown in timeline sub lines and in event detail `그때 나이`.
 - Sources: planning 연표 (리엔 12세); 인물 항목 §6; boards `Timeline`, `TwoTimeline`; Q-14.
 
+#### WLD-74 · 사건 만들기 · 그 자리에서 (create an event in place) — P0 · needsExternal: no (0.2.0, U-15)
+
+- **Row.** The first row of the 연표 list (above the first world event, in every view of WLD-34) is icon `plus` + `새 사건`. It opens the shared create card titled `새 사건`, with CST-66's look, buttons and behaviour (`취소 · 만들고 열기 · 만들기`; `만들고 열기` opens the event detail, WLD-33). Hidden in a read-only project, and absent while world time is `시간 없이` (the module is off).
+- **Fields (U-15.7):** `이름 · 때 · 관련 인물`. Only `이름` is required.
+  - `때` is optional. It has two visible choices:
+    - a year (plus month and day in `세계 달력` mode, WLD-30), which makes a `WORLD` event;
+    - a scene picked with `씬 고르기` (as WLD-32), which makes a `STORY` event whose time is the scene's.
+    - Left empty, the event is `WORLD` with no date, and the 연표 lists it after the dated world events before the story. `종류` is never asked: it follows from `때`.
+  - `관련 인물` is optional: several live characters, picked with the character picker (its `＋ 새 인물` row is not offered inside this card; no nested card).
+- **Data (additive).** `TimelineEvent` gains `relatedCharacterKeys: List<ULID> = []`.
+  - The event detail (WLD-33) shows the row `관련 인물 | 리엔 · 세라`, tap → the same picker.
+  - Deleted characters in it follow CST-41's dotted rule for `연결` values. Locked hidden characters show as `숨긴 인물` (CST-39).
+- **Pickers.** The event pickers (`기준 사건` chip, WLD-34; flashback `기준 사건`, rule 11) show the row `＋ 새 사건` / `＋ ‘<query>’ 새 사건` (U-15.3). In a picker the card has `취소 · 만들기` and the new event is picked.
+- **Write.** One edit through the event write path of `domain:world` `time` (`Events.kt`), extended additively with `when` and `relatedCharacterKeys`. One undo step.
+- Sources: `u15-create-in-place.md` rows 4, 7 (planning); scope U-15.4, U-15.7.
+
 ### E. 지도 만들기
 
-#### WLD-36 · 지도 목록 · 새 지도 — P0 · needsExternal: no
+#### WLD-36 · 지도 목록 · 새 지도 — P0 · needsExternal: no (0.2.0: image maps only, WLD-75)
 
 - `세계 › 지도` tab: header small `잿빛 새벽의 등불 · 세계`, title `지도`, `+`. Section `지도 · N`; horizontal row of map cards (200 × 150 thumbnail, name in Myeongjo 16, small line e.g. `생성 · 핀 9 · 영역 4` or `세계 지도 › 핀 · 이미지` for a sub-map).
 - `+` (or `+` on a pin's sub-map row, WLD-48) opens the sheet `새 지도 · 닫기`; when started from a pin it shows `상위 | 세계 지도 · 핀 ‘상층’ | → 하위 지도`. Options (one radio-like row each):
@@ -486,7 +664,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Map names: authored; default `[PROPOSED]` `지도 N`. A map list view for accessibility is not designed (Q-21).
 - Sources: planning 지도 만들기 (바탕 table); board `MapNew`.
 
-#### WLD-37 · 지도 보기 — P0 · needsExternal: no
+#### WLD-37 · 지도 보기 — P0 · needsExternal: no (0.2.0: WLD-75)
 
 - Cover (`MapC`, `MapSoftC`): full-screen map under glass bars; header small `세계 · 지도` (or `세계 · 지도 · 색면`), title = map name (e.g. `하층 구역 지도`), lens chip, zoom label (e.g. `120%`); breadcrumb when nested (`세계 지도 › 하층 구역`). Tapping a pin selects it (`acc`) and opens the place bottom sheet (WLD-09) with `핀 옮기기 · 장소 카드 열기`.
 - Inner (`Map`, `MapSoft`): map fills 800×800; side card at right (WLD-09) with `장소 카드 · 핀 옮기기`; bottom-left chips: layer/scope filters (`전체 핀 · 하층 구역 · 상층`; on generated maps `전체 핀 · 지역 · 그림 · 색면 · 편집`) and `지도 이미지 바꾸기`; scale bar bottom-left (`1일 · 15 km`).
@@ -496,19 +674,19 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Fold/unfold: centre and zoom stay; the sides reveal more; the selected pin keeps its screen position; place sheet ↔ side card is the same element; in edit mode the tool bar and in-progress vertices stay.
 - Sources: planning 지도, 접기 · 펼치기; boards `Map`, `MapC`, `MapSoft`, `MapSoftC`, `MFoldMap`; Q-02 (pin tap with child map).
 
-#### WLD-38 · 바탕 · 이미지 가져오기 · 큰 이미지 — P0 · needsExternal: no
+#### WLD-38 · 바탕 · 이미지 가져오기 · 큰 이미지 — P0 · needsExternal: no (0.2.0: kept, WLD-75)
 
 - Import from gallery or file picker; the image is kept uncropped at full resolution, stored once by content hash.
 - Large images load as tiles: a small overview first, then sharp tiles only for the zoomed area (subsampled region decoding; reference: telephoto). Loading the whole bitmap freezes around 8000 px, so full decoding is forbidden above a threshold `[PROPOSED: > 4096 px on the long edge]`.
 - Sources: planning 지도 만들기 (성능); Q-21.
 
-#### WLD-39 · 바탕 · 스케치 촬영 — P1 · needsExternal: no
+#### WLD-39 · 바탕 · 스케치 촬영 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Take a photo of a paper map with the system camera (or pick a photo), straighten it (`펴기`) and trace over it with the normal tools (`덧그리기`).
 - `[PROPOSED]` 펴기 = four draggable corner handles + `펴기` button producing a perspective-corrected image; the original photo is kept. No ML or cloud service.
 - Sources: planning 지도 만들기 (바탕 · 스케치 촬영); board `MapNew`.
 
-#### WLD-40 · 편집 모드 · 도구 줄 — P0 · needsExternal: no
+#### WLD-40 · 편집 모드 · 도구 줄 — P0 · needsExternal: no (0.2.0: image maps only, WLD-75)
 
 - Edit header: breadcrumb, title `<지도 이름> · 편집`, lens chip, `완료`.
 - Visible tool bar (`MapToolbar`, 52px items, selected = `pri` fill, `role=toolbar`, label `지도 도구`): base set `이동 · 핀 · 영역 · 경로 · 라벨 · 레이어`; detailed terrain `이동 · 도장 · 강 · 길 · 라벨 · 영역 · 레이어`; hex `한 칸 · 줄 · 채우기 · 고르기 · 되돌리기`; polygon `고르기 · 칸 넣기 · 합치기 · 나누기 · 땅 · 바다 · 레이어`; node `이동 · 노드 · 연결 · 라벨 · 레이어`. Only the selected tool acts on taps (tour copy `고른 것만 동작`).
@@ -517,7 +695,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - No hidden gestures, no freehand drawing; every change is undoable.
 - Sources: planning 지도 만들기 (편집); DS `MapToolbar`; boards `MapEdit`, `MapRouteC`, `MapDetail`, `MapHex`, `MapPoly`, `MapNode`, `TourMap`.
 
-#### WLD-41 · 핀 — P0 · needsExternal: no
+#### WLD-41 · 핀 — P0 · needsExternal: no (0.2.0: kept, WLD-75)
 
 - `핀` tool: tap a point → sheet to choose an existing place (list with search) or `새 장소` (name input) `[PROPOSED sheet]`; the pin stores the place key and 0–1 coordinates. One pin per place per map `[PROPOSED]`.
 - Pin mark: icon + glass name tag; selected pin in `acc`; hit area ≥ 44px.
@@ -525,7 +703,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Pin properties (inner `속성` tab, cover sheet): place, `보이는 시점`, layer, `하위 지도` (WLD-48).
 - Sources: planning 지도 (핀 옮기기 · 지도 이미지 바꾸기는 눈에 보이는 버튼으로); DS `MapMarks`; boards `Map`, `MapC`.
 
-#### WLD-42 · 영역 — P1 · needsExternal: no
+#### WLD-42 · 영역 — P1 · needsExternal: no (0.2.0: kept, WLD-75)
 
 - `영역` tool: tap to add vertices; floating bar `꼭짓점 N · 되돌리기 · 닫기`; `되돌리기` removes the last vertex; `닫기` (button only; no auto-close near the first point) closes the polygon (min 3 vertices). Vertex: 14px rounded square, last one filled; hit area 44px; pop 1.3× → rest with a haptic tick; closing fills in 200 ms.
 - Panel `새 영역 · 그리는 중`: name (e.g. `상층 관문 구역`), `종류 | 세력 영역 ›` (kind list `[PROPOSED: 세력 영역 · 지역 · 기타]`, Q-17), `연결 | 세력 · 상층 경비대`, `보이는 시점 | 1-7부터`, `레이어 | 정치`, `색` (swatches from `map-art-*`).
@@ -534,7 +712,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Shape can change over story time (WLD-65).
 - Sources: planning 지도 만들기 (영역); boards `MapEdit`, `MMapRegion`.
 
-#### WLD-43 · 경로 — P1 · needsExternal: no
+#### WLD-43 · 경로 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - `경로` tool: tap points (each tap draws that segment, distance counter updates per segment); endpoints may snap to pins. Sheet `경로 · 닫기`: title `결사의 문 → 상층 관문`, big duration `2일 4시간`, small `38 km · 지점 3`, mode chips `도보 15 km · 8시간 · 말 · 배 · 직접` (selected mode shows its parameters), `보이는 시점 | 1-7부터`, `쓰인 곳 | 1-7 씬 2 · “이틀 반이면 닿아.”`.
 - On the map a chip label `결사의 문 → 상층 관문 · 도보 2일 4시간 · 38 km`.
@@ -544,17 +722,17 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Motion: segment-by-segment draw, distance counter, duration enters from below (decelerate 320 ms); haptic tick per point.
 - Sources: planning 지도 만들기 (경로); rule 18 §3; boards `MapRouteC`, `MapEdit`, `MMapRoute`, `TourMap`.
 
-#### WLD-44 · 라벨 — P1 · needsExternal: no
+#### WLD-44 · 라벨 — P1 · needsExternal: no (0.2.0: kept, WLD-75)
 
 - `라벨` tool: tap → text input → placed at that point; on detailed-terrain maps labels can follow a curve (`곡선 라벨`, control points editable by handles `[PROPOSED]`). Labels are overlay data (not baked), have layer and `보이는 시점`.
 - Sources: planning 지도 만들기, 지도 생성 · 양식 (곡선 라벨); board `MapDetail`.
 
-#### WLD-45 · 레이어 — P1 · needsExternal: no
+#### WLD-45 · 레이어 — P1 · needsExternal: no (0.2.0: kept, WLD-75)
 
 - Each map has named layers (e.g. `정치`); pins, regions, routes, labels, stamps belong to at most one layer. `레이어` tool / tab: list with visibility toggles, rename, add, order `[PROPOSED]`; each layer has `보이는 시점`.
 - Sources: planning 지도 만들기 (레이어 · 시점별 공개); boards `MapEdit`, `MapDetail`, `MapPoly`.
 
-#### WLD-46 · 축척 맞추기 — P1 · needsExternal: no
+#### WLD-46 · 축척 맞추기 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Sheet `축척 맞추기 · 닫기`, hint `아는 거리 하나 → 지도 전체`: tap point `A` and point `B` on the map (shown as `A — B`, labels name the nearest place when on a pin, e.g. `A | 결사의 문`, `B | 잿더미 시장`), enter a number (e.g. `2`) and a unit chip `일 · km · 리 · 직접`; for `일` the row `하루 이동 | 도보 15 km ›` picks the travel mode used for conversion; primary `축척 저장`.
 - Stored: A, B (0–1), value, unit, mode key. Derived: km per normalised unit = value_km / |AB|. Scale bar shows `<n>일 · <km> km` with n = 1 or 2 by zoom `[PROPOSED]`.
@@ -562,20 +740,20 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Sub-maps have their own scale.
 - Sources: planning 지도 만들기 (축척); board `MapScale`.
 
-#### WLD-47 · 이동 수단 — P1 · needsExternal: no
+#### WLD-47 · 이동 수단 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Project setting `이동 수단` (row `도보 15 km · 8시간 · 말 40 km · 8시간 · 배 30 km · 24시간`, button `바꾸기 ›`). Each mode: name, daily distance (km), daily moving hours. Defaults 도보 15/8, 말 40/8, 배 30/24. Users can add modes (`직접`) and edit values `[PROPOSED editor]`.
 - Used by route durations (WLD-43), scale conversion (WLD-46), and the travel check (consumer: 장소와 때). Project default mode = 도보; a character field `기본 이동 수단` may override for that character (rule 18 §3; consumer side).
 - Sources: rule 18 §3, §7; boards `ProjSettings`, `MapRouteC`, `MapScale`.
 
-#### WLD-48 · 하위 지도 (중첩) — P1 · needsExternal: no
+#### WLD-48 · 하위 지도 (중첩) — P1 · needsExternal: no (0.2.0: kept, image child maps only, WLD-75)
 
 - A pin can link a child map (`세계 › 지역 › 장소`). Create: pin properties `하위 지도 · 만들기 · 고르기` `[PROPOSED]` → `새 지도` sheet with `상위` line (WLD-36).
 - Entering: the trigger is open (Q-02); default = a visible control in the pin's place sheet `[PROPOSED]`. The transition zooms centred on the pin into the child map (decelerate 360 ms, haptic `확인`); breadcrumb `세계 지도 › 하층 구역` at the top; tapping a breadcrumb part zooms out to it (accelerate 240 ms); breadcrumb text swaps only the changed part.
 - Distances across maps: see WLD-66.
 - Sources: planning 지도 만들기 (중첩); boards `MMapZoom`, `MapEdit`, `MapNew`.
 
-#### WLD-49 · 시점별 공개 — P1 · needsExternal: no
+#### WLD-49 · 시점별 공개 — P1 · needsExternal: no (0.2.0: kept, WLD-75)
 
 - Pins, regions, routes, labels and layers have `보이는 시점` (optional point, `X부터`). At lens L an item is visible iff its point ≤ L.
 - Reveal view (`시점별 공개`, header `<map> › 시점별 공개`, chip `시점 · 1-5`): mode chips `<L> 시점 · 보이는 것만 | 숨은 것 흐리게`; a point scrubber (`1-1 · 1-3 · 1-5 · 1-7 · 1-9 · 2-1 · 2-3`); summary `보임 · 핀 N · 영역 M | 아직 공개 전 · K`. Hidden items show their point in the tag (`상층 관문 · 1-7`).
@@ -584,28 +762,85 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Rule 22 consumer: a scene whose place's pin has a later `보이는 시점` raises `◇ 공개 전 장소 · 전환 문구` (owned by 장소와 때 / SCR).
 - Sources: planning 지도 만들기 (시점별 공개); rule 12 §1 (지도의 보이는 시점 · 씬 · 에피소드를 가리킴); boards `MapReveal`, `MMapReveal`.
 
-#### WLD-50 · 노드 지도 — P1 · needsExternal: no
+#### WLD-50 · 노드 지도 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Base-less map of places (nodes) and connections, for buildings, dungeons, episode routes. Header `<부모> › <이름>` (e.g. `하층 구역 › 결사 본부`), title `노드 지도`, lens chip; tools `이동 · 노드 · 연결 · 라벨 · 레이어`; search `장소 · 노드 찾기`.
 - Node: name + optional sub line (e.g. `기록실 · 세라 · 1-3`, `송전탑 쪽 출구 · 2장 공개`), optional place link, `보이는 시점`. Connection: between two nodes, optional label (`계단 · 잠김`, `정문 통과`), `보이는 시점`. Node maps have no scale (travel check shows `◇ 축척 없음 · 점검 못 함`).
 - Sources: planning 지도 만들기 (노드 지도); board `MapNode`; rule 18 §6.
 
-#### WLD-51 · 지도 내보내기 4K · 8K — P1 · needsExternal: no
+#### WLD-51 · 지도 내보내기 4K · 8K — P1 · needsExternal: no (0.2.0: kept, WLD-75)
 
 - Export the current map (base + visible overlay at the current lens) as an image; long edge 3840 px (`4K`, default) or 7680 px (`8K`), default from `설정 › 지도 · 이미지 · 연표 › 큰 지도 내보내기`. Entry `[PROPOSED]`: map `⋯ › 지도 내보내기`, then the system share/save sheet.
 - Sources: planning 지도 만들기 (내보내기는 4K 기본, 8K 선택); board `SettingsMore`.
 
-#### WLD-52 · 장소 고르기 (다른 영역에 주는 것) — P0 · needsExternal: no
+#### WLD-52 · 장소 고르기 (다른 영역에 주는 것) — P0 · needsExternal: no (0.2.0: U-15 row, WLD-70 · WLD-75)
 
 - Opened by scene `장소와 때` (`장소 · 지역으로 바꾸기`, `지도에서 고르기 ›`), bulk `장소 정하기` (`모두 같은 장소 · 씬마다 차례로 · 장소 · 지역`), event place (WLD-32).
 - List mode: places (or regions when `지역` is chosen) with the count of scenes using each (`잿더미 시장 · 씬 4개`), search, and the row `새 장소 · 지도에 핀을 꽂으며 만들기`.
 - Map mode (`지도에서 고르기 ›`): the map opens in pick mode; tapping a pin picks the place; in `지역` mode tapping inside a region picks it; a bottom bar confirms (`<씬 4개> → <잿더미 시장>`); inner bulk table shows `장소별 씬 수` on the map and the instruction `핀으로 끌어다 놓기 대신 · 고른 씬 → 핀 탭 → 장소 정하기`.
 - Returns `PlaceRef(placeKey)` or `RegionRef(mapKey, regionKey)`.
+- **(0.2.0)**
+  - The list mode's top row is `＋ 새 장소` / `＋ ‘<query>’ 새 장소` (WLD-70). **Superseded:** `새 장소 · 지도에 핀을 꽂으며 만들기`.
+  - Map mode works on every listed map with pins, including 0.1.0 node, generated and sketch maps viewed read-only. On a node map, tapping a node that has a place picks that place.
 - Sources: planning 지도 ↔ 연표 (장소 정하기); boards `SceneWhere`, `BulkPlace`, `BulkWide`.
+
+#### WLD-75 · 지도 단순화 · 그림 한 장 + 장소 핀 (simplified maps) — P0 · needsExternal: no (0.2.0, S-3, S-2)
+
+- **Rule (S-3).** A new map is one image plus place pins. Hidden, never deleted:
+  - creating node, generated (terrain) and sketch maps, and the editing tools of those maps;
+  - distance calculation and its surfaces (scale, routes, travel modes);
+  - character routes (`인물 동선`).
+- **Every map a 0.1.0 project has stays listed and opens for viewing with its base and pins** (D11), so no map looks lost. Stored data is never changed (scope §8).
+- **New map.**
+  - The `지도` tab's first row is icon `plus` + `새 지도`. A pin's `하위 지도` row in WLD-48 makes a child map the same way.
+  - The row opens the system image picker (gallery or file, WLD-38) directly.
+  - Picking an image creates an `IMAGE` map named `지도 N` (WLD-36 default), with the parent set when started from a pin, and opens it in map view. N is the smallest number ≥ 1 for which no live map of the project is named `지도 N`.
+  - Cancelling the picker creates nothing.
+  - **Superseded:** the `새 지도` sheet with `지형 만들기 · 이미지 가져오기 · 스케치 촬영 · 노드 지도`.
+- **Status of every map feature in 0.2.0:**
+
+| Feature | 0.2.0 | Stored data |
+| --- | --- | --- |
+| WLD-36 list | All maps listed with their thumbnails and sub lines (`생성 · 핀 9 · 영역 4` stays for a generated map). New maps: image only (above) | kept |
+| WLD-37 view | `IMAGE` maps as before, except: no lens chip (reads at `최신`, WLD-71), no scale bar, no route chips. `GENERATED`, `SKETCH` and `NODE` maps open **view-only**: base (stored result, corrected sketch image, or nodes and connections), pins, regions, labels, layers, at `최신`. On them `편집`, `지도 이미지 바꾸기` and the style chips (`그림 · 색면`) are hidden | kept |
+| WLD-38 import, large images | kept | kept |
+| WLD-39 sketch | creating hidden; existing sketch maps view-only | photo, corners kept |
+| WLD-40 edit, tool bar | `IMAGE` maps only. Tool bar `이동 · 핀 · 영역 · 라벨 · 레이어` (`경로` removed). The detailed-terrain, hex, polygon and node bars are unreachable. Edit head without the lens chip | — |
+| WLD-41 pins | kept on `IMAGE` maps; read-only on the others (`핀 옮기기` hidden there) | kept |
+| WLD-42 regions | kept on `IMAGE` maps (S-3 does not name them; scenes may use a region as `지역`) | kept |
+| WLD-43 routes | tool, sheet and map chips hidden; existing routes are not drawn | kept |
+| WLD-44 labels | kept on `IMAGE` maps; curved labels of detailed maps are view-only | kept |
+| WLD-45 layers | kept | kept |
+| WLD-46 scale | sheet, scale bar and every `축척 맞추기` button hidden | kept |
+| WLD-47 travel modes | the project settings row `이동 수단` hidden | kept, incl. `defaultTravelModeKey` |
+| WLD-48 sub-maps | kept; a new child map is image-only | kept |
+| WLD-49 reveal by point | kept (its own scrubber); the normal map view applies visibility at `최신` | kept |
+| WLD-50 node maps | creating and editing hidden; existing node maps view-only | kept |
+| WLD-51 export 4K · 8K | kept for every map (base + overlays visible at `최신`, routes not drawn) | — |
+| WLD-52 place picker | kept; U-15 row (WLD-70) | — |
+| WLD-53 … WLD-61 generation, styles, hex, polygon, detailed terrain, text → terrain | hidden (no entry anywhere); generated maps view-only from their stored result | seeds, history, conditions, overrides kept |
+| WLD-62 인물 동선 | hidden: no entry from the map, a character, a place or help | kept (track data is derived) |
+| WLD-63 이곳의 시간 | kept (no distance) | — |
+| WLD-64 연표 + 지도 | kept, without its lens chip | — |
+| WLD-65 region shape over time | kept | kept |
+| WLD-66 distance | no UI. The domain functions stay for the travel check (below) | — |
+| WLD-67 app settings | `새 지도 그림` and `지형 만들기 · 글로 설명` hidden; `큰 지도 내보내기` kept | values kept |
+| WLD-68 motion | rows of hidden features are unreachable; the rest unchanged | — |
+| WLD-14 delete, WLD-15 merge (route parts) | the impact and merge sheets leave out route counts (`경로 끝 N · …`), and the fix actions `다른 핀에 잇기 · 경로 지우기` are not offered. The data effects still happen out of sight: a route end stays dotted on delete, and moves to the target pin on merge | kept |
+
+- **Search and commands.** Map-related `/` commands and search rows for hidden tools (`지형 만들기`, `동선`, `축척`, `경로`) are not offered (S-9).
+- **Tours and help.** The `지도 안내` tour runs on an `IMAGE` map and leaves out steps whose target is hidden: `경로`, the terrain editor, and `인물 동선 · 장소와 때`'s route step (S-9, D15). It never points at a hidden tool. The tour content is the library area's; this row says which targets are gone.
+- **Travel check (S-2, D10).**
+  - Owned by 장소와 때 and the check center: off by default, turned on in settings (`이동 점검`).
+  - While on, it uses WLD-66 on the distance data a 0.1.0 project already holds (pins, routes, scales, travel modes). 0.2.0 offers no way to add any.
+  - While off, its five check kinds are hidden (D33), and their acknowledgements are kept.
+  - Storage note for that lane: 0.1.0 has `AppSettings.checkTravel` with default `true`, so "off by default" needs a new additive field rather than rewriting the stored value (scope §8 rule 1). See Q-31.
+- **Rule 22 consumer.** `◇ 공개 전 장소 · 전환 문구` still reads pin reveal points (WLD-49), unchanged.
+- Sources: decisions rows `단순화 · 지도`, `단순화 · 점검 센터 · 이동 점검` (planning); scope S-2, S-3, S-9, D10, D11, D15, D33; `icon-buttons.md` (`새 지도` menu, the "그 뒤 (지도 단순화)" notes) (planning).
 
 ### F. 지도 생성 · 양식
 
-#### WLD-53 · 생성기 — P1 · needsExternal: no
+#### WLD-53 · 생성기 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - One generator, on device, deterministic: same generator version + same seeds + same choices → identical result. Pipeline: seed → height and moisture fields on [0,1]² → sea level from `땅 비율` (quantile) → steps in order `해안선 → 산 → 강 → 숲 · 기후 → 마을 · 길` → the same world drawn per format.
 - Reference algorithm (mock code, informative only; no parity required with it or with board images): value noise with octaves (3, 6, 12, 24) weighted (.5, .27, .15, .08); kind-specific falloff (`대륙`: one central ellipse; `두 대륙`: two ellipses; `섬 무리`: tiled noise minus centre distance; `한 지역`: no falloff, edges continue off-map); terrain thresholds by quantiles of land height (hill .72, mountain .88, peak .96) and moisture (dry .18, wet .62, swamp .9); rivers descend from high cells over a depression-filled height field (priority flood) to the sea; towns on low dry land near rivers/coast with spacing; roads as a minimum spanning tree between towns; polygon provinces from Lloyd-relaxed Voronoi cells grown from spaced seeds.
@@ -614,7 +849,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - No place names are generated.
 - Sources: planning 지도 만들기 (생성기 규칙), 지도 생성 · 양식; file format §4 (생성 지도); memory map generation; `mapgeo.py` (reference only).
 
-#### WLD-54 · 지형 만들기 흐름 — P1 · needsExternal: no
+#### WLD-54 · 지형 만들기 흐름 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 1. `새 지도 › 지형 만들기` → `양식` (`새 지도 · 지형 만들기 1/2`): note `같은 세계 · 시드 4827 · 양식만 다름 · 시작 전까지 바꾸기 가능`; cards `육각 · 칸마다 지형 · 전략 지도`, `다각형 · 지방 · 국경 나누기`, `상세 지형 · 색면 · 산 · 강 · 길 · 마을`, `윤곽 · 해안선 · 등고선만`, `노드 · 장소와 연결만`, and `글로 설명 · 문장 → 조건 → 지형` (WLD-61); buttons `이전 · 단계별로 만들기`.
 2. `지형 만들기` (2/2): base chips `종류 · 대륙 · 두 대륙 · 섬 무리 · 한 지역`, `땅 비율 · 바다 많음 · 반반 · 땅 많음`, style chips (WLD-57), step rows (WLD-55), candidate thumbnails + `새 후보` (inner) / `후보 기록 N` (cover), primary `이 지도로 시작`.
@@ -623,7 +858,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Generation draws in step order and doubles as the progress indicator (coastline → land fill → mountains rise → rivers top to bottom → forests → towns · roads, ≈ 1.2 s, no spinner); reduce motion → one 120 ms fade of the finished map.
 - Sources: planning 지도 만들기, 지도 생성 · 양식; boards `MapFormat`, `MapGen`, `MapGenWide`, `MMapGen`.
 
-#### WLD-55 · 단계 조작 · 시드 · 고정 · 다시 — P1 · needsExternal: no
+#### WLD-55 · 단계 조작 · 시드 · 고정 · 다시 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Per step row: name, seed (mono, e.g. `4827`), `고정` toggle (lock icon, label `고정`), `다시` (dice, label `다시`). Header shows locks, e.g. `상세 지형 · 색면 · 시드 4827 · 해안선 고정`.
 - Per step 2–3 chips per question, no sliders. Drawn: `산` → `산맥 수 · 1 · 2 · 3 · 흩어짐`, `높이 · 낮게 · 보통 · 높게`; `강` → `개수 · 적게 · 보통 · 많이`, `굽이 · 곧게 · 보통 · 많이`, toggle `호수 · 막힌 곳에 호수`. Chips for `해안선`, `숲 · 기후`, `마을 · 길` are not drawn (Q-20; `[PROPOSED]` none until defined).
@@ -631,7 +866,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - `다시` on a step re-seeds that step only; only the changed layer animates (old fades accelerate 160 ms, new 400 ms); locked steps never change. Re-rolling an upstream step while a downstream step is locked → Q-22.
 - Sources: planning 지도 생성 · 양식 (단계 조작); boards `MapGen`, `MapGenWide`, `MMapReroll`.
 
-#### WLD-56 · 시작 뒤 단계 다시 만들기 — P1 · needsExternal: no
+#### WLD-56 · 시작 뒤 단계 다시 만들기 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - After start, any step can be re-generated from map edit (`<단계> 다시 만들기` `[PROPOSED entry: edit ⋯]`). If the author edited that layer, a sheet asks first: title e.g. `강 다시 만들기`, line `직접 고친 강 2 · 강에 붙은 도장 1(다리)`, options `고친 강은 남기기 · 나머지만 새로` (default) and `모두 새로 · 다리 도장 → 위치 확인 목록`, note `이전 강 · 기록에 보관 · 되돌리기 가능`, buttons `취소 · 다시 만들기`.
 - The previous layer result is stored in history and can be restored (undo and history list).
@@ -639,14 +874,14 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - `모두 새로` produces a `위치 확인` list of stamps that were attached to the old layer `[PROPOSED: list rows = stamp + 원래 자리 · 지금 자리]`.
 - Sources: planning 생성기 규칙, 단계 조작; board `MapReroll`.
 
-#### WLD-57 · 그림 · 양식 바꾸기 — P1 · needsExternal: no
+#### WLD-57 · 그림 · 양식 바꾸기 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Styles for detailed terrain and polygon: `색면` (default) · `먹선` · `색` · `양피지`. `색면`: province fields in the theme's `map-art-*` colours as soft blurred fields clipped to the coastline, faint coast/ripple/mountain/river/road lines on top; follows dark/light theme; no blue hues on land. Hex and polygon cells use fixed `ter-*` colours (same in both themes): deep #24394A, sea #33505F, plain #8E9A6A, forest #5E7352, hill #A39466, mount #857E73, peak #D3D7DB, desert #C4AB7A, swamp #66705A, snow #C6CED4. `등고선` toggle on detailed terrain.
 - Default style for new maps: `설정 › 지도 · 이미지 · 연표 › 새 지도 그림`.
 - Format can change until `이 지도로 시작`; switching keeps the coastline fixed on top and crossfades the interior (200 ms).
 - Sources: planning 지도 생성 · 양식 (그림); DS `MapStyle`, tokens; boards `MapFormat`, `MapSoft`, `MapGenWide`, `MMapFormat`, `SettingsMore`.
 
-#### WLD-58 · 육각 편집 — P1 · needsExternal: no
+#### WLD-58 · 육각 편집 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Header `세계 지도 · 육각`, title `칸 칠하기`, info `24 km · 뾰족 · 32×24`. Tools `한 칸 · 줄 · 채우기 · 고르기 · 되돌리기`; terrain palette `바다 · 평원 · 숲 · 언덕 · 산 · 사막 · 늪 · 설원`; hint `칸 탭 → 고른 지형 · 표식(산 · 숲)은 지형 따라 자동`.
 - `한 칸`: paint the tapped cell (120 ms fade). `채우기`: flood-fill the connected cells of the same terrain from the tapped cell, spreading by distance (≤ 300 ms total). `고르기`: select a cell → info `O09 | 숲 · 하층 구역 | 칸 24 km · 장소 없음` and button `장소 만들기` (creates a place with a pin at the cell centre). `줄`: Q-23.
@@ -654,14 +889,14 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Mountain and forest marks are drawn automatically from the terrain.
 - Sources: planning 지도 생성 · 양식 (육각); boards `MapHex`, `MMapHexFill`.
 
-#### WLD-59 · 다각형 편집 — P1 · needsExternal: no
+#### WLD-59 · 다각형 편집 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Header breadcrumb `세계 지도 › 지방`, title `다각형 · 지역 나누기`; tabs `지역 · 레이어`; region list rows `<이름> | 칸 N` (e.g. `등불 결사 영역 | 칸 37`), hint `이름 · 색 · 연결 세력 → 지역 탭`, `새 지역`.
 - Tools `고르기 · 칸 넣기 · 합치기 · 나누기 · 땅 · 바다 · 레이어`: `칸 넣기` assigns tapped cells to the selected region (floating `칸 1 → 하층 구역`); `합치기` merges two regions; `나누기` splits a region by assigning chosen cells to a new region `[PROPOSED]`; `땅 · 바다` toggles a cell between land and sea.
 - Region = 이름 · 색 · 연결 세력. Whether a province can be a scene `지역` → Q-17.
 - Sources: planning 지도 생성 · 양식 (다각형); board `MapPoly`.
 
-#### WLD-60 · 상세 지형 편집 — P1 · needsExternal: no
+#### WLD-60 · 상세 지형 편집 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Header `세계 지도`, title `상세 지형 · 편집`, lens chip, `완료`; tabs `도장 · 범례 · 레이어`; tools `이동 · 도장 · 강 · 길 · 라벨 · 영역 · 레이어`; scale bar.
 - Stamps (12): `산 · 언덕 · 숲 · 도시 · 마을 · 성 · 폐허 · 탑 · 다리 · 항구 · 동굴 · 표지석`. Hint `탭 → 놓기 · 모서리 → 크기 · 위 손잡이 → 회전`. Size steps `1 · 2 · 3` only; rotation snaps to 15° with a haptic tick (release → nearest 15°); placing drops 14 px with a 0.96 press (decelerate 240 ms). Row `장소 연결 | 결사의 문 ›`. Selected chip `성 · 크기 2 · 0° · 장소 ‘결사의 문’`.
@@ -669,7 +904,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Curved labels (WLD-44).
 - Sources: planning 지도 생성 · 양식 (상세 지형); boards `MapDetail`, `MMapStamp`.
 
-#### WLD-61 · 글로 설명 → 조건 → 지형 — P1 · needsExternal: yes (on-device small language model; optional cloud)
+#### WLD-61 · 글로 설명 → 조건 → 지형 — P1 · needsExternal: yes (on-device small language model; optional cloud) (0.2.0: hidden, data kept, WLD-75)
 
 - Input screen (`새 지도 · 글로 설명`, title `지형 만들기`): text area (e.g. `북쪽은 눈 덮인 산맥이 가로막고, 남쪽 해안에 항구 도시가 있다. 동쪽은 메마른 사막, 서쪽 숲속에 결사의 문.`), line `함께 읽기 | 장소 6 | 세력 3 | 페이지 ‘하층 구역의 빛’` (project records read along; chips toggle each source `[PROPOSED]`), engine toggle `기기 안 · 클라우드`, result `읽어 낸 조건 · N | 기기 안 모델`, condition rows (`ConditionRow`: 3×3 grid showing 어디, name = 무엇, small = 특징 · 연결 장소, e.g. `산맥 · 북쪽 · 눈 덮임`, `항구 도시 · 남쪽 해안 · 장소 ‘잿더미 시장’`, `사막 · 동쪽 · 메마름`, `숲 · 서쪽 · 장소 ‘결사의 문’`), hint `조건 → 생성기 입력 · 그림은 생성기가 · 이름은 프로젝트 기록에서만`, buttons `조건 · 이 조건으로 만들기`.
 - Conditions are a visible, editable list: edit, delete, add (`조건` opens the editor `[PROPOSED]`). Each condition = 무엇 (kind such as 산맥 · 항구 도시 · 사막 · 숲) · 어디 (subset of 3×3 cells) · 특징 · 연결 장소 (existing place only).
@@ -683,7 +918,7 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 
 ### G. 지도 ↔ 연표
 
-#### WLD-62 · 인물 동선 — P1 · needsExternal: no
+#### WLD-62 · 인물 동선 — P1 · needsExternal: no (0.2.0: hidden, data kept, WLD-75)
 
 - Inner board `MapTrack` (cover version not drawn, Q-21): breadcrumb, title `인물 동선`, chip `시점 · 1-7`; side tabs `동선 · 장소 · 레이어`; character chips (`리엔 · 하르트 · 세라`, multi-select; the focused character in `acc`, others outlined, dashed line).
 - Side list `리엔 · 씬 순서`: rows `<episode> | <place> | <scene> · <day label>` (e.g. `1-2 | 하층 거리 | 씬 1 · 1일째 새벽`). Note `장소 · 때는 씬 속성에서 · 선은 지도 경로를 따라 · 경로가 없으면 직선 ‘추정’`.
@@ -692,27 +927,27 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 - Bottom scrubber of episodes (`1-1 … 1-9`) moves the point and can play; the character position at the point = place of the latest stop at or before it, drawn as an initial + name glass chip.
 - Sources: planning 지도 ↔ 연표 (인물 동선); rule 11 §5; rule 19 §6; rule 20 §2; boards `MapTrack`; DS `MapMarks`.
 
-#### WLD-63 · 이곳의 시간 — P1 · needsExternal: no
+#### WLD-63 · 이곳의 시간 — P1 · needsExternal: no (0.2.0: kept, WLD-75)
 
 - Place card tab `이곳의 시간`: world events whose place is this place (or its region), and scenes at this place, in time order. Rows: time label (`1195`, `1-2 씬 1`), title (event name or scene title), sub (`세계 사건 · 빛이 꺼진 첫 거리`, `1일째 새벽 · 리엔`, `대정전 그날 · 세라`, `계획 · 하르트`).
 - Flashback scenes are placed at their own era (rule 11 §4), not at their manuscript position (Q-24: the board `PlaceTime` differs).
 - A divider at the lens point `시점 1-7 · 이 아래는 아직` (`acc`, dashed); rows after it are dimmed (50 %).
 - Sources: planning 지도 ↔ 연표 (이곳의 시간); rule 11 §4; board `PlaceTime`.
 
-#### WLD-64 · 연표 + 지도 — P1 · needsExternal: no
+#### WLD-64 · 연표 + 지도 — P1 · needsExternal: no (0.2.0: kept without lens chip, WLD-75)
 
 - Inner screen (header small `세계 · 연표 + 지도`, title `연표`, lens chip): left the event list (`1200 · 1-3 | 리엔, 결사 합류 | 씬 2 · 1일째 아침 | 결사의 문`), right the map. Hint `사건마다 장소 · 고르면 지도에서 강조`. Selecting an event highlights its place pin or region on the map.
 - Faction region changes: an event row can show `세력 영역 변화 ◆`; chips `1-7 · 1-9 ◆ · 비교` switch the map between the two points or overlay them; caption `상층 경비대 | 영역 · 1-9 ◆ 넓어짐` and `점선 = 1-9부터 더해진 곳`.
 - Cover version not drawn (Q-21).
 - Sources: planning 지도 ↔ 연표 (연표 + 지도); board `TimelineMap`.
 
-#### WLD-65 · 세력 영역의 시점별 모양 — P1 · needsExternal: no
+#### WLD-65 · 세력 영역의 시점별 모양 — P1 · needsExternal: no (0.2.0: kept, WLD-75)
 
 - A region's shape (vertex list) is a value with `◆` history like any field: editing vertices at a lens point offers `이 값 고치기 · 여기서부터 바뀜` (rule 11-2); the map at lens L draws the shape in effect at L; `예정` shapes (beyond the 집필 선) are not applied at 최신.
 - Comparison of two points: union drawn with the added area dotted.
 - Sources: planning 지도 ↔ 연표 (세력 영역이 시점에 따라 바뀌면 ◆); rule 11 §1–§2; board `TimelineMap`.
 
-#### WLD-66 · 거리 계산 (동선 · 이동 점검에 넘김) — P1 · needsExternal: no
+#### WLD-66 · 거리 계산 (동선 · 이동 점검에 넘김) — P1 · needsExternal: no (0.2.0: domain kept, no UI, WLD-75)
 
 - `distanceKm(from: PlaceOrRegionRef, to: PlaceOrRegionRef, mode?)` returns `{km, kind: ROUTE | STRAIGHT | ZERO, unavailable: NO_SCALE | NO_LOCATION | null}`:
   - same place → 0 (`ZERO`);
@@ -728,9 +963,13 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 
 ### H. 설정 · 모션 · 나중
 
-#### WLD-67 · 설정 · 지도 · 이미지 · 연표 (앱 설정) — P1 · needsExternal: no
+#### WLD-67 · 설정 · 지도 · 이미지 · 연표 (앱 설정) — P1 · needsExternal: no (0.2.0: rows changed, WLD-75 · WLD-73)
 
 - Screen `설정 › 지도 · 이미지 · 연표` (row in `설정`: `지도 · 이미지 · 연표 | 색면 · 홀로 · 생성 방식 · 이동 거리 ›`). Rows owned here: `지도 · 새 지도 그림 | 색면 · 먹선 · 색 · 양피지 · 색면 ›`; `지형 만들기 · 글로 설명 | 기기 안 · 클라우드(정확도↑ · 전송) · 기기 안 ›`; `큰 지도 내보내기 | 4K · 8K · 4K ›`. Rows shown on the same screen but owned elsewhere: `이미지` group (`홀로그램 효과 기본`, `기본 이미지`), `연표 · 때` group (`때 표기 기본`, `이동 점검`, `장소 없는 씬 알림`).
+- **(0.2.0)**
+  - `지도 · 새 지도 그림` and `지형 만들기 · 글로 설명` are hidden (WLD-75), and the row sub in `설정` drops `생성 방식`. The row sub is the library area's, which picks its new text.
+  - `이동 점검` stays and is off by default (S-2, WLD-75).
+  - The project setting `용어 후보` is WLD-73's (project settings, not this app screen).
 - Sources: boards `SettingsMore`, `Settings`.
 
 #### WLD-68 · 지도 · 카드 모션 — P1 · needsExternal: no
@@ -757,6 +996,37 @@ Rows this area emits under the check-center filter `용어 공개` (shell, filte
 
 - Faction-to-faction relations use the same storage shape as character relationships (사이 + each side's 마음); screens later. v1 stores nothing new; data model reserved.
 - Sources: memory rules-relations (Faction-to-faction relations: same storage shape, screens later); rule 20 (세력끼리 관계 · 화면은 나중).
+
+#### WLD-76 · 게임 제작 도구가 꺼져 있을 때 · 세계 · 0.2.0 글 (switch surfaces and copy) — P0 · needsExternal: no (0.2.0, G-2)
+
+- The project switch `게임 제작 도구` (G-1) is owned by the library area. World reads it and never writes it.
+- **World surfaces while it is off.** Each is hidden and its data kept; turning the switch on shows them as in 0.1.0.
+
+| Surface | While off | Stored data |
+| --- | --- | --- |
+| Place `배경 에셋` row: map sheet, side card, card `개요` (WLD-09) | hidden | asset → place links kept |
+| Impact sheet counts of background-asset links (WLD-14) | left out; the links still turn dotted as before, out of sight | kept |
+| Term card rows tagged `게임 텍스트` (profile voice lines and archive documents, WLD-19) and their count in `원고 밖 · 메모 · N` | not listed and not counted | links kept |
+| Asset creation in U-15 (the `연출` asset picker) | not offered (script area, U-15.4) | — |
+
+- **Not affected** by the switch: the `쓰인 곳` text kinds, `▲`, candidates, the automatic reveal, maps and the timeline. "Game output" in WLD-19 names the text kinds, not the switch.
+- **Copy (Kotlin constants; `WorldCopy` unless noted).** Sourced copy is verbatim; `TODO_COPY_…` rows have no source and go to the lane's Requests (DECISIONS §3).
+
+| Constant (suggested) | Copy | Where | Source |
+| --- | --- | --- | --- |
+| `NEW_PLACE` · `NEW_TERM` · `NEW_FACTION` | `새 장소` · `새 용어` · `새 세력` (with icon `plus`) | list rows, card titles | u15 row 1; icon list row 60 |
+| `newFor(kind, q)` | `‘<q>’ 새 장소` (likewise per kind) | picker rows | u15 row 3; quote style DS-72 |
+| field labels | `이미지 · 이름 · 상위 지역 · 한 줄 설명` · `이름 · 다른 이름 · 한 줄 설명` · `이미지 · 이름 · 한 줄 설명` | create cards | u15 row 7 |
+| `NEW_EVENT` · event fields | `새 사건` · `이름 · 때 · 관련 인물` | 연표 row, card | u15 rows 4, 7 |
+| `RELATED_CHARACTERS` | `관련 인물` | event detail row | u15 row 7 |
+| `NEW_MAP` (`MapCopy`) | `새 지도` (with icon `plus`) | 지도 tab row | WLD-36 sheet title; icon list row 60 rule |
+| `TERM_CANDIDATES` | `용어 후보` | project setting, 용어 tab section `용어 후보 · N` | decisions rows `단순화 · 용어` |
+| `candRow(word)` | `용어 후보 · 등불` + actions `잇기` · `아님` | `참고` row (rendered by the script area) | board `scr_core.py` `cand_row` |
+| `TODO_COPY_WORLD_CANDIDATES_SUB` | none | setting sub | no source |
+| `TODO_COPY_WORLD_REVEAL_AUTO` | none | `공개 시점 옮기기` row that returns to automatic | no source |
+| `TODO_COPY_WORLD_REVEAL_AUTO_MARK` | none | mark after an automatic `첫 공개` value | no source |
+
+- Sources: scope G-2, G-6, D33; decisions row `방향 · 게임 제작 기능` (planning).
 
 ---
 
@@ -802,6 +1072,8 @@ Common to every entity below (file format §4, §7): `key: ULID` (permanent, gen
 | anchor | Anchor | no | `BLOCK(blockKey)` or `POINT(unitKey, unitKind: CHAPTER · EPISODE · SCENE)`; engine owned by SCR / rule 12 |
 | originalBlockKey | ULID | yes | reference only: mirrors SCR's anchor model; set while `근거 지워짐` (anchor moved), cleared on re-attach |
 | state | enum `NORMAL · ORPHANED · LEFT_AS_IS` | no | reference only: mirrors SCR's anchor states (`근거 지워짐`, `이대로 두기`); use SCR's type if it defines one |
+
+**(0.2.0)** A `FirstReveal` record is always hand-set. The automatic reveal (WLD-72) is derived from the link index and never stored, so no record is ever written for it.
 
 **Place** (`world.json › places[]`)
 
@@ -857,6 +1129,7 @@ Common to every entity below (file format §4, §7): `key: ULID` (permanent, gen
 | relatedTerms | List<ULID> | no | 관련 용어 |
 | revealPoint | PointRef | yes | 공개 시점 (`2장에서 공개 예정`) |
 | hidden | Boolean | no | `[PROPOSED]` follows item hiding of linked items only |
+| relatedCharacterKeys | List<ULID> | no (default empty) | **(0.2.0, additive)** 관련 인물 (WLD-74) |
 
 **WorldMap** (`maps/<mapKey>.json`)
 
@@ -922,6 +1195,10 @@ Common to every entity below (file format §4, §7): `key: ULID` (permanent, gen
 
 **TermMatching** (`project.json › termMatching`): `extraParticles: List<String>` (project additions to the built-in list).
 
+**(0.2.0) Project setting `termCandidates`**: Boolean, default `true` (WLD-73), additive. It lives with the other project settings in `core:model` `ProjectSettings` (owned by the library lane, a Request), so it travels in `.civilight`. A 0.1.0 file without it reads `true`. The 0.1.0 script display toggle `용어 후보` (WLD-27) is no longer read; its stored value is kept.
+
+**(0.2.0) Additions to the term and place create paths** need no new field: the create card writes `aliases`, `image`, `description` and `parentPlaceKey`, which already exist.
+
 **App settings (device-local, not in `.civilight`)**: `defaultMapStyle` (SOFT), `textMapEngine` (ON_DEVICE · CLOUD), `largeMapExport` (K4 · K8), remembered world tab and list/card view per screen, last map viewport.
 
 ### 3.2 Relations to entities owned by other areas
@@ -954,6 +1231,12 @@ Common to every entity below (file format §4, §7): `key: ULID` (permanent, gen
 | manifest `features` | `maps.gen` (optional), `fields.custom` (optional); a reader that lacks `maps.gen` still shows the stored base image and overlays |
 
 Not stored: usage counts, candidate lists and the candidate index, `▲` lists, ages, `등장`, `배경 에셋` counts, distances, durations, track and place-time lists, check results other than `맞음` and `아님`.
+
+**(0.2.0)**
+- The automatic first reveal is never stored (WLD-72).
+- `events[]` entries may carry `relatedCharacterKeys`, and `project.json` carries `termCandidates`.
+- Hidden map data (node, generated and sketch maps, routes, scales, travel modes, text conditions) and the `게임 제작 도구` value are always written, on or off (scope §8, G-4).
+- A 0.1.0 file opens unchanged.
 
 Trash is not exported unless the export option `휴지통도 포함` is chosen (storage area). Deleted items keep a tombstone `{key, deletedAt}` for 30 days and a name tag after permanent delete (`{key, name, kind}`) so dotted references can print `영구 삭제 · <이름>`.
 
@@ -1053,7 +1336,7 @@ Unless stated, term T1 (`오리지늄 등불`, alias `오리지늄`) and each te
 
 **WLD-T34 · Flashback compared by manuscript order.** Given term T2 `대정전` with `첫 공개` = BLOCK(b41), b41 placed in 1-4 씬 2 before b42, and links to T2 in b42 and in a block of 1-3 씬 2. Then the b42 link is not `▲` (after the reveal in manuscript order although the scene is a 1195 flashback) and the 1-3 씬 2 link is `▲`.
 
-**WLD-T35 · No first reveal.** Given term T8 without `첫 공개` and links in 1-2 씬 1, 1-4 씬 2, 1-6 씬 1. Then no `▲`; the card shows `첫 공개 없음 · 쓰인 곳 3` and chip `1-2 씬 1을 첫 공개로`; the check center has `◇ 첫 공개 없음` for T8. When the chip is tapped. Then `첫 공개` = BLOCK(the 1-2 씬 1 block holding the first link) and no link is `▲`.
+**WLD-T35 · No first reveal.** **Superseded (0.2.0):** with WLD-72, T8 has the automatic reveal BLOCK(the 1-2 씬 1 block), no `◇ 첫 공개 없음` row and no chip; see WLD-T73 … T78. The 0.1.0 expectation follows for reference. Given term T8 without `첫 공개` and links in 1-2 씬 1, 1-4 씬 2, 1-6 씬 1. Then no `▲`; the card shows `첫 공개 없음 · 쓰인 곳 3` and chip `1-2 씬 1을 첫 공개로`; the check center has `◇ 첫 공개 없음` for T8. When the chip is tapped. Then `첫 공개` = BLOCK(the 1-2 씬 1 block holding the first link) and no link is `▲`.
 
 **WLD-T36 · Reveal planned beyond the 집필 선.** Given term T4 `잿불의 서약` with `첫 공개` = POINT(episode 2-5) and links in 1-5, 1-6 and 1-7. Then all three are `▲`; the check center shows one grouped row `잿불의 서약 · ▲ 3` that expands into three rows; the list shows T4 in `아직 공개 전` with `공개 예정 2-5`.
 
@@ -1067,7 +1350,7 @@ Unless stated, term T1 (`오리지늄 등불`, alias `오리지늄`) and each te
 
 **WLD-T41 · 맞음 lifecycle.** Given a `맞음` on l42. When the reveal is moved to 1-8. Then the `맞음` stays. When l42 is unlinked (text kept). Then the `맞음` record is deleted and b42's `오리지늄` becomes a candidate again.
 
-**WLD-T42 · Particle for the suggestion chip.** Given first-link locations `1-2 씬 1`, `1-2 씬 2`, `1-6 씬 4`. Then chips read `1-2 씬 1을 첫 공개로`, `1-2 씬 2를 첫 공개로`, `1-6 씬 4를 첫 공개로` (particle by the Sino-Korean reading of the last digit: 0 3 6 7 8 1 → `을`; 2 4 5 9 → `를`).
+**WLD-T42 · Particle for the suggestion chip.** **Superseded (0.2.0):** the chip is gone (WLD-18). The particle helper may stay for other copy; this case is no longer a product rule. Given first-link locations `1-2 씬 1`, `1-2 씬 2`, `1-6 씬 4`. Then chips read `1-2 씬 1을 첫 공개로`, `1-2 씬 2를 첫 공개로`, `1-6 씬 4를 첫 공개로` (particle by the Sino-Korean reading of the last digit: 0 3 6 7 8 1 → `을`; 2 4 5 9 → `를`).
 
 ### 4.5 Delete, hide, persist (WLD-13, WLD-14, section 3.3)
 
@@ -1136,6 +1419,96 @@ Unless stated, term T1 (`오리지늄 등불`, alias `오리지늄`) and each te
 **WLD-T70 · Merging terms with two first reveals.** Given term T9 `빛돌` with `첫 공개` = BLOCK(b32) and links to T9 in b32 and b61, and T1 in state A. When T9 is merged into T1 with the default choice (target's reveal b7344). Then the links in b32 and b61 target T1, both are `▲`, and T1's `▲` count is 3 (b42, b32, b61). When the author picks T9's reveal (b32) in the comparison row instead. Then no link of T1 is `▲` (b32 is the reveal block; b42 and b61 come after). `[PROPOSED, Q-11]` `빛돌` becomes an alias of T1.
 
 **WLD-T71 · Restoring a place whose map was deleted.** Given place `기록실` with a pin on `하층 구역 지도`. When `기록실` goes to trash, then `하층 구역 지도` goes to trash, then `기록실` is restored. Then the place returns; its pin is flagged `◇ 지도 없음` with actions `지도 되살리기 · 핀 다시 놓기`.
+
+### 4.9 0.2.0 cases (WLD-70 … WLD-76)
+
+Fixture F as in §4.1, with one change: **state A0** = state A **without** the stored `첫 공개` record of T1. Every earlier case that uses Fixture F keeps its stored record and so tests the hand-set path. WLD-T35 and WLD-T42, which rely on a term with no record, are superseded. Cases marked "state model" run on the screen's JVM state builder; cases marked "emulator" are checked on the emulator. The project setting `용어 후보` is on unless a case says otherwise.
+
+**WLD-T73 · Automatic reveal.** Given state A0. Then:
+- `TermReveals.effective(T1)` = `AUTO`, anchor BLOCK(b42) (1-4 씬 2, the first manuscript link l42; the page link lpg never counts).
+- The card row reads `첫 공개 | 1-4 씬 2 · <b42 number>` followed by `TODO_COPY_WORLD_REVEAL_AUTO_MARK`.
+- No link of T1 is `▲` (l42 is in the reveal block; l44 comes after it), and the card header is `쓰인 곳 · 2 · 후보 1`.
+- The list shows T1 in `공개됨 · 최신 · 1-7` with `첫 공개 1-4 · ◇ 후보 1` and no second line.
+- The check center has exactly one `용어 공개` row: `◇ 공개 전 후보 · 1-2 씬 1 · …` ending `첫 공개 1-4` (b12 comes before b42).
+- `changes.json` holds no `firstReveal` record for T1.
+
+**WLD-T74 · The automatic reveal follows the links.** Given state A0.
+- When l42 is unlinked (text kept) → Then the reveal is BLOCK(b7344) `AUTO`, and b42's `오리지늄` becomes a FULL candidate before the reveal. The list shows `첫 공개 1-7 · ◇ 후보 2`. No toast and no `◇ 근거 지워짐` appear.
+- When b42 is moved to the trash instead → Then the reveal is BLOCK(b7344). When b42 is restored → Then BLOCK(b42) again.
+- Still no stored record in either case.
+
+**WLD-T75 · A stored record wins, and `자동` removes it.** Given state A (stored BLOCK(b7344)). Then WLD-T01 … WLD-T03 hold (`▲` on b42).
+- When the `공개 시점 옮기기` row `TODO_COPY_WORLD_REVEAL_AUTO` is chosen → Then the record is deleted, the state equals WLD-T73, and the `▲` row is gone.
+- When undo → Then the record and the `▲` return.
+
+**WLD-T76 · Picking in the sheet makes it hand-set.** Given state A0. When `공개 시점 옮기기` → `에피소드 · 장으로` → `2-5` → Then a stored POINT(2-5) record exists, l42 and l44 are both `▲`, and the check center groups them as `오리지늄 등불 · ▲ 2`.
+
+**WLD-T77 · First link in a choice line.** Given term T10 whose only link is in option line `#045-2` of choice block c15 (1-5). Then the effective reveal is BLOCK(c15), not refused (the option-line ban is for stored records), and the link is not `▲`.
+
+**WLD-T78 · Text kinds that never reveal.** Given term T11 with links only in an author memo, a direction block and a page. Then T11 has no effective reveal and is in `아직 공개 전` with `첫 공개 없음`. No `◇ 첫 공개 없음` check row appears, because the usage is 0.
+
+**WLD-T79 · Candidates off.** Given state A, and `용어 후보` turned off. Then:
+- the card header is `쓰인 곳 · 2`, and the card has no `후보` group, no `글자 찾기` row and no `⋯ › 아님으로 둔 것`;
+- the list shows `첫 공개 1-7` and `▲ 앞에서 1회 사용` (no `◇ 후보`);
+- the check center has only the `▲` row;
+- the script gets no candidate spans;
+- the 용어 tab has no `용어 후보` section;
+- the index is not built;
+- T1's `textSearch` and every `아님` record are unchanged.
+- When it is turned back on → Then a full scan runs, and WLD-T01 holds again.
+
+**WLD-T80 · Candidate section in the 용어 tab.** Given state B. Then the last section of the 용어 list is `용어 후보 · 1`, with one row `오리지늄 등불` · `후보 3` · `◇ 공개 전 후보 3`. Tapping it opens T1's card at its `후보` group.
+
+**WLD-T81 · `참고` row data.** Given state B and block b61 `하층에서 빛돌을 판다고?`.
+- Then WLD gives the script one span `{T1, 오리지늄 등불, matchedText 빛돌, FULL, [5, 7)}`, and the script draws `용어 후보 · 빛돌 · 잇기 · 아님`.
+- When `아님` → Then the rejection of WLD-T13's shape is stored for b61, and the span list for b61 is empty.
+
+**WLD-T82 · Create a term in place.** When the `＋ 새 용어` card is filled with `이름 반딧돌 · 다른 이름 반디 · 한 줄 설명 작은 빛을 내는 돌` and `만들기` → Then:
+- one term exists with aliases `[반디]` and that description;
+- one undo step removes it;
+- only that term is rescanned.
+
+The same card with `다른 이름` = `반디, 개똥` stores the single alias `반디, 개똥`, which is never split (WLD-70).
+
+**WLD-T83 · Create from a picker.**
+- Given the scene place picker with the query `은빛 항구` and no match → Then the top row's label is `‘은빛 항구’ 새 장소` (icon `plus`). When `만들기` → Then a place `은빛 항구` exists with no pin and is returned as `PlaceRef`.
+- Given the merge target picker → Then it has no create row.
+
+**WLD-T84 · Create an event in place.**
+- `이름 결사 창립 · 때 1190` makes a `WORLD` event in 1190.
+- `때` = scene `1-3 씬 2` makes a `STORY` event on that scene.
+- An empty `때` makes a `WORLD` event with no date, listed after the dated world events before the story.
+- `관련 인물 리엔 · 세라` is stored as two keys, and the detail row reads `관련 인물 | 리엔 · 세라`.
+- With world time `시간 없이` → Then the 연표 is off and no `＋ 새 사건` exists.
+
+**WLD-T85 · Maps (state model; the picker step on the emulator).**
+- Given a project from 0.1.0 with a node map, a generated map, a sketch map and an image map with a route and a scale.
+- Then the 지도 list shows all four.
+- The node, generated and sketch maps open with no `편집`.
+- The image map's tool bar is `이동 · 핀 · 영역 · 라벨 · 레이어`, no route or scale bar is drawn, and no `축척 맞추기` is reachable.
+- When `＋ 새 지도` → an image is picked → Then an `IMAGE` map named `지도 1` exists and opens. None of the four 0.1.0 maps is named `지도 N`; see the naming rule in WLD-75. When the picker is cancelled instead → Then nothing is created.
+- The domain cases WLD-T53 … WLD-T55 still pass (the functions are kept).
+- Saving and reloading the project leaves the four 0.1.0 map files unchanged.
+
+**WLD-T86 · Lens on world heads (state model).** Given the lens `1-5` picked on the world head.
+- Then the term list puts T1 (state A) in `아직 공개 전`, as WLD-T40.
+- The 연표, the map view and 연표 + 지도 read at `최신` and show no lens chip.
+- When the project is reopened → Then the world head reads `최신 · 1-7`.
+
+**WLD-T87 · Switch off.** Given `게임 제작 도구` off and a link to T1 in 세라's archive document. Then:
+- T1's card has no `게임 텍스트` row, and `원고 밖 · 메모` counts only lpg;
+- the place card of `하층 거리` has no `배경 에셋` row.
+- When the switch is on → Then both appear, with the same counts as 0.1.0.
+
+**WLD-T88 · Read-only (state model).** Given the example project (read-only). Then no `＋ 새 장소 · ＋ 새 용어 · ＋ 새 세력 · ＋ 새 사건 · ＋ 새 지도` row exists, and no picker shows a create row.
+
+**WLD-T89 · Automatic reveal in a hidden scene.** Given state A0 with scene 1-4 씬 2 hidden and the lock closed. Then:
+- the effective reveal is still BLOCK(b42) (no `▲`, same candidates as WLD-T73);
+- the card row reads `첫 공개 | 1-4 · 숨긴 씬`, and the list reads `첫 공개 1-4`.
+- When unlocked → Then the card row names the scene and block as in WLD-T73.
+
+**WLD-T90 · Copy lint.** Every constant of WLD-76's copy table passes `CopyLint`. Each `TODO_COPY_WORLD_…` is listed under the lane's Requests.
+
 ---
 
 ## 5. Screens
@@ -1183,6 +1556,22 @@ Components are from the design system (`.nm` scope): `GlassBars` (top/bottom gla
 | 모션 규칙 · 지도 · 카드 | `MotionSpec2`, `MMap*`, `MCardView`, `MCarousel`, `MFoldMap` | — | — | WLD-68 |
 | 이미지 규격 | `ImageSlots`, `ImagePick`, `ImageCrop` | — | — | WLD-07 |
 
+**(0.2.0) Screens.**
+- 세계 lists: no `+`, a create row on top, the small lens chip.
+- 용어 list: the `용어 후보 · N` section last.
+- 용어 후보 작은 창: superseded by the `참고` row (script area).
+- 연표 and map screens: no lens chip.
+- Hidden map screens (경로, 축척, 노드 편집, 양식, 단계별 만들기, 단계 다시 만들기, 육각, 다각형, 상세 지형, 글로 설명, 인물 동선) are unreachable (WLD-75).
+
+| Screen / state (0.2.0) | Boards | Cover (390) | Inner (800) | Features |
+| --- | --- | --- | --- | --- |
+| 만들기 카드 · 장소 · 용어 · 세력 · 사건 (list and picker modes) | `scr_icon_variants.py` (row only) | centred floating card over a dimmed list, above the IME | centred card | WLD-70, 74 |
+| 용어 후보 section | none | last list section | same in the list pane | WLD-73 |
+| 참고 · 용어 후보 row (data only; the script renders it) | `scr_core.py` `cand_row` | top of `참고` | same | WLD-73 |
+| 새 지도 (image picker) | none | system picker | same | WLD-75 |
+| 지도 보기 · 보기 전용 (node, generated, sketch) | `MapNode`, `MapSoft`, `Map` minus the edit controls | full-screen map, no `편집` | map with side card | WLD-75 |
+| 사건 상세 · 관련 인물 row | right pane of `TwoTimeline` + one row | full screen | right pane | WLD-33, 74 |
+
 **Layout notes.**
 - Glass header heights: lists 110–118 px content offset; map screens overlay the map. Map tool bar sits bottom-left (inner) / bottom centre (cover), never near the fold line. Hit areas ≥ 44px for pins, vertices, chips, toggles.
 - Typography: names and sentences in Nanum Myeongjo; labels and buttons in Noto Sans KR; numbers (years, `1-7`, `#044`, km, seeds, `O09`) in IBM Plex Mono.
@@ -1223,3 +1612,14 @@ Each item names the conflicting or silent sources and the default this spec uses
 - **Q-26 · Where `◇ 첫 공개`, `아님`, `맞음` live in `.civilight`.** The file-format tab lists `changes.json` for ◆ only and is silent on these three (it only says the `맞음` mark is stored). Default: `firstReveal` in `changes.json`, `아님` inside the term in `world.json`, `맞음` with the check-center owner keyed by `linkId`.
 - **Q-27 · A place with pins on several maps.** Rule 22's `◇ 공개 전 장소 · 전환 문구` reads "the place's visible point (map)"; with pins on both a parent and a child map the two points may differ. Default: the earliest point among the place's pins.
 - **Q-28 · Cross-area contracts this spec assumes.** (a) SCR gives every link run a stable `linkId` (ULID) so `맞음` can attach to a link (rule 21 §6 says `맞음` attaches to "그 연결"; no source defines link identity). (b) The travel verdict and its chips, the scene `장소와 때` sheet, `장소 · 때 한꺼번에`, and the `맞음` store are owned by other areas and are not specified here; this spec supplies only the place picker, distances, travel modes and term rows. (c) The `.civilight` placement of `첫 공개` and `아님` (Q-26) needs the storage owner's agreement.
+
+**0.2.0 questions (each with the default used above)**
+- **Q-29 · Which map tools S-3 hides.** S-3 and scope §8 name only node, terrain and sketch maps, distances, routes, travel modes and tracks. The headline "one image plus pins" could also mean hiding regions, labels, layers, sub-maps and reveal points. Default: those five stay on image maps, because scenes may use a region as `지역` and nothing names them. Scale goes with distances, and `연표 + 지도` stays without its lens chip.
+- **Q-30 · Hand-set reveals in 0.2.0.** Scope D12 keeps 0.1.0 hand-set reveals but does not say whether a new one can be set. Default: `공개 시점 옮기기` stays (the check center's `▲` row still needs it), and one new row returns a term to automatic (WLD-72). The `◇ 첫 공개 없음` row keeps its trigger and in practice no longer shows.
+- **Q-31 · Travel check default and storage.** 0.1.0 `AppSettings.checkTravel` defaults to `true`. Default proposed to the owning lane: a new additive field read in its place, default off, with the old value kept. Rewriting the stored value would break scope §8 rule 1.
+- **Q-32 · Where the candidate setting lives.** "설정에서 끌 수 있다" does not say app or project. Default: a project setting `용어 후보`, default on, which travels in `.civilight`.
+- **Q-33 · The candidate list in the 용어 tab.** Default: one row per term with candidates, as the last section, opening the term card's `후보` group, instead of a separate screen listing every candidate.
+- **Q-34 · `다른 이름` and `상위 지역` in the create card.** U-15 words them so. Default: they are the existing `별칭` (one alias, never split) and `지역` fields, and the card keeps U-15's words.
+- **Q-35 · Lens chip on world heads.** Default: the list head and the term, place and faction card heads only. 연표, map view, map edit and 연표 + 지도 read at `최신` with no chip.
+- **Q-36 · New map entry.** U-15 lists no map kind. Default: the 지도 tab gets the same create row, `＋ 새 지도` (icon list rule "목록마다"), which opens the image picker directly, because image is the only base left.
+- **Q-37 · `때` in the event card.** Default: one optional field with two visible choices (year, or `씬 고르기`); the event kind follows. Empty means an undated world event.

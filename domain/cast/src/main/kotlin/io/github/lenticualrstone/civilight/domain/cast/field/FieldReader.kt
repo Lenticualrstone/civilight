@@ -103,7 +103,8 @@ object FieldReader {
         dates: StoryDateSource,
     ): FieldReading {
         val mode = doc.project.worldTime.mode.known ?: WorldTimeMode.YEAR_ONLY
-        val sourceDef = def.calc?.sourceFieldDefKey?.let { doc.index.fieldDef(it) }
+        // A source in the trash (or purged, or missing) reads as empty (CST-55, TC-F-31).
+        val sourceDef = liveCalcSource(doc, def)
         val source = sourceDef?.let { storedAt(doc, kind, entityKey, it, point).first }
         val birth = source?.payload as? FieldPayload.Date
         if (birth != null && mode != WorldTimeMode.NONE && source.valueState == ValueState.VALUE) {
@@ -120,6 +121,10 @@ object FieldReader {
         if (source.valueState == ValueState.UNKNOWN) return FieldReading(def, FieldValue.UNKNOWN, null, hasHistory, Derivation.AGE_FROM_BIRTH)
         return FieldReading(def, null, null, hasHistory)
     }
+
+    /** The live source definition of a `계산` field; null when none, trashed or purged (CST-55). */
+    fun liveCalcSource(doc: ProjectDoc, def: FieldDef): FieldDef? =
+        def.calc?.sourceFieldDefKey?.let { doc.index.fieldDef(it) }?.takeIf { it.deletedAt == null }
 
     /**
      * Age in years: `연도만` subtracts years; `세계 달력` gives 만 나이 when both dates have month and

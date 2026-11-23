@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.model.project.FieldBundle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -124,9 +125,12 @@ internal fun NewProjectScreen(route: NewProject, services: LibraryServices) {
         localSheets = { key ->
             when (key) {
                 is BundlePickerSheet -> sheetBody {
-                    BundlePickerContent(form, inputs.bundleSources) { bundle, source ->
-                        update { it.copy(bundle = bundle, bundleSourceKey = source) }
-                    }
+                    BundlePickerContent(
+                        form, inputs.bundleSources,
+                        onPick = { bundle, source -> update { it.copy(bundle = bundle, bundleSourceKey = source, bundleTemplateKey = null) } },
+                        templates = inputs.visibleTemplates,
+                        onPickTemplate = { key -> update { it.copy(bundle = FieldBundle.TEMPLATE, bundleSourceKey = null, bundleTemplateKey = key) } },
+                    )
                 }
                 else -> null
             }

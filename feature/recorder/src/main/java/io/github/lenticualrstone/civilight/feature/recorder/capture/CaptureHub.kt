@@ -37,6 +37,7 @@ import io.github.lenticualrstone.civilight.model.recorder.RecordingSession
 import io.github.lenticualrstone.civilight.model.recorder.TranscriptionMode
 import io.github.lenticualrstone.civilight.model.text.TextRun
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,8 +49,10 @@ import kotlinx.coroutines.launch
 
 /**
  * The one capture of the app (LRC-01 … LRC-20): recording, `정리 중`, the text memo and the link
- * picker. It lives for the process, not for a screen: system back only minimises a recording
- * (LRC-07), and a second mic tap reopens the running one (LRC-01). Rules are `domain:recorder`
+ * picker. It lives for the process, not for a screen: a recording goes on while the app is in the
+ * background (LRC-09), and a second mic tap reopens the running one (LRC-01). Leaving the recorder
+ * inside the app (back, another screen) saves the take as `정리 안 됨` and releases the microphone
+ * ([leave], U-13). Rules are `domain:recorder`
  * (`Recording`, `TextMemo`, `LinkPicker`); this class sequences them, runs the timer and the
  * speech engine, and writes the library through [recorder].
  *
@@ -255,6 +258,11 @@ class CaptureHub(
     /** The engine that transcribed this take (the record's `transcribedBy`); on-device when none ran. */
     private fun transcription(): TranscriptionMode = chosen?.mode ?: TranscriptionMode.ON_DEVICE
 
+    /**
+     * `일시정지` and its resume. A pause closes and releases every holder of the microphone (the take's
+     * recorder, the speech engine's input, the audio focus), so the system's mic indicator goes off;
+     * the resume opens them again and the same record goes on (U-13).
+     */
     fun togglePause() {
         val session = s.session ?: return
         when (session.phase) {
@@ -392,11 +400,32 @@ class CaptureHub(
         refreshEnv()
     }
 
-    /** System back: a recording only minimises (never discards); `정리 중` keeps the record in the inbox. */
+    /**
+     * The recorder was left inside the app while a take records or is paused (system back, another
+     * screen, U-13). The microphone is released at once, before this returns (the take's recorder,
+     * the engine, the audio focus), and a tour hold is cleared so its release cannot reopen it. The
+     * take is then saved like `멈추고 저장` + `기록함에 두기`: a voice record `정리 안 됨` with its
+     * links and hide switch, never discarded. Returns the save, which the caller awaits for the
+     * toast; null (and nothing changes) when no take is recording or paused. Calling it again
+     * while the save runs does nothing.
+     */
+    fun leave(): Job? {
+        val session = s.session ?: return null
+        if (s.stage != CaptureStage.RECORDING) return null
+        pausedForTour = false
+        // Undispatched: `stopAndSave` releases the microphone and moves to `정리 중` before its first suspension.
+        return scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            stopAndSave()
+            val now = s
+            if (now.stage == CaptureStage.PROCESSING && now.session?.recordKey == session.recordKey) keepInInbox()
+        }
+    }
+
+    /** System back: a recording is saved and left ([leave]); `정리 중` keeps the record in the inbox. */
     suspend fun back() {
         when (s.stage) {
             CaptureStage.PROCESSING -> keepInInbox()
-            CaptureStage.RECORDING -> Unit
+            CaptureStage.RECORDING -> leave()?.join()
             CaptureStage.TYPING -> memoClose()
             CaptureStage.MIC_REASON, CaptureStage.MIC_OFF -> dismissMic()
             CaptureStage.IDLE -> Unit

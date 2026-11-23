@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
@@ -44,6 +45,9 @@ import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.Popover
 import io.github.lenticualrstone.civilight.designsystem.component.PopoverCard
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
+import io.github.lenticualrstone.civilight.designsystem.glass.LocalGlassSource
+import io.github.lenticualrstone.civilight.designsystem.glass.glassSource
+import io.github.lenticualrstone.civilight.designsystem.glass.rememberGlassSource
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightHaptics
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
@@ -244,6 +248,7 @@ fun PaneSplitHandle(state: PaneSplitState, modifier: Modifier = Modifier) {
  * A two-pane frame with the CNV-47 handle: [left] | 1 dp `line` | [right]. The split comes from [module]'s
  * stored ratio, [defaultLeft] gives the module's own left width for a total width (`기본`). On the cover
  * screen, or when two 280 dp panes do not fit, the frame keeps [defaultLeft] and shows no handle.
+ * [bottomBar] (DS-65) is drawn once at the bottom over both panes, with the left pane's live width.
  */
 @Composable
 fun SplitPanes(
@@ -252,14 +257,24 @@ fun SplitPanes(
     right: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     defaultLeft: (totalDp: Float) -> Float = PaneSplitRules::listDetailDefaultLeft,
+    bottomBar: (@Composable (leftDp: () -> Float) -> Unit)? = null,
 ) {
     val colors = CivilightTheme.colors
     BoxWithConstraints(modifier.fillMaxSize().background(colors.bg)) {
         val total = maxWidth.value
         val state = rememberPaneSplitState(module, total, defaultLeft(total))
-        SplitLayout(leftDp = { state.leftDp }, left = left, right = right, divider = {
-            Box(Modifier.fillMaxSize().background(colors.line))
-        })
+        // DS-65: the frame's one bottom bar spans both panes and blurs both, so the panes are its glass source.
+        val source = rememberGlassSource()
+        Box(Modifier.fillMaxSize().then(if (bottomBar != null) Modifier.glassSource(source) else Modifier)) {
+            SplitLayout(leftDp = { state.leftDp }, left = left, right = right, divider = {
+                Box(Modifier.fillMaxSize().background(colors.line))
+            })
+        }
+        if (bottomBar != null) {
+            Box(Modifier.align(Alignment.BottomCenter)) {
+                CompositionLocalProvider(LocalGlassSource provides source) { bottomBar { state.leftDp } }
+            }
+        }
         PaneSplitHandle(
             state,
             Modifier

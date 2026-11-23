@@ -36,6 +36,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.Pill
+import io.github.lenticualrstone.civilight.designsystem.component.caretFollow
+import io.github.lenticualrstone.civilight.designsystem.component.rememberCaretFollow
 import io.github.lenticualrstone.civilight.designsystem.component.fieldOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightColors
@@ -100,6 +102,10 @@ fun RichTextEditor(
     val focused by source.collectIsFocusedAsState()
     val outline = fieldOutline(focused, error = false, colors = colors)
     val shape = RoundedCornerShape(12.dp)
+    // U-02: the caret line stays in view while the editor grows (offsets mapped to the drawn text).
+    val caret = rememberCaretFollow(state.field, focused, enabled = enabled) {
+        transformation.filter(AnnotatedString(it.text)).offsetMapping.originalToTransformed(it.selection.end)
+    }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (label != null) CivilightText(label, type.label, color = colors.ink2)
@@ -114,6 +120,7 @@ fun RichTextEditor(
             visualTransformation = transformation,
             interactionSource = source,
             modifier = Modifier.fillMaxWidth(),
+            onTextLayout = caret::onTextLayout,
             decorationBox = { inner ->
                 Box(
                     Modifier
@@ -127,7 +134,7 @@ fun RichTextEditor(
                     if (state.field.text.isEmpty() && placeholder != null) {
                         CivilightText(placeholder, type.field, color = colors.ink3)
                     }
-                    inner()
+                    Box(Modifier.caretFollow(caret)) { inner() }
                 }
             },
         )

@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightTextField
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
@@ -46,16 +47,20 @@ fun ColumnScope.NodeEditRows(
         // Held here while the surface is open: the document value arrives only after the store write,
         // and feeding it back would snap the field between keystrokes (Hangul composition).
         var text by rememberSaveable(view.nodeKey) { mutableStateOf(view.text) }
-        CivilightTextField(
-            value = text,
-            onValueChange = {
-                text = it
-                onText(it)
-            },
-            modifier = Modifier.padding(top = if (compact) 8.dp else 12.dp),
-            singleLine = false,
-            enabled = !view.readOnly,
-        )
+        val field: @Composable () -> Unit = {
+            CivilightTextField(
+                value = text,
+                onValueChange = {
+                    text = it
+                    onText(it)
+                },
+                modifier = Modifier.padding(top = if (compact) 8.dp else 12.dp),
+                singleLine = false,
+                enabled = !view.readOnly,
+            )
+        }
+        // U-02: in the sheet a long text scrolls (the buttons stay below), so its caret line can be followed.
+        if (compact) field() else SheetScrollBody { field() }
     }
     FoldReveal(view.readOnly) { CivilightText(CanvasCopy.READ_ONLY, CivilightTheme.type.small, Modifier.padding(top = 10.dp), color = colors.ink3) }
     val variant = if (compact) ButtonVariant.COMPACT_GHOST else ButtonVariant.GHOST

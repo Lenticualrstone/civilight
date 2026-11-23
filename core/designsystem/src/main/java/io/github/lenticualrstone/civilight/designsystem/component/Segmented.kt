@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -107,7 +108,8 @@ data class SegmentItem(val label: String, val icon: IconId? = null)
 /**
  * DS-33 outlined segmented (`.seg`): inline row, height 36 (32 in the WhenPicker), radius 12, 1 dp `edge`
  * inset, clipped; icon cells 44 wide (icon 18), text cells padding 0 × 12 in 600 12 / 16; selected
- * `pri` / `onpri`, others `ink3`; touch height 44. [groupLabel] names the group (`보기`). The selected fill
+ * `pri` / `onpri`, others `ink3`; touch height 44. [groupLabel] names the group (`보기`). [maxCellWidth] caps a
+ * text cell (label ellipsised; the DS-65 scope switch uses 160). The selected fill
  * slides between cells on `standard` and content colours cross over (S6); reduced motion: crossfade.
  */
 @Composable
@@ -118,6 +120,7 @@ fun OutlinedSegmented(
     modifier: Modifier = Modifier,
     height: Dp = 36.dp,
     groupLabel: String? = null,
+    maxCellWidth: Dp? = null,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -157,6 +160,7 @@ fun OutlinedSegmented(
                         hitTarget = HitTarget.BUTTON,
                         scaleOnPress = false,
                     )
+                    .then(if (item.icon == null && maxCellWidth != null) Modifier.widthIn(max = maxCellWidth) else Modifier)
                     .then(if (item.icon != null) Modifier.width(44.dp) else Modifier.padding(horizontal = 12.dp))
                     .then(if (item.icon != null) Modifier.semantics { contentDescription = item.label } else Modifier),
                 contentAlignment = Alignment.Center,

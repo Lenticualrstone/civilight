@@ -17,7 +17,7 @@ internal class ProjectSettingsViewModel(projectKey: Key, private val services: L
     ProjectViewModel(projectKey, services.deps.projects) {
 
     val ui: StateFlow<ProjectSettingsUi?> = combine(state, services.deps.settings) { load, settings ->
-        (load as? ProjectLoad.Ready)?.let { ProjectSettingsState.build(it.doc, it.readOnly, settings.ratingDefaults) }
+        (load as? ProjectLoad.Ready)?.let { ProjectSettingsState.build(it.doc, it.readOnly, settings.ratingDefaults, services.deps.stores.blobs::contains) }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** One switch (LIB-25): hiding off asks first; the rating never changes. */

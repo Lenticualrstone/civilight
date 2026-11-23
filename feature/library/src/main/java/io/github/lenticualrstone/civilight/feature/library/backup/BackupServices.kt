@@ -7,6 +7,7 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Keys
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.app.AppSettings
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +57,11 @@ internal class StoreBackupSources(private val deps: FeatureDeps) : BackupSources
     override fun audio(hash: String): ByteArray? = stores.blobs.fileOf(hash)?.readBytes()
 
     override suspend fun settings(): AppSettings = deps.settings.value
+
+    override suspend fun templates(): List<FieldTemplate> {
+        stores.fieldTemplates.ensureLoaded()
+        return stores.fieldTemplates.state.value.templates
+    }
 }
 
 /**

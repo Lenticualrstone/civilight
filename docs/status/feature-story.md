@@ -197,7 +197,7 @@ UI features are built and wired to the store, but have not been seen on a device
   - 1 level: the scenes. The first stat is `k/n` with the episode or scene level name.
 - **`시작해 볼 것` block:**
   - Shown while `startChecklist.dismissed` is false, never on a read-only project (the example). Imported projects show it too until closed, because `startChecklist` is app state and is not exported.
-  - While shown and nothing is written yet (no `이어 쓰기` target), home follows `NewReady`: head `새 프로젝트`, no rating badge or lens chip in the head (the rating sits in the summary line), no stats. The chapter rows and `작업` stay below. Once there is something to resume, home is `Home` with the block between `이어 쓰기` and the chapter list.
+  - While shown and nothing is written yet (no `이어 쓰기` target), home follows `NewReady`: no rating badge or lens chip in the head (the rating sits in the summary line), no stats except a 1-level project's `k/n 씬` (QA 0.1.1 backlog). The head title is the project's name in every state (QA U-06). The chapter rows and `작업` stay below. Once there is something to resume, home is `Home` with the block between `이어 쓰기` and the chapter list.
   - Row targets: `주인공 만들기` → `CastList`; `연결된 기록 …` → `RecorderInbox(projectKey = p)` (`FromProject`); `세계 용어 하나 적기` → `World(TERMS, createTerm = true)`; `첫 대사 쓰기` and `쓰기` → `Script` at the first scene.
 - **Structure:**
   - On entry the episode of `focusUnitKey`, else the episode of the last edit, is expanded, plus any planned chapter above it.
@@ -247,7 +247,8 @@ UI features are built and wired to the store, but have not been seen on a device
 - **BLK-01 `장소 · 때 빈 것 12`:** the fixture gives 14 (two scenes are timed without a place, `domain:story` `BulkTest` ignored case); the screen shows the computed 14.
 - **SUG examples:** the fixture's three proposals are 1-4 씬 1, 1-6 씬 2 and 1-8 씬 2 (`domain-story.md` open question on body sentences), not the spec's illustrative three.
 
-- **Home head vs the emulator note (batch 2):** the orchestrator saw `서재` / `새 프로젝트` in the top bar right after creating a project. Board `NewReady` draws exactly `‹ 서재 · 새 프로젝트` as the head, with the name as the large line below; kept as drawn.
+- **Home head vs board `NewReady` (QA U-06, 2026-11-23):** the board draws `‹ 서재 · 새 프로젝트` (and `Home` draws `프로젝트`); the user asked for the project's name. The head now reads `‹ 서재` + the name in every state; the large name line in the body stays.
+- **`작업` shortcuts (QA U-07, 2026-11-23):** the board's three-column text grid read as plain text. They are now DS `ListRow`s (hairline, pressed state, trailing `›`), one per shortcut, `설정` last; `설정`'s `ink3` dim is not drawn (`ListRow` has no title colour).
 
 - **`NewReady` text extract vs HTML:** `docs/boards/boards_text.txt` lists row 2 as `가져온 기록 2개 정리하기 | 프로젝트 메모`, while the HTML board and LIB-13 say `연결된 기록 2개 정리하기 | 기록함`. The HTML and spec are followed (via `domain:library` `StartBlock`).
 - **`시작해 볼 것 · n/4`** keeps `/4` when the `연결된 기록` row is hidden (k = 0, LIB-13 `ED`), so a fresh project reads `0/4` with three rows. This is `domain:library`'s header; it is flagged here for the library lane.

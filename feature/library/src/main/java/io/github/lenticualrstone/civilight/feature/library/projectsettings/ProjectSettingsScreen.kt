@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.library.projectsettings
 
+import io.github.lenticualrstone.civilight.model.asset.ImageSlot
+import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
+import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
 import io.github.lenticualrstone.civilight.feature.library.settings.SettingsValueRow
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import androidx.compose.foundation.layout.Arrangement
@@ -102,7 +105,21 @@ internal fun ProjectSettingsScreen(route: ProjectSettings, services: LibraryServ
                     .padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 8.dp, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
                 val open: (ProjectSettingsTarget) -> Unit = { target -> deps.navigator.push(routeOf(target, route.projectKey)) }
-                LinkSection(ProjectSettingsCopy.SECTION_STRUCTURE, current.structure, !current.readOnly, first = true, onOpen = open)
+                // U-08 LIB-82: `표지` first; the row opens the shared cover picker over this screen.
+                SectionHead(ProjectSettingsCopy.SECTION_COVER, first = true)
+                Box(Modifier.alpha(if (!current.readOnly) 1f else DISABLED_ALPHA)) {
+                    SettingsValueRow(
+                        title = current.cover.title,
+                        onClick = {
+                            if (!current.readOnly) {
+                                sheets.open(ImagePickSheet(route.projectKey, ImageOwnerKind.PROJECT, route.projectKey, ImageSlot.PROJECT_COVER))
+                            }
+                        },
+                        value = current.cover.value,
+                        subtitle = current.cover.sub,
+                    )
+                }
+                LinkSection(ProjectSettingsCopy.SECTION_STRUCTURE, current.structure, !current.readOnly, onOpen = open)
                 LinkSection(ProjectSettingsCopy.SECTION_CAST, current.cast, !current.readOnly, onOpen = open)
                 ProtectionSection(
                     ui = current,

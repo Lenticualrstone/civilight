@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.card.CardKind
 import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
+import io.github.lenticualrstone.civilight.designsystem.card.CardSize
 import io.github.lenticualrstone.civilight.designsystem.card.SnapCardRow
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
@@ -115,12 +116,13 @@ private sealed interface CardSlot {
 fun LazyListScope.cardRows(
     s: GalleryBodyState,
     rowStates: (String) -> LazyListState,
+    fit: (CardSize) -> CardSize = { it },
     onScrollToPick: (String, Int) -> Unit,
 ) {
     s.view.sections.forEach { section ->
         section.header?.let { header -> item(key = "head-${section.id}") { GroupHeader(s, section, header, rowStates(section.id), civilightItem()) } }
         item(key = "cards-${section.id}") {
-            CardRowSection(s, section, rowStates(section.id), onScrollToPick, civilightItem())
+            CardRowSection(s, section, rowStates(section.id), onScrollToPick, civilightItem(), fit)
         }
     }
     // Grouped rows (GAL-10): hidden images of visible owners collapse into one row after the groups.
@@ -135,6 +137,7 @@ private fun CardRowSection(
     rowState: LazyListState,
     onScrollToPick: (String, Int) -> Unit,
     modifier: Modifier,
+    fit: (CardSize) -> CardSize = { it },
 ) {
     val density = LocalDensity.current
     val slots = remember(section, s.view.lockedRow, s.view.grouped) {
@@ -143,7 +146,8 @@ private fun CardRowSection(
     }
     val pickedKey = s.pick.pickedKey
     val pickedIndex = section.entries.indexOfFirst { it.key == pickedKey }.takeIf { it >= 0 }
-    val cardSize = GalleryCardSizes.of(section, s.view.grouped, s.inner)
+    // The reference size, shrunk to stand whole between the bars with the next card peeking (CardFit).
+    val cardSize = fit(GalleryCardSizes.of(section, s.view.grouped, s.inner))
     val cardW = cardSize.width
     val inset = CardMetrics.inset(s.inner)
     Column(modifier.fillMaxWidth().padding(bottom = 12.dp)) {

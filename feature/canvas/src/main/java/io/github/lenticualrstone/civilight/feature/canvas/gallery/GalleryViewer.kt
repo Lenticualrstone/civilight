@@ -185,7 +185,7 @@ private fun ZoomableImage(item: GalleryItem, sharedImage: @Composable (Key) -> M
                 },
         ) {
             Box(Modifier.matchParentSize().then(sharedImage(item.key))) {
-                GalleryImage(item, ratio = null, maxSide = GalleryImageSizes.VIEWER, contentScale = ContentScale.Fit, contentDescription = item.title.ifBlank { null })
+                GalleryImage(item, ratio = null, maxSide = GalleryImageSizes.VIEWER, contentScale = ContentScale.Fit, contentDescription = item.title.ifBlank { null }, holoDragConsumes = true)
             }
         }
     }

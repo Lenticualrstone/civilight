@@ -41,6 +41,7 @@ object FieldBundles {
         FieldBundle.GAME_PROFILE -> "게임 프로필"
         FieldBundle.EMPTY -> "비어 있음"
         FieldBundle.FROM_PROJECT -> "다른 프로젝트에서"
+        FieldBundle.TEMPLATE -> "템플릿"
     }
 
     /** Picker order. */
@@ -81,7 +82,7 @@ object FieldBundles {
         if (kind != EntityKind.CHARACTER) emptyList() else when (bundle) {
             FieldBundle.BASIC -> BASIC
             FieldBundle.GAME_PROFILE -> GAME_PROFILE
-            FieldBundle.EMPTY, FieldBundle.FROM_PROJECT -> emptyList()
+            FieldBundle.EMPTY, FieldBundle.FROM_PROJECT, FieldBundle.TEMPLATE -> emptyList()
         }
 
     /** New-project step 4 row: `인물 항목 | 출생 · 나이 · 생일 · 소속 · 성격 | 기본 ›` (TC-F-15). */
@@ -131,26 +132,49 @@ object FieldBundles {
     fun sourceProjects(entries: List<LibraryEntry>, currentKey: Key, hiddenUnlocked: Boolean): List<LibraryEntry> =
         entries.filter { it.key != currentKey && it.deletedAt == null && (!it.hidden || hiddenUnlocked) }
 
+    /**
+     * Adds [fields] of [kind] that are missing, at the end in their order (`항목 더하기`), with the
+     * same matching as the built-in bundles: [match] finds the existing field a bundle field stands
+     * for (default: bundle id, else name), and [skip] leaves fields out without matching them (a
+     * template's `◇ 같은 이름 · 다른 종류`). A `계산` field takes the matched or newly added field of
+     * its source origin; a skipped source gives no source (typed age). Existing fields never change.
+     */
+    fun addFields(
+        doc: ProjectDoc,
+        fields: List<BundleField>,
+        kind: EntityKind,
+        ctx: EditContext,
+        match: ((BundleField) -> FieldDef?)? = null,
+        skip: (BundleField) -> Boolean = { false },
+        keepOrigin: (BundleField) -> String? = { it.origin },
+    ): BundleResult = addMissing(doc, fields, kind, ctx, keepOrigin, match, skip)
+
     private fun addMissing(
         doc: ProjectDoc,
         bundle: List<BundleField>,
         kind: EntityKind,
         ctx: EditContext,
         keepOrigin: (BundleField) -> String? = { it.origin },
+        customMatch: ((BundleField) -> FieldDef?)? = null,
+        skip: (BundleField) -> Boolean = { false },
     ): BundleResult {
         val existing = FieldDefinitions.live(doc, kind)
         val byOrigin = existing.filter { it.bundleOrigin != null }.associateBy { it.bundleOrigin!! }
         val byName = existing.associateBy { it.name.nfc() }
-        fun match(b: BundleField): FieldDef? = byOrigin[b.origin] ?: b.field.bundleOrigin?.let { byOrigin[it] } ?: byName[b.field.name.nfc()]
+        fun match(b: BundleField): FieldDef? = if (customMatch != null) {
+            customMatch(b)
+        } else {
+            byOrigin[b.origin] ?: b.field.bundleOrigin?.let { byOrigin[it] } ?: byName[b.field.name.nfc()]
+        }
 
-        val missing = bundle.filter { match(it) == null }
+        val missing = bundle.filter { !skip(it) && match(it) == null }
         if (missing.isEmpty()) return BundleResult(doc, emptyList())
         val orders = OrderKeys.between(existing.maxOfOrNull { it.order }, null, missing.size)
         val newKeys = missing.associate { it.origin to ctx.newKey() }
         val added = missing.mapIndexed { i, b ->
             val f = b.field
             val calcSource = b.calcSourceOrigin?.let { src ->
-                newKeys[src] ?: bundle.firstOrNull { it.origin == src }?.let(::match)?.key
+                newKeys[src] ?: bundle.firstOrNull { it.origin == src }?.takeIf { !skip(it) }?.let(::match)?.key
             }
             FieldDef(
                 key = newKeys.getValue(b.origin),

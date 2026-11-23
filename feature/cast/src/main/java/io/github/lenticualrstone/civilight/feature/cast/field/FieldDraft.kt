@@ -42,7 +42,7 @@ data class FieldDraft(
     val linkKeys: List<Key> = emptyList(),
 )
 
-/** Result of checking a draft: whether `이 값 고치기` (and the other save buttons) may run. */
+/** Result of checking a draft: whether `저장` (and the lens buttons) may run. */
 data class DraftCheck(val valid: Boolean, val changed: Boolean) {
     val canSave: Boolean get() = valid && changed
 }

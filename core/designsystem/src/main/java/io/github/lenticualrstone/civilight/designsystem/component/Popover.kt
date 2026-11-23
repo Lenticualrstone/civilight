@@ -44,6 +44,8 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.tokenShadow
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassMode
 import io.github.lenticualrstone.civilight.designsystem.glass.SCRIM_ALPHA
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.OverlayGaps
+import androidx.compose.ui.platform.LocalConfiguration
 
 /**
  * Colours the `▲` part of [text] in [warn]: from the `▲` to the next ` · ` separator or the end
@@ -60,19 +62,29 @@ fun warningSpan(text: String, warn: androidx.compose.ui.graphics.Color): Annotat
     }
 }
 
-/** Places a popup [gap] below its anchor, or above when there is no room; kept inside the window. */
-class AnchorBelowPositionProvider(private val gapPx: Int, private val marginPx: Int) : PopupPositionProvider {
+/**
+ * Places a popup [gapPx] below its anchor, or above when there is no room; kept inside the window (DS-66):
+ * [sidePx] from both sides, never above [topPx], and its bottom never below `H − bottomPx` ([bottomPx] =
+ * `max(systemBottom + edge, bar height above the window bottom + 6)`). The extra limits default to [marginPx].
+ */
+class AnchorBelowPositionProvider(
+    private val gapPx: Int,
+    private val marginPx: Int,
+    private val sidePx: Int = marginPx,
+    private val topPx: Int = marginPx,
+    private val bottomPx: Int = marginPx,
+) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
-        val maxX = (windowSize.width - popupContentSize.width - marginPx).coerceAtLeast(marginPx)
-        val x = anchorBounds.left.coerceIn(marginPx, maxX)
+        val maxX = (windowSize.width - popupContentSize.width - sidePx).coerceAtLeast(sidePx)
+        val x = anchorBounds.left.coerceIn(sidePx, maxX)
         val below = anchorBounds.bottom + gapPx
-        val y = if (below + popupContentSize.height <= windowSize.height - marginPx) below
-        else (anchorBounds.top - gapPx - popupContentSize.height).coerceAtLeast(marginPx)
+        val y = if (below + popupContentSize.height <= windowSize.height - bottomPx) below
+        else (anchorBounds.top - gapPx - popupContentSize.height).coerceAtLeast(topPx)
         return IntOffset(x, y)
     }
 }
@@ -87,8 +99,27 @@ class AnchorBelowPositionProvider(private val gapPx: Int, private val marginPx: 
 fun Popover(onDismissRequest: () -> Unit, gap: Dp = 6.dp, content: @Composable () -> Unit) {
     val density = LocalDensity.current
     val motion = LocalMotion.current
-    val provider = remember(density, gap) {
-        with(density) { AnchorBelowPositionProvider(gap.roundToPx(), 12.dp.roundToPx()) }
+    // DS-66 limits: sides 12 (cover) / 24 (inner), top = status bar + 8, bottom above `systemBottom + edge` and
+    // 6 dp above the bottom glass bar.
+    val inner = LocalConfiguration.current.screenWidthDp >= INNER_MIN_WIDTH_DP
+    val systemBottom = rememberSystemBottom()
+    val bar = LocalBottomChrome.current.tallest
+    val top = statusTop() + OverlayGaps.top
+    val bottom = maxOf(
+        systemBottom + OverlayGaps.edge(inner),
+        // The bar sits on `systemBottom` (it rides on the keyboard), so its top is `systemBottom + bar`.
+        if (bar > 0.dp) systemBottom + bar + OverlayGaps.aboveBar else 0.dp,
+    )
+    val provider = remember(density, gap, inner, top, bottom) {
+        with(density) {
+            AnchorBelowPositionProvider(
+                gap.roundToPx(),
+                OverlayGaps.sideCompact.roundToPx(),
+                sidePx = OverlayGaps.side(inner).roundToPx(),
+                topPx = top.roundToPx(),
+                bottomPx = bottom.roundToPx(),
+            )
+        }
     }
     // S8: the card rises 6 dp and fades in on `enter`; an outside tap or back fades it out on `exit` first and
     // only then calls [onDismissRequest]. Removing the popover from composition is still an instant close.
@@ -124,6 +155,9 @@ fun Popover(onDismissRequest: () -> Unit, gap: Dp = 6.dp, content: @Composable (
         }
     }
 }
+
+/** Window width from which the popover keeps the inner-screen side gap. */
+private const val INNER_MIN_WIDTH_DP = 600
 
 /**
  * DS-26 popover card: radius 16, padding 12 · 12 · 12 · 14, 1 dp `edge` inset, shadow `0 10 28 shade`,

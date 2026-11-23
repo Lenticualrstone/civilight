@@ -61,7 +61,7 @@ class ShelfCardsTest {
 
     private fun withCover(doc: ProjectDoc, holo: Boolean): ProjectDoc = doc.copy(
         assets = doc.assets.copy(
-            imageUses = doc.assets.imageUses + ImageUse("cover-1", ImageOwnerKind.PROJECT.open(), doc.key, ImageSlot.PROJECT_COVER.open(), "preset:dawn", holo = holo),
+            imageUses = doc.assets.imageUses + ImageUse("cover-1", ImageOwnerKind.PROJECT.open(), doc.key, ImageSlot.PROJECT_COVER.open(), "preset:ash-dawn", holo = holo),
         ),
     )
 
@@ -110,7 +110,7 @@ class ShelfCardsTest {
         val byTitle = ui.cards.associateBy { it.row.title }
         assertEquals("쓰는 중", byTitle.getValue("잿빛 새벽의 등불").chip)
         assertEquals("홀로", byTitle.getValue("유리 정원").chip)
-        assertEquals("dawn", byTitle.getValue("유리 정원").cover.presetId)
+        assertEquals("ash-dawn", byTitle.getValue("유리 정원").cover.presetId)
         assertEquals("잿", byTitle.getValue("잿빛 새벽의 등불").cover.initial)
         assertNull(byTitle.getValue("잿빛 새벽의 등불").cover.hash)
         assertEquals("쓰는 중 · 홀로", ShelfCards.chip(writing = true, holo = true))
@@ -239,7 +239,7 @@ class ShelfCardsTest {
     fun `D6 every row carries a 48 dp thumbnail made from the cover's 1 to 1 crop`() {
         val ui = build()
         val byTitle = ui.rows.associateBy { it.title }
-        assertEquals("dawn", byTitle.getValue("유리 정원").thumb.presetId)
+        assertEquals("ash-dawn", byTitle.getValue("유리 정원").thumb.presetId)
         assertEquals("잿", byTitle.getValue("잿빛 새벽의 등불").thumb.initial)
         assertNull(byTitle.getValue("잿빛 새벽의 등불").thumb.hash)
         val withImage = ashen.copy(

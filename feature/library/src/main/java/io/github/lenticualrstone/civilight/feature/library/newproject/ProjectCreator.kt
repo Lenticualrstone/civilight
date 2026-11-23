@@ -2,6 +2,8 @@ package io.github.lenticualrstone.civilight.feature.library.newproject
 
 import io.github.lenticualrstone.civilight.domain.actions.ActionContext
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldBundles
+import io.github.lenticualrstone.civilight.domain.cast.field.FieldTemplates
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
 import io.github.lenticualrstone.civilight.domain.library.newproject.CreatedProject
 import io.github.lenticualrstone.civilight.domain.library.newproject.NewProjectFlow
 import io.github.lenticualrstone.civilight.domain.recorder.hooks.RecorderHooks
@@ -43,6 +45,8 @@ data class CreateResult(
     val opensCalendar: Boolean,
     /** Hiding was asked for but the device has no secure lock screen: created visible (§6 Q19). */
     val hidingRefused: Boolean = false,
+    /** The picked 인물 템플릿 was deleted before `만들기`: created with `기본` (CST-61, `◇ 템플릿 없음 · 기본으로`). */
+    val templateGone: Boolean = false,
 )
 
 /**
@@ -62,10 +66,16 @@ object ProjectCreator {
         ctx: ActionContext,
         bundleSource: ProjectDoc?,
         notation: SceneNotationPref = SceneNotationPref.EPISODE,
+        template: FieldTemplate? = null,
     ): CreatedProject {
         val created = NewProjectFlow.create(NewProjectRules.toDraft(form), defaults, ctx.now, ctx.device, ctx.newKey)
         val withFields = when (form.bundle) {
             FieldBundle.FROM_PROJECT -> bundleSource?.let { FieldBundles.applyFromProject(created.doc, it, ctx.edit).doc } ?: created.doc
+            // CST-61: every kind at once; a template deleted before `만들기` falls back to `기본`.
+            FieldBundle.TEMPLATE -> template?.takeIf { it.deletedAt == null }?.let { FieldTemplates.forProjectCreation(created.doc, it, ctx.edit) }
+                ?: FieldBundles.apply(created.doc, FieldBundles.DEFAULT, ctx.edit).doc.let { d ->
+                    d.copy(project = d.project.copy(fieldBundleAtCreation = FieldBundles.DEFAULT.open()))
+                }
             else -> FieldBundles.apply(created.doc, form.bundle, ctx.edit).doc
         }
         return CreatedProject(withNotation(withFields, notation), created.entry, emptyList(), created.protections)
@@ -84,8 +94,9 @@ object ProjectCreator {
         ctx: ActionContext,
         bundleSource: ProjectDoc?,
         notation: SceneNotationPref = SceneNotationPref.EPISODE,
+        template: FieldTemplate? = null,
     ): CreateResult {
-        val built = build(form, defaults, ctx, bundleSource, notation)
+        val built = build(form, defaults, ctx, bundleSource, notation, template)
         val wantsHidden = built.doc.project.protections.hidden
         val refused = wantsHidden && !ports.deviceSecure()
         val doc = if (refused) built.doc.copy(project = built.doc.project.copy(protections = built.doc.project.protections.copy(hidden = false))) else built.doc
@@ -95,7 +106,8 @@ object ProjectCreator {
         if (hidden) ports.keepOpen(key)
         val records = form.linkedRecordKeys.distinct()
         if (records.isNotEmpty()) ports.updateRecorder { RecorderHooks.linkRecords(it, records, key, ctx.recorder) }
-        return CreateResult(key, hidden, form.timeMode == WorldTimeMode.CALENDAR, hidingRefused = refused)
+        val templateGone = form.bundle == FieldBundle.TEMPLATE && template?.takeIf { it.deletedAt == null } == null
+        return CreateResult(key, hidden, form.timeMode == WorldTimeMode.CALENDAR, hidingRefused = refused, templateGone = templateGone)
     }
 
     /**

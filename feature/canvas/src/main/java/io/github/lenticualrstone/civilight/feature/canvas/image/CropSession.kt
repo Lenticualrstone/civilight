@@ -75,18 +75,27 @@ data class CropSession(
 
         /**
          * A new session for an original of [source] pixels in [slot]. When [existing] already shows this
-         * original, its crops are the starting edits (re-cropping); otherwise every ratio starts at the
-         * largest centred frame. The first ratio is the one edited first and counts as edited.
+         * original, its crops are the starting edits (re-cropping); otherwise [initialCrops] are (U-08 LIB-85:
+         * a gallery item's own crops, which then count as edited so `적용` keeps them), and every other ratio
+         * starts at the largest centred frame. The first ratio is the one edited first and counts as edited.
          */
-        fun start(slot: ImageSlot, source: PixelSize, existing: ImageUse?, blobHash: String, holo: Boolean): CropSession {
+        fun start(
+            slot: ImageSlot,
+            source: PixelSize,
+            existing: ImageUse?,
+            blobHash: String,
+            holo: Boolean,
+            initialCrops: Map<Ratio, Crop> = emptyMap(),
+        ): CropSession {
             val ratios = ImageSlots.ratios(slot)
             val same = existing?.blobHash == blobHash
+            val prefilled = if (same) emptyMap() else initialCrops.filterKeys { it in ratios }
             val edits = ratios.associateWith { r ->
-                val stored = if (same) existing?.cropFor(r) else null
+                val stored = if (same) existing?.cropFor(r) else prefilled[r]
                 stored?.let { CropMath.editOf(source, it) } ?: CropEdit()
             }
             val first = ratios.first()
-            return CropSession(slot, source.w, source.h, first, edits, setOf(first), holo && ImageSlots.holoAllowed(slot))
+            return CropSession(slot, source.w, source.h, first, edits, setOf(first) + prefilled.keys, holo && ImageSlots.holoAllowed(slot))
         }
 
         /**

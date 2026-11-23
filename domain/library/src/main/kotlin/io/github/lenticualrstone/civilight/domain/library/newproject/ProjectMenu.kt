@@ -15,8 +15,8 @@ data class ProjectCounts(val scenes: Int, val characters: Int, val pages: Int) {
     }
 }
 
-/** The actions of the project ⋯ sheet (LIB-02), in board order. */
-enum class ProjectMenuAction { OPEN, RENAME, RATING, HIDE, UNHIDE, BACKUP_EXPORT, DELETE }
+/** The actions of the project ⋯ sheet (LIB-02); the rows' order is [ProjectMenus.of]'s. [COVER]: `표지 이미지` (U-08 LIB-81). */
+enum class ProjectMenuAction { OPEN, RENAME, RATING, HIDE, UNHIDE, BACKUP_EXPORT, DELETE, COVER }
 
 data class ProjectMenuRow(val action: ProjectMenuAction, val title: String, val sub: String?)
 
@@ -29,15 +29,17 @@ object ProjectMenus {
     /**
      * Header sub `<format> · 씬 <s>개 · 인물 <c> · 페이지 <p>`. The example project shows only `열기`
      * (`ED`, read-only); a hidden project (reachable only while the group is open) offers `숨김 풀기`
-     * instead of `프로젝트 숨기기`.
+     * instead of `프로젝트 숨기기`. `표지 이미지` follows `이름 바꾸기` with `지금 <source word>` or
+     * `없음 · 첫 글자 카드` (U-08 LIB-81); [fileExists] says whether a cover original is on this device.
      */
-    fun of(doc: ProjectDoc, isExample: Boolean = false): ProjectMenu {
+    fun of(doc: ProjectDoc, isExample: Boolean = false, fileExists: (String) -> Boolean = { true }): ProjectMenu {
         val p = doc.project
         val c = ProjectCounts.of(doc)
         val rows = buildList {
             add(ProjectMenuRow(ProjectMenuAction.OPEN, "열기", "마지막 위치"))
             if (!isExample) {
                 add(ProjectMenuRow(ProjectMenuAction.RENAME, "이름 바꾸기", null))
+                add(ProjectMenuRow(ProjectMenuAction.COVER, CoverSummary.TITLE, CoverSummary.menuSub(doc, fileExists)))
                 add(ProjectMenuRow(ProjectMenuAction.RATING, "수위 등급", RatingLabels.menuSub(RatingLabels.effective(p.rating))))
                 if (p.protections.hidden) {
                     add(ProjectMenuRow(ProjectMenuAction.UNHIDE, "숨김 풀기", null))

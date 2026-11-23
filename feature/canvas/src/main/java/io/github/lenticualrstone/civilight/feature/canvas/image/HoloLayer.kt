@@ -5,11 +5,15 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.hardware.display.DisplayManager
+import android.view.Display
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -26,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import io.github.lenticualrstone.civilight.designsystem.component.HoloStrength
@@ -38,14 +43,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-/** The rotation sensor behind [TiltSensorPort]: pitch and roll from the game rotation vector. */
+/**
+ * The rotation sensor behind [TiltSensorPort]: the device's lean and pitch from the gravity row of the game
+ * rotation vector's matrix, on the screen's axes (display rotation), relative to how the device was held when
+ * the first holo surface appeared ([HoloRules.anglesFromGravity]: smooth when held upright, where
+ * `getOrientation`'s roll swings through ±180°). A change of display rotation takes the new holding as the base.
+ */
 private class AndroidTiltSensor(context: Context, private val onTilt: (Tilt) -> Unit) : TiltSensorPort, SensorEventListener {
     private val manager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+    private val displays = context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
     private val sensor: Sensor? = manager?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
         ?: manager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     private val matrix = FloatArray(9)
-    private val angles = FloatArray(3)
-    private var base: Pair<Float, Float>? = null
+    private var base: DeviceAngles? = null
+    private var baseRotation = -1
 
     override val available: Boolean get() = sensor != null
 
@@ -60,11 +71,14 @@ private class AndroidTiltSensor(context: Context, private val onTilt: (Tilt) -> 
 
     override fun onSensorChanged(event: SensorEvent) {
         SensorManager.getRotationMatrixFromVector(matrix, event.values)
-        SensorManager.getOrientation(matrix, angles)
-        val pitch = Math.toDegrees(angles[1].toDouble()).toFloat()
-        val roll = Math.toDegrees(angles[2].toDouble()).toFloat()
-        val b = base ?: (pitch to roll).also { base = it }
-        onTilt(HoloRules.fromDevice(pitch, roll, b.first, b.second))
+        val rotation = displays?.getDisplay(Display.DEFAULT_DISPLAY)?.rotation ?: 0
+        val now = HoloRules.anglesFromGravity(matrix[6], matrix[7], matrix[8], rotation)
+        if (rotation != baseRotation) {
+            base = null
+            baseRotation = rotation
+        }
+        val b = base ?: now.also { base = it }
+        onTilt(HoloRules.fromAngles(now, b))
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -164,15 +178,40 @@ internal fun rememberHoloTilt(gate: SweepGate?): HoloTilt {
     return remember(hub, loops, sweep, settle, drag, scope) { HoloTilt(hub, loops, sweep, settle, drag, scope) }
 }
 
-/** Drag-to-tilt input for [tilt] when the device has no rotation sensor (board `Holo`). */
-fun Modifier.holoDrag(tilt: HoloTilt): Modifier = if (!tilt.usesDrag) this else pointerInput(tilt) {
-    detectDragGestures(
-        onDragStart = { tilt.drag.hold() },
-        onDragEnd = { tilt.drag.release(tilt.scope) },
-        onDragCancel = { tilt.drag.release(tilt.scope) },
-    ) { change, amount ->
-        change.consume()
-        tilt.drag.value = HoloRules.fromDrag(tilt.drag.value, amount.x, amount.y, size.width.toFloat(), size.height.toFloat())
+/**
+ * Drag-to-tilt input for [tilt] when the device has no rotation sensor (board `Holo`).
+ *
+ * [consume] true: the drag is the surface's own (the experiment, the viewer). False, for a surface inside a
+ * scroller (card rows, the grid, list rows): the finger is only watched, never consumed, so the row or column
+ * still scrolls and a tap still picks; the foil follows the finger until the scroll takes over.
+ */
+fun Modifier.holoDrag(tilt: HoloTilt, consume: Boolean = true): Modifier = when {
+    !tilt.usesDrag -> this
+    consume -> pointerInput(tilt) {
+        detectDragGestures(
+            onDragStart = { tilt.drag.hold() },
+            onDragEnd = { tilt.drag.release(tilt.scope) },
+            onDragCancel = { tilt.drag.release(tilt.scope) },
+        ) { change, amount ->
+            change.consume()
+            tilt.drag.value = HoloRules.fromDrag(tilt.drag.value, amount.x, amount.y, size.width.toFloat(), size.height.toFloat())
+        }
+    }
+    else -> pointerInput(tilt) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            tilt.drag.hold()
+            var last = down.position
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed) break
+                val d = change.position - last
+                last = change.position
+                tilt.drag.value = HoloRules.fromDrag(tilt.drag.value, d.x, d.y, size.width.toFloat(), size.height.toFloat())
+            }
+            tilt.drag.release(tilt.scope)
+        }
     }
 }
 
@@ -190,26 +229,35 @@ fun rememberSpringTilt(target: Tilt): Tilt {
 
 /**
  * The holo foil of a surface while [on] (CNV-30): DS `holoFoil` driven by the device tilt; without a
- * rotation sensor the surface is dragged to tilt and sways back on release. The foil fades in and out on
+ * rotation sensor the surface is dragged to tilt and sways back on release. The whole foil fades in and out on
  * `standard` when [on] changes. The turn-on sweep (one pass left → right, 480 ms decelerate) plays on the
  * edge of [sweepTrigger]: the caller raises it when the user switches holo on, so it does not replay on a
  * restore or when another tile becomes the shown one. Reduced motion: a still foil, no sweep, no sensor. The
  * sensor is registered only while a holo surface is composed (on screen), T-CNV-55. [strength] defaults to
- * the theme's tint strength.
+ * the theme's tint strength. The tilt is read in the draw phase (no recomposition per sensor event), and the
+ * foil keeps to the drawn image, never the empty box around a fitted one. [consumeDrag]: see [holoDrag]
+ * (false for surfaces inside a scrolling row or column).
  */
 @Composable
-fun Modifier.holoSurface(on: Boolean, sweepTrigger: Int = 0, strength: Float? = null): Modifier {
-    val amount by animatedFraction(on, label = "holoFoil")
+fun Modifier.holoSurface(on: Boolean, sweepTrigger: Int = 0, strength: Float? = null, consumeDrag: Boolean = true): Modifier {
+    val amount = animatedFraction(on, label = "holoFoil")
     val gate = remember { SweepGate(sweepTrigger) }
     val fire = HoloRules.sweepEdge(gate.seenTrigger, sweepTrigger, on)
     SideEffect {
         gate.seenTrigger = sweepTrigger
         if (fire) gate.stamp++
     }
-    if (!on && amount <= 0f) return this
+    if (!on && amount.value <= 0f) return this
     val theme = if (CivilightTheme.colors.isDark) ResolvedTheme.DARK else ResolvedTheme.LIGHT
     val tilt = rememberHoloTilt(gate)
-    return holoDrag(tilt).holoFoilAt(tilt.value, theme, (strength ?: HoloStrength.of(theme)) * amount)
+    val tint = strength ?: HoloStrength.of(theme)
+    return holoDrag(tilt, consumeDrag).holoFoil(
+        tilt = { tilt.value.let { Offset(it.x, it.y) } },
+        theme = theme,
+        strength = { tint },
+        maskToContent = true,
+        fade = { amount.value },
+    )
 }
 
 /** Drag-to-tilt without a gyro: follows the finger, then sways back to rest on a damped spring ([HoloRules.SWAY_DAMPING]). */

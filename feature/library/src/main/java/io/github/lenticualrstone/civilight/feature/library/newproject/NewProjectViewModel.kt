@@ -13,7 +13,9 @@ import io.github.lenticualrstone.civilight.feature.library.common.LibraryDocs
 import io.github.lenticualrstone.civilight.feature.library.common.actionContext
 import io.github.lenticualrstone.civilight.feature.library.common.toAccess
 import io.github.lenticualrstone.civilight.feature.library.common.toSession
+import io.github.lenticualrstone.civilight.domain.cast.field.FieldTemplates
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.app.FieldTemplate
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.navigation.Route
@@ -29,7 +31,13 @@ import kotlinx.coroutines.launch
 data class StartInputs(
     val records: List<StartMaterialRow> = emptyList(),
     val bundleSources: List<ProjectProfile> = emptyList(),
-)
+    /** Every 인물 템플릿 (CST-61); the picker shows only [FieldTemplates.visible] ones. */
+    val templates: List<FieldTemplate> = emptyList(),
+    val hiddenUnlocked: Boolean = false,
+) {
+    /** The `템플릿 · n` rows of the picker (hidden ones only while the group is open). */
+    val visibleTemplates: List<FieldTemplate> get() = FieldTemplates.visible(templates, hiddenUnlocked)
+}
 
 /**
  * One 새 프로젝트 step entry. The draft itself lives in [LibraryServices.draft] (shared by the four
@@ -42,7 +50,9 @@ internal class NewProjectViewModel(private val services: LibraryServices) : View
     private val _creating = MutableStateFlow(false)
     val creating: StateFlow<Boolean> = _creating.asStateFlow()
 
-    val inputs: StateFlow<StartInputs> = combine(stores.library.state, docs.docs, stores.recorder.state, deps.unlock.state) { library, docs, recorder, unlock ->
+    val inputs: StateFlow<StartInputs> = combine(
+        stores.library.state, docs.docs, stores.recorder.state, deps.unlock.state, stores.fieldTemplates.state,
+    ) { library, docs, recorder, unlock, templates ->
         val live = library.live.filter { !it.isExample }
         val snapshots = live.mapNotNull { e -> docs[e.key]?.let { ProjectSnapshot(e, it) } }
         val env = RecorderEnv(snapshots, unlock.toSession(), deps.clock.zone)
@@ -50,12 +60,19 @@ internal class NewProjectViewModel(private val services: LibraryServices) : View
         StartInputs(
             records = RecorderHooks.startMaterialCandidates(recorder.library, env, deps.clock.now()),
             bundleSources = NewProjectFlow.bundleSources(profiles, unlock.toAccess()),
+            templates = templates.templates,
+            hiddenUnlocked = unlock.hiddenGroupOpen,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, StartInputs())
 
     init {
         viewModelScope.launch { stores.recorder.ensureLoaded() }
+        viewModelScope.launch { stores.fieldTemplates.ensureLoaded() }
     }
+
+    /** The picked 인물 템플릿 (kept and applied even when its hidden group locked meanwhile, TC-F-42). */
+    fun template(form: NewProjectForm): FieldTemplate? =
+        form.bundleTemplateKey?.let { key -> stores.fieldTemplates.state.value.templates.firstOrNull { it.key == key && it.deletedAt == null } }
 
     /** The source document of `다른 프로젝트에서`, when one is picked. */
     fun sourceDoc(form: NewProjectForm): ProjectDoc? = form.bundleSourceKey?.let { docs.docs.value[it] }
@@ -73,8 +90,10 @@ internal class NewProjectViewModel(private val services: LibraryServices) : View
                     ctx = stores.actionContext(),
                     bundleSource = sourceDoc(form),
                     notation = deps.settings.value.defaultSceneNotation,
+                    template = template(form),
                 )
                 if (result.hidingRefused) services.showNoDeviceLock()
+                if (result.templateGone) deps.toasts.show(NewProjectCopy.TEMPLATE_GONE, actionLabel = null)
                 onCreated(ProjectCreator.stackAfter(result))
             } finally {
                 _creating.value = false

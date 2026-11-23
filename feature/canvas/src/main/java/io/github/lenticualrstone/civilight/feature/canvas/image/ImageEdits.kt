@@ -47,6 +47,17 @@ object ImageEdits {
         return put(doc, owner, hash, kept + crops.mapKeys { it.key.serialName }, holo, ctx)
     }
 
+    /**
+     * Empties [owner]'s slot: its [ImageUse] row goes, the original stays in `assets.blobs` until the blob
+     * sweep finds nothing referencing it (U-08 LIB-87 `빼기`; 00 §5.3). One undo step; [ctx] is unused but
+     * kept so every slot write has the same shape. No row: [doc] unchanged.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun clear(doc: ProjectDoc, owner: ImageOwner, ctx: EditContext): ProjectDoc {
+        if (doc.assets.imageUses.none(owner::matches)) return doc
+        return doc.copy(assets = doc.assets.copy(imageUses = doc.assets.imageUses.filterNot(owner::matches)))
+    }
+
     /** The holo flag of the slot's image; always false where holo is not allowed (T-CNV-34). */
     fun setHolo(doc: ProjectDoc, owner: ImageOwner, holo: Boolean, ctx: EditContext): ProjectDoc {
         val old = use(doc, owner) ?: return doc

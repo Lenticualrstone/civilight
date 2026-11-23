@@ -3,6 +3,11 @@ package io.github.lenticualrstone.civilight.feature.library.projectsettings
 /** Copy of 프로젝트 설정 (LIB-69 container, LIB-25 section; board `ProjSettings`, CNV-20 row map). */
 object ProjectSettingsCopy {
     const val TITLE = "프로젝트 설정"
+
+    /** U-08 LIB-82: first section `표지` with one row (`[PROPOSED]`, 60 §7.2). */
+    const val SECTION_COVER = "표지"
+    const val COVER = "표지 이미지"
+    const val COVER_SUB = "서재 카드 · 목록 썸네일 · 프로젝트 홈"
     const val SECTION_STRUCTURE = "구조"
     const val SECTION_CAST = "인물"
     const val SECTION_PROTECTION = "등급 · 숨기기"

@@ -190,7 +190,7 @@ private fun SheetScope.NewKindContent(sheet: NewKindSheet) {
 }
 
 /**
- * A kind (not drawn): `이름` (and `짝 이름`) with `이 값 고치기`; the `사이 / 마음` and `대칭 / 짝`
+ * A kind (not drawn): `이름` (and `짝 이름`) with `저장`; the `사이 / 마음` and `대칭 / 짝`
  * switches, which show `바뀌는 관계 N` and the pairs before `바꾸기` applies them (TC-13-20); and
  * `지우기` (relations keep the text with `◇`, TC-13-12).
  */
@@ -217,9 +217,9 @@ private fun SheetScope.KindEditContent(sheet: KindEditSheet) {
         }
         if (view.shape.isPair == shape.isPair) {
             Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                CivilightButton(CastUiCopy.BTN_CORRECT, {
+                CivilightButton(CastUiCopy.BTN_SAVE, {
                     val saved = shape
-                    editor.act(CastUiCopy.BTN_CORRECT) { d, ctx -> RelationKindModel.rename(d, sheet.kindKey, saved, ctx) }
+                    editor.act(CastUiCopy.BTN_SAVE) { d, ctx -> RelationKindModel.rename(d, sheet.kindKey, saved, ctx) }
                 }, Modifier.weight(1f), enabled = RelationKindModel.namesChanged(view.shape, shape) && shape.name.isNotBlank())
             }
         }

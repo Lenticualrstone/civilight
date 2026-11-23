@@ -238,7 +238,7 @@ fun FieldDefEditScreen(route: FieldDefEdit, deps: FeatureDeps) {
                 trash.deleteFieldDef(key) { deps.navigator.pop() }
             },
             onDismissRequest = { pendingText = null },
-            facts = listOf(view.deleteSummary to "", TrashCopy.SHEET_FOOTNOTE to ""),
+            facts = view.deleteLines.map { it to "" } + (TrashCopy.SHEET_FOOTNOTE to ""),
             cancelLabel = TrashCopy.CANCEL,
             hardToUndo = true,
         )
@@ -247,7 +247,7 @@ fun FieldDefEditScreen(route: FieldDefEdit, deps: FeatureDeps) {
 
 /** `보기`: each option renames in place; `빼기` asks first when someone holds it; `+ 보기` adds one. */
 @Composable
-private fun OptionsEditor(view: FieldDefView, editable: Boolean, onRename: (Key, String) -> Unit, onAdd: (String) -> Unit, onRemove: (Key) -> Unit) {
+internal fun OptionsEditor(view: FieldDefView, editable: Boolean, onRename: (Key, String) -> Unit, onAdd: (String) -> Unit, onRemove: (Key) -> Unit) {
     var adding by rememberSaveable(view.key) { mutableStateOf<String?>(null) }
     SectionLabel(CastUiCopy.OPTIONS, Modifier.padding(top = 20.dp, bottom = 6.dp))
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -276,7 +276,7 @@ private fun OptionsEditor(view: FieldDefView, editable: Boolean, onRename: (Key,
 
 /** `종류`: the type now and the types it may change to (CST-23 table); `연결` asks for its target first. */
 @Composable
-private fun TypeSection(view: FieldDefView, editable: Boolean, target: FieldLinkTargetKind, onTarget: (FieldLinkTargetKind) -> Unit, onChange: (FieldType) -> Unit) {
+internal fun TypeSection(view: FieldDefView, editable: Boolean, target: FieldLinkTargetKind, onTarget: (FieldLinkTargetKind) -> Unit, onChange: (FieldType) -> Unit) {
     SectionLabel(CastUiCopy.TYPE, Modifier.padding(top = 20.dp, bottom = 4.dp))
     FieldTableRow(CastUiCopy.TYPE, view.typeLabel)
     if (!editable || view.offered.isEmpty()) return

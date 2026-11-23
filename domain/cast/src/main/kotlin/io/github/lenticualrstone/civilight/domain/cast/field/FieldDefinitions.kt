@@ -45,6 +45,24 @@ data class NewField(
     val bundleOrigin: String? = null,
 )
 
+/** What deleting a field definition touches (CST-55, TC-F-30). */
+data class FieldDeleteImpact(
+    val kind: EntityKind,
+    val holders: Int,
+    val records: Int,
+    /** Names of the live `계산` fields that calculate from it. */
+    val calcDependents: List<String>,
+    val inFilter: Boolean,
+) {
+    /** The confirm lines: holders always; the others only when they apply (no footnote). */
+    fun lines(): List<String> = buildList {
+        add(FieldDefinitions.deleteHolders(kind, holders))
+        if (records > 0) add(FieldDefinitions.deleteRecords(records))
+        calcDependents.forEach { add(FieldDefinitions.deleteCalc(it)) }
+        if (inFilter) add(FieldDefinitions.DELETE_FILTER)
+    }
+}
+
 /** State of the `넣기` button and the notice under the name input. */
 data class NewFieldCheck(val canSave: Boolean, val sameNameNotice: String?)
 
@@ -225,11 +243,52 @@ object FieldDefinitions {
         return liveEntities(doc, kind).count { (key, _, fields) -> fields.containsKey(defKey) || key in byRecord }
     }
 
-    /** Delete sheet line (TC-F-12). */
+    /** Delete sheet line (TC-F-12): `값이 있는 인물 12명`, `값이 있는 세력 3개` (per-kind unit, CST-55). */
     fun deleteSummary(doc: ProjectDoc, defKey: Key): String {
+        val kind = doc.index.fieldDef(defKey)?.entityKind?.known ?: EntityKind.CHARACTER
+        return deleteHolders(kind, valueHolderCount(doc, defKey))
+    }
+
+    /** `값이 있는 인물 12명` · `값이 있는 장소 4개` (CST-55: `명` for 인물, `개` for the others). */
+    fun deleteHolders(kind: EntityKind, n: Int): String = "값이 있는 ${kind.label} $n${countUnit(kind)}"
+
+    /** `명` for characters, `개` for places, terms and factions. */
+    fun countUnit(kind: EntityKind): String = if (kind == EntityKind.CHARACTER) "명" else "개"
+
+    /** `◆ 변화 기록 5`. */
+    fun deleteRecords(n: Int): String = "${CastCopy.CHANGE_MARK} 변화 기록 $n"
+
+    /** `계산 항목 나이 · 직접 넣기로`. */
+    fun deleteCalc(name: String): String = "계산 항목 $name · 직접 넣기로"
+
+    const val DELETE_FILTER = "필터에서 빠짐"
+
+    /** Live `◆` records whose target is the field. */
+    fun liveRecordCount(doc: ProjectDoc, defKey: Key): Int = doc.changes.records.count { r ->
+        val t = r.target as? ChangeTarget.Field
+        t != null && t.fieldDefKey == defKey && doc.liveness.isLive(r)
+    }
+
+    /** Live `계산` fields whose source is [defKey], in order. */
+    fun calcDependents(doc: ProjectDoc, defKey: Key): List<FieldDef> = doc.project.fieldDefs
+        .filter { it.deletedAt == null && it.key != defKey && it.type.known == FieldType.CALC && it.calc?.sourceFieldDefKey == defKey }
+        .sortedWith(compareBy({ it.order }, { it.key }))
+
+    /**
+     * What deleting a field touches (CST-55): holders, live `◆` records, `계산` fields that lose
+     * their source, and whether it is a filter. Extends [deleteSummary] (field definitions have only
+     * values, no references in `domain:trash`).
+     */
+    fun deleteImpact(doc: ProjectDoc, defKey: Key): FieldDeleteImpact {
         val def = doc.index.fieldDef(defKey)
-        val word = def?.entityKind?.known?.label ?: "인물"
-        return "값이 있는 $word ${valueHolderCount(doc, defKey)}명"
+        val kind = def?.entityKind?.known ?: EntityKind.CHARACTER
+        return FieldDeleteImpact(
+            kind = kind,
+            holders = valueHolderCount(doc, defKey),
+            records = liveRecordCount(doc, defKey),
+            calcDependents = calcDependents(doc, defKey).map { it.name },
+            inFilter = def?.inFilter == true,
+        )
     }
 
     /**

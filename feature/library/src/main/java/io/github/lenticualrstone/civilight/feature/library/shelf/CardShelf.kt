@@ -87,6 +87,7 @@ internal fun ProjectCardsBlock(
             is ShelfCardItem.Project -> {
                 val card = item.card
                 if (card.hiddenOpen) ProtectWindow(WindowProtection.forProject(card.row.protections))
+                else if (ShelfState.coverProtects(card.row.protections, card.cover)) ProtectWindow(COVER_PROTECTION)
                 ImageCard(
                     title = card.row.title,
                     meta = card.row.meta,

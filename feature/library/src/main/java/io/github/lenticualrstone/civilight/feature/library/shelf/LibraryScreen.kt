@@ -2,6 +2,12 @@
 
 package io.github.lenticualrstone.civilight.feature.library.shelf
 
+import io.github.lenticualrstone.civilight.ui.scaffold.LocalSheetRegistry
+import io.github.lenticualrstone.civilight.model.asset.ImageSlot
+import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
+import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.LifecycleEventObserver
@@ -122,6 +128,7 @@ internal fun LibraryScreen(services: LibraryServices) {
     val ui by vm.state.collectAsState()
     val docs by vm.documents.collectAsState()
     val sheets = rememberSheetHost()
+    val sheetRegistry = LocalSheetRegistry.current
     var deleting by rememberSaveable { mutableStateOf<String?>(null) }
     val navigator = deps.navigator
     val entries by deps.stores.library.state.collectAsState()
@@ -228,6 +235,13 @@ internal fun LibraryScreen(services: LibraryServices) {
                 close()
                 deleting = key
             }
+            // U-08 LIB-81: the shared cover picker over the 서재 (`ImagePickSheet` below).
+            ProjectMenuAction.COVER -> {
+                close()
+                // Each opening gets a fresh session (a store the library closed meanwhile is never reused).
+                vm.coverPickers.release(key)
+                openSheet(ImagePickSheet(key, ImageOwnerKind.PROJECT, key, ImageSlot.PROJECT_COVER))
+            }
         }
     }
 
@@ -278,7 +292,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                 when (key) {
                     is ShelfMenuSheet -> sheetBody {
                         docs[key.projectKey]?.takeIf { ui.shows(key.projectKey) }?.let { doc ->
-                            ProjectMenuContent(doc, isExample(key.projectKey)) { action ->
+                            ProjectMenuContent(doc, isExample(key.projectKey), deps.stores.blobs::contains) { action ->
                                 onMenuAction(key.projectKey, doc, action, { close() }, { open(it) })
                             }
                         }
@@ -288,6 +302,20 @@ internal fun LibraryScreen(services: LibraryServices) {
                     }
                     MultiExportSheet -> sheetBody {
                         MultiExportContent(ui.exportable.mapNotNull { docs[it] }, services)
+                    }
+                    // U-08 LIB-81 · LIB-89: the cover picker (drawn by canvas) only while the 서재 may show the
+                    // project, also before the stores answered after a restore, and with its view model in a
+                    // per-project store the 서재 lets go of once the project leaves it.
+                    is ImagePickSheet -> sheetBody {
+                        if (ui.shows(key.projectKey)) {
+                            // Project content over the 서재: the window is protected as for its ⋯ sheet (LIB-26, LIB-89).
+                            docs[key.projectKey]?.let { ProtectWindow(WindowProtection.forProject(it.project.protections)) }
+                            sheetRegistry.contentFor(key)?.let { content ->
+                                CompositionLocalProvider(LocalViewModelStoreOwner provides vm.coverPickers.ownerFor(key.projectKey)) {
+                                    content(this, key)
+                                }
+                            }
+                        }
                     }
                     is RatingPickSheet -> sheetBody {
                         docs[key.projectKey]?.takeIf { ui.shows(key.projectKey) }?.let { doc -> RatingPickContent(key.projectKey, RatingLabels.effective(doc.project.rating)) }
