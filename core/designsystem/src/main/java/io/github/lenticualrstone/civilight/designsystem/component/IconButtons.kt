@@ -36,6 +36,10 @@ import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtons
+import io.github.lenticualrstone.civilight.designsystem.icon.IconClass
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 
 /** An icon action with its required Korean accessibility label (owner copy), e.g. back or `⋯`. */
@@ -61,6 +65,109 @@ fun CivilightIconButton(
         contentAlignment = Alignment.Center,
     ) {
         CivilightIcon(icon, contentDescription = null, size = iconSize, tint = tint)
+    }
+}
+
+/**
+ * DS-70 class a by name: the same 44 × 44 button with a 20 dp icon. [contentDescription] is required and must
+ * not be blank (`IconButtonLint` checks every call site).
+ */
+@Composable
+fun IconOnlyButton(
+    icon: IconId,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = CivilightTheme.colors.ink2,
+    enabled: Boolean = true,
+) {
+    CivilightIconButton(icon, contentDescription, onClick, modifier, tint = tint, iconSize = IconButtons.ICON_ONLY_DP.dp, enabled = enabled)
+}
+
+/**
+ * DS-70 class b: an icon 16 … 18 before (or over, [stacked]) a short label, gap 6, touch area ≥ 44. The
+ * accessibility name is [contentDescription], which defaults to the label and may be the longer old text
+ * (`시점` reads `시점 추가`). [on] marks a toggle (`설명`, `뒤집기`) and exposes its state.
+ */
+@Composable
+fun IconLabelButton(
+    icon: IconId,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentDescription: String = label,
+    tint: Color = CivilightTheme.colors.ink2,
+    labelColor: Color = CivilightTheme.colors.ink,
+    labelStyle: TextStyle = CivilightTheme.type.button,
+    iconSize: Dp = IconButtons.ICON_WITH_TEXT_DEFAULT_DP.dp,
+    enabled: Boolean = true,
+    on: Boolean? = null,
+    stacked: Boolean = false,
+) {
+    val description = contentDescription
+    val action = if (on != null) PressAction.Toggle(on) { onClick() } else PressAction.Click(onClick)
+    val base = modifier
+        .alpha(if (enabled) 1f else DISABLED_ALPHA)
+        .pressable(
+            action,
+            enabled = enabled,
+            role = if (on != null) Role.Switch else Role.Button,
+            hitTarget = HitTarget.BUTTON,
+            shape = RoundedCornerShape(12.dp),
+        )
+        .heightIn(min = IconButtons.TOUCH_DP.dp)
+        .widthIn(min = IconButtons.TOUCH_DP.dp)
+        .semantics { this.contentDescription = description }
+    // The visible label is read through [contentDescription] only (it can be the longer old text).
+    val hidden = Modifier.clearAndSetSemantics { }
+    if (stacked) {
+        androidx.compose.foundation.layout.Column(
+            base,
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CivilightIcon(icon, contentDescription = null, size = iconSize, tint = tint)
+            CivilightText(label, labelStyle, hidden, color = labelColor, maxLines = 1)
+        }
+    } else {
+        Row(
+            base.padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(IconButtons.ICON_TEXT_GAP_DP.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CivilightIcon(icon, contentDescription = null, size = iconSize, tint = tint)
+            CivilightText(label, labelStyle, hidden, color = labelColor, maxLines = 1)
+        }
+    }
+}
+
+/**
+ * A DS-70 table button by its [spec]: class a draws [IconOnlyButton], class b [IconLabelButton] and class c a
+ * text action, each with the table's accessibility name. [label] overrides the visible text (a b row whose
+ * text follows the screen, e.g. `새 장소` for [IconButtonSpec.LIST_CREATE]).
+ */
+@Composable
+fun CivilightIconButton(
+    spec: IconButtonSpec,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    enabled: Boolean = true,
+    on: Boolean? = null,
+    tint: Color = CivilightTheme.colors.ink2,
+) {
+    val icon = spec.icon
+    val text = label ?: spec.text
+    when {
+        spec.cls == IconClass.A && icon != null ->
+            IconOnlyButton(icon, spec.accessibilityName, onClick, modifier, tint = tint, enabled = enabled)
+        spec.cls == IconClass.B && icon != null && text != null ->
+            IconLabelButton(
+                icon, text, onClick, modifier,
+                contentDescription = if (label != null && spec.accessibilityName == spec.text) label else spec.accessibilityName,
+                tint = tint, enabled = enabled, on = on,
+            )
+        else -> TextAction(text ?: spec.accessibilityName, onClick, modifier)
     }
 }
 

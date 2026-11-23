@@ -87,7 +87,7 @@ enum class ItemKind {
             TrashKind.SCENE -> UNIT
             TrashKind.BLOCK_GROUP -> BLOCK
             TrashKind.GALLERY_ITEM -> GALLERY_ITEM
-            TrashKind.PROJECT, TrashKind.RECORDER, null -> null
+            TrashKind.PROJECT, TrashKind.RECORDER, TrashKind.TAG, null -> null
         }
 
         fun of(kind: EntityKind): ItemKind = when (kind) {

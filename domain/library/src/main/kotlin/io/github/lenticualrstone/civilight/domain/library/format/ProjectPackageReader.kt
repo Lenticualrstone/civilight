@@ -5,6 +5,7 @@ import io.github.lenticualrstone.civilight.model.app.UnknownFile
 import io.github.lenticualrstone.civilight.model.OpenEnum
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.doc.ProjectFileSet
+import io.github.lenticualrstone.civilight.model.game.GameToolsUpgrade
 import io.github.lenticualrstone.civilight.model.file.EncryptionHeader
 import io.github.lenticualrstone.civilight.model.file.Features
 import io.github.lenticualrstone.civilight.model.file.FileManifest
@@ -197,7 +198,10 @@ object ProjectPackageReader {
             }
         }
 
-        val doc = withoutOrphanGallery(decoded.files.toDoc(unknownFiles = unknown))
+        // (0.2.0, G-3) A 0.1.0 file has no `gameTools`: decided once from its game data (D6). An
+        // imported file carries no export records, but every block a CSV or JSON export wrote has a
+        // fixed ID, so the result is the same as on the exporting device.
+        val doc = GameToolsUpgrade.resolve(withoutOrphanGallery(decoded.files.toDoc(unknownFiles = unknown)), exportRecords = emptyList())
         val codes = UnitCodes(doc)
         val failed = failedPaths.map { path -> FailedPart(path, labelOf(path, codes)) }
         return PackageOpen.Ready(

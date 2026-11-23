@@ -139,4 +139,15 @@ class PickerModelsTest {
         val onlyFactions = PickerModels.links(doc, "", false, setOf(PickKind.FACTION))
         assertTrue(onlyFactions.items.all { it.kind == PickKind.FACTION })
     }
+
+    @Test
+    fun `U-15_3 picker create row reads the query only when nothing matches`() {
+        val all = PickerModels.characters(doc, sceneCast = emptyList(), recent = emptyList())
+        val none = io.github.lenticualrstone.civilight.ui.picker.PickerModel(sections = emptyList())
+        assertTrue(io.github.lenticualrstone.civilight.ui.picker.PickerCreate.matched("", none))
+        assertTrue(io.github.lenticualrstone.civilight.ui.picker.PickerCreate.matched("리", all))
+        assertFalse(io.github.lenticualrstone.civilight.ui.picker.PickerCreate.matched("세라라", none))
+        val kind = io.github.lenticualrstone.civilight.designsystem.component.CreateKind.CHARACTER
+        assertEquals("‘세라라’ 새 인물", io.github.lenticualrstone.civilight.designsystem.component.CreateCard.rowLabel(kind, "세라라", matched = false))
+    }
 }

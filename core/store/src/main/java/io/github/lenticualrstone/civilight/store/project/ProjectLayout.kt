@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.store.project
 
+import io.github.lenticualrstone.civilight.model.app.LensOnOpen
 import io.github.lenticualrstone.civilight.model.app.ProjectActivityFile
 import io.github.lenticualrstone.civilight.model.app.ProjectViewFile
 import io.github.lenticualrstone.civilight.model.canvas.Canvas
@@ -22,6 +23,7 @@ import io.github.lenticualrstone.civilight.model.gallery.GalleryFile
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
 import io.github.lenticualrstone.civilight.model.map.WorldMap
 import io.github.lenticualrstone.civilight.model.project.Project
+import io.github.lenticualrstone.civilight.model.version.EpisodeVersionsFile
 import io.github.lenticualrstone.civilight.store.io.AtomicFiles
 import io.github.lenticualrstone.civilight.store.io.StoreDirectory
 import io.github.lenticualrstone.civilight.store.version.StoreVersionFile
@@ -55,7 +57,8 @@ object ProjectLayout {
             out[PackagePaths.TRASH_INDEX] = unit(doc.trash, TrashIndexFile.serializer())
         }
         out[PackagePaths.APP_ACTIVITY] = unit(doc.app.activity, ProjectActivityFile.serializer())
-        out[PackagePaths.APP_VIEW] = unit(doc.app.view, ProjectViewFile.serializer())
+        // (0.2.0, D9) The stored lens is written back while the open project is at 최신.
+        out[PackagePaths.APP_VIEW] = unit(LensOnOpen.toStore(doc.app), ProjectViewFile.serializer())
         out[STORE_META] = unit(StoreVersionFile(storeVersion), StoreVersionFile.serializer())
         return out
     }
@@ -64,7 +67,7 @@ object ProjectLayout {
     private fun addUnits(out: MutableMap<String, UnitFile>, prefix: String, u: FileUnits) {
         val mirror = prefix.isNotEmpty()
         if (!mirror || u.project.fieldDefs.isNotEmpty()) out[prefix + PackagePaths.PROJECT] = unit(u.project, Project.serializer())
-        if (!mirror || u.storyIndex.units.isNotEmpty()) out[prefix + PackagePaths.STORY_INDEX] = unit(u.storyIndex, StoryIndexFile.serializer())
+        if (!mirror || u.storyIndex.units.isNotEmpty() || u.storyIndex.foreshadows.isNotEmpty()) out[prefix + PackagePaths.STORY_INDEX] = unit(u.storyIndex, StoryIndexFile.serializer())
         for ((key, file) in u.episodes) out[prefix + PackagePaths.episode(key)] = unit(file, EpisodeFile.serializer())
         if (!mirror || u.cast != CastFile()) out[prefix + PackagePaths.CAST] = unit(u.cast, CastFile.serializer())
         if (!mirror || u.world != WorldFile()) out[prefix + PackagePaths.WORLD] = unit(u.world, WorldFile.serializer())
@@ -75,6 +78,8 @@ object ProjectLayout {
         if (!mirror || u.assets != AssetsIndexFile()) out[prefix + PackagePaths.ASSETS_INDEX] = unit(u.assets, AssetsIndexFile.serializer())
         // One unit per gallery owner (55 §3.3, §12.5): a caption keystroke rewrites only that owner's file.
         for ((key, file) in u.gallery) out[prefix + PackagePaths.gallery(key)] = unit(file, GalleryFile.serializer())
+        // (0.2.0, N-29) One unit per numbering unit with versions; never in the trash mirror.
+        if (!mirror) for ((key, file) in u.versions) out[PackagePaths.versions(key)] = unit(file, EpisodeVersionsFile.serializer())
         if (!mirror) {
             out[PackagePaths.CHECKS] = unit(u.checks, ChecksFile.serializer())
             out[PackagePaths.TOMBSTONES] = unit(u.tombstones, TombstonesFile.serializer())
@@ -95,7 +100,8 @@ object ProjectLayout {
         if (rel in FIXED) return true
         if (!rel.endsWith(".json")) return false
         return (rel.startsWith("story/") && rel.count { it == '/' } == 1) ||
-            rel.startsWith("maps/") || rel.startsWith("canvas/") || rel.startsWith("pages/") || PackagePaths.isGalleryUnit(rel)
+            rel.startsWith("maps/") || rel.startsWith("canvas/") || rel.startsWith("pages/") || PackagePaths.isGalleryUnit(rel) ||
+            (path == rel && PackagePaths.isVersionsUnit(rel))
     }
 
     /** True when an unknown file may be kept at [path] (not a layout path, not store-internal). */
@@ -131,6 +137,7 @@ object ProjectLayout {
             rel.startsWith("canvas/") -> u.canvases[fileKey("canvas/")]
             rel.startsWith("pages/") -> u.pages[fileKey("pages/")]
             PackagePaths.isGalleryUnit(rel) -> u.gallery[PackagePaths.galleryOwnerOf(rel)]
+            !inTrash && PackagePaths.isVersionsUnit(rel) -> u.versions[PackagePaths.versionsUnitOf(rel)]
             else -> null
         }
     }

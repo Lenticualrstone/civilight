@@ -138,6 +138,8 @@ class TrashRows(private val now: Timestamp, private val zone: ZoneId) {
             }
             TrashKind.CHANGE -> TODO_COPY_LIB38_CHANGE to location
             TrashKind.FIELD_DEF -> (target?.let(index::fieldDef)?.name ?: TODO_COPY_LIB38_FIELD_DEF) to "인물 · $location"
+            // (0.2.0, N-44) A trashed tag: its name; the sub copy is the cast lane's TODO_COPY_CAST_TAG_TRASH_SUB.
+            TrashKind.TAG -> (doc.project.tags.firstOrNull { it.key == target }?.name.orEmpty()) to location
             TrashKind.GALLERY_ITEM -> {
                 val g = target?.let(index::galleryItem)
                 val owner = if (g?.ownerKind?.known == io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind.CHARACTER) index.character(g.ownerKey)?.name else doc.project.name

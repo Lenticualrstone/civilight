@@ -46,6 +46,14 @@ data class Project(
     @EncodeDefault val createdAt: Timestamp = 0L,
     @EncodeDefault override val updatedAt: Timestamp = 0L,
     @EncodeDefault override val updatedBy: String = "",
+    /**
+     * (0.2.0, G-1, 00 §13.2) `게임 제작 도구`. **Absent and `false` differ**: null = written by 0.1.0 and
+     * not decided yet; the load step ([io.github.lenticualrstone.civilight.model.game.GameToolsUpgrade])
+     * resolves it once. A 0.2.0 writer always writes `true` or `false`. UI reads [io.github.lenticualrstone.civilight.model.game.GameTools.on].
+     */
+    val gameTools: Boolean? = null,
+    /** (0.2.0, WLD-73, S-5) Project setting `용어 후보`; default on, not written while on. */
+    val termCandidates: Boolean = true,
     override val ext: JsonObject? = null,
 ) : Entity
 

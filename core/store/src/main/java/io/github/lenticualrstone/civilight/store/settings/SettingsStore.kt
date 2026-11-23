@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.lenticualrstone.civilight.model.app.AnimationPref
 import io.github.lenticualrstone.civilight.model.app.AppSettings
+import io.github.lenticualrstone.civilight.model.app.CardStyle
+import io.github.lenticualrstone.civilight.model.app.LibraryStyle
 import io.github.lenticualrstone.civilight.model.app.LargeMapExport
 import io.github.lenticualrstone.civilight.model.app.MapStylePref
 import io.github.lenticualrstone.civilight.model.app.PaneSplit
@@ -79,6 +81,28 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     /** Gallery viewer `설명` toggle (55 GAL-09). */
     suspend fun setGalleryTextOn(value: Boolean) = update { it.copy(galleryTextOn = value) }
+
+    /**
+     * (0.2.0, LIB-94) `서재 보기`. Picking a 3D style also sets the 서재 head toggle to that view
+     * (`CARD`) so the choice shows on return; picking `목록` leaves the toggle as stored.
+     */
+    suspend fun setLibraryStyle(value: LibraryStyle) = update {
+        it.copy(libraryStyle = value, libraryToggle = if (value.isList) it.libraryToggle else ViewMode.CARD)
+    }
+
+    /** (0.2.0, LIB-94, CST-67) Character `카드 보기`; same toggle rule as [setLibraryStyle]. */
+    suspend fun setCastCardStyle(value: CardStyle) = update {
+        it.copy(castCardStyle = value, castToggle = if (value.isList) it.castToggle else ViewMode.CARD)
+    }
+
+    /** (0.2.0, LIB-93) 서재 head toggle position (`LIST` or `CARD`), remembered across restarts. */
+    suspend fun setLibraryToggle(value: ViewMode) = update { it.copy(libraryToggle = value) }
+
+    /** (0.2.0, CST-67) Character list head toggle position. */
+    suspend fun setCastToggle(value: ViewMode) = update { it.copy(castToggle = value) }
+
+    /** (0.2.0, LIB-94) Tilt follow switch. */
+    suspend fun setViewTilt(value: Boolean) = update { it.copy(viewTilt = value) }
 
     /** CNV-47: the inner-screen pane ratio of [module] ([PaneSplit.Modules]); [PaneSplit.DEFAULT] clears it. */
     suspend fun setPaneSplit(module: String, value: PaneSplit) = update { it.withPaneSplit(module, value) }

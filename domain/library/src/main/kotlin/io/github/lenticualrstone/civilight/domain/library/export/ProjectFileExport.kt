@@ -42,6 +42,7 @@ object ProjectFileExport {
                 includeTrash = options.includeTrash,
                 includeRecorderAudio = options.includeRecorderAudio,
                 encrypted = options.encrypt,
+                includeVersions = options.includeVersions,
                 preview = preview,
             ),
             writtenBy, now,
@@ -64,8 +65,9 @@ object ProjectFileExport {
     ): ProjectFile {
         val content = ProjectPackageWriter.content(
             doc, recorder, blobs,
-            // Recorder audio travels once, in the library backup (`.civilight-recorder`).
-            ProjectFileOptions(encrypted = recovery != null, preview = preview, includeRecorderAudio = false),
+            // Recorder audio travels once, in the library backup (`.civilight-recorder`). Backups always
+            // carry episode versions (LIB-97) and game data (LIB-91).
+            ProjectFileOptions(encrypted = recovery != null, preview = preview, includeRecorderAudio = false, includeVersions = true),
             writtenBy, now,
         )
         val plain = content.toZip()

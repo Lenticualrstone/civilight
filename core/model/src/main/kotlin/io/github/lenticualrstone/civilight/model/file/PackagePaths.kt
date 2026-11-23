@@ -46,6 +46,19 @@ object PackagePaths {
     fun page(pageKey: Key) = "pages/$pageKey.json"
     fun asset(hash: String, ext: String) = "assets/$hash.$ext"
     fun gallery(ownerKey: Key) = "$GALLERY_DIR$ownerKey.json"
+
+    /** (0.2.0, 00 §13.5) `versions/`: one file per numbering unit with versions. */
+    const val VERSIONS_DIR = "versions/"
+
+    /** (0.2.0) `versions/<unitKey>.json`. */
+    fun versions(unitKey: Key) = "$VERSIONS_DIR$unitKey.json"
+
+    /** (0.2.0) True for `versions/<key>.json` (one level, not a nested path). */
+    fun isVersionsUnit(path: String): Boolean =
+        path.startsWith(VERSIONS_DIR) && path.endsWith(".json") && path.count { it == '/' } == 1
+
+    /** (0.2.0) The unit key of a `versions/<unitKey>.json` path. */
+    fun versionsUnitOf(path: String): Key = path.removePrefix(VERSIONS_DIR).removeSuffix(".json")
     fun galleryOriginal(hash: String, ext: String) = "$GALLERY_FILES_DIR$hash.$ext"
 
     /** True for a gallery file unit path (`gallery/<ownerKey>.json`, not an original). */

@@ -12,6 +12,7 @@ import io.github.lenticualrstone.civilight.model.cast.Relation
 import io.github.lenticualrstone.civilight.model.cast.VoiceLine
 import io.github.lenticualrstone.civilight.model.change.ChangeRecord
 import io.github.lenticualrstone.civilight.model.checks.Acknowledgement
+import io.github.lenticualrstone.civilight.model.marks.Foreshadow
 import io.github.lenticualrstone.civilight.model.script.Block
 import io.github.lenticualrstone.civilight.model.script.DiscardedVoiceId
 import io.github.lenticualrstone.civilight.model.script.ScriptAsset
@@ -45,6 +46,11 @@ import kotlinx.serialization.json.JsonObject
 data class StoryIndexFile(
     @EncodeDefault val units: List<StoryUnit> = emptyList(),
     val discardedVoiceIds: List<DiscardedVoiceId> = emptyList(),
+    /**
+     * (0.2.0, N-41) Foreshadowings (`복선`); additive, not written while empty. Live rows here,
+     * trashed rows in `trash/story/index.json`.
+     */
+    val foreshadows: List<Foreshadow> = emptyList(),
     override val ext: JsonObject? = null,
 ) : HasExt
 

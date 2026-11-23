@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.script
 
+import io.github.lenticualrstone.civilight.model.marks.Marks
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.OrderKeys
 import io.github.lenticualrstone.civilight.model.change.Anchor
@@ -216,6 +217,8 @@ object BlockOps {
             }
             .addDiscarded(doc.numberingUnitOf(later), VoiceIds.discardedOf(later, DiscardReason.MERGED, ctx.now))
         out = Containers.mergeContainers(out, later.key, previous.key, previous.runs.plainText)
+        // (0.2.0, N-41) Foreshadowing marks on the removed block join the kept one.
+        out = Marks.moveAnchors(out, later.key, previous.key)
         val diamonds = moved.count { !it.isReveal }
         val reveals = moved.count { it.isReveal }
         return BackspaceResult.Merged(out, previous.key, caret, Toasts.recordsTo(diamonds, reveals, Labels.number(previous.number)))

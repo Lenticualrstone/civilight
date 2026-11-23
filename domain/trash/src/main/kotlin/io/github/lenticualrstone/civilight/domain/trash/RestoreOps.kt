@@ -73,6 +73,13 @@ object RestoreOps {
         if (entry.kind.known == TrashKind.BLOCK_GROUP) {
             return restoreBlocks(doc, entryKey, entry.targetKeys, ctx, authenticated, sceneChoice)
         }
+        // (0.2.0, N-44) A tag: NotFound while a live tag has its name (check TagTrash.canRestore first).
+        if (entry.kind.known == TrashKind.TAG) {
+            return when (val r = TagTrash.restore(doc, entryKey, ctx)) {
+                is TagRestore.Restored -> RestoreOutcome.Restored(r.doc, RestoreReport(null, r.tag.name, emptyMap(), emptyMap(), emptyList()), DocChange(doc, r.doc))
+                else -> RestoreOutcome.NotFound
+            }
+        }
         val kind = ItemKind.of(entry.kind) ?: return RestoreOutcome.NotFound
         val before = doc
         var d = doc

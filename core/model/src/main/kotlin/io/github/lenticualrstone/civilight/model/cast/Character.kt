@@ -43,13 +43,21 @@ data class Character(
     override val trashEntryKey: Key? = null,
     @EncodeDefault override val updatedAt: Timestamp = 0L,
     @EncodeDefault override val updatedBy: String = "",
+    /** (0.2.0, CST-72) `말투 · 한 줄 요약`: one line, NFC, trimmed; blank is stored as null. */
+    val speechSummary: String? = null,
+    /** (0.2.0, CST-73) `이 탭 잠그기`: the 비밀 tab asks for the device lock on every opening. */
+    val secretTabLocked: Boolean = false,
     override val ext: JsonObject? = null,
 ) : Entity, Ordered, Trashable
 
 /** Kinds of items that carry custom fields (and change-record `field` targets). */
 enum class EntityKind { CHARACTER, PLACE, TERM, FACTION }
 
-/** A tag (`project.json › tags`); names are unique per project. */
+/**
+ * A tag (`project.json › tags`); names are unique among **live** tags (CST-75). (0.2.0, N-44) A
+ * trashed tag stays in `project.json` with [deletedAt]: characters and gallery images keep its key
+ * and show it again on restore.
+ */
 @Serializable
 data class Tag(
     override val key: Key,
@@ -57,8 +65,17 @@ data class Tag(
     override val order: OrderKey,
     @EncodeDefault override val updatedAt: Timestamp = 0L,
     @EncodeDefault override val updatedBy: String = "",
+    /** (0.2.0, CST-75) Tag palette token name; null = no colour. */
+    val color: String? = null,
+    /** (0.2.0, N-44) Set while the tag is in the trash. */
+    val deletedAt: Timestamp? = null,
+    /** (0.2.0, N-44) The trash row of this tag while trashed. */
+    val trashEntryKey: Key? = null,
     override val ext: JsonObject? = null,
-) : Entity, Ordered
+) : Entity, Ordered {
+    /** Not in the trash. */
+    val isLive: Boolean get() = deletedAt == null
+}
 
 /** An in-game voice line of a character (`cast.json › voiceLines`); `비어 있음` is derived. */
 @Serializable

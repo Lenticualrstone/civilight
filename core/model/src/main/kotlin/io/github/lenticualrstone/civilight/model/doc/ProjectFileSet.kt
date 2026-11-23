@@ -20,6 +20,7 @@ import io.github.lenticualrstone.civilight.model.gallery.GalleryFile
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
 import io.github.lenticualrstone.civilight.model.map.WorldMap
 import io.github.lenticualrstone.civilight.model.project.Project
+import io.github.lenticualrstone.civilight.model.version.EpisodeVersionsFile
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonElement
 
@@ -48,6 +49,7 @@ data class ProjectFileSet(
             story = live.storyIndex.copy(
                 units = union(live.storyIndex.units, t?.storyIndex?.units) { it.key },
                 discardedVoiceIds = live.storyIndex.discardedVoiceIds + t?.storyIndex?.discardedVoiceIds.orEmpty(),
+                foreshadows = union(live.storyIndex.foreshadows, t?.storyIndex?.foreshadows) { it.key },
             ),
             episodes = mergeEpisodes(live.episodes, t?.episodes.orEmpty()),
             cast = CastFile(
@@ -80,6 +82,7 @@ data class ProjectFileSet(
             app = app,
             unknownFiles = unknownFiles,
             gallery = mergeGallery(live.gallery, t?.gallery.orEmpty()),
+            versions = live.versions,
         )
     }
 
@@ -94,6 +97,7 @@ data class ProjectFileSet(
             val ix = doc.index
 
             val (liveUnits, deadUnits) = doc.story.units.partition { l.isLive(it) }
+            val (liveMarks, deadMarks) = doc.story.foreshadows.partition { it.deletedAt == null }
 
             val liveNumberingUnits = liveUnits.filter { ix.isScene(it) }.mapNotNull { ix.numberingUnitKeyOfScene(it.key) }.toSet()
             val liveEpisodes = LinkedHashMap<Key, EpisodeFile>()
@@ -141,7 +145,7 @@ data class ProjectFileSet(
             val (liveDefs, deadDefs) = doc.project.fieldDefs.partition { it.deletedAt == null }
             val live = FileUnits(
                 project = doc.project.copy(fieldDefs = liveDefs),
-                storyIndex = doc.story.copy(units = liveUnits),
+                storyIndex = doc.story.copy(units = liveUnits, foreshadows = liveMarks),
                 episodes = liveEpisodes,
                 cast = doc.cast.copy(characters = liveChars, relations = liveRels, voiceLines = liveLines, archiveDocs = liveDocs),
                 world = doc.world.copy(places = livePlaces, terms = liveTerms, factions = liveFactions, events = liveEvents),
@@ -154,10 +158,11 @@ data class ProjectFileSet(
                 tombstones = doc.tombstones,
                 deletions = doc.deletions,
                 gallery = liveGallery,
+                versions = doc.versions,
             )
             val dead = FileUnits(
                 project = doc.project.copy(fieldDefs = deadDefs, tags = emptyList(), relationKinds = emptyList(), travelModes = emptyList()),
-                storyIndex = StoryIndexFile(units = deadUnits),
+                storyIndex = StoryIndexFile(units = deadUnits, foreshadows = deadMarks),
                 episodes = deadEpisodes,
                 cast = CastFile(characters = deadChars, relations = deadRels, voiceLines = deadLines, archiveDocs = deadDocs),
                 world = WorldFile(places = deadPlaces, terms = deadTerms, factions = deadFactions, events = deadEvents),
@@ -213,6 +218,7 @@ data class ProjectFileSet(
                 val canvases = LinkedHashMap<Key, Canvas>()
                 val pages = LinkedHashMap<Key, Page>()
                 val gallery = LinkedHashMap<Key, GalleryFile>()
+                val versions = LinkedHashMap<Key, EpisodeVersionsFile>()
                 for (path in files.keys) {
                     if (!path.startsWith(prefix)) continue
                     val rel = path.removePrefix(prefix)
@@ -232,6 +238,8 @@ data class ProjectFileSet(
                                 // Items of another owner than the file's own are dropped (a damaged or edited file).
                                 gallery[file.ownerKey] = file.copy(items = file.items.filter { it.ownerKey == file.ownerKey })
                             }
+                        prefix.isEmpty() && PackagePaths.isVersionsUnit(rel) ->
+                            read(path, EpisodeVersionsFile.serializer())?.let { versions[PackagePaths.versionsUnitOf(rel)] = it }
                     }
                 }
                 val base = fallbackProject ?: project!!
@@ -250,6 +258,7 @@ data class ProjectFileSet(
                     tombstones = read(prefix + PackagePaths.TOMBSTONES, TombstonesFile.serializer()) ?: TombstonesFile(),
                     deletions = read(prefix + PackagePaths.DELETIONS, DeletionsFile.serializer()) ?: DeletionsFile(),
                     gallery = gallery,
+                    versions = versions,
                 )
             }
 
@@ -331,6 +340,8 @@ data class FileUnits(
     val deletions: DeletionsFile,
     /** Gallery files by owner key (`gallery/<ownerKey>.json`, 55 §3.3); only owners with items. */
     val gallery: Map<Key, GalleryFile> = emptyMap(),
+    /** (0.2.0) `versions/<unitKey>.json` by unit key; only in the normal files, never the trash mirror. */
+    val versions: Map<Key, EpisodeVersionsFile> = emptyMap(),
 ) {
     /**
      * JSON of each unit by path under [prefix]. With a non-empty prefix (the trash mirror) the
@@ -341,7 +352,7 @@ data class FileUnits(
         val mirror = prefix.isNotEmpty()
         val out = LinkedHashMap<String, JsonElement>()
         if (!mirror || project.fieldDefs.isNotEmpty()) out[prefix + PackagePaths.PROJECT] = CivilightJson.encodeElement(Project.serializer(), project)
-        if (!mirror || storyIndex.units.isNotEmpty()) out[prefix + PackagePaths.STORY_INDEX] = CivilightJson.encodeElement(StoryIndexFile.serializer(), storyIndex)
+        if (!mirror || storyIndex.units.isNotEmpty() || storyIndex.foreshadows.isNotEmpty()) out[prefix + PackagePaths.STORY_INDEX] = CivilightJson.encodeElement(StoryIndexFile.serializer(), storyIndex)
         for ((key, file) in episodes) out[prefix + PackagePaths.episode(key)] = CivilightJson.encodeElement(EpisodeFile.serializer(), file)
         if (!mirror || cast != CastFile()) out[prefix + PackagePaths.CAST] = CivilightJson.encodeElement(CastFile.serializer(), cast)
         if (!mirror || world != WorldFile()) out[prefix + PackagePaths.WORLD] = CivilightJson.encodeElement(WorldFile.serializer(), world)
@@ -351,6 +362,7 @@ data class FileUnits(
         for ((key, page) in pages) out[prefix + PackagePaths.page(key)] = CivilightJson.encodeElement(Page.serializer(), page)
         if (!mirror || assets != AssetsIndexFile()) out[prefix + PackagePaths.ASSETS_INDEX] = CivilightJson.encodeElement(AssetsIndexFile.serializer(), assets)
         for ((key, file) in gallery) out[prefix + PackagePaths.gallery(key)] = CivilightJson.encodeElement(GalleryFile.serializer(), file)
+        if (!mirror) for ((key, file) in versions) out[PackagePaths.versions(key)] = CivilightJson.encodeElement(EpisodeVersionsFile.serializer(), file)
         if (!mirror) {
             out[PackagePaths.CHECKS] = CivilightJson.encodeElement(ChecksFile.serializer(), checks)
             out[PackagePaths.TOMBSTONES] = CivilightJson.encodeElement(TombstonesFile.serializer(), tombstones)

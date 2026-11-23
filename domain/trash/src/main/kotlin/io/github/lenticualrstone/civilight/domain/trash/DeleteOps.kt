@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.trash
 
+import io.github.lenticualrstone.civilight.model.marks.Marks
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.change.Anchor
 import io.github.lenticualrstone.civilight.model.checks.Acknowledgement
@@ -97,7 +98,8 @@ object TrashOps {
         val blocks = blockItems.mapNotNull { item ->
             doc.index.block(item.key)?.takeIf { doc.liveness.isLive(it) }.also { if (it == null) skipped += item }
         }
-        val (empty, nonEmpty) = blocks.partition { !it.hasContent() && it.key !in anchoredBlocks }
+        // (0.2.0, SCR-04) A block carrying a foreshadowing mark is not empty: it goes to the trash, so the mark can come back.
+        val (empty, nonEmpty) = blocks.partition { !it.hasContent() && it.key !in anchoredBlocks && !Marks.carriesMark(doc, it.key) }
         val updatedGroups = mutableMapOf<Key, TrashEntry>()
         val discarded = mutableListOf<DiscardedVoiceId>()
         for ((sceneKey, sceneBlocks) in nonEmpty.groupBy { it.sceneKey }) {

@@ -103,6 +103,13 @@ object CivilightMotion {
     /** Lens value swap travel (CNV-42). */
     val valueSwapShift: Dp = 8.dp
 
+    // 0.2.0 (U-14, U-15).
+    /** `씬 n 끝에` flash when the scene in view changes (SCR-71): fill in, hold, out on `standard`, 600 ms in all. */
+    val placeFlash: MotionToken = MotionToken(standardCurve, 600)
+
+    /** A new list row's `hl` highlight after `만들기` (DS-72), faded out on `standard`. */
+    const val createdRowHighlightMs: Int = 1200
+
     const val sheetBackScale: Float = 0.965f
     val sheetBackBlur: Dp = 2.dp
     val unhideBlur: Dp = 7.dp

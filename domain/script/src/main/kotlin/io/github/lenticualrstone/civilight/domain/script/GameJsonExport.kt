@@ -148,7 +148,8 @@ object GameJsonExport {
                 BlockKind.DIALOGUE -> {
                     put("type", "dialogue")
                     put("speaker", b.speakerKey?.let(::JsonPrimitive) ?: JsonNull)
-                    b.speakerKey?.let { s -> put("displayName", Manuscript.displayNameAt(doc, s, b.key) ?: Labels.speakerName(doc, s)) }
+                    // (0.2.0, N-43, SCR-78) A per-block display name wins; the voice ID stays the speaker's.
+                    b.speakerKey?.let { s -> put("displayName", b.displayNameOverride ?: Manuscript.displayNameAt(doc, s, b.key) ?: Labels.speakerName(doc, s)) }
                     if (doc.project.script.stagePositionEnabled) b.stage?.let { put("stage", it.raw) }
                     put("text", Runs.exportText(b.runs, scope.includeParens))
                     if (voices) VoiceIds.currentId(doc, b)?.let { put("voice", it) }
@@ -166,7 +167,7 @@ object GameJsonExport {
                         for (o in BlockOps.orderedOptions(b)) addJsonObject {
                             put("id", o.key)
                             put("text", Runs.exportText(o.runs, scope.includeParens))
-                            if (voices) VoiceIds.currentIdOfOption(doc, b, o)?.let { put("voice", it) }
+                            // (0.2.0, N-23) Choice lines are text only: no voice ID is written.
                         }
                     }
                     put("rejoin", rejoinOf(doc, b)?.let(::JsonPrimitive) ?: JsonNull)

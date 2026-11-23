@@ -23,11 +23,11 @@ enum class IconId(val pathData: String) {
     Next("M9 5l7 7-7 7"),
     More("M5 12h.01M12 12h.01M19 12h.01"),
     Plus("M12 5v14M5 12h14"),
-    X("M6 6l12 12M18 6L6 18"),
-    Check("M5 12l4 4 10-10"),
+    X("M6.5 6.5l11 11M17.5 6.5l-11 11"),
+    Check("M5 12.5l4.5 4.5L19 7.5"),
     Grip("M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"),
     Filter("M4 6h16M7 12h10M10 18h4"),
-    Search("M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"),
+    Search("M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM20 20l-4.5-4.5"),
     Mic("M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v3"),
     Text("M5 6h14M12 6v12M9 18h6"),
     Pause("M9 6v12M15 6v12"),
@@ -49,14 +49,14 @@ enum class IconId(val pathData: String) {
     UndoMap("M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2"),
     Cloud("M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 11a3.5 3.5 0 0 0 1 7z"),
     Drive("M8 4h8l5 9-4 7H7l-4-7zM8 4l9 16M16 4L7 20M3 13h18"),
-    File("M7 3h7l5 5v13H7zM14 3v5h5"),
+    File("M6 3h8l4 4v14H6zM14 3v4h4"),
     Folder("M3 7h7l2 2h9v10H3z"),
     Image("M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4"),
     Grid("M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"),
 
     /** Gallery `격자` (GAL, board `scr_gallery.py` I_GRID9): three columns of tall 3:4 tiles, two rows. */
     GridTall("M3.5 3.5h4.5v7.5H3.5zM9.75 3.5h4.5v7.5h-4.5zM16 3.5h4.5v7.5H16zM3.5 13h4.5v7.5H3.5zM9.75 13h4.5v7.5h-4.5zM16 13h4.5v7.5H16z"),
-    List("M4 6h16M4 12h16M4 18h16"),
+    List("M4 7h16M4 12h16M4 17h16"),
     Rotate("M4 12a8 8 0 1 0 3-6.2M4 4v4h4"),
     Flip("M12 3v18M8 7l-4 5 4 5M16 7l4 5-4 5"),
     Reset("M4 4v6h6M4.5 15a8 8 0 1 0 2-8.5L4 9"),
@@ -75,8 +75,8 @@ enum class IconId(val pathData: String) {
     Camera("M4 8h4l2-3h4l2 3h4v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"),
     Wave("M3 12c3-4 6 4 9 0s6 4 9 0"),
     Book("M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11"),
-    Merge("M6 6l6 6-6 6M18 6l-6 6 6 6"),
-    Split("M12 4v16M6 8l-3 4 3 4M18 8l3 4-3 4"),
+    Merge("M12 4v16M3 12h5M5.5 9.5L8 12l-2.5 2.5M21 12h-5M18.5 9.5L16 12l2.5 2.5"),
+    Split("M12 4v16M4 12h5M6.5 9.5L4 12l2.5 2.5M20 12h-5M17.5 9.5L20 12l-2.5 2.5"),
     Paper("M5 5h14v10h-8l-4 3.5V15H5z"),
     Props("M4 7h16M4 12h16M4 17h10"),
     StepLock("M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3"),
@@ -94,6 +94,116 @@ enum class IconId(val pathData: String) {
 
     /** Zoom out `−` (canvas zoom column, CNV-01); the pair of [Plus]. */
     Minus("M5 12h14"),
+
+    // ---- DS-71 (0.2.0): ids added by the r2 icon set. Existing ids are kept; seven of them took the r2 path above.
+
+    /** `보내기` (input bar send, A1). */
+    Send("M12 19V6M6.5 11.5L12 6l5.5 5.5"),
+
+    /** `다음 씬` (B2). */
+    NextScene("M4 6h12M4 10h12M4 14h7M17 13v7M13.5 16.5h7"),
+
+    /** `고치기` pencil (right swipe, caption panels). */
+    Edit("M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"),
+
+    /** `이 뒤에` (right swipe). */
+    InsertAfter("M5 6h14M5 11h14M12 14v6M9 17h6"),
+
+    /** `종류` (right swipe). */
+    Kind("M4 7h10M4 12h16M4 17h7M17 4l3 3-3 3"),
+
+    /** `씬 나누기` (right swipe). */
+    SceneCut("M4 5h16M4 19h16M4 12h3M10.5 12h3M17 12h3"),
+
+    /** `복사` (block selection tools). */
+    Copy("M8 8h11v11H8zM5 16V5h11"),
+
+    /** `잘라내기` (block selection tools). */
+    Cut("M6 7a2.5 2.5 0 1 0 0 .01M6 17a2.5 2.5 0 1 0 0 .01M8 8.5L19 18M8 15.5L19 6"),
+
+    /** `옮기기` (block selection tools); [Move] stays the map pan tool. */
+    MoveBlock("M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4"),
+
+    /** `관계도` (cast list view switch). */
+    Graph(
+        "M8.5 6.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM20.5 9a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z" +
+            "M12.5 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM8.4 7.1l7.2 1.4M6.6 8.9l2.6 6.8M16.4 10.8l-4.6 5.4",
+    ),
+
+    /** `이전` in bottom rows and card controls; same shape as [Back], which sits at a head's left (D31). */
+    Prev("M15 5l-7 7 7 7"),
+
+    /** `이전 카드` (롤로덱스). */
+    Up("M5 15l7-7 7 7"),
+
+    /** `다음 카드` (롤로덱스). */
+    Down("M5 9l7 7 7-7"),
+
+    /** `맨 앞` (gallery reorder). */
+    ToTop("M5 4.5h14M12 20V9M7 14l5-5 5 5"),
+
+    /** `맨 뒤` (gallery reorder). */
+    ToBottom("M5 19.5h14M12 4v11M7 10l5 5 5-5"),
+
+    /** `여러 장 고르기`. */
+    SelectBox("M5 5h14v14H5zM8.5 12l2.5 2.5 4.5-5"),
+
+    /** `설명` (gallery viewer, on and off). */
+    Caption("M5 6h14M5 11h14M5 16h9"),
+
+    /** `보기` (full screen). */
+    Expand("M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"),
+
+    /** Card `뒤집기`; not the crop mirror, which is [Flip]. */
+    CardFlip("M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4"),
+
+    /** `다시 펼치기` (타로 펼침). */
+    Redeal("M4 12a8 8 0 1 0 2.4-5.7M4 4.5v4h4"),
+
+    /** `열기` (card page). */
+    OpenOut("M14 5h5v5M19 5l-8 8M10 6H6a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-4"),
+
+    /** `펼치기` (원고 더미). */
+    Fan("M12 20L5 7M12 20l7-13M12 20V5"),
+
+    /** `모으기` (원고 더미). */
+    Gather("M5 9l7-4 7 4-7 4zM5 13l7 4 7-4M5 17l7 4 7-4"),
+
+    /** `들어 보기` (원고 더미). */
+    Lift("M4 17h16M4 20.5h16M7 6.5h10v6H7zM9.5 4L12 2l2.5 2"),
+
+    /** `내려놓기` (원고 더미). */
+    Drop("M4 17h16M4 20.5h16M7 8h10v5.5H7zM9.5 3L12 5l2.5-2"),
+    ;
+
+    companion object {
+        /**
+         * DS-71: the r2 icon-set key (`send`, `close`, `mirror` …) → its id. Every one of the 51 keys maps to one
+         * id; null for an unknown key.
+         */
+        fun forKey(key: String): IconId? = R2_KEYS[key]
+
+        /** The 51 r2 keys in the set's order. */
+        val r2Keys: List<String> get() = R2_KEYS.keys.toList()
+
+        private val R2_KEYS: Map<String, IconId> by lazy {
+            linkedMapOf(
+                "send" to Send, "check" to Check, "search" to Search, "layers" to Layers, "close" to X,
+                "split" to Split, "merge" to Merge, "next_scene" to NextScene,
+                "edit" to Edit, "insert_after" to InsertAfter, "kind" to Kind, "scene_cut" to SceneCut, "trash" to Trash,
+                "note_ref" to Paper, "props" to Props, "copy" to Copy, "cut" to Cut, "move" to MoveBlock, "undo" to Undo,
+                "plus" to Plus, "list" to List, "graph" to Graph, "back" to Back, "prev" to Prev, "next" to Next,
+                "up" to Up, "down" to Down, "to_top" to ToTop, "to_bottom" to ToBottom, "select_box" to SelectBox,
+                "more" to More,
+                "caption" to Caption, "expand" to Expand, "image" to Image, "file" to File, "rotate" to Rotate,
+                "mirror" to Flip, "reset" to Reset, "lock" to Lock, "fingerprint" to Fingerprint,
+                "mic" to Mic, "write" to Text, "pause" to Pause,
+                "dice" to Dice,
+                "flip" to CardFlip, "redeal" to Redeal, "open_out" to OpenOut, "fan" to Fan, "gather" to Gather,
+                "lift" to Lift, "drop" to Drop,
+            )
+        }
+    }
 }
 
 /** [ImageVector]s for [IconId]; built once and cached. */

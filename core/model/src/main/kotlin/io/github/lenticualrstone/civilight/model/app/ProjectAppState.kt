@@ -17,7 +17,31 @@ import kotlinx.serialization.json.JsonElement
 data class ProjectAppState(
     val activity: ProjectActivityFile = ProjectActivityFile(),
     val view: ProjectViewFile = ProjectViewFile(),
+    /**
+     * (0.2.0, D9, scope §8) The lens stored in `_app/view.json` when the project was opened, kept
+     * while the open project shows `최신` ([LensOnOpen]); null when the stored lens was `최신`.
+     * Never a file of its own.
+     */
+    val lensKept: LensState? = null,
 )
+
+/**
+ * (0.2.0, S-1, D9) A project always opens at `최신`; a point picked on the cast or world head lasts
+ * until the project is closed. The stored lens is kept (scope §8: lens state kept, not applied):
+ * while the open project is still at `최신`, the store writes the stored value back unchanged.
+ */
+object LensOnOpen {
+    /** The app state an opened project starts with, from the state read from disk. */
+    fun open(stored: ProjectAppState): ProjectAppState =
+        if (stored.view.lens == LensState()) stored
+        else stored.copy(view = stored.view.copy(lens = LensState()), lensKept = stored.view.lens)
+
+    /** The `_app/view.json` value to store for [app]. */
+    fun toStore(app: ProjectAppState): ProjectViewFile {
+        val kept = app.lensKept ?: return app.view
+        return if (app.view.lens == LensState()) app.view.copy(lens = kept) else app.view
+    }
+}
 
 /** `_app/activity.json`. */
 @Serializable

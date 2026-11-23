@@ -53,6 +53,9 @@ enum class TrashKind {
 
     /** One gallery image (55 GAL-20, serial `galleryItem`). */
     GALLERY_ITEM,
+
+    /** (0.2.0, N-44, CST-75) One tag; characters and images keep its key (serial `tag`). */
+    TAG,
 }
 
 enum class TrashReason { DELETED, MERGED, REPLACED_BY_OVERWRITE }

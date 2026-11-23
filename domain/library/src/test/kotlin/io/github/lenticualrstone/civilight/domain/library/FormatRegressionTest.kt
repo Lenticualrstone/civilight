@@ -1,5 +1,10 @@
 package io.github.lenticualrstone.civilight.domain.library
 
+import io.github.lenticualrstone.civilight.model.game.GameData
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import io.github.lenticualrstone.civilight.domain.library.format.FormatVersion
 import io.github.lenticualrstone.civilight.domain.library.format.PackageOpen
 import io.github.lenticualrstone.civilight.domain.library.format.ProjectFileOptions
@@ -72,7 +77,16 @@ class FormatRegressionTest {
             val stored = ZipCodec.read(bytes)
             if (version == FormatVersion.CURRENT) {
                 assertEquals("$file", stored.paths, again.paths)
-                for (path in stored.paths.filter { it != PackagePaths.MANIFEST }) assertArrayEquals("$file $path", stored[path], again[path])
+                for (path in stored.paths.filter { it != PackagePaths.MANIFEST && it != PackagePaths.PROJECT }) assertArrayEquals("$file $path", stored[path], again[path])
+                // (0.2.0, G-3) A file without `gameTools` gets it decided on read; nothing else of project.json changes.
+                val storedProject = Json.parseToJsonElement(stored[PackagePaths.PROJECT]!!.toString(Charsets.UTF_8)).jsonObject
+                val againProject = Json.parseToJsonElement(again[PackagePaths.PROJECT]!!.toString(Charsets.UTF_8)).jsonObject
+                if ("gameTools" !in storedProject) {
+                    assertEquals("$file", JsonPrimitive(GameData.present(pkg.doc, emptyList())), againProject["gameTools"])
+                    assertEquals("$file", storedProject, JsonObject(againProject - "gameTools"))
+                } else {
+                    assertEquals("$file", storedProject, againProject)
+                }
             }
             // The source file is never modified (promise 1).
             assertArrayEquals(before, bytes)

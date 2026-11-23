@@ -24,6 +24,7 @@ import io.github.lenticualrstone.civilight.model.position.ManuscriptIndex
 import io.github.lenticualrstone.civilight.model.project.Project
 import io.github.lenticualrstone.civilight.model.script.Block
 import io.github.lenticualrstone.civilight.model.story.StoryUnit
+import io.github.lenticualrstone.civilight.model.version.EpisodeVersionsFile
 
 /**
  * The whole in-memory project (§8.2): one immutable value; edits are pure functions
@@ -63,6 +64,12 @@ data class ProjectDoc(
      * (the project key for the project gallery), live and trashed items together.
      */
     val gallery: Map<Key, GalleryFile> = emptyMap(),
+    /**
+     * (0.2.0, N-29, 00 §13.5) Episode versions by numbering unit key: one `versions/<unitKey>.json`
+     * file unit each. Never split into the trash mirror; a version of a trashed unit is hidden by
+     * derivation and deleted with the unit's purge.
+     */
+    val versions: Map<Key, EpisodeVersionsFile> = emptyMap(),
 ) {
     /** Keyed lookups and tree navigation. */
     val index: ProjectIndex by lazy { ProjectIndex(this) }

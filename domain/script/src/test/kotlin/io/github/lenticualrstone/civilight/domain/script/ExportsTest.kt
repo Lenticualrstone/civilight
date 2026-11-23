@@ -63,14 +63,15 @@ class ExportsTest {
     }
 
     @Test
-    fun `choice options, rejoin and spoken option voice`() {
+    fun `choice options, rejoin and no option voice (N-23)`() {
         val doc = F3.build()
         val json = GameJsonExport.build(doc, ExportScope.json(listOf(F1.S3)), StoryTimes.source(doc))
         val choice = blocksOf(json).getValue(b(45))
         assertEquals("choice", choice["type"]!!.jsonPrimitive.content)
         val options = choice["options"]!!.jsonArray.map { it.jsonObject }
         assertEquals(listOf("따라간다", "불빛 쪽을 한 번 더 본다"), options.map { it["text"]!!.jsonPrimitive.content })
-        assertEquals("HRT_0107_045_1", options[0]["voice"]!!.jsonPrimitive.content)
+        // (0.2.0, N-23) Choice lines are text only: a stored 0.1.0 option speaker writes no voice ID.
+        assertNull(options[0]["voice"])
         assertNull(options[1]["voice"])
         assertEquals(b(46), choice["rejoin"]!!.jsonPrimitive.content)
         val deleted = BlockTrash.delete(doc, listOf(b(46)), ctx).doc

@@ -135,7 +135,8 @@ class SettingsBatch6Test {
         assertEquals("에피소드 기준", ui.notation.current)
         assertEquals("새 프로젝트 · 프로젝트마다 바꾸기 가능", ui.notation.sub)
         assertEquals("이동 시간 부족 · 같은 때 · 동시에 두 장소", ui.checkTravel.sub)
-        assertTrue(ui.checkTravel.on)
+        // (0.2.0, S-2) The travel check is off by default.
+        assertFalse(ui.checkTravel.on)
         assertEquals("점검 센터 ◇", ui.checkNoPlace.sub)
         assertTrue(ui.checkNoPlace.on)
     }

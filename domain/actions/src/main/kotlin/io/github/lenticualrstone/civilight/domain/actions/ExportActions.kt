@@ -7,7 +7,11 @@ import io.github.lenticualrstone.civilight.domain.library.export.CsvRowPlan
 import io.github.lenticualrstone.civilight.domain.library.export.CsvRows
 import io.github.lenticualrstone.civilight.domain.library.export.ExportPlan
 import io.github.lenticualrstone.civilight.domain.library.export.ExportRun
+import io.github.lenticualrstone.civilight.domain.library.export.ExportDefaults
 import io.github.lenticualrstone.civilight.domain.library.export.ExportRunOutcome
+import io.github.lenticualrstone.civilight.domain.library.export.ExportStart
+import io.github.lenticualrstone.civilight.domain.library.export.ExportedFile
+import io.github.lenticualrstone.civilight.domain.library.export.VoiceFixation
 import io.github.lenticualrstone.civilight.domain.library.export.ExportSerializer
 import io.github.lenticualrstone.civilight.domain.library.export.WrittenLine
 import io.github.lenticualrstone.civilight.domain.script.DialogueCsvExport
@@ -23,6 +27,7 @@ import io.github.lenticualrstone.civilight.model.app.ExportFormat
 import io.github.lenticualrstone.civilight.model.app.ExportOptions
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.script.BlockKind
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -47,10 +52,45 @@ object ExportActions {
      * `<형식> 만들기` for CSV and engine JSON: [ExportRun.run] with this module's serialiser and the
      * script's voice IDs. PDF and `.civilight` are refused here (feature:library, `ProjectFileExport`).
      */
-    fun run(doc: ProjectDoc, options: ExportOptions, authenticated: Boolean, now: Timestamp): ExportRunOutcome {
+    fun run(doc: ProjectDoc, options: ExportOptions, authenticated: Boolean, now: Timestamp): ExportRunOutcome =
+        run(doc, options, authenticated, ActionContext(now))
+
+    /**
+     * [ExportRun.run]'s steps (gate, plan, serialiser, fixation of exactly the lines written) with
+     * the 0.2.0 rules: choice options are never written as spoken lines and get no voice ID (N-23),
+     * and the returned document carries one automatic `내보낸 판` per exported numbering unit (D21).
+     */
+    fun run(doc: ProjectDoc, options: ExportOptions, authenticated: Boolean, ctx: ActionContext): ExportRunOutcome {
         val serializer = requireNotNull(serializerFor(options.format)) { "no serialiser here for ${options.format}" }
-        return ExportRun.run(doc, options, authenticated, serializer, voiceIdOf(doc), now)
+        val plan = when (val start = ExportStart.of(doc, options, authenticated)) {
+            ExportStart.Cancelled -> return ExportRunOutcome.Cancelled
+            is ExportStart.Write -> withoutChoiceVoices(start.plan)
+        }
+        val bytes = serializer.write(doc, plan)
+        val fixed = VoiceFixation.apply(doc, plan, ctx.now, voiceIdOf(doc))
+        val versioned = VersionActions.captureForExport(fixed, plan, ctx)
+        val file = ExportedFile(ExportRun.fileName(options.fileName, options.format), ExportDefaults.mimeType(options.format), bytes)
+        return ExportRunOutcome.Done(file, versioned, plan)
     }
+
+    /**
+     * (0.2.0, N-23) [plan] with choice options carrying no speaker and no voice, so no option is a
+     * written line (no CSV row, no voice-ID fixation). Stored 0.1.0 option speakers and IDs stay in
+     * the document; only the plan forgets them.
+     */
+    fun withoutChoiceVoices(plan: ExportPlan): ExportPlan = plan.copy(
+        scenes = plan.scenes.map { scene ->
+            scene.copy(
+                blocks = scene.blocks.map { b ->
+                    if (b.kind.known == BlockKind.CHOICE && b.options.any { it.speakerKey != null || it.voice != null }) {
+                        b.copy(options = b.options.map { it.copy(speakerKey = null, voice = null) })
+                    } else {
+                        b
+                    }
+                },
+            )
+        },
+    )
 
     /** The serialiser of [format], or null for PDF (feature:library) and `.civilight`. */
     fun serializerFor(format: ExportFormat): ExportSerializer? = when (format) {

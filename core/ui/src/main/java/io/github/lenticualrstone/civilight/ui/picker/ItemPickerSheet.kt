@@ -14,6 +14,8 @@ import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.designsystem.component.PickerCreateRow
 import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.LockRow
@@ -49,6 +51,8 @@ fun ColumnScope.ItemPickerSheet(
     onUnlockHidden: (() -> Unit)? = null,
     onRestoreDeleted: ((DeletedRow) -> Unit)? = null,
     placeholder: String = PickerCopy.SEARCH_PLACEHOLDER,
+    createKind: CreateKind? = null,
+    onCreate: ((query: String) -> Unit)? = null,
 ) {
     var field by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(query)) }
     SheetHeader(title = title, onClose = onClose)
@@ -67,6 +71,18 @@ fun ColumnScope.ItemPickerSheet(
         }
     }
     LazyColumn(modifier.weight(1f, fill = false).padding(top = 8.dp)) {
+        // U-15.3: `＋ 새 인물` on top; with an unmatched query `＋ ‘세라’ 새 인물`, the query becoming the name.
+        if (createKind != null && onCreate != null) {
+            item(key = "create") {
+                PickerCreateRow(
+                    kind = createKind,
+                    query = query,
+                    matched = PickerCreate.matched(query, model),
+                    onClick = { onCreate(query.trim()) },
+                    modifier = civilightItem(),
+                )
+            }
+        }
         model.deleted?.let { deleted ->
             item(key = "deleted") {
                 ListRow(

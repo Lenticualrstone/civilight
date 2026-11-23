@@ -170,4 +170,6 @@ data class ExportOptions(
     val password: String? = null,
     val includeRecorderAudio: Boolean = false,
     val includeTrash: Boolean = false,
+    /** (0.2.0, LIB-97) `.civilight` export row `TODO_COPY_LIB_EXPORT_VERSIONS`: write `versions/`; default on. */
+    val includeVersions: Boolean = true,
 )

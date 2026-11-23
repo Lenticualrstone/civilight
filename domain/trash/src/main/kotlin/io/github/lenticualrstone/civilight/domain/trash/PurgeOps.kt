@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.domain.trash
 
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.marks.Marks
 import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.cast.Relation
@@ -19,6 +20,7 @@ import io.github.lenticualrstone.civilight.model.trash.DeletionLogEntry
 import io.github.lenticualrstone.civilight.model.trash.NameTag
 import io.github.lenticualrstone.civilight.model.trash.NameTagState
 import io.github.lenticualrstone.civilight.model.trash.TrashEntry
+import io.github.lenticualrstone.civilight.model.trash.TrashKind
 
 /** A purged item that recorder links and placements may point at (they get `purgedAt` and keep the label). */
 data class PurgedTarget(val kind: ItemKind, val key: Key, val label: String, val hidden: Boolean)
@@ -61,7 +63,20 @@ object PurgeOps {
             purged += entry
             val kind = ItemKind.of(entry.kind)
             if (kind != null) entry.targetKeys.forEach { state.purgeItem(ItemId(kind, it)) }
+            // (0.2.0, N-44) A tag entry: the tag leaves every character and image for good.
+            if (entry.kind.known == TrashKind.TAG) {
+                entry.targetKeys.forEach { state.doc = TagTrash.removeEverywhere(state.doc, it, ctx) }
+                state.removed += entry.targetKeys
+            }
             state.doc = state.doc.removeEntry(entryKey)
+        }
+        // (0.2.0, N-41) Marks on purged blocks are pinned to where they were drawn (rule 12 §2), and
+        // (N-29) versions of purged numbering units go with them.
+        state.doc = Marks.settleBeforePurge(doc, state.removed).let { settled ->
+            if (settled === doc) state.doc else state.doc.copy(story = state.doc.story.copy(foreshadows = settled.story.foreshadows))
+        }
+        if (state.doc.versions.keys.any { it in state.removed }) {
+            state.doc = state.doc.copy(versions = state.doc.versions.filterKeys { it !in state.removed })
         }
         state.finish()
         return PurgeResult(

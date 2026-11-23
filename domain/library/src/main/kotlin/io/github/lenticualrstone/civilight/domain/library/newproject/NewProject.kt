@@ -195,6 +195,8 @@ object NewProjectFlow {
             createdAt = now,
             updatedAt = now,
             updatedBy = device,
+            // (0.2.0, G-1) `게임 제작 도구` is off for a new project and always written.
+            gameTools = false,
         )
         val doc = ProjectDoc(
             project = project,

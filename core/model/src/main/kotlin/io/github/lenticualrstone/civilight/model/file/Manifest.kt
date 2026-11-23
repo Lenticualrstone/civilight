@@ -68,9 +68,12 @@ object Features {
     /** `gallery/` (55 §3.3): present when any gallery file is written. Part of format 1.0. */
     const val GALLERY = "gallery"
 
+    /** (0.2.0, 00 §13.5) `versions/<unitKey>.json`: present when the file holds any episode version. */
+    const val VERSIONS = "versions"
+
     val ALWAYS_REQUIRED: List<String> = listOf(STORY_BLOCKS, CHANGES, TIME_BASE_INTERVAL)
 
-    val OPTIONAL: List<String> = listOf(FIELDS_CUSTOM, MAPS_GEN, CHECKS_ACK, TOMBSTONES, DELETIONS, TRASH, RECORDER, RECORDER_AUDIO, GALLERY)
+    val OPTIONAL: List<String> = listOf(FIELDS_CUSTOM, MAPS_GEN, CHECKS_ACK, TOMBSTONES, DELETIONS, TRASH, RECORDER, RECORDER_AUDIO, GALLERY, VERSIONS)
 
     /** Every id this reader understands; a required id outside this set refuses the file. */
     val KNOWN: Set<String> = (ALWAYS_REQUIRED + OPTIONAL).toSet()

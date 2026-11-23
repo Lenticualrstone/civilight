@@ -18,6 +18,7 @@ import io.github.lenticualrstone.civilight.model.file.PackagePaths
 import io.github.lenticualrstone.civilight.model.file.RecorderFile
 import io.github.lenticualrstone.civilight.model.file.TombstonesFile
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
+import io.github.lenticualrstone.civilight.model.marks.Marks
 import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.model.trash.NameTag
@@ -47,6 +48,11 @@ data class ProjectFileOptions(
     val encrypted: Boolean = false,
     /** Library card cover (`preview.webp`); never written for a hidden project. */
     val preview: ByteArray? = null,
+    /**
+     * (0.2.0, LIB-97, 00 §13.5) Write `versions/` (episode versions). Default on; the manual export
+     * sheet row may turn it off; backups always write them.
+     */
+    val includeVersions: Boolean = true,
 )
 
 /** First writer layer's result: the package files (without `mimetype` and the manifest) and the manifest. */
@@ -96,9 +102,10 @@ object ProjectPackageWriter {
         val recorderFile = slice.toFile(recorder, projectKey, options.includeRecorderAudio)
         val recorderJson = if (recorderFile.records.isEmpty()) null else CivilightJson.encodeElement(RecorderFile.serializer(), recorderFile)
 
-        val exportedDoc = if (options.includeTrash) doc else withNotExportedNameTags(doc, recorderJson)
+        val exportedDoc = if (options.includeTrash) doc else withoutTrashed020(withNotExportedNameTags(doc, recorderJson))
         val fileSet = ProjectFileSet.split(exportedDoc).let { if (options.includeTrash) it else it.copy(trash = null) }
         val json = LinkedHashMap(fileSet.encode())
+        if (!options.includeVersions) json.keys.removeAll { PackagePaths.isVersionsUnit(it) }
         dropEmpty(json, PackagePaths.CHECKS, exportedDoc.checks == ChecksFile())
         dropEmpty(json, PackagePaths.TOMBSTONES, exportedDoc.tombstones == TombstonesFile())
         dropEmpty(json, PackagePaths.DELETIONS, exportedDoc.deletions == DeletionsFile())
@@ -168,6 +175,7 @@ object ProjectPackageWriter {
             if (recorderJson != null) add(Features.RECORDER)
             if (audioBlobs.isNotEmpty()) add(Features.RECORDER_AUDIO)
             if (json.keys.any(::isGalleryJson)) add(Features.GALLERY)
+            if (json.keys.any(PackagePaths::isVersionsUnit)) add(Features.VERSIONS)
         }
         val manifest = FileManifest(
             format = FileManifest.FORMAT_PROJECT,
@@ -226,6 +234,22 @@ object ProjectPackageWriter {
         }
         if (tags.isEmpty()) return doc
         return doc.copy(tombstones = doc.tombstones.copy(nameTags = doc.tombstones.nameTags + tags))
+    }
+
+    /**
+     * (0.2.0) Without `휴지통도 포함`, rows that live in the normal files while trashed are left out
+     * like every other trashed row: trashed tags (N-44; their entry is not written either), versions
+     * of numbering units that are not live (N-29), and mark anchors on blocks that are not written
+     * are pinned to the block they are drawn on now (N-41, as a purge does).
+     */
+    fun withoutTrashed020(doc: ProjectDoc): ProjectDoc {
+        val l = doc.liveness
+        val deadBlocks = doc.allBlocks.filterNot { l.isLive(it) }.mapTo(HashSet()) { it.key }
+        val marked = Marks.settleBeforePurge(doc, deadBlocks)
+        val tags = doc.project.tags.filter { it.isLive }
+        val versions = doc.versions.filterKeys { it == doc.key || l.isUnitLive(it) }
+        if (marked === doc && tags.size == doc.project.tags.size && versions.size == doc.versions.size) return doc
+        return marked.copy(project = marked.project.copy(tags = tags), versions = versions)
     }
 
     /** `gallery/<owner>.json` and its trash mirror `trash/gallery/<owner>.json`. */

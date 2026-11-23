@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.store.project
 
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.app.LensOnOpen
 import io.github.lenticualrstone.civilight.model.app.ProjectActivityFile
 import io.github.lenticualrstone.civilight.model.app.ProjectAppState
 import io.github.lenticualrstone.civilight.model.app.ProjectViewFile
@@ -8,6 +9,7 @@ import io.github.lenticualrstone.civilight.model.app.UnknownFile
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.doc.ProjectFileSet
 import io.github.lenticualrstone.civilight.model.file.PackagePaths
+import io.github.lenticualrstone.civilight.model.game.GameToolsUpgrade
 import io.github.lenticualrstone.civilight.model.json.CivilightJson
 import io.github.lenticualrstone.civilight.store.AppClock
 import io.github.lenticualrstone.civilight.store.ProjectLoadException
@@ -33,6 +35,11 @@ data class LoadReport(
     val upgradedFrom: Int? = null,
     /** True when an interrupted save was completed from its journal. */
     val recoveredTransaction: Boolean = false,
+    /**
+     * (0.2.0, G-3) The `게임 제작 도구` value decided by this load for a project that had none (a
+     * 0.1.0 project), or null when the stored value was already there.
+     */
+    val gameToolsDecided: Boolean? = null,
 )
 
 /** What is on disk right after a load or a save: path → value (or [Stale]) and the unknown files. */
@@ -134,7 +141,12 @@ internal object ProjectLoader {
 
         val activity = decodeApp(PackagePaths.APP_ACTIVITY, appJson, ProjectActivityFile.serializer(), damaged)
         val view = decodeApp(PackagePaths.APP_VIEW, appJson, ProjectViewFile.serializer(), damaged)
-        val doc = set.toDoc(ProjectAppState(activity ?: ProjectActivityFile(), view ?: ProjectViewFile()), unknown)
+        // (0.2.0, D9) The project opens at 최신; the stored lens is kept and written back unchanged.
+        val loadedDoc = set.toDoc(LensOnOpen.open(ProjectAppState(activity ?: ProjectActivityFile(), view ?: ProjectViewFile())), unknown)
+        // (0.2.0, G-3) A project without a stored `gameTools` (written by 0.1.0) gets it decided once
+        // from its game data (D6). With [mutate] the new project.json is written at once (no undo step).
+        val doc = GameToolsUpgrade.resolve(loadedDoc)
+        val decided = if (doc !== loadedDoc) doc.project.gameTools else null
 
         val written = LinkedHashMap<String, Any>()
         for (path in json.keys) {
@@ -144,12 +156,17 @@ internal object ProjectLoader {
         activity?.let { written[PackagePaths.APP_ACTIVITY] = it }
         view?.let { written[PackagePaths.APP_VIEW] = it }
         if (upgrade || dir.exists(ProjectLayout.STORE_META)) written[ProjectLayout.STORE_META] = StoreVersionFile(chain.current)
+        if (decided != null && mutate) {
+            val unit = ProjectLayout.units(doc, chain.current).getValue(PackagePaths.PROJECT)
+            dir.commit(mapOf(PackagePaths.PROJECT to unit.encode()), emptyList())
+            written[PackagePaths.PROJECT] = unit.value
+        }
 
         val damagedDir = if (mutate && damaged.isNotEmpty()) quarantine(dir, damaged.keys, clock) else null
         return LoadedProject(
             doc = doc,
             written = WrittenState(written, unknown),
-            report = LoadReport(damaged, damagedDir, version.takeIf { upgrade }, recovered),
+            report = LoadReport(damaged, damagedDir, version.takeIf { upgrade }, recovered, decided),
         )
     }
 

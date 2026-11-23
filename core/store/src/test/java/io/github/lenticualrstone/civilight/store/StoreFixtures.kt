@@ -93,6 +93,8 @@ object Fx {
         return ProjectDoc(
             project = Project(
                 key = key, name = "잿빛 새벽의 등불", oneLiner = "꺼져 가는 하층 구역",
+                // A 0.2.0 project always carries the switch (G-1); 0.1.0 upgrades are V010UpgradeTest.
+                gameTools = false,
                 travelModes = TravelMode.defaults(newKey = sequence().iterator()::next),
                 fieldDefs = listOf(
                     FieldDef(key = "FD_AFF", entityKind = EntityKind.CHARACTER.open(), name = "소속", type = FieldType.SHORT_TEXT.open(), order = "V"),

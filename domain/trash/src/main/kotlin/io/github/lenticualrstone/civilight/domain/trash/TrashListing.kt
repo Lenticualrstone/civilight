@@ -31,7 +31,7 @@ enum class TrashFilter(val label: String) {
         PROJECT -> kind.known == TrashKind.PROJECT
         SCENE -> kind.known == TrashKind.SCENE
         BLOCK -> kind.known == TrashKind.BLOCK_GROUP
-        CHARACTER -> kind.known == TrashKind.CHARACTER || kind.known == TrashKind.FIELD_DEF
+        CHARACTER -> kind.known == TrashKind.CHARACTER || kind.known == TrashKind.FIELD_DEF || kind.known == TrashKind.TAG
         WORLD -> kind.known in setOf(TrashKind.PLACE, TrashKind.TERM, TrashKind.FACTION, TrashKind.MAP, TrashKind.EVENT)
         CHANGE -> kind.known == TrashKind.CHANGE
         RECORDER -> kind.known == TrashKind.RECORDER
@@ -95,6 +95,9 @@ object TrashListing {
             val hiddenItem = entry.hiddenAtDelete || (item != null && doc.itemHidden(item))
             val masked = projectMasked || (hiddenItem && locks.itemsLocked)
             val (title, sub) = when {
+                // (0.2.0, N-44) A tag row: its name; sub `TODO_COPY_CAST_TAG_TRASH_SUB` is the cast lane's copy.
+                entry.kind.known == TrashKind.TAG ->
+                    (doc.project.tags.firstOrNull { it.key == key }?.name ?: "") to location
                 kind == null || item == null -> "" to location
                 kind == ItemKind.BLOCK -> blockGroupCopy(doc, entry, codes, location, ctx)
                 masked && kind != ItemKind.UNIT -> TrashCopy.hiddenKind(kind) to

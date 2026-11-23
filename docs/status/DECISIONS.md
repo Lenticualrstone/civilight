@@ -32,6 +32,16 @@ Every feature agent follows this file. It settles the "pick one" requests from t
 | Unit labels (`1-7 씬 3`) | `core:ui` `UnitLabels` in UI, `domain:story` `UnitCodes` in domain code | `domain:recorder` `link/UnitLabels` for new code |
 | Rating badge text | `domain:library` `RatingLabels` / `core:ui` `ThemeBridge.rating` | `domain:recorder` copy |
 | Korean initial search (초성) | `core:ui` `KoreanSearch` | per-area copies |
+| (0.2.0) `게임 제작 도구` switch and `용어 후보` project setting (G-1, WLD-73) | `domain:actions` `ProjectSettingActions.setGameTools` · `setTermCandidates`; read with `core:model` `GameTools.on(project)` | writing `Project.gameTools` by hand; reading `gameTools == null` in UI |
+| (0.2.0) G-3 one-time decision for 0.1.0 data (D6) | `core:model` `GameData.present` + `GameToolsUpgrade.resolve`, run only by `core:store` `ProjectLoader` (store load) and `domain:library` `ProjectPackageReader` (`.civilight` read) | a per-feature check |
+| (0.2.0) 서재 보기 · 카드 보기 · head toggles · tilt (U-16) | `core:store` `SettingsStore.setLibraryStyle` · `setCastCardStyle` · `setLibraryToggle` · `setCastToggle` · `setViewTilt`; shown view `core:model` `ShownView.library` / `.cast`; tilt `Tilt.follows` | `viewByScreen["library" / "cast"]` (kept, not read) |
+| (0.2.0) Per-block display name, memo `할 일` (N-43, N-41) | `domain:actions` `BlockFieldActions.setDisplayNameOverride` · `setTodo` · `setTodoDone`; label `BlockFieldActions.speakerLabel` | — |
+| (0.2.0) `말투 · 한 줄 요약`, `이 탭 잠그기` (N-43, CST-72, CST-73) | `domain:actions` `CharacterFieldActions.setSpeechSummary` · `setSecretTabLocked` | — |
+| (0.2.0) Tags: create with colour, colour, delete to the trash, restore, purge (U-15, N-44, CST-75) | `domain:actions` `TagActions` (`create` · `setColor` · `usage` · `trash` · `restore` · `purge` · `liveTags` · `canName`), over `domain:trash` `TagTrash`. `RestoreOps.restore` and `PurgeOps` also handle trash kind `tag`, so trash rows and `PurgeActions.runDue` need nothing extra; `TagTrash.canRestore` disables `되살리기` while the name is taken | `domain:cast` `CharacterEdits.removeTag` for a delete (it is the purge step only); `addTag` for new tags (it matches trashed names) |
+| (0.2.0) Foreshadowing `복선 심기` · `다시 언급` · `거두기` (N-41) | `domain:actions` `MarkActions.plant` · `mention` · `payoff` · `edit`; reads (list, `열림 · 거둠 · 끝냄` counts, where a mark is drawn after a block delete, marks on a block) `core:model` `Marks` | storing a relocated anchor (relocation is derived; a merge calls `Marks.moveAnchors`, a purge `Marks.settleBeforePurge` inside `PurgeOps`) |
+| (0.2.0) Episode versions `판 남기기` · `이 판 글로` · automatic `내보낸 판` (N-29) | `domain:actions` `VersionActions.capture` · `restoreBlockText` · `canRestore` · `captureForExport` (PDF: call it with the plan after drawing; CSV and engine JSON: `ExportActions.run` already does) | — |
+| (0.2.0) Several canvases (N-58) | `domain:actions` `CanvasActions` (`live` · `openTarget` · `opened` · `create` · `rename` · `delete` · `restore`); last opened = `_app/view.json › lastCanvasKey` | — |
+| (0.2.0) CSV and engine JSON without choice voices (N-23) | `domain:actions` `ExportActions.run` (plan through `withoutChoiceVoices`) | `ExportRun.run` directly for CSV or JSON |
 
 ## 2. Who owns what during the feature phase
 

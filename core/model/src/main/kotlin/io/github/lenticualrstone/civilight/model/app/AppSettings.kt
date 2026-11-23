@@ -31,7 +31,11 @@ data class AppSettings(
     val driveAccountId: String? = null,
     val firstUseTips: Boolean = true,
     val defaultSceneNotation: SceneNotationPref = SceneNotationPref.EPISODE,
-    val checkTravel: Boolean = true,
+    /**
+     * `이동 점검` (STO-42). (0.2.0, S-2) Off by default. 0.1.0 never stored `true` (the old default),
+     * so upgraded installs read off as well; a user who turns it on stores `true`.
+     */
+    val checkTravel: Boolean = false,
     val checkNoPlace: Boolean = true,
     val defaultMapStyle: MapStylePref = MapStylePref.SOFT,
     val textMapEngine: TextMapEngine = TextMapEngine.ON_DEVICE,
@@ -45,6 +49,16 @@ data class AppSettings(
      * → chosen ratio. Absent = [PaneSplit.DEFAULT] (today's layout); not written while empty.
      */
     val paneSplit: Map<String, PaneSplit> = emptyMap(),
+    /** (0.2.0, U-16, LIB-93) `서재 보기`. The old `viewByScreen["library"]` is kept and not read. */
+    val libraryStyle: LibraryStyle = LibraryStyle.BOOKSHELF,
+    /** (0.2.0, U-16, CST-67) `카드 보기` of the character list. The old `viewByScreen["cast"]` is kept and not read. */
+    val castCardStyle: CardStyle = CardStyle.FAN_DECK,
+    /** (0.2.0) 서재 head toggle: `LIST` = the list, `CARD` = the chosen 3D view; absent = `CARD` (00 §13.4). */
+    val libraryToggle: ViewMode? = null,
+    /** (0.2.0) Character list head toggle, same meaning as [libraryToggle]. */
+    val castToggle: ViewMode? = null,
+    /** (0.2.0, LIB-94) Tilt follow switch; see [Tilt.follows]. */
+    val viewTilt: Boolean = true,
 ) {
     /** The remembered pane ratio of [module] (CNV-47); [PaneSplit.DEFAULT] when none was chosen. */
     fun paneSplitOf(module: String): PaneSplit = paneSplit[module] ?: PaneSplit.DEFAULT
@@ -59,6 +73,102 @@ data class AppSettings(
 
         /** [viewByScreen] id of the project gallery. */
         const val GALLERY_PROJECT = "projectGallery"
+    }
+}
+
+/** (0.2.0, U-16) `서재 보기` values in settings order (00 §13.4). Unknown stored values read [BOOKSHELF]. */
+@Serializable(with = LibraryStyle.Codec::class)
+enum class LibraryStyle {
+    /** `3D 책장` (D1). */
+    BOOKSHELF,
+
+    /** `표지 회전`. */
+    COVER_SPIN,
+
+    /** `원고 더미`. */
+    MANUSCRIPT_STACK,
+
+    /** `서고 회랑`. */
+    ARCHIVE_HALL,
+
+    /** `색인 카드 서랍`. */
+    INDEX_DRAWER,
+
+    /** `별자리`. */
+    CONSTELLATION,
+
+    /** `목록`. */
+    LIST;
+
+    val isList: Boolean get() = this == LIST
+
+    object Codec : LowerCamelEnumSerializer<LibraryStyle>("LibraryStyle", entries, BOOKSHELF)
+}
+
+/** (0.2.0, U-16) Character `카드 보기` values in settings order (00 §13.4). Unknown stored values read [FAN_DECK]. */
+@Serializable(with = CardStyle.Codec::class)
+enum class CardStyle {
+    /** `부채꼴 덱` (D1). */
+    FAN_DECK,
+
+    /** `회전 목마`. */
+    CAROUSEL,
+
+    /** `겹친 더미`. */
+    STACK,
+
+    /** `타로 펼침`. */
+    TAROT,
+
+    /** `기울어진 벽`. */
+    TILTED_WALL,
+
+    /** `롤로덱스`. */
+    ROLODEX,
+
+    /** `목록`. */
+    LIST;
+
+    val isList: Boolean get() = this == LIST
+
+    object Codec : LowerCamelEnumSerializer<CardStyle>("CardStyle", entries, FAN_DECK)
+}
+
+/**
+ * (0.2.0, 00 §13.4) Which view a 3D-capable list shows. `style == LIST` → the list and no toggle;
+ * a `LIST` toggle → the list; otherwise (absent, `CARD`, or a `GRID` read here) → the chosen style.
+ */
+object ShownView {
+    fun of(style: LibraryStyle, toggle: ViewMode?): LibraryStyle =
+        if (style.isList || toggle == ViewMode.LIST) LibraryStyle.LIST else style
+
+    fun of(style: CardStyle, toggle: ViewMode?): CardStyle =
+        if (style.isList || toggle == ViewMode.LIST) CardStyle.LIST else style
+
+    /** The head toggle is drawn only when a 3D style is chosen. */
+    fun showsToggle(style: LibraryStyle): Boolean = !style.isList
+
+    fun showsToggle(style: CardStyle): Boolean = !style.isList
+
+    /** 서재 of [settings]. */
+    fun library(settings: AppSettings): LibraryStyle = of(settings.libraryStyle, settings.libraryToggle)
+
+    /** Character list of [settings]. */
+    fun cast(settings: AppSettings): CardStyle = of(settings.castCardStyle, settings.castToggle)
+}
+
+/**
+ * (0.2.0, LIB-94, 00 §13.4) Tilt (parallax and light) follows the device only while [viewTilt] is on
+ * and motion is not reduced (CNV-46: `ALWAYS_REDUCE`, or `FOLLOW_SYSTEM` with the system flag on).
+ */
+object Tilt {
+    fun follows(viewTilt: Boolean, animation: AnimationPref, systemReduceMotion: Boolean): Boolean =
+        viewTilt && !motionReduced(animation, systemReduceMotion)
+
+    fun motionReduced(animation: AnimationPref, systemReduceMotion: Boolean): Boolean = when (animation) {
+        AnimationPref.ALWAYS_REDUCE -> true
+        AnimationPref.NEVER_REDUCE -> false
+        AnimationPref.FOLLOW_SYSTEM -> systemReduceMotion
     }
 }
 

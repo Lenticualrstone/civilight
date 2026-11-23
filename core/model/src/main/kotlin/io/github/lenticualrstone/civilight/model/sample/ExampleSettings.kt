@@ -58,6 +58,8 @@ internal object ExampleSettings {
         createdAt = PROJECT_CREATED,
         updatedAt = LAST_EDIT,
         updatedBy = DEVICE,
+        // (0.2.0, D7) The example holds game data (fixed voice IDs, cues, assets), so G-3 decides `on`.
+        gameTools = true,
     )
 
     private fun option(def: Int, n: Int, label: String, count: Int) =

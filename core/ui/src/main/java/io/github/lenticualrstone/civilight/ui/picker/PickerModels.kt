@@ -45,6 +45,12 @@ data class PickerModel(
     val isEmpty: Boolean get() = sections.all { it.items.isEmpty() } && hiddenCount == 0 && deleted == null
 }
 
+/** U-15.3: the picker's create row. */
+object PickerCreate {
+    /** The query matches something (or is blank): the row reads `새 인물`; otherwise `‘세라’ 새 인물`. */
+    fun matched(query: String, model: PickerModel): Boolean = query.isBlank() || model.items.isNotEmpty()
+}
+
 /** Picker copy from the specs (SCR-19, SCR-55, R19 §6, R20). */
 object PickerCopy {
     const val SPEAKER_TITLE = "화자"

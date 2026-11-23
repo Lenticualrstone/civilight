@@ -152,7 +152,24 @@ class LibraryStoreTest {
                 project = doc.project.copy(structure = StoryStructure(preset = StructurePreset.CUSTOM.open(), levels = listOf("씬"))),
                 story = StoryIndexFile(units = listOf(StoryUnit(key = "S1", level = 0, order = "V"))),
                 episodes = mapOf(doc.key to EpisodeFile(unitKey = doc.key, blocks = listOf(Fx.block("B1", "S1", "V", 1, "첫 줄")))),
-            )
+                // (0.2.0) Versions and a mark's 거둘 곳 of the 1-level unit are filed under the project key.
+                versions = mapOf(
+                    doc.key to io.github.lenticualrstone.civilight.model.version.EpisodeVersionsFile(
+                        unitKey = doc.key,
+                        versions = listOf(io.github.lenticualrstone.civilight.model.version.EpisodeVersion(key = "V1", name = "판", createdAt = 1L)),
+                    ),
+                ),
+            ).let {
+                it.copy(
+                    story = it.story.copy(
+                        foreshadows = listOf(
+                            io.github.lenticualrstone.civilight.model.marks.Foreshadow(
+                                key = "F1", name = "등불", plant = io.github.lenticualrstone.civilight.model.marks.MarkAnchor("B1"), payoffUnitKey = doc.key,
+                            ),
+                        ),
+                    ),
+                )
+            }
         }
         val copy = lib.duplicate(entry.key)
         val doc = lib.readDoc(copy.key)
@@ -160,6 +177,11 @@ class LibraryStoreTest {
         assertEquals(copy.key, doc.episodes.getValue(copy.key).unitKey)
         assertEquals(listOf("B1"), doc.episodes.getValue(copy.key).blocks.map { it.key })
         assertTrue(File(lib.projectDir(copy.key), "story/${copy.key}.json").isFile)
+        assertEquals(setOf(copy.key), doc.versions.keys)
+        assertEquals(copy.key, doc.versions.getValue(copy.key).unitKey)
+        assertEquals(listOf("V1"), doc.versions.getValue(copy.key).versions.map { it.key })
+        assertTrue(File(lib.projectDir(copy.key), "versions/${copy.key}.json").isFile)
+        assertEquals(copy.key, doc.story.foreshadows.single().payoffUnitKey)
     }
 
     @Test

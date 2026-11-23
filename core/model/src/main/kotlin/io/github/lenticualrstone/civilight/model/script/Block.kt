@@ -51,18 +51,34 @@ data class Block(
     val trashPlacement: TrashPlacement? = null,
     @EncodeDefault override val updatedAt: Timestamp = 0L,
     @EncodeDefault override val updatedBy: String = "",
+    /**
+     * (0.2.0, N-43, SCR-78) `이 블록만 · 표시 이름`; trimmed, blank stored as null. Kept when the kind
+     * changes away from dialogue (not drawn then).
+     */
+    val displayNameOverride: String? = null,
+    /** (0.2.0, N-41, SCR-77) Memo only; non-null = `할 일` on. */
+    val todo: BlockTodo? = null,
     override val ext: JsonObject? = null,
 ) : Entity, Ordered, Trashable {
     /**
      * True when the block shows anything: text in its runs, a direction cue, or text in a choice
      * option. A block of an unknown kind counts by its runs. Used for the 집필 선 (§4.4).
+     * (0.2.0, SCR-04) A direction block also counts by its text line.
      */
     fun hasContent(): Boolean = when (kind.known) {
-        BlockKind.DIRECTION -> cues.isNotEmpty()
+        BlockKind.DIRECTION -> cues.isNotEmpty() || !runs.isBlankText()
         BlockKind.CHOICE -> options.any { !it.runs.isBlankText() }
         else -> !runs.isBlankText()
     }
 }
+
+/** (0.2.0, N-41) `할 일` of a memo block: `열림` until [done], then `끝냄`. */
+@Serializable
+data class BlockTodo(
+    @EncodeDefault val done: Boolean = false,
+    val doneAt: Timestamp? = null,
+    override val ext: JsonObject? = null,
+) : HasExt
 
 /** Block kinds; an unknown kind from a newer file is kept read-only (§8.3). */
 enum class BlockKind { DIALOGUE, NARRATION, DIRECTION, CHOICE, SYSTEM, MEMO }

@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.script
 
+import io.github.lenticualrstone.civilight.model.marks.Marks
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.change.Anchor
 import io.github.lenticualrstone.civilight.model.checks.Acknowledgement
@@ -22,7 +23,8 @@ import java.time.temporal.ChronoUnit
  */
 object BlockTrash {
     /** A block is empty when it shows nothing and anchors no record (SCR-04). */
-    fun isEmpty(doc: ProjectDoc, block: Block): Boolean = !block.hasContent() && doc.recordsAnchoredOn(block.key).isEmpty()
+    fun isEmpty(doc: ProjectDoc, block: Block): Boolean =
+        !block.hasContent() && doc.recordsAnchoredOn(block.key).isEmpty() && !Marks.carriesMark(doc, block.key)
 
     data class DeleteResult(
         val doc: ProjectDoc,
