@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.domain.story
 import io.github.lenticualrstone.civilight.domain.story.Fx.unit
 import io.github.lenticualrstone.civilight.domain.story.Fx.withUnit
 import io.github.lenticualrstone.civilight.domain.story.structure.NewUnit
+import io.github.lenticualrstone.civilight.domain.story.structure.SceneStatus
 import io.github.lenticualrstone.civilight.domain.story.structure.StoryOverview
 import io.github.lenticualrstone.civilight.domain.story.structure.UnitSettingsEdit
 import io.github.lenticualrstone.civilight.domain.story.structure.resumeTarget
@@ -115,6 +116,45 @@ class StructureAdditionsTest {
         // Content-only facts are unchanged.
         assertFalse(v.hasContentUnder(done.unit(K.EPISODE_1_8)))
         assertEquals(v0.writtenRange(), v.writtenRange())
+    }
+
+    /**
+     * Emulator round 3: `완료 표시` on an empty scene still read `—` and `미정`, because [StoryOverview.status]
+     * checked content first. The scene's own mark wins over "no content" (as for episodes); its
+     * episode's mark does not reach an empty scene; `완료 표시 빼기` brings `미정` and `—` back.
+     */
+    @Test
+    fun anEmptySceneMarkedDoneIsDoneAndCounts_STO06() {
+        val v0 = StoryOverview(doc)
+        val empty = doc.unit(K.SCENE_1_7_4)
+        assertFalse(v0.hasContent(empty))
+        assertEquals(SceneStatus.UNDECIDED, v0.status(empty))
+        assertEquals("—", v0.sceneRow(empty).meta)
+        assertFalse(v0.countsAsWritten(empty))
+        assertEquals("쓰는 중 · 씬 3", v0.episodeStatus(doc.unit(K.EPISODE_1_7)))
+
+        val done = UnitSettingsEdit.setDone(doc, K.SCENE_1_7_4, true, ctx)
+        val v = StoryOverview(done)
+        val marked = done.unit(K.SCENE_1_7_4)
+        assertEquals(SceneStatus.DONE, v.status(marked))
+        assertEquals(SceneStatus.DONE, v.sceneRow(marked).status)
+        assertEquals("—", v.sceneRow(marked).meta) // content fact: still nothing written
+        assertTrue(v.countsAsWritten(marked))
+        // The episode's own roll-up and chapter progress are unchanged (1-7 already counts; scene 3 is written).
+        assertEquals("쓰는 중 · 씬 3", v.episodeStatus(done.unit(K.EPISODE_1_7)))
+        assertEquals(v0.progress(doc.unit(K.CHAPTER_1)), v.progress(done.unit(K.CHAPTER_1)))
+        assertFalse(v.hasContent(marked))
+
+        val undone = UnitSettingsEdit.setDone(done, K.SCENE_1_7_4, false, ctx)
+        val vu = StoryOverview(undone)
+        assertEquals(SceneStatus.UNDECIDED, vu.status(undone.unit(K.SCENE_1_7_4)))
+        assertEquals("—", vu.sceneRow(undone.unit(K.SCENE_1_7_4)).meta)
+        assertFalse(vu.countsAsWritten(undone.unit(K.SCENE_1_7_4)))
+
+        // Only the episode marked: its empty scene stays `미정` (the mark is the episode's, not the scene's).
+        val episodeDone = UnitSettingsEdit.setDone(doc, K.EPISODE_1_7, true, ctx)
+        assertEquals(SceneStatus.UNDECIDED, StoryOverview(episodeDone).status(episodeDone.unit(K.SCENE_1_7_4)))
+        assertEquals(SceneStatus.DONE, StoryOverview(episodeDone).status(episodeDone.unit(K.SCENE_1_7_3)))
     }
 
     @Test

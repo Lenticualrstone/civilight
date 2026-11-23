@@ -203,8 +203,9 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
             collapsed = collapsed,
             collapsedTitle = state.name,
             collapsedSmallLine = state.header.title.substringBefore(CastCopy.SEP),
-            // LIB-19 cast tour: the lens and the `관계` tab are the holes of `시점 렌즈` and `관계` (CastTourSteps).
-            lensModifier = Modifier.tourTarget(CastTourSteps.LENS),
+            // LIB-19 cast tour: the lens and the `관계` tab are the holes of `시점 렌즈` and `관계` (CastTourSteps);
+            // the lens backs up `값이 바뀌는 때` when the header has no field row.
+            lensModifier = Modifier.tourTarget(CastTourSteps.LENS).tourTarget(CastTourSteps.TIMED_VALUE, fallback = true),
             tabs = {
                 CivilightTabs(CastUiCopy.TABS, tab, { tab = it }, Modifier.weight(1f)) { i ->
                     CastTourSteps.stepOfTab(i)?.let { Modifier.tourTarget(it) } ?: Modifier
@@ -312,9 +313,15 @@ private fun RecordHead(state: ProfileState, editable: Boolean, actions: RecordAc
 private fun HeaderTable(doc: ProjectDoc, state: ProfileState, full: ProfileState, expanded: Boolean, actions: RecordActions, onMore: () -> Unit) {
     val colors = CivilightTheme.colors
     val shown = remember(state) { state.header.rows.mapTo(HashSet()) { it.label } }
+    // LIB-19 cast tour: the `값이 바뀌는 때` hole (CastTourSteps.timedValueRow).
+    val timed = remember(state) { CastTourSteps.timedValueRow(state.header.rows) }
     Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
         for (row in full.header.rows) {
-            key(row.label) { FoldReveal(expanded || row.label in shown) { FieldRowItem(doc, row, actions) } }
+            key(row.label) {
+                FoldReveal(expanded || row.label in shown) {
+                    FieldRowItem(doc, row, actions, if (row.label == timed) Modifier.tourTarget(CastTourSteps.TIMED_VALUE) else Modifier)
+                }
+            }
         }
         FoldRevealValue(state.header.moreLabel) { label -> TextAction(label, onMore, color = colors.ink2, style = CivilightTheme.type.small) }
         FoldRevealValue(state.header.plannedFootnote) { note -> CivilightText(note, CivilightTheme.type.small, Modifier.padding(top = 14.dp), color = colors.ink3) }

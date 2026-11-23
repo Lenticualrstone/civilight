@@ -45,8 +45,8 @@ data class EpisodeItem(val row: EpisodeRow, val current: Boolean, val done: Bool
 /**
  * `1일째 새벽 | 씬 1 · 새벽 순찰 | 1,820자`, indented under its episode (not in a 1-level structure).
  * [masked]: a hidden scene while locked (`씬 4 · 숨긴 씬`, STO-11); its tap asks to unlock first.
- * [done]: the scene status is `완료` (STO-06: marked, or its episode is); [meta] is then `1,820자 · 완료`,
- * never `쓰는 중`, even for the scene of the last edit.
+ * [done]: the scene status is `완료` (STO-06: marked, or its episode is); [meta] is then `1,820자 · 완료`
+ * (`완료` alone for a scene marked before it has content), never `쓰는 중`, even for the scene of the last edit.
  */
 data class SceneItem(
     val row: SceneRow,
@@ -124,11 +124,15 @@ object StructureModel {
         )
     }
 
-    /** A scene row; a `완료` scene shows its char count and `완료` instead of `쓰는 중` (STO-06). */
+    /**
+     * A scene row; a `완료` scene shows its char count and `완료` instead of `쓰는 중` (STO-06), or `완료`
+     * alone when it is marked before it has content (not `0자 · 완료`, as [EpisodeItem]).
+     */
     private fun sceneItem(view: StoryOverview, unit: StoryUnit, indented: Boolean, masked: Boolean): SceneItem {
         val row = view.sceneRow(unit)
         if (row.status != SceneStatus.DONE) return SceneItem(row, indented, masked)
-        return SceneItem(row, indented, masked, done = true, meta = "${StoryOverview.chars(view.charCount(unit))} · ${StoryCopy.DONE}")
+        val meta = if (view.hasContent(unit)) "${StoryOverview.chars(view.charCount(unit))} · ${StoryCopy.DONE}" else StoryCopy.DONE
+        return SceneItem(row, indented, masked, done = true, meta = meta)
     }
 
     /**

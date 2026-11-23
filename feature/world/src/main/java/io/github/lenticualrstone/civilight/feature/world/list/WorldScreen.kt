@@ -74,6 +74,8 @@ import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
 import io.github.lenticualrstone.civilight.ui.window.CenterColumn
+import io.github.lenticualrstone.civilight.ui.tour.TourHold
+import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 
 /**
  * 세계 (WLD-01 … WLD-04, boards `World`, `TwoWorld`, `ColWorld`): header `<project>` · `세계` with the
@@ -95,6 +97,8 @@ fun WorldScreen(route: World, deps: FeatureDeps) {
     val showCards = WorldCardRows.showCards(settings.viewByScreen, tab)
     val scope = rememberCoroutineScope()
     val cardRows = remember(doc, ui) { val d = doc; val u = ui; if (d != null && u != null) WorldCardRows.build(d, u.items) else emptyList() }
+    // LIB-19 world tour: it waits for the list, so its holes are known before a card shows (WorldTourSteps).
+    if (ui == null) TourHold()
     // LIB-13 `세계 용어 하나 적기`: open the new-term form once on arrival (shell.md core pass, item 3).
     var createHandled by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(route.createTerm) {
@@ -200,7 +204,8 @@ private fun WorldList(
                 options = WorldSegment.labels,
                 selectedIndex = WorldSegment.of(tab).ordinal,
                 onSelect = { onSegment(WorldSegment.entries[it]) },
-                modifier = Modifier.fillMaxWidth(),
+                // LIB-19 world tour: the segments back up every step whose own element is not on screen.
+                modifier = WorldTourSteps.TABS_FALLBACK.fold(Modifier.fillMaxWidth()) { m, step -> m.tourTarget(step, fallback = true) },
             )
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
@@ -208,6 +213,7 @@ private fun WorldList(
                         TextAction(
                             text = WorldCopy.TERM_HINT,
                             onClick = onHint,
+                            modifier = Modifier.tourTarget(WorldTourSteps.REVEAL),
                             color = colors.ink3,
                             style = type.small,
                         )
@@ -260,13 +266,14 @@ private fun RowsBody(
     onCreate: () -> Unit,
 ) {
     val keys = remember(body.items) { WorldViewSwitch.uniqueKeys(body.items.map { it.id }) }
+    val linkKey = remember(body.items) { WorldTourSteps.linkRowKey(body.items) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = bottom),
     ) {
         itemsIndexed(body.items, key = { i, _ -> keys[i] }) { _, item ->
             Box(civilightItem()) {
-                ListItemView(item, selectedKey, readOnly, body.pending, onRow, onUnlock, onCreate)
+                ListItemView(item, selectedKey, readOnly, body.pending, onRow, onUnlock, onCreate, tourLink = linkKey != null && (item as? WorldListItem.Row)?.key == linkKey)
             }
         }
     }
@@ -312,6 +319,7 @@ private fun ListItemView(
     onRow: (WorldListItem.Row) -> Unit,
     onUnlock: () -> Unit,
     onCreate: () -> Unit,
+    tourLink: Boolean = false,
 ) {
     when (item) {
         is WorldListItem.Section -> SectionLabel(item.title, Modifier.padding(top = 18.dp, bottom = 6.dp))
@@ -332,7 +340,8 @@ private fun ListItemView(
             subtitle = item.fragment.ifBlank { null },
             onClick = { onRow(item) },
             selected = item.key == selectedKey,
-            trailing = { RightColumn(item, pending = pending) },
+            // LIB-19 world tour: the first `◇ 후보` column is the `용어 잇기` hole.
+            trailing = { RightColumn(item, pending = pending, modifier = if (tourLink) Modifier.tourTarget(WorldTourSteps.LINK) else Modifier) },
         )
     }
 }
@@ -359,12 +368,12 @@ private fun Modifier.growIn(grows: Boolean): Modifier {
 
 /** The row's right column (`.small`, right-aligned): `첫 공개 1-7 · ◇ 후보 1` / `▲ 앞에서 1회 사용`. */
 @Composable
-private fun RightColumn(row: WorldListItem.Row, pending: Boolean) {
+private fun RightColumn(row: WorldListItem.Row, pending: Boolean, modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val firstColor = if (row.warning != null) colors.warn else colors.ink3
     Column(
-        modifier = Modifier.widthIn(max = 168.dp),
+        modifier = modifier.widthIn(max = 168.dp),
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {

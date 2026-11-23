@@ -82,7 +82,7 @@ internal fun ColumnScope.NameStep(form: NewProjectForm, defaults: RatingDefaults
             Triple(ProjectFormat.SHORT, NewProjectCopy.FORMAT_SHORT, NewProjectCopy.FORMAT_SHORT_SUB),
             Triple(ProjectFormat.SETTING_ONLY, NewProjectCopy.FORMAT_SETTING, NewProjectCopy.FORMAT_SETTING_SUB),
         ).forEach { (format, title, sub) ->
-            ChoiceCard(title, selected = form.format == format, onClick = { update { it.copy(format = format) } }, subtitle = sub)
+            ChoiceCard(title, selected = form.format == format, onClick = { update { NewProjectRules.withFormat(it, format) } }, subtitle = sub)
         }
     }
     FieldCaption(NewProjectCopy.RATING, trailing = NewProjectCopy.RATING_NOTE)

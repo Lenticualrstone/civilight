@@ -20,11 +20,18 @@ object HelpCopy {
     const val NOT_SEEN = "아직 안 봄"
     const val STEPS_SUFFIX = "단계"
 
-    /** `3단계 · 봤음`. */
-    fun stepsLine(steps: Int, seen: Boolean): String = "$steps$STEPS_SUFFIX · ${if (seen) SEEN else NOT_SEEN}"
+    /** `3단계 · 봤음` (the walkthrough: its page count is fixed). */
+    fun stepsLine(steps: Int, seen: Boolean): String = "$steps$STEPS_SUFFIX · ${seenLine(seen)}"
+
+    /** `봤음` / `아직 안 봄`: a module row has no step count (its tour leaves out steps its screen has nothing for). */
+    fun seenLine(seen: Boolean): String = if (seen) SEEN else NOT_SEEN
 }
 
-/** One replay row: title, `<n>단계 · 봤음|아직 안 봄`, tag `다시 보기`. [module] null = the walkthrough. */
+/**
+ * One replay row: title, sub, tag `다시 보기`. [module] null = the walkthrough (`3단계 · 봤음`); a module
+ * row reads `봤음` / `아직 안 봄` only: a module tour skips the steps its screen has nothing for (the
+ * read-only example's script runs 2 of 3), so a fixed `3단계` would not match what runs.
+ */
 data class ReplayRow(val title: String, val sub: String, val module: TourModule?)
 
 data class HelpReplayUi(val walkthrough: ReplayRow, val modules: List<ReplayRow>, val tipsOn: Boolean)
@@ -34,7 +41,7 @@ object HelpReplayState {
     fun build(state: OnboardingState, tipsOn: Boolean): HelpReplayUi = HelpReplayUi(
         walkthrough = ReplayRow(HelpCopy.WALKTHROUGH, HelpCopy.stepsLine(OnboardingFlow.WALK_PAGES, state.walkthroughSeen), null),
         modules = TourModule.entries.map { m ->
-            ReplayRow(m.rowTitle, HelpCopy.stepsLine(ModuleTours.stepCount(m), ModuleTours.seen(state, m)), m)
+            ReplayRow(m.rowTitle, HelpCopy.seenLine(ModuleTours.seen(state, m)), m)
         },
         tipsOn = tipsOn,
     )

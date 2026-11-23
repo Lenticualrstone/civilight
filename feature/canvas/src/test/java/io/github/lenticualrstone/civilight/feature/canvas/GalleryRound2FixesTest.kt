@@ -145,13 +145,15 @@ class GalleryRound2FixesTest {
     }
 
     @Test
-    fun `reveal follows list and grid on the cover and the centre column, not cards or the right pane`() {
+    fun `reveal follows list and grid in every layout, not cards`() {
         assertTrue(GalleryReveal.applies(GalleryViewKind.LIST, GalleryLayout.COVER))
         assertTrue(GalleryReveal.applies(GalleryViewKind.GRID, GalleryLayout.COVER))
         assertTrue(GalleryReveal.applies(GalleryViewKind.LIST, GalleryLayout.INNER_COLUMN))
         assertFalse(GalleryReveal.applies(GalleryViewKind.CARD, GalleryLayout.COVER))
-        assertFalse(GalleryReveal.applies(GalleryViewKind.LIST, GalleryLayout.INNER_SPLIT))
-        assertFalse(GalleryReveal.applies(GalleryViewKind.GRID, GalleryLayout.INNER_SPLIT))
+        // Inner list + detail: a row picked half under the bottom bar is lifted out (left pane, GAL-23).
+        assertTrue(GalleryReveal.applies(GalleryViewKind.LIST, GalleryLayout.INNER_SPLIT))
+        assertTrue(GalleryReveal.applies(GalleryViewKind.GRID, GalleryLayout.INNER_SPLIT))
+        assertFalse(GalleryReveal.applies(GalleryViewKind.CARD, GalleryLayout.INNER_SPLIT))
     }
 
     @Test

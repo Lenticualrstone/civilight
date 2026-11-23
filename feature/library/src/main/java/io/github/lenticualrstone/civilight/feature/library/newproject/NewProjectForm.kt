@@ -39,6 +39,8 @@ data class NewProjectForm(
     val bundleSourceKey: Key? = null,
     /** Step-4 switch as left by the author; null = untouched (follows the rating's default). */
     val step4Hide: Boolean? = null,
+    /** True once the author changed the step-2 structure by hand; until then it follows the 형식 ([NewProjectRules.withFormat]). */
+    val structureTouched: Boolean = false,
 )
 
 /** The rules of the four steps, pure (state in, state out). */
@@ -75,13 +77,29 @@ object NewProjectRules {
     private fun structureValid(form: NewProjectForm): Boolean =
         form.structurePreset != StructurePreset.CUSTOM || NewProjectFlow.levelsValid(form.customLevels)
 
+    /**
+     * Step-1 `형식`: while the structure is untouched it moves to the new format's default
+     * ([NewProjectFlow.defaultStructure]: 단편 → one level `씬`); a structure picked by hand is kept.
+     */
+    fun withFormat(form: NewProjectForm, format: ProjectFormat): NewProjectForm {
+        if (form.structureTouched) return form.copy(format = format)
+        val (preset, levels) = NewProjectFlow.defaultStructure(format)
+        return form.copy(
+            format = format,
+            structurePreset = preset,
+            customLevels = if (preset == StructurePreset.CUSTOM) levels else emptyList(),
+        )
+    }
+
     fun withPreset(form: NewProjectForm, preset: StructurePreset): NewProjectForm = form.copy(
         structurePreset = preset,
         customLevels = if (preset == StructurePreset.CUSTOM && form.customLevels.isEmpty()) StoryStructure.DEFAULT_LEVELS else form.customLevels,
+        // Re-tapping the card already selected is not a change: the structure keeps following the 형식.
+        structureTouched = form.structureTouched || preset != form.structurePreset,
     )
 
     fun setLevel(form: NewProjectForm, index: Int, name: String): NewProjectForm =
-        form.copy(customLevels = form.customLevels.mapIndexed { i, old -> if (i == index) name else old })
+        form.copy(customLevels = form.customLevels.mapIndexed { i, old -> if (i == index) name else old }, structureTouched = true)
 
     fun canAddLevel(form: NewProjectForm): Boolean = form.customLevels.size < NewProjectFlow.MAX_LEVELS
 
@@ -89,10 +107,10 @@ object NewProjectRules {
 
     /** A new level goes below the others (`ED`), empty until named. */
     fun addLevel(form: NewProjectForm): NewProjectForm =
-        if (canAddLevel(form)) form.copy(customLevels = form.customLevels + "") else form
+        if (canAddLevel(form)) form.copy(customLevels = form.customLevels + "", structureTouched = true) else form
 
     fun removeLevel(form: NewProjectForm, index: Int): NewProjectForm =
-        if (canRemoveLevel(form)) form.copy(customLevels = form.customLevels.filterIndexed { i, _ -> i != index }) else form
+        if (canRemoveLevel(form)) form.copy(customLevels = form.customLevels.filterIndexed { i, _ -> i != index }, structureTouched = true) else form
 
     /** Digits only, at most 6 (`이야기가 시작되는 해`, an integer). */
     fun withYear(form: NewProjectForm, text: String): NewProjectForm =

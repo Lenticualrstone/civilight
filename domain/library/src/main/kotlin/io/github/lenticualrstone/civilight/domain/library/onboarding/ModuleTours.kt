@@ -58,7 +58,8 @@ object ModuleTours {
         TourModule.WORLD_TIMELINE -> listOf(
             TourStep("공개 시점", "앞에서 쓰이면 ▲ 점검 센터"),
             TourStep("용어 잇기", "원고 속 후보 · 잇기 · 아님"),
-            TourStep("연표", "사건을 때 순서로 · 쓰인 곳"),
+            // No `연표` step: the tour runs on 세계 (`World`), which has no 연표 control (the 연표 opens from
+            // the project home and the `장소와 때` sheet), so that card pointed at nothing (emulator QA 2026-11-23).
         )
         TourModule.RECORDER -> listOf(
             TourStep("기록 남기기", "녹음 · 글로 쓰기 · 멈추고 저장"),
@@ -77,11 +78,17 @@ object ModuleTours {
         )
         TourModule.ROUTE_PLACE_TIME -> listOf(
             TourStep("장소와 때", "직전 씬 기준 · 시간대 · 정확/대략 → 이동 점검"),
-            TourStep("▲ 이동 시간", "못 닿으면 표시 · +일 · 다른 수단 · 맞음"),
+            // No `▲ 이동 시간` step: the tour runs on 인물 동선 (`CharacterTrack`), which draws no travel-time
+            // mark or its fixes (`+일 · 다른 수단 · 맞음` live in the script's `장소와 때` sheet), so that card
+            // pointed at nothing (emulator QA 2026-11-23).
             TourStep("인물 동선", "씬 순서대로 지도 위에"),
         )
     }
 
+    /**
+     * How many steps [module] lists. The tour on screen can run fewer (a step its screen has nothing
+     * for is left out, `TourStepAbsent`), so this is not a count to show the user (`도움말` shows none).
+     */
     fun stepCount(module: TourModule): Int = steps(module).size
 
     /** Every step and the label have real copy. */

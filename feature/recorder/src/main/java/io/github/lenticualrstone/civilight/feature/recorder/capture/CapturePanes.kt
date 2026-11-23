@@ -67,6 +67,7 @@ import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.domain.recorder.link.Chip
 import io.github.lenticualrstone.civilight.feature.recorder.RecorderUiCopy
 import io.github.lenticualrstone.civilight.feature.recorder.link.LinkChipRow
+import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 
 /** Readable column of the capture screens: 560 at most, centred on inner screens (LRC-07 `[PROPOSED]`). */
 private val COLUMN = 560.dp
@@ -183,18 +184,20 @@ fun ColumnScope.RecordingPane(
 ) {
     val screen = view.screen
     CaptureHeader(screen.timer, live = screen.live, cancel = screen.cancel, onCancel = onCancel)
-    LinkChipRow(screen.chips, onAddLink, onReplaceLink, onRemoveLink, Modifier.padding(start = 22.dp, end = 22.dp, top = 8.dp))
+    // LIB-19 recorder tour holes (RecorderTourSteps): the chip row, the bottom row and `멈추고 저장`.
+    LinkChipRow(screen.chips, onAddLink, onReplaceLink, onRemoveLink, Modifier.padding(start = 22.dp, end = 22.dp, top = 8.dp).tourTarget(RecorderTourSteps.LINK))
     Spacer(Modifier.height(28.dp))
     Transcript(screen.transcript.label, view.engineNote, screen.transcript.confirmed, screen.transcript.tail, caret = true)
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 26.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 26.dp)
+            .tourTarget(RecorderTourSteps.RECORD),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (view.canToText) CivilightButton(screen.toText, onToText, variant = ButtonVariant.GHOST, icon = IconId.Text)
-        CivilightButton(screen.stopAndSave, onStop, Modifier.weight(1f).heightIn(min = 56.dp), variant = ButtonVariant.PRIMARY_LARGE)
+        CivilightButton(screen.stopAndSave, onStop, Modifier.weight(1f).heightIn(min = 56.dp).tourTarget(RecorderTourSteps.INBOX), variant = ButtonVariant.PRIMARY_LARGE)
         RoundButton(
             icon = if (view.paused) IconId.Mic else IconId.Pause,
             label = ShownCopy.of(screen.pauseLabel),
@@ -224,6 +227,8 @@ fun ColumnScope.ProcessingPane(
         Modifier
             .weight(1f)
             .fillMaxWidth()
+            // A long text can push the chip row out of view: the text area that holds it backs up `연결`.
+            .tourTarget(RecorderTourSteps.LINK, fallback = true)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp),
     ) {
@@ -232,7 +237,7 @@ fun ColumnScope.ProcessingPane(
             Spacer(Modifier.height(64.dp))
             FoldRevealValue(screen.sectionLabel) { CivilightText(it, CivilightTheme.type.sec, color = colors.ink3) }
             CivilightText(screen.text, CivilightTheme.type.recorderLive, Modifier.padding(top = 12.dp), color = colors.ink)
-            LinkChipRow(screen.chips, onAddLink, onReplaceLink, onRemoveLink, Modifier.padding(top = 22.dp))
+            LinkChipRow(screen.chips, onAddLink, onReplaceLink, onRemoveLink, Modifier.padding(top = 22.dp).tourTarget(RecorderTourSteps.LINK))
             FoldRevealValue(screen.hideRow) { row ->
                 SwitchRow(title = row.title, subtitle = row.sub, checked = row.on, onCheckedChange = onHide, modifier = Modifier.padding(top = 12.dp))
             }
@@ -244,17 +249,19 @@ fun ColumnScope.ProcessingPane(
             )
         }
     }
+    // LIB-19 recorder tour holes (RecorderTourSteps): the bottom buttons and `기록함에 두기`.
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 26.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 26.dp)
+            .tourTarget(RecorderTourSteps.RECORD),
     ) {
         FoldRevealValue(screen.putHere) { label ->
             CivilightButton(label, onPutHere, Modifier.fillMaxWidth().padding(bottom = 10.dp), variant = ButtonVariant.GHOST)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             CivilightButton(screen.buttons[0], onContinue, Modifier.weight(1f), variant = ButtonVariant.GHOST)
-            CivilightButton(screen.buttons[1], onKeep, Modifier.weight(1f), variant = ButtonVariant.PRIMARY)
+            CivilightButton(screen.buttons[1], onKeep, Modifier.weight(1f).tourTarget(RecorderTourSteps.INBOX), variant = ButtonVariant.PRIMARY)
         }
     }
 }

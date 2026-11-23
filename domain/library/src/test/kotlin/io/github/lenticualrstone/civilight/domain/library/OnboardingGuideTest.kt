@@ -23,7 +23,15 @@ class OnboardingGuideTest {
     @Test
     fun `LIB-19 step counts and drawn copy follow the spec table`() {
         // The script tour ends at `씬 머리`: no `시점 렌즈` step, the script has no lens (STO-16).
-        TourModule.entries.forEach { assertEquals(it.name, 3, ModuleTours.stepCount(it)) }
+        // 세계 has no `연표` step and 장소와 때 no `▲ 이동 시간` step: their screens have no control for them
+        // (emulator QA 2026-11-23: those cards floated with nothing marked).
+        val counts = mapOf(
+            TourModule.SCRIPT to 3, TourModule.CAST to 3, TourModule.WORLD_TIMELINE to 2, TourModule.RECORDER to 3,
+            TourModule.LIBRARY_HIDING to 3, TourModule.MAP to 3, TourModule.ROUTE_PLACE_TIME to 2,
+        )
+        TourModule.entries.forEach { assertEquals(it.name, counts.getValue(it), ModuleTours.stepCount(it)) }
+        assertEquals(listOf("공개 시점", "용어 잇기"), ModuleTours.steps(TourModule.WORLD_TIMELINE).map { it.title })
+        assertEquals(listOf("장소와 때", "인물 동선"), ModuleTours.steps(TourModule.ROUTE_PLACE_TIME).map { it.title })
         val script = ModuleTours.steps(TourModule.SCRIPT)
         assertEquals("명령 칸" to "이동 · 검색 · 블록 추가 · 마이크", script[0].title to script[0].sub)
         assertEquals("블록을 왼쪽으로" to "시간 · 참고 · 속성 → 옆 패널 탭", script[1].title to script[1].sub)

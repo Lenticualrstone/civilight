@@ -82,7 +82,13 @@ class StoryOverview(
     /** `완료` when the scene or its episode is marked done (`ED`: the flag exists on every unit). */
     fun isMarkedDone(scene: StoryUnit): Boolean = scene.doneMarked || codes.episodeOf(scene)?.doneMarked == true
 
+    /**
+     * `완료` when the scene itself is marked, even with no content yet (`ED`, as for episodes:
+     * an empty scene marked done read `—` and `미정`); else `미정` with no content; else `완료` when its
+     * episode is marked; else `쓰는 중`. An empty scene under a marked episode stays `미정`.
+     */
     fun status(scene: StoryUnit): SceneStatus = when {
+        scene.doneMarked -> SceneStatus.DONE
         !hasContent(scene) -> SceneStatus.UNDECIDED
         isMarkedDone(scene) -> SceneStatus.DONE
         else -> SceneStatus.WRITING
@@ -92,7 +98,8 @@ class StoryOverview(
 
     /**
      * An episode that counts toward chapter progress: it has content, or the author marked it `완료`
-     * (`ED`, emulator round 2: an empty episode marked done read `0/1 · 계획` and `미정`).
+     * (`ED`, emulator round 2: an empty episode marked done read `0/1 · 계획` and `미정`). Works for a
+     * scene too (its own mark or its content, as [status]): the 1-level home stat counts scenes with it.
      */
     fun countsAsWritten(episode: StoryUnit): Boolean = episode.doneMarked || hasContentUnder(episode)
 
@@ -125,7 +132,7 @@ class StoryOverview(
         val masked = scene.hidden && locked
         val title = if (masked) "숨긴 씬" else scene.title ?: "미정"
         val meta = when {
-            status == SceneStatus.UNDECIDED -> "—"
+            !hasContent(scene) -> "—"
             current -> "쓰는 중"
             else -> chars(charCount(scene))
         }

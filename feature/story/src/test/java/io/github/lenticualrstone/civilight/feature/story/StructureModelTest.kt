@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.feature.story
 import io.github.lenticualrstone.civilight.domain.actions.SceneActions
 import io.github.lenticualrstone.civilight.feature.story.Fx.node
 import io.github.lenticualrstone.civilight.feature.story.common.StoryActions
+import io.github.lenticualrstone.civilight.feature.story.home.HomeModel
 import io.github.lenticualrstone.civilight.feature.story.menu.MenuAction
 import io.github.lenticualrstone.civilight.feature.story.menu.MenuSurface
 import io.github.lenticualrstone.civilight.feature.story.menu.UnitMenuModel
@@ -237,5 +238,56 @@ class StructureModelTest {
         val scenes = ui.items.filterIsInstance<SceneItem>().filter { marked.index.unit(it.row.key)?.parentKey == K.EPISODE_1_8 }
         assertTrue(scenes.isNotEmpty())
         assertTrue(scenes.all { it.meta == "—" && !it.done })
+    }
+
+    /**
+     * Emulator round 3 (1-level project): `완료 표시` on an empty scene still listed `—` and its ⋯ value
+     * line said `미정`. The scene's own mark wins over "no content": the row reads `완료`, the ⋯ says
+     * `완료` and offers `완료 표시 빼기`, and home counts it; taking the mark off brings all of it back.
+     */
+    @Test
+    fun anEmptySceneMarkedDoneReadsDoneInOneLevel_STO06() {
+        val d = Fx.mini(listOf("씬"), node("S1", "첫 장", "글"), node("S2"))
+        fun scene(ui: io.github.lenticualrstone.civilight.feature.story.structure.StructureUi) =
+            ui.items.filterIsInstance<SceneItem>().single { it.row.key == "S2" }
+        fun doneRow(x: ProjectDoc) = UnitMenuModel.build(x, "S2", MenuSurface.STORY_LIST, readOnly = false)!!.rows.last()
+        fun home(x: ProjectDoc) = HomeModel.build(x, readOnly = false, locked = false, today = Fx.today, zone = Fx.zone)
+
+        val before = scene(build(d, emptyList()))
+        assertFalse(before.done)
+        assertEquals("—", before.meta)
+        assertEquals(MenuAction.MARK_DONE to "미정", doneRow(d).let { it.action to it.value })
+        assertEquals("1/2", home(d).stats.first().value)
+
+        val marked = StoryActions.setDone(d, "S2", true, Fx.ctx())
+        val after = scene(build(marked, emptyList()))
+        assertTrue(after.done)
+        assertEquals("완료", after.meta)
+        assertFalse(after.writing)
+        assertEquals(MenuAction.UNMARK_DONE to "완료", doneRow(marked).let { it.action to it.value })
+        val markedHome = home(marked)
+        assertEquals("2/2", markedHome.stats.first().value)
+        assertEquals(listOf("쓰는 중", "완료"), markedHome.rows.map { it.status })
+        assertFalse(markedHome.rows[1].writing)
+
+        val unmarked = StoryActions.setDone(marked, "S2", false, Fx.ctx())
+        val back = scene(build(unmarked, emptyList()))
+        assertFalse(back.done)
+        assertEquals("—", back.meta)
+        assertEquals(MenuAction.MARK_DONE to "미정", doneRow(unmarked).let { it.action to it.value })
+        assertEquals("1/2", home(unmarked).stats.first().value)
+    }
+
+    /** In the example project: the empty scene `1-7 씬 4` marked done reads `완료` under its episode. */
+    @Test
+    fun anEmptySceneMarkedDoneInTheExample_STO06() {
+        val marked = StoryActions.setDone(doc, K.SCENE_1_7_4, true, Fx.ctx())
+        val item = build(marked, listOf(K.EPISODE_1_7)).items.filterIsInstance<SceneItem>().single { it.row.key == K.SCENE_1_7_4 }
+        assertTrue(item.done)
+        assertEquals("완료", item.meta)
+        val menu = UnitMenuModel.build(marked, K.SCENE_1_7_4, MenuSurface.STORY_LIST, readOnly = false)!!.rows.last()
+        assertEquals(MenuAction.UNMARK_DONE to "완료", menu.action to menu.value)
+        val unmarked = StoryActions.setDone(marked, K.SCENE_1_7_4, false, Fx.ctx())
+        assertEquals("—", build(unmarked, listOf(K.EPISODE_1_7)).items.filterIsInstance<SceneItem>().single { it.row.key == K.SCENE_1_7_4 }.meta)
     }
 }

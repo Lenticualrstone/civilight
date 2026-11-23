@@ -208,8 +208,8 @@ object HomeModel {
         val names = view.doc.project.structure.levels
         val units = view.chapters
         if (units.isEmpty()) return null
-        // An episode marked `완료` counts even before it has content (as chapter progress does, STO-06 `ED`).
-        val written = units.count(if (levels == 2) view::countsAsWritten else view::hasContentUnder)
+        // An episode or scene marked `완료` counts even before it has content (as chapter progress does, STO-06 `ED`).
+        val written = units.count(view::countsAsWritten)
         return HomeStat("$written/${units.size}", names.first())
     }
 

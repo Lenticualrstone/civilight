@@ -79,6 +79,7 @@ import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.feature.library.tour.ModuleTourHost
 import io.github.lenticualrstone.civilight.feature.library.tour.tourTarget
 import io.github.lenticualrstone.civilight.ui.tour.TourHold
+import io.github.lenticualrstone.civilight.ui.tour.TourStepAbsent
 import io.github.lenticualrstone.civilight.domain.library.onboarding.TourModule
 import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
 import io.github.lenticualrstone.civilight.feature.library.newproject.startNewProject
@@ -231,11 +232,12 @@ internal fun LibraryScreen(services: LibraryServices) {
     }
 
     // LIB-19 `서재 · 숨기기` tour (copy 2026-11-23): each step spotlights its control (`LibraryTourSteps`),
-    // or the 설정 button while that control is not on screen (an empty 서재, no hidden projects).
+    // or the 설정 button while that control is not on screen (no hidden projects). With no project shown,
+    // `프로젝트 숨기기` is left out (`LibraryTourSteps.absent`), not pointed at 설정.
     val tourMenuRow = LibraryTourSteps.menuRow(ui.rows.map { it.key }, ui.openGroup?.rows.orEmpty().map { it.key })
     ModuleTourHost(TourModule.LIBRARY_HIDING, deps) {
     // Until the stores answered the rows are unknown: the tour waits instead of starting on the fallback.
-    if (!ui.loaded) TourHold()
+    if (!ui.loaded) TourHold() else LibraryTourSteps.absent(tourMenuRow).forEach { step -> key(step) { TourStepAbsent(step) } }
     CenterColumn {
         CivilightScreen(
             title = ShelfCopy.TITLE,

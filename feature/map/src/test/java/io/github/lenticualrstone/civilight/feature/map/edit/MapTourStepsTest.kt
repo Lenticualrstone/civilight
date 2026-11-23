@@ -20,6 +20,13 @@ class MapTourStepsTest {
     }
 
     @Test
+    fun `보이는 시점 points at the ⋯ menu, whose 시점별 공개 row opens the map's reveal points`() {
+        assertEquals(2, MapTourSteps.REVEAL)
+        assertEquals("시점별 공개", io.github.lenticualrstone.civilight.feature.map.MapCopy.REVEAL_TITLE)
+        assertEquals("보이는 시점", io.github.lenticualrstone.civilight.feature.map.MapCopy.REVEAL_POINT)
+    }
+
+    @Test
     fun `only the 경로 cell is a hole, and the editor's tool bar has it`() {
         assertEquals(MapTourSteps.ROUTE, MapTourSteps.stepOfTool(EditTool.ROUTE))
         EditTool.entries.filter { it != EditTool.ROUTE }.forEach { assertNull(it.name, MapTourSteps.stepOfTool(it)) }

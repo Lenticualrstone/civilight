@@ -9,6 +9,7 @@ import io.github.lenticualrstone.civilight.domain.library.rating.Protection
 import io.github.lenticualrstone.civilight.domain.library.rating.ProjectProtectionSettings
 import io.github.lenticualrstone.civilight.domain.recorder.ProjectSnapshot
 import io.github.lenticualrstone.civilight.domain.recorder.link.LinkViews
+import io.github.lenticualrstone.civilight.feature.library.help.HelpCopy
 import io.github.lenticualrstone.civilight.feature.library.help.HelpReplayState
 import io.github.lenticualrstone.civilight.feature.library.notices.LibraryNotices
 import io.github.lenticualrstone.civilight.feature.library.onboarding.ExampleTourState
@@ -207,14 +208,16 @@ class OnboardingTest {
         assertEquals("워크스루" to "3단계 · 봤음", ui.walkthrough.title to ui.walkthrough.sub)
         assertEquals(
             listOf(
-                "스크립트 | 3단계 · 봤음", "인물 | 3단계 · 봤음", "세계 · 연표 | 3단계 · 아직 안 봄", "라이프 레코더 | 3단계 · 봤음",
-                "서재 · 숨기기 | 3단계 · 아직 안 봄", "지도 만들기 | 3단계 · 아직 안 봄", "인물 동선 · 장소와 때 | 3단계 · 아직 안 봄",
+                "스크립트 | 봤음", "인물 | 봤음", "세계 · 연표 | 아직 안 봄", "라이프 레코더 | 봤음",
+                "서재 · 숨기기 | 아직 안 봄", "지도 만들기 | 아직 안 봄", "인물 동선 · 장소와 때 | 아직 안 봄",
             ),
             ui.modules.map { "${it.title} | ${it.sub}" },
         )
+        // No step count on a module row: the read-only example's script tour runs 2 of its 3 steps (emulator QA 2026-11-23).
+        assertTrue(ui.modules.none { it.sub.contains(HelpCopy.STEPS_SUFFIX) })
         assertTrue(ui.tipsOn)
         val reset = ModuleTours.reset(state, TourModule.SCRIPT)
-        assertEquals("3단계 · 아직 안 봄", HelpReplayState.build(reset, tipsOn = false).modules.first().sub)
+        assertEquals("아직 안 봄", HelpReplayState.build(reset, tipsOn = false).modules.first().sub)
     }
 
     @Test

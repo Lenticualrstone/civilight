@@ -255,9 +255,13 @@ object GalleryReveal {
         return minOf(bottom - viewEnd, maxOf(top - viewStart, 0))
     }
 
-    /** A tap pick opens a description inside the column (`목록` row, `격자` panel line); cards and the right pane do not. */
-    fun applies(view: GalleryViewKind, layout: GalleryLayout): Boolean =
-        view != GalleryViewKind.CARD && GalleryPlacement.panel(view, layout) != PanelPlace.RIGHT_PANE
+    /**
+     * The column follows a tap pick in `목록` and `격자`: the row opens in place (cover), the panel line opens under
+     * the tiles, or (inner list + detail, GAL-23) the picked row or tile line itself is lifted out from under the
+     * bottom bar. Card rows scroll sideways and do not.
+     */
+    fun applies(view: GalleryViewKind, @Suppress("UNUSED_PARAMETER") layout: GalleryLayout): Boolean =
+        view != GalleryViewKind.CARD
 
     /**
      * Arriving with a route item (search result, `보기` back): the picked item is scrolled to whenever it is

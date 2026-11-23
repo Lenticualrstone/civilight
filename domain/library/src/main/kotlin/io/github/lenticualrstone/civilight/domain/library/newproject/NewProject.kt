@@ -77,6 +77,18 @@ class CreatedProject(
 object NewProjectFlow {
     const val MAX_LEVELS = 4
 
+    /** The one level of 단편 (`씬만으로 짧게`): scenes only, no chapter or episode (§6 Q10). */
+    val SCENE_ONLY_LEVELS: List<String> = listOf("씬")
+
+    /**
+     * Step-2 default for a 형식 (LIB-10, §6 Q10): 단편 starts on `직접 정하기` with the one level [SCENE_ONLY_LEVELS];
+     * 연재 장편 and 설정만 start on `장 › 에피소드 › 씬`. Returns the preset and its level names.
+     */
+    fun defaultStructure(format: ProjectFormat): Pair<StructurePreset, List<String>> = when (format) {
+        ProjectFormat.SHORT -> StructurePreset.CUSTOM to SCENE_ONLY_LEVELS
+        ProjectFormat.SERIAL, ProjectFormat.SETTING_ONLY -> StructurePreset.CHAPTER_EPISODE_SCENE to StoryStructure.DEFAULT_LEVELS
+    }
+
     /** Step 1 `다음`: enabled when the name is not blank after trimming (P-06). */
     fun canProceedFromName(name: String): Boolean = name.isNotBlank()
 

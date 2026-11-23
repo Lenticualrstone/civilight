@@ -96,6 +96,53 @@ class NewProjectTest {
     }
 
     @Test
+    fun `단편 picked in step 1 makes step 2 start on 씬 only`() {
+        val short = NewProjectRules.withFormat(NewProjectForm(name = "유리 정원"), ProjectFormat.SHORT)
+        assertEquals(ProjectFormat.SHORT, short.format)
+        assertEquals(StructurePreset.CUSTOM, short.structurePreset)
+        assertEquals(listOf("씬"), NewProjectRules.levels(short))
+        assertEquals(listOf(0 to "씬 1", 0 to "씬 2"), NewProjectRules.preview(short))
+        assertTrue(NewProjectRules.canProceed(short, NewProjectStep.STRUCTURE))
+        assertEquals(listOf("씬"), NewProjectRules.toDraft(short).levels)
+        // Back to 연재 장편 / 설정만 while untouched: their own default again, nothing left over.
+        val serial = NewProjectRules.withFormat(short, ProjectFormat.SERIAL)
+        assertEquals(NewProjectForm(name = "유리 정원"), serial)
+        val setting = NewProjectRules.withFormat(short, ProjectFormat.SETTING_ONLY)
+        assertEquals(StructurePreset.CHAPTER_EPISODE_SCENE, setting.structurePreset)
+        assertEquals(listOf("장", "에피소드", "씬"), NewProjectRules.levels(setting))
+        // Re-tapping the selected 장 › 에피소드 › 씬 card is not a manual change.
+        val retapped = NewProjectRules.withPreset(NewProjectForm(name = "x"), StructurePreset.CHAPTER_EPISODE_SCENE)
+        assertEquals(listOf("씬"), NewProjectRules.levels(NewProjectRules.withFormat(retapped, ProjectFormat.SHORT)))
+        // Step 2 on 단편: 직접 정하기 with the one level, which cannot be removed.
+        assertFalse(NewProjectRules.canRemoveLevel(short))
+    }
+
+    @Test
+    fun `a structure picked by hand survives a format change`() {
+        val act = NewProjectRules.withPreset(NewProjectForm(name = "x"), StructurePreset.ACT_SCENE)
+        val short = NewProjectRules.withFormat(act, ProjectFormat.SHORT)
+        assertEquals(ProjectFormat.SHORT, short.format)
+        assertEquals(StructurePreset.ACT_SCENE, short.structurePreset)
+        // Edited 단편 levels stay when the format changes again.
+        val edited = NewProjectRules.addLevel(NewProjectRules.withFormat(NewProjectForm(name = "x"), ProjectFormat.SHORT))
+        val named = NewProjectRules.setLevel(edited, 1, "컷")
+        val serial = NewProjectRules.withFormat(named, ProjectFormat.SERIAL)
+        assertEquals(StructurePreset.CUSTOM, serial.structurePreset)
+        assertEquals(listOf("씬", "컷"), serial.customLevels)
+        // The flag survives process death with the draft.
+        assertEquals(serial, NewProjectDraftHolder.decode(NewProjectDraftHolder.encode(serial)))
+    }
+
+    @Test
+    fun `만들기 after 단편 creates a scene-only project`() {
+        val doc = LibFx.created(NewProjectRules.withFormat(NewProjectForm(name = "유리 정원"), ProjectFormat.SHORT))
+        assertEquals(ProjectFormat.SHORT, doc.project.format.known)
+        assertEquals(StructurePreset.CUSTOM, doc.project.structure.preset.known)
+        assertEquals(listOf("씬"), doc.project.structure.levels)
+        assertEquals(1, doc.story.units.size)
+    }
+
+    @Test
     fun `step 3 year takes digits only and 시간 없이 drops it`() {
         val form = NewProjectRules.withYear(NewProjectForm(name = "x"), "12a00년")
         assertEquals("1200", form.startYear)

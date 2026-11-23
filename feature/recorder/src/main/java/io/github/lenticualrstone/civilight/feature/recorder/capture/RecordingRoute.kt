@@ -42,6 +42,8 @@ import io.github.lenticualrstone.civilight.feature.recorder.outside.KeepAlive
 import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
+import io.github.lenticualrstone.civilight.ui.tour.TourHold
+import io.github.lenticualrstone.civilight.ui.tour.tourRunning
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
 import kotlinx.coroutines.flow.first
 
@@ -117,6 +119,16 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
     }
 
     ProtectWindow(CaptureProtection.of(state.env, CaptureProtection.projectsShown(state)))
+
+    // LIB-19 recorder tour: it waits until a capture pane is drawn, so every card has its hole (RecorderTourSteps).
+    if (RecorderTourSteps.hold(state)) TourHold()
+    // While its card is shown the take pauses, so reading the cards is not recorded; it resumes when the
+    // card closes (or this screen leaves). Keyed on the stage: a take started from the memo's mic pauses too.
+    val touring = tourRunning()
+    DisposableEffect(touring, state.stage) {
+        if (touring) hub.holdForTour()
+        onDispose { if (touring) hub.releaseTour() }
+    }
 
     val inner = LocalWindowLayout.current.isInner
     val reduced = CivilightTheme.reducedMotion

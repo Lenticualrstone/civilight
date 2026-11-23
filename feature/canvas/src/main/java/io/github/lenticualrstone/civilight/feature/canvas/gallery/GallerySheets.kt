@@ -4,13 +4,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -33,8 +38,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -100,6 +108,7 @@ import io.github.lenticualrstone.civilight.ui.richtext.rememberRichTextEditorSta
 import io.github.lenticualrstone.civilight.ui.security.AuthCopy
 import io.github.lenticualrstone.civilight.ui.security.AuthRequest
 import io.github.lenticualrstone.civilight.ui.security.AuthResult
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -343,7 +352,12 @@ fun SheetScope.GalleryInfoSheetContent(sheet: GalleryInfoSheet) {
     val editable = !c.readOnly
 
     SheetHeader(GalleryUiCopy.INFO_TITLE, onClose = ::close, closeLabel = GalleryUiCopy.BTN_CLOSE)
-    SheetScrollBody(Modifier.padding(top = 12.dp)) {
+    // Heights (px) that decide whether 제목 and 설명 both fit above the keyboard ([FieldInView.fits]).
+    var viewport by remember { mutableIntStateOf(0) }
+    var titleBlock by remember { mutableIntStateOf(0) }
+    var descriptionBlock by remember { mutableIntStateOf(0) }
+    val fieldGap = with(LocalDensity.current) { 16.dp.roundToPx() }
+    SheetScrollBody(Modifier.padding(top = 12.dp).onSizeChanged { viewport = it.height }) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(52.dp).clip(RoundedCornerShape(10.dp))) { GalleryImage(item, Ratio.R1X1, GalleryImageSizes.THUMB) }
@@ -363,15 +377,24 @@ fun SheetScope.GalleryInfoSheetContent(sheet: GalleryInfoSheet) {
             val captionWriter = remember(itemKey) { TypingWriter<RichDoc>(typingScope) { vm.setCaption(itemKey, it) } }
             // 제목: one line (one merged undo step).
             var title by rememberSaveable(sheet.itemKey) { mutableStateOf(item.title) }
+            // 제목's block is also brought in first whenever 설명 is and both fit above the keyboard (제목 is not left
+            // as a cut strip at the top). A tap on its label focuses it as well.
+            val titleInView = remember { BringIntoViewRequester() }
+            val titleFocus = remember { FocusRequester() }
             CivilightTextField(
                 title,
                 {
                     title = it
                     titleWriter.offer(it)
                 },
-                Modifier.fillMaxWidth().onFocusChanged {
-                    if (it.hasFocus) titleWriter.hold() else if (titleWriter.isHeld) titleWriter.release()
-                },
+                Modifier.fillMaxWidth()
+                    .onSizeChanged { titleBlock = it.height }
+                    .bringIntoViewRequester(titleInView)
+                    .focusRequester(titleFocus)
+                    .pointerInput(titleFocus) { detectTapGestures(onTap = { runCatching { titleFocus.requestFocus() } }) }
+                    .onFocusChanged {
+                        if (it.hasFocus) titleWriter.hold() else if (titleWriter.isHeld) titleWriter.release()
+                    }.keepInViewWhileFocused(),
                 label = GalleryUiCopy.FIELD_TITLE,
                 enabled = editable,
             )
@@ -391,7 +414,13 @@ fun SheetScope.GalleryInfoSheetContent(sheet: GalleryInfoSheet) {
             }
             LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { writeNow() }
             val focus = remember { FocusRequester() }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // The label row and the editor scroll into view together (not only the editor's box).
+            Column(
+                Modifier.onSizeChanged { descriptionBlock = it.height }.keepInViewWhileFocused(
+                    above = titleInView,
+                    aboveFits = { FieldInView.fits(viewport, titleBlock, fieldGap, descriptionBlock) },
+                ),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CivilightText(GalleryUiCopy.FIELD_DESCRIPTION, type.label, Modifier.weight(1f), color = colors.ink2)
                     CivilightText(GalleryUiCopy.LINK_HINT, type.small, color = colors.ink3, maxLines = 1)
@@ -420,6 +449,34 @@ fun SheetScope.GalleryInfoSheetContent(sheet: GalleryInfoSheet) {
     }
 }
 
+/**
+ * Keeps a field block (its label and box) inside the sheet's scroll while it holds focus: when focus arrives and
+ * again while the keyboard rises and the sheet shrinks above it ([FieldInView]). The system only keeps the text
+ * box itself in view, so a label above it could stay cut at the top of the sheet. Focus is only observed here;
+ * the fields' own focus handling (the writers' hold / release) is untouched.
+ * [above] is the field block right above this one (`설명` → `제목`): when [aboveFits] (read at bring time) it is
+ * brought in first and this block last ([FieldInView.order]); otherwise only this block, as before.
+ */
+@Composable
+private fun Modifier.keepInViewWhileFocused(
+    above: BringIntoViewRequester? = null,
+    aboveFits: () -> Boolean = { true },
+): Modifier {
+    val requester = remember { BringIntoViewRequester() }
+    val focused = remember { mutableStateOf(false) }
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    LaunchedEffect(requester, above, ime, density) {
+        var before = FieldInView.State(focused = false, keyboard = ime.getBottom(density))
+        snapshotFlow { FieldInView.State(focused.value, ime.getBottom(density)) }.collectLatest { now ->
+            val bring = FieldInView.bring(before, now)
+            before = now
+            if (bring) for (block in FieldInView.order(requester, above?.takeIf { aboveFits() })) block.bringIntoView()
+        }
+    }
+    return this.bringIntoViewRequester(requester).onFocusChanged { focused.value = it.hasFocus }
+}
+
 /** `태그`: project tags as chips (tap toggles), `+ 태그` reveals a name line with `넣기`. */
 @Composable
 private fun InfoTags(c: SheetCtx, item: GalleryItem, editable: Boolean) {
@@ -436,7 +493,7 @@ private fun InfoTags(c: SheetCtx, item: GalleryItem, editable: Boolean) {
         }
         FoldReveal(adding && editable, label = "galleryNewTag") {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                CivilightTextField(name, { name = it }, Modifier.weight(1f), label = GalleryUiCopy.FIELD_NAME)
+                CivilightTextField(name, { name = it }, Modifier.weight(1f).keepInViewWhileFocused(), label = GalleryUiCopy.FIELD_NAME)
                 CivilightButton(GalleryUiCopy.BTN_ADD, {
                     c.vm.addTag(listOf(item.key), name)
                     name = ""
@@ -714,7 +771,7 @@ fun SheetScope.GalleryTagsSheetContent(sheet: GalleryTagsSheet) {
         }
         if (!c.readOnly) {
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                CivilightTextField(name, { name = it }, Modifier.weight(1f), label = GalleryUiCopy.FIELD_NAME)
+                CivilightTextField(name, { name = it }, Modifier.weight(1f).keepInViewWhileFocused(), label = GalleryUiCopy.FIELD_NAME)
                 CivilightButton(GalleryUiCopy.BTN_ADD, {
                     c.vm.addTag(sheet.itemKeys, name)
                     name = ""
@@ -749,3 +806,26 @@ object GalleryBatch {
 }
 
 class GalleryBatchActions(val delete: (List<Key>) -> Unit, val hide: (List<Key>) -> Unit, val unhide: (List<Key>) -> Unit)
+
+/** When a sheet field block is brought back into view (see `keepInViewWhileFocused`); pure, JVM-tested. */
+internal object FieldInView {
+    /** Whether the block holds focus, and the keyboard's height under the window (px). */
+    data class State(val focused: Boolean, val keyboard: Int)
+
+    /** On gaining focus, and while focused whenever the keyboard grows (the sheet above it gets shorter). */
+    fun bring(before: State, now: State): Boolean = now.focused && (!before.focused || now.keyboard > before.keyboard)
+
+    /**
+     * The blocks brought into view, in order: the block [above] the focused one first (when there is one), the
+     * [focused] block last. Each bring scrolls only as far as needed, so when both fit the second is already in
+     * view; when they do not, the focused block has the last word.
+     */
+    fun <T : Any> order(focused: T, above: T?): List<T> = listOfNotNull(above, focused)
+
+    /**
+     * Whether the block [above] (px), the [gap] and the [focused] block fit the sheet's scroll [viewport] together;
+     * false until all are measured.
+     */
+    fun fits(viewport: Int, above: Int, gap: Int, focused: Int): Boolean =
+        viewport > 0 && above > 0 && focused > 0 && above + gap + focused <= viewport
+}

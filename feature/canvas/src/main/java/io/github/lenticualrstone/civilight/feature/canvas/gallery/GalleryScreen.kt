@@ -600,7 +600,8 @@ private fun ItemsBody(
         }
     }
     // A picked row (`목록`) or the panel under a picked tile line (`격자`) opens in place; when it would end below
-    // the bars, the column follows it up while it unfolds (never past the row's own top). A drag stops it.
+    // the bars, the column follows it up while it unfolds (never past the row's own top). In inner list + detail the
+    // picked row (or tile line) itself is lifted out from under the bottom bar the same way. A drag stops it.
     val currentView by rememberUpdatedState(v)
     LaunchedEffect(pick.pickedKey, viewKind, layout) {
         val key = pick.pickedKey ?: return@LaunchedEffect

@@ -120,13 +120,14 @@ class RecordActions(
 
 /** A field row of the header table or the `항목` list with its planned row. */
 @Composable
-fun FieldRowItem(doc: ProjectDoc, row: FieldRow, actions: RecordActions) {
+fun FieldRowItem(doc: ProjectDoc, row: FieldRow, actions: RecordActions, modifier: Modifier = Modifier) {
     val def = row.defKey?.let(doc.index::fieldDef)
     val numeric = def == null || def.type.known == FieldType.NUMBER || def.type.known == FieldType.CALC
     val key = row.defKey
     RecordFieldRow(
         label = row.label,
         value = row.value,
+        modifier = modifier,
         since = row.since,
         hasHistory = row.hasHistory,
         numeric = numeric,

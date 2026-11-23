@@ -86,6 +86,9 @@ class CaptureHub(
     private var engineToken = 0
     private var micDenied = false
 
+    /** The take was paused by [holdForTour] (not by the user or a call), so [releaseTour] resumes it. */
+    private var pausedForTour = false
+
     /** The shared memo sheet was dismissed by its host (scrim, back) while the hub still holds the memo. */
     private var memoDetached = false
 
@@ -201,6 +204,7 @@ class CaptureHub(
     // ---- recording (LRC-07, LRC-08) ----
 
     private fun start(entry: EntryContext) {
+        pausedForTour = false
         val ctx = context()
         val env = envSource.quick()
         val fullEntry = withExample(entry, env)
@@ -272,6 +276,23 @@ class CaptureHub(
             RecordingPhase.PROCESSING -> Unit
         }
         persistSoon()
+    }
+
+    /**
+     * LIB-19: the recorder tour's card is shown over `녹음 중`. A running take pauses, so the time spent
+     * reading the cards is not recorded; [releaseTour] resumes it. A take already paused stays as it is.
+     */
+    fun holdForTour() {
+        if (s.stage != CaptureStage.RECORDING || s.session?.phase != RecordingPhase.RECORDING) return
+        togglePause()
+        pausedForTour = true
+    }
+
+    /** The tour's card closed: the take [holdForTour] paused resumes (one the user paused stays paused). */
+    fun releaseTour() {
+        val resume = pausedForTour && s.stage == CaptureStage.RECORDING && s.session?.phase == RecordingPhase.PAUSED
+        pausedForTour = false
+        if (resume) togglePause()
     }
 
     /** Audio focus lost (a call): paused until the user resumes (LRC-09). */
@@ -681,6 +702,7 @@ class CaptureHub(
 
     private fun close() {
         memoDetached = false
+        pausedForTour = false
         focus.abandon()
         stopTicker()
         finalBase = null

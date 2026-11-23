@@ -272,6 +272,23 @@ class NewProjectTest {
     }
 
     @Test
+    fun `step 2 default follows the format - 단편 is scenes only (Q10)`() {
+        assertEquals(StructurePreset.CUSTOM to listOf("씬"), NewProjectFlow.defaultStructure(ProjectFormat.SHORT))
+        assertEquals(StructurePreset.CHAPTER_EPISODE_SCENE to listOf("장", "에피소드", "씬"), NewProjectFlow.defaultStructure(ProjectFormat.SERIAL))
+        assertEquals(StructurePreset.CHAPTER_EPISODE_SCENE to listOf("장", "에피소드", "씬"), NewProjectFlow.defaultStructure(ProjectFormat.SETTING_ONLY))
+        val (preset, levels) = NewProjectFlow.defaultStructure(ProjectFormat.SHORT)
+        val short = create(
+            NewProjectDraft(name = "유리 정원", format = ProjectFormat.SHORT, structurePreset = preset, customLevels = levels, startYear = 1200), seed = 5,
+        )
+        assertEquals(listOf("씬"), short.doc.project.structure.levels)
+        assertEquals(listOf(0), short.doc.story.units.map { it.level })
+        assertNull(short.doc.project.structure.episodeLevel)
+        // LIB-13: no chapter or episode left in the summary or the quick-write line.
+        assertEquals("단편 · 씬 · 1200년", StartBlock.of(short.doc, RecorderLibrary()).summary)
+        assertEquals("씬 1", StartBlock.quickWriteLine(short.doc))
+    }
+
+    @Test
     fun `summary line of the 만든 직후 block`() {
         val serial = create(NewProjectDraft(name = "새 이야기", startYear = 1200))
         assertEquals("연재 장편 · 장 › 에피소드 › 씬 · 1200년", StartBlock.of(serial.doc, RecorderLibrary()).summary)

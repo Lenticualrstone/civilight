@@ -210,7 +210,8 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
         lens = d?.let(::lensChipLabel),
         onLens = { sheets.open(LensSheet(route.projectKey)) },
         actions = {
-            CivilightIconButton(IconId.More, MapCopy.MORE, { sheets.open(MapMoreSheet) })
+            // LIB-19 map tour: `⋯` (its `시점별 공개` row) is the `보이는 시점` hole (MapTourSteps).
+            CivilightIconButton(IconId.More, MapCopy.MORE, { sheets.open(MapMoreSheet) }, Modifier.tourTarget(MapTourSteps.REVEAL))
             CivilightIconButton(IconId.Undo, MapCopy.BTN_UNDO, { vm.undoLast() }, enabled = !readOnly)
             TextAction(MapCopy.BTN_DONE, { deps.navigator.pop() })
         },

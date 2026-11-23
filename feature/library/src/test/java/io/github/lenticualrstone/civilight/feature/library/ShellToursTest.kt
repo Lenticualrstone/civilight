@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.feature.library
 import io.github.lenticualrstone.civilight.domain.library.onboarding.ModuleTours
 import io.github.lenticualrstone.civilight.domain.library.onboarding.TourModule
 import io.github.lenticualrstone.civilight.feature.library.shelf.LibraryTourSteps
+import io.github.lenticualrstone.civilight.ui.tour.TourStepFilter
 import io.github.lenticualrstone.civilight.feature.library.tour.ShellTours
 import io.github.lenticualrstone.civilight.feature.library.tour.TourPlacement
 import io.github.lenticualrstone.civilight.model.app.OnboardingState
@@ -103,10 +104,26 @@ class ShellToursTest {
             (0 until ModuleTours.stepCount(TourModule.LIBRARY_HIDING)).toSet(),
             LibraryTourSteps.SETTINGS_FALLBACK.toSet() + LibraryTourSteps.SETTINGS,
         )
-        // `프로젝트 숨기기` points at the ⋯ of the first shown row, else the open group's first row, else 설정.
+        // `프로젝트 숨기기` points at the ⋯ of the first shown row, else the open group's first row, else none (absent).
         assertEquals("a", LibraryTourSteps.menuRow(listOf("a", "b"), listOf("h")))
         assertEquals("h", LibraryTourSteps.menuRow(emptyList(), listOf("h", "i")))
         assertNull(LibraryTourSteps.menuRow(emptyList(), emptyList()))
+    }
+
+    @Test
+    fun `서재 · 숨기기 - with no project shown, 프로젝트 숨기기 is left out, not pointed at 설정`() {
+        // Tour QA 2026-11-23: with 0 projects all three cards pointed at 설정, step 1 talking about the ⋯ menu.
+        val count = ModuleTours.stepCount(TourModule.LIBRARY_HIDING)
+        assertEquals(setOf(LibraryTourSteps.HIDE), LibraryTourSteps.absent(LibraryTourSteps.menuRow(emptyList(), emptyList())))
+        assertEquals(
+            listOf(LibraryTourSteps.HIDDEN_GROUP, LibraryTourSteps.SETTINGS),
+            TourStepFilter.shown(count, LibraryTourSteps.absent(null)),
+        )
+        // Any project shown (a row, or only the open hidden group's row): all three steps.
+        listOf(LibraryTourSteps.menuRow(listOf("a"), emptyList()), LibraryTourSteps.menuRow(emptyList(), listOf("h"))).forEach {
+            assertEquals(emptySet<Int>(), LibraryTourSteps.absent(it))
+        }
+        assertEquals(listOf(0, 1, 2), TourStepFilter.shown(count, LibraryTourSteps.absent("a")))
     }
 
     @Test

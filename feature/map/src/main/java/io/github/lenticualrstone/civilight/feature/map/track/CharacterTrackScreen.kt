@@ -75,6 +75,8 @@ import io.github.lenticualrstone.civilight.ui.project.currentProjectStore
 import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
+import io.github.lenticualrstone.civilight.ui.tour.TourHold
+import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import kotlinx.coroutines.delay
 
 /** 인물 동선 reads the project only; the lens moves through the project's lens controller. */
@@ -108,6 +110,8 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
         d?.let { TrackState.build(it, mapKey, selected.orEmpty(), MapScreenViewModel.lensOf(it), hiddenOpen, layerFilter) }
     }
     val stopsNow by rememberUpdatedState(ui?.scrubber.orEmpty())
+    // LIB-19 `장소와 때` tour: it waits until the map is drawn, so its holes exist (TrackTourSteps).
+    if (TrackTourSteps.hold(ui)) TourHold()
     val motion = CivilightTheme.motion
     LaunchedEffect(playing) {
         while (playing) {
@@ -159,7 +163,7 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
             )
             TopBarTapGuard(padding.calculateTopPadding())
             val scrubber: @Composable ColumnScope.() -> Unit = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.tourTarget(TrackTourSteps.TRACK), verticalAlignment = Alignment.CenterVertically) {
                     CivilightIconButton(if (playing) IconId.Pause else IconId.Next, if (playing) MapCopy.TRACK_PAUSE else MapCopy.TRACK_PLAY, { playing = !playing })
                     Column(Modifier.weight(1f)) { Scrubber(u.scrubber) { key -> playing = false; lens.set(LensPoint.UnitEnd(key)) } }
                 }
@@ -168,7 +172,10 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     u.chips.forEach { c -> FilterChip(c.name, c.selected, { selected = TrackState.tapChip(selected.orEmpty(), c.key) }) }
                 }
-                SegmentedControl(listOf(MapCopy.TAB_TRACK, MapCopy.TAB_TRACK_PLACES, MapCopy.TAB_LAYERS), tab, { tab = it })
+                SegmentedControl(
+                    listOf(MapCopy.TAB_TRACK, MapCopy.TAB_TRACK_PLACES, MapCopy.TAB_LAYERS), tab, { tab = it },
+                    TrackTourSteps.TABS_FALLBACK.fold<Int, Modifier>(Modifier) { m, step -> m.tourTarget(step, fallback = true) },
+                )
                 TabContent(tab) { t ->
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (t) {
@@ -179,10 +186,11 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
                     else -> {
                         if (u.listTitle == null) CivilightText(MapCopy.TRACK_EMPTY, CivilightTheme.type.small, color = colors.ink3)
                         u.listTitle?.let { CivilightText(it, CivilightTheme.type.sec, color = colors.ink3) }
-                        u.rows.forEach { r ->
+                        u.rows.forEachIndexed { i, r ->
                             ListRow(
                                 "${r.episode} | ${r.place}", subtitle = r.detail, compact = true, titleDotted = !r.onMap,
                                 onClick = { lens.set(LensPoint.UnitEnd(r.sceneKey)) },
+                                modifier = if (i == 0) Modifier.tourTarget(TrackTourSteps.PLACE_TIME) else Modifier,
                             )
                         }
                         CivilightText(DomainTrack.NOTE, CivilightTheme.type.small, color = colors.ink3)
