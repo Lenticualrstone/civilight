@@ -5,11 +5,12 @@ import io.github.lenticualrstone.civilight.model.app.OnboardingState
 /**
  * The modules that run a tooltip tour on first entry (LIB-19, `OnboardingState.moduleTourSeen`).
  * [id] is the key in `moduleTourSeen` (spec §3.2 ModuleId); [rowTitle] the `도움말 · 안내 다시 보기`
- * row (board `HelpReplay`); [label] the mono label before `k/n` on the tooltip card (null = `k/n`
- * only, as the script tour draws it). Listed in the `HelpReplay` row order.
+ * row (board `HelpReplay`); [label] the mono label before `k/n` on the tooltip card (`인물 안내 · 1/3`;
+ * null = `k/n` only). Every module names its tour the same way, the script too (emulator QA
+ * 2026-11-23: its card read a bare `1/3`). Listed in the `HelpReplay` row order.
  */
 enum class TourModule(val id: String, val rowTitle: String, val label: String?) {
-    SCRIPT("SCRIPT", "스크립트", null),
+    SCRIPT("SCRIPT", "스크립트", "스크립트 안내"),
     CAST("CAST", "인물", "인물 안내"),
     WORLD_TIMELINE("WORLD_TIMELINE", "세계 · 연표", "세계 안내"),
     RECORDER("RECORDER", "라이프 레코더", "레코더 안내"),
@@ -46,7 +47,8 @@ object ModuleTours {
             TourStep("명령 칸", "이동 · 검색 · 블록 추가 · 마이크"),
             TourStep("블록을 왼쪽으로", "시간 · 참고 · 속성 → 옆 패널 탭"),
             TourStep("씬 머리", "장소와 때 · 전환 문구 · ⋯ 메뉴"),
-            TourStep("시점 렌즈", "고른 시점까지의 인물 · 관계 · 용어"),
+            // No `시점 렌즈` step: the script has no lens (STO-16; the lens lives in the shell), so that
+            // card had nothing to point at.
         )
         TourModule.CAST -> listOf(
             TourStep("시점 렌즈", "이 시점까지의 필드 · 관계만"),

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
@@ -31,10 +32,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.lenticualrstone.civilight.designsystem.component.AddChip
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
@@ -64,6 +68,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNul
 import io.github.lenticualrstone.civilight.domain.actions.GalleryMove
 import io.github.lenticualrstone.civilight.domain.actions.GalleryOwner
 import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
+import io.github.lenticualrstone.civilight.feature.canvas.common.TypingWriter
 import io.github.lenticualrstone.civilight.feature.canvas.common.canvasEditContext
 import io.github.lenticualrstone.civilight.feature.canvas.image.CropHandOff
 import io.github.lenticualrstone.civilight.feature.canvas.image.MineThumb
@@ -74,6 +79,7 @@ import io.github.lenticualrstone.civilight.model.asset.Ratio
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.gallery.GalleryItem
 import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
+import io.github.lenticualrstone.civilight.model.text.RichDoc
 import io.github.lenticualrstone.civilight.navigation.Gallery
 import io.github.lenticualrstone.civilight.navigation.GalleryAddSheet
 import io.github.lenticualrstone.civilight.navigation.GalleryInfoSheet
@@ -314,7 +320,9 @@ private fun AddTileView(tile: AddTile, onClick: () -> Unit, modifier: Modifier) 
 /**
  * `이미지 정보` (GAL-13, board `GalInfo`): head (thumbnail, `<W> × <H> · <size> · <source>`, `<owner> · 갤러리
  * <i>/<N> · 원본 그대로`), then `제목`, `설명` (shared rich editor with `@` links), `태그` (project tags; `+ 태그`
- * through `CharacterEdits.addTag`) and `연결` (one scene). Saves as typed; one undo step per field edit.
+ * through `CharacterEdits.addTag`) and `연결` (one scene). 제목 and 설명 save when focus leaves the field, when the
+ * sheet closes or another sheet is stacked over it, and when the app goes to the background (never while typing);
+ * one undo step per field edit.
  */
 @Composable
 fun SheetScope.GalleryInfoSheetContent(sheet: GalleryInfoSheet) {
@@ -344,23 +352,44 @@ fun SheetScope.GalleryInfoSheetContent(sheet: GalleryInfoSheet) {
                     CivilightText(head.small, type.small, color = colors.ink3, maxLines = 1)
                 }
             }
-            // 제목: one line, written through as typed (one merged undo step).
+            // 제목 and 설명 never write the document while they hold focus: a write in the middle of a fast burst
+            // stalled the keys behind it until the system dropped them (the tail of the burst was lost). They write
+            // when focus leaves, when typing pauses without focus, and at once when the sheet closes, another sheet
+            // is stacked over it or the app goes to the background. The fields themselves are never re-seeded.
+            val itemKey = item.key
+            val vm = c.vm
+            val typingScope = rememberCoroutineScope()
+            val titleWriter = remember(itemKey) { TypingWriter<String>(typingScope) { vm.setTitle(itemKey, it) } }
+            val captionWriter = remember(itemKey) { TypingWriter<RichDoc>(typingScope) { vm.setCaption(itemKey, it) } }
+            // 제목: one line (one merged undo step).
             var title by rememberSaveable(sheet.itemKey) { mutableStateOf(item.title) }
             CivilightTextField(
                 title,
                 {
                     title = it
-                    c.vm.setTitle(item.key, it)
+                    titleWriter.offer(it)
                 },
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().onFocusChanged {
+                    if (it.hasFocus) titleWriter.hold() else if (titleWriter.isHeld) titleWriter.release()
+                },
                 label = GalleryUiCopy.FIELD_TITLE,
                 enabled = editable,
             )
             // 설명: the shared run contract; never re-seeded from the document while open.
             val caption = rememberRichTextEditorState(item.caption ?: emptyList(), key = sheet.itemKey)
             LaunchedEffect(caption) {
-                snapshotFlow { caption.result }.drop(1).collect { c.vm.setCaption(item.key, it) }
+                snapshotFlow { caption.result }.drop(1).collect { captionWriter.offer(it) }
             }
+            // The caption reaches its writer a frame after the key; catch up before writing what waits.
+            fun writeNow() {
+                titleWriter.flush()
+                captionWriter.catchUp(caption.result, isStart = !caption.changed)
+                captionWriter.flush()
+            }
+            DisposableEffect(titleWriter, captionWriter, caption) {
+                onDispose { writeNow() }
+            }
+            LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { writeNow() }
             val focus = remember { FocusRequester() }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -372,7 +401,14 @@ fun SheetScope.GalleryInfoSheetContent(sheet: GalleryInfoSheet) {
                     projectKey = sheet.projectKey,
                     linkPickerTitle = GalleryUiCopy.LINK_PICKER_TITLE,
                     openSheet = sheetScope::open,
-                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus).onFocusChanged {
+                        if (it.hasFocus) {
+                            captionWriter.hold()
+                        } else if (captionWriter.isHeld) {
+                            captionWriter.catchUp(caption.result, isStart = !caption.changed)
+                            captionWriter.release()
+                        }
+                    },
                     enabled = editable,
                     minHeight = 120.dp,
                 )
@@ -520,7 +556,14 @@ fun SheetScope.GalleryMenuSheetContent(sheet: GalleryMenuSheet) {
             title = GalleryUiCopy.BTN_COPY_TO,
             subtitle = GalleryUiCopy.COPY_TO_SUB,
             trailing = { MenuTrailing(null) },
-            onClick = { guarded { sheetScope.open(GalleryCopySheet(sheet.projectKey, listOf(item.key))) } },
+            // The picker takes the menu's place: after a pick the stack is empty, so the result toast is not left
+            // under the menu (GAL-16).
+            onClick = {
+                guarded {
+                    sheetScope.close()
+                    sheetScope.open(GalleryCopySheet(sheet.projectKey, listOf(item.key)))
+                }
+            },
         )
         OrderRow(menu.order, enabled = true) { move -> guarded { c.vm.move(item.key, move, c.locked) } }
         ListRow(

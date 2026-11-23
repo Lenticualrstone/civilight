@@ -1,5 +1,10 @@
 package io.github.lenticualrstone.civilight.feature.script
 
+import androidx.compose.runtime.key
+import io.github.lenticualrstone.civilight.ui.tour.TourHold
+import io.github.lenticualrstone.civilight.ui.tour.TourStepAbsent
+import io.github.lenticualrstone.civilight.ui.tour.tourRunning
+import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import io.github.lenticualrstone.civilight.feature.script.ui.AppearOnJoin
 import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedContent
@@ -205,6 +210,8 @@ fun ScriptScreen(route: Script, deps: FeatureDeps) {
     val panelActions = { open: (SheetKey) -> Unit, leave: () -> Unit -> scriptPanelActions(route, deps, vm, gate.open, open, leave) }
     SheetHostLayout(sheets, localSheets = { key -> scriptSheet(key, vm, c?.doc, editor, panelActions, panelScroll) }) {
         if (c == null) {
+            // LIB-19: the tour waits until the script knows whether it is the read-only example.
+            TourHold()
             Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
         } else {
             BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -359,6 +366,8 @@ private fun ScriptFrame(
     panelScroll: PanelScrollMemory,
 ) {
     val doc = c.doc
+    // LIB-19: steps with nothing on this screen (the example's `명령 칸`) are left out of the tour.
+    ScriptTourSteps.absent(c.readOnly).forEach { step -> key(step) { TourStepAbsent(step) } }
     // SCR-03: the side panel is open by default on inner screens; `닫기` closes it for this entry.
     var panelOpen by rememberSaveable { mutableStateOf(true) }
     val panelTab by vm.panelTab.collectAsState()
@@ -505,8 +514,10 @@ private fun ScriptFrame(
         row.key == caretRow && editor.caretOption.let { option -> option == null || (row as? BlockRow)?.options?.any { it.optionKey == option } == true }
     }
     // Keyed on the option line too: moving the caret to another option swaps the field (SCR-09).
-    LaunchedEffect(caretRow, editor.caretOption, sheetOpen, caretRowReady) {
-        if (caretRow == null || sheetOpen || !caretRowReady) return@LaunchedEffect
+    // LIB-19: while the script tour shows, nothing is typed (its first target is the command row).
+    val touring = tourRunning()
+    LaunchedEffect(caretRow, editor.caretOption, sheetOpen, caretRowReady, touring) {
+        if (touring || caretRow == null || sheetOpen || !caretRowReady) return@LaunchedEffect
         // The field exists only while its row is composed: bring it into view first.
         val index = rows.indexOfFirst { it.key == caretRow }
         if (index >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.key == caretRow }) listState.scrollToItem(index)
@@ -622,6 +633,15 @@ private fun ScriptFrame(
         }
         stopCommand()
     }
+    // LIB-19: the tour starts over a script being typed (`이어 쓰기`): leave typing as `완료` does, so the
+    // command row the first step points at is on screen, not the keyboard toolbar under the keyboard.
+    LaunchedEffect(touring, editor.editing, commandTyping) {
+        if (!touring || (!editor.editing && !commandTyping)) return@LaunchedEffect
+        if (editor.editing) vm.done()
+        if (commandTyping) stopCommand()
+        focusManager.clearFocus()
+        keyboard?.hide()
+    }
     // System back while typing leaves editing first (as `완료`); with the command field open, closes it.
     LocalBackHandler.current(editor.editing && !sheetOpen) {
         vm.done()
@@ -677,7 +697,8 @@ private fun ScriptFrame(
         } else {
             val selectedKind = ScriptOps.currentKind(doc, editor)
             val selectedRow = editor.selected?.let { key -> rows.firstOrNull { it.key == ScriptRowKeys.block(key) } as? BlockRow }
-            Box(Modifier.windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars))) {
+            Box(Modifier.windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars)).then(if (c.readOnly) Modifier else Modifier.tourTarget(ScriptTourSteps.COMMAND))) {
+                // LIB-19 `명령 칸`: the read-only example has no command field here, so its tour skips that step.
                 ScriptBottomBar(
                     row = CommandRow.of(editor, c.readOnly, previewOnly, panelShown = layout.panel || split != null, wide = wide),
                     speakerName = speakerName,

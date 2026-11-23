@@ -35,6 +35,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldBundles
@@ -110,26 +111,39 @@ internal fun ColumnScope.NameStep(form: NewProjectForm, defaults: RatingDefaults
     }
 }
 
-/** The `미리 보기` tree: top level bold, scene level `ink2`, indented by depth (`NewStructure`). */
+/**
+ * The `미리 보기` tree: top level bold, scene level `ink2`, indented by depth (`NewStructure`). The box stays
+ * put and the lines crossfade, its height following on `standard`, when [swapKey] changes (another structure,
+ * a level added or removed); renaming a level updates the text in place. The whole box folds away while
+ * [lines] is empty (a custom level still unnamed).
+ */
 @Composable
-internal fun PreviewTree(lines: List<Pair<Int, String>>, modifier: Modifier = Modifier) {
-    if (lines.isEmpty()) return
+internal fun PreviewTree(lines: List<Pair<Int, String>>, modifier: Modifier = Modifier, swapKey: Any? = NewProjectRules.previewSwapKey(null, lines)) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val deepest = lines.maxOf { it.first }
-    // Boards `NewStructure` / `NewWide`: box padding 14 · 16, each line 4 dp above and below, 18 dp per level.
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(colors.tint).padding(horizontal = 16.dp, vertical = 14.dp)) {
-        lines.forEach { (depth, text) ->
-            val style = type.lead.merge(TextStyle(fontSize = 15.sp, lineHeight = 22.sp, fontWeight = if (depth == 0) FontWeight.Bold else FontWeight.Normal))
-            CivilightText(
-                text,
-                style,
-                Modifier.padding(start = (depth * 18).dp, top = 4.dp, bottom = 4.dp),
-                color = if (depth == deepest && depth > 0) colors.ink2 else colors.ink,
-            )
+    FoldRevealValue(PreviewLines(swapKey, lines).takeIf { lines.isNotEmpty() }, label = "previewTree") { shown ->
+        // Boards `NewStructure` / `NewWide`: box padding 14 · 16, each line 4 dp above and below, 18 dp per level.
+        Box(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(colors.tint).padding(horizontal = 16.dp, vertical = 14.dp)) {
+            ContentSwap(shown, Modifier.fillMaxWidth(), contentKey = { it.key }, label = "previewLines") { state ->
+                val deepest = state.lines.maxOfOrNull { it.first } ?: 0
+                Column(Modifier.fillMaxWidth()) {
+                    state.lines.forEach { (depth, text) ->
+                        val style = type.lead.merge(TextStyle(fontSize = 15.sp, lineHeight = 22.sp, fontWeight = if (depth == 0) FontWeight.Bold else FontWeight.Normal))
+                        CivilightText(
+                            text,
+                            style,
+                            Modifier.padding(start = (depth * 18).dp, top = 4.dp, bottom = 4.dp),
+                            color = if (depth == deepest && depth > 0) colors.ink2 else colors.ink,
+                        )
+                    }
+                }
+            }
         }
     }
 }
+
+/** The preview lines with the key that decides whether a change swaps (see [NewProjectRules.previewSwapKey]). */
+private data class PreviewLines(val key: Any?, val lines: List<Pair<Int, String>>)
 
 /** 2/4 `구조` (LIB-10; boards `NewStructure`, `NewWide`). */
 @Composable
@@ -165,7 +179,7 @@ internal fun ColumnScope.StructureStep(form: NewProjectForm, wide: Boolean, show
     FoldReveal(showPreview) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SectionLabel(NewProjectCopy.PREVIEW, Modifier.padding(top = 8.dp))
-            PreviewTree(NewProjectRules.preview(form))
+            PreviewTree(NewProjectRules.preview(form), swapKey = NewProjectRules.previewSwapKey(form))
         }
     }
 }

@@ -29,8 +29,17 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 
-/** What the search overlay shows: the result for the query and filter (null while the query is empty). */
-data class SearchUi(val query: String, val filter: SearchFilter, val result: SearchResult?, val context: SearchContext)
+/**
+ * What the search overlay shows: the result for the query and filter (null while the query is empty), and the
+ * [gallery] scope when it was opened from a gallery's command bar (GAL-04).
+ */
+data class SearchUi(
+    val query: String,
+    val filter: SearchFilter,
+    val result: SearchResult?,
+    val context: SearchContext,
+    val gallery: GalleryScope? = null,
+)
 
 /**
  * 검색 · 명령 (STO-37, STO-38): runs `domain:story` [ProjectSearch] off the main thread, debounced, for
@@ -81,8 +90,15 @@ class SearchViewModel(
     val ui: StateFlow<SearchUi?> = combine(state, services.unlock, openChecks, inputs) { load, unlock, checks, (q, f, b) ->
         val ready = load as? ProjectLoad.Ready ?: return@combine null
         val context = SearchModel.context(ready.doc, b, itemsLocked(unlock), checks)
-        val result = if (!SearchModel.listsWithoutQuery(q, f)) null else ProjectSearch(ready.doc, context).search(q, f)
-        SearchUi(q, f, result, context)
+        val scope = SearchModel.galleryScope(b)
+        // Gallery titles, descriptions and tags are part of the command-bar index (55 §3.5, GAL-04): under
+        // `전체` here, and alone when the overlay was opened over a gallery.
+        val result = when {
+            scope != null -> if (q.isBlank()) null else SearchModel.galleryResult(ready.doc, q, context.locked, scope)
+            !SearchModel.listsWithoutQuery(q, f) -> null
+            else -> ProjectSearch(ready.doc, context).search(q, f, includeGallery = true)
+        }
+        SearchUi(q, f, result, context, scope)
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)

@@ -54,6 +54,17 @@ class ServiceLocator(context: Context) {
     /** The first back stack (LIB-08 routing), null until settings, onboarding and the seed are ready. */
     val start: StateFlow<List<Route>?> = _start.asStateFlow()
 
+    /**
+     * Called by each new activity before it draws: once [start] is known, a fresh activity ([restored]
+     * false) gets its first back stack from the live onboarding state. The process can outlive the first
+     * run (back to the launcher, opened again), and the routes [Startup.prepare] chose then would show
+     * onboarding again after it was finished.
+     */
+    fun refreshStartForNewActivity(restored: Boolean) {
+        val next = Startup.forNewActivity(_start.value, restored) { Startup(stores).currentRoutes() }
+        if (next != null) _start.value = next
+    }
+
     init {
         appScope.launch {
             val result = Startup(stores).prepare()

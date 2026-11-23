@@ -202,7 +202,7 @@ private fun EpisodeLine(item: EpisodeItem, onToggle: (Key) -> Unit, onMenu: (Key
             color = if (row.unwritten) colors.ink3 else colors.ink,
             maxLines = 1,
         )
-        CivilightText(row.meta, type.small, color = colors.ink3, maxLines = 1)
+        CivilightText(item.meta, type.small, color = colors.ink3, maxLines = 1)
         CivilightIconButton(IconId.More, StructureCopy.MENU, { onMenu(row.key) })
     }
 }
@@ -235,7 +235,7 @@ private fun SceneLine(item: SceneItem, onScene: (SceneItem) -> Unit, onMenu: (Ke
             maxLines = 1,
         )
         if (row.hiddenTag) CivilightText(StoryCopy.HIDDEN_TAG, type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
-        CivilightText(row.meta, type.small, color = if (row.current) colors.acc else colors.ink3, maxLines = 1)
+        CivilightText(item.meta, type.small, color = if (item.writing) colors.acc else colors.ink3, maxLines = 1)
         CivilightIconButton(IconId.More, StructureCopy.MENU, { onMenu(row.key) })
     }
 }

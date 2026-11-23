@@ -83,6 +83,10 @@ Civilight는 스크립트, 인물, 세계, 연표를 한 프로젝트 안에서 
 ## 화면
 
 <!-- SCREENSHOTS -->
+<table>
+<tr><td align="center"><img src="docs/assets/screens/01-library.png" width="200" alt="서재"><br><sub>서재</sub></td><td align="center"><img src="docs/assets/screens/02-project-home.png" width="200" alt="프로젝트 홈"><br><sub>프로젝트 홈</sub></td><td align="center"><img src="docs/assets/screens/03-script.png" width="200" alt="스크립트"><br><sub>스크립트</sub></td><td align="center"><img src="docs/assets/screens/04-cast-profile.png" width="200" alt="인물 프로필"><br><sub>인물 프로필</sub></td></tr>
+<tr><td align="center"><img src="docs/assets/screens/05-world-term.png" width="200" alt="세계 · 용어"><br><sub>세계 · 용어</sub></td><td align="center"><img src="docs/assets/screens/06-map.png" width="200" alt="지도"><br><sub>지도</sub></td><td align="center"><img src="docs/assets/screens/07-canvas.png" width="200" alt="캔버스"><br><sub>캔버스</sub></td><td align="center"><img src="docs/assets/screens/08-light-home.png" width="200" alt="라이트 테마"><br><sub>라이트 테마</sub></td></tr>
+</table>
 
 ## 설치
 

@@ -184,6 +184,15 @@ fun LibrarySearchScreen(route: LibrarySearch, deps: FeatureDeps) {
 /** Copy of the cross-project search (board `EmptySearch`). */
 object SearchCopy {
     const val NO_RESULTS = "결과 없음"
+
+    /** The `갤러리` section of the project search (55 §3.5). */
+    const val GALLERY = "갤러리"
+
+    /** Hint line of the search opened from a character's gallery (GAL-04, board `GalSearch`). */
+    const val GALLERY_FIND = "갤러리에서 찾기 · 제목 · 설명 · 태그"
+
+    /** The same from the project gallery (GAL-04, GAL-10). */
+    const val ALL_GALLERIES_FIND = "모든 갤러리 · 제목 · 설명 · 태그"
 }
 
 private const val SCRIM = 0.82f

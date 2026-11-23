@@ -181,9 +181,11 @@ class ProjectSearch(val doc: ProjectDoc, val context: SearchContext = SearchCont
             }
             if (items.isEmpty()) null else SearchSection(kind, items)
         }
-        val gallery = if (includeGallery && filter == SearchFilter.ALL) GallerySearch(doc, context.locked).search(q) else emptyList()
-        val empty = if (sections.isEmpty() && gallery.isEmpty()) EmptySearch(q.text, hiddenExcluded, similar(q)) else null
-        return SearchResult(q.text, filter, sections, hiddenExcluded, empty, gallery)
+        val galleries = if (includeGallery && filter == SearchFilter.ALL) GallerySearch(doc, context.locked) else null
+        val gallery = galleries?.search(q).orEmpty()
+        val hidden = hiddenExcluded || galleries?.hiddenExcluded() == true
+        val empty = if (sections.isEmpty() && gallery.isEmpty()) EmptySearch(q.text, hidden, similar(q)) else null
+        return SearchResult(q.text, filter, sections, hidden, empty, gallery)
     }
 
     // --- Sections ----------------------------------------------------------------------------------

@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 
 /**
@@ -37,11 +38,31 @@ fun CenterColumn(modifier: Modifier = Modifier, content: @Composable () -> Unit)
     }
 }
 
+/** Copy of the `목록 + 상세` frame (CNV-33). */
+object ListDetailCopy {
+    /**
+     * The right pane before anything is selected (Q-LY-02 leaves it open). Follows `고른 블록 없음` and the
+     * setting line `왼쪽 목록 · 오른쪽 고른 항목`; listed under "Copy to confirm" in `docs/status/shell.md`.
+     */
+    const val NO_SELECTION = "고른 항목 없음"
+
+    val all: List<String> = listOf(NO_SELECTION)
+}
+
+/** The right pane of `목록 + 상세` before a selection: one centred `ink3` line on `bg` (Q-LY-02). */
+@Composable
+fun EmptyDetailPane(modifier: Modifier = Modifier, text: String = ListDetailCopy.NO_SELECTION) {
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CivilightText(text, CivilightTheme.type.label, color = CivilightTheme.colors.ink3, maxLines = 1)
+    }
+}
+
 /**
  * `목록 + 상세` (CNV-33): [list] at 390 dp (or 50 % on narrow Medium windows, Q-LY-01), a 1 dp
- * `line` divider, [detail] in the rest. [detail] null leaves the right pane empty on `bg`
- * (Q-LY-02: nothing selected yet). With a [module] id (`PaneSplit.Modules`) the frame carries the CNV-47
- * handle and uses that module's stored ratio ([SplitPanes]); without one it keeps the fixed split.
+ * `line` divider, [detail] in the rest. [detail] null shows [emptyDetail] centred in the right pane
+ * ([EmptyDetailPane], Q-LY-02: nothing selected yet; null leaves it blank on `bg`). With a [module] id
+ * (`PaneSplit.Modules`) the frame carries the CNV-47 handle and uses that module's stored ratio
+ * ([SplitPanes]); without one it keeps the fixed split.
  */
 @Composable
 fun ListDetailPanes(
@@ -49,9 +70,16 @@ fun ListDetailPanes(
     detail: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
     module: String? = null,
+    emptyDetail: String? = ListDetailCopy.NO_SELECTION,
 ) {
+    val right: @Composable () -> Unit = {
+        when {
+            detail != null -> detail()
+            emptyDetail != null -> EmptyDetailPane(text = emptyDetail)
+        }
+    }
     if (module != null) {
-        SplitPanes(module, left = list, right = { detail?.invoke() }, modifier = modifier)
+        SplitPanes(module, left = list, right = right, modifier = modifier)
         return
     }
     val colors = CivilightTheme.colors
@@ -60,7 +88,7 @@ fun ListDetailPanes(
         Row(Modifier.fillMaxSize()) {
             Box(Modifier.width(listWidth).fillMaxHeight()) { list() }
             Spacer(Modifier.width(1.dp).fillMaxHeight().background(colors.line))
-            Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopStart) { detail?.invoke() }
+            Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopStart) { right() }
         }
     }
 }

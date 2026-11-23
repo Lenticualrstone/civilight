@@ -114,11 +114,22 @@ object CastList {
     fun visible(doc: ProjectDoc, hiddenUnlocked: Boolean): Pair<List<Character>, List<Character>> =
         CharacterEdits.live(doc).partition { ItemRefs.character(doc, it.key, hiddenUnlocked) is ResolvedItem.Live }
 
-    /** `전체 N` + one chip per project tag in tag order. */
+    /**
+     * The tags the list offers as chips: project tags (in tag order) held by at least one character the
+     * list shows. The project tag list is shared with the gallery (55 §3.4), so a tag used only on gallery
+     * items, only by characters in the trash, or only by locked hidden characters gets no chip: its chip
+     * would open an empty list, and for a locked hidden character it would tell that the character exists.
+     */
+    fun chipTags(doc: ProjectDoc, hiddenUnlocked: Boolean = false): List<Tag> {
+        val held = visible(doc, hiddenUnlocked).first.flatMapTo(HashSet()) { it.tagKeys }
+        return CharacterEdits.tags(doc).filter { it.key in held }
+    }
+
+    /** `전체 N` + one chip per tag the shown characters hold ([chipTags]), in tag order. */
     fun chips(doc: ProjectDoc, selectedTag: Key?, hiddenUnlocked: Boolean = false): List<TagChip> {
         val count = visible(doc, hiddenUnlocked).first.size
         return listOf(TagChip(null, "전체 $count", selectedTag == null)) +
-            CharacterEdits.tags(doc).map { TagChip(it.key, it.name, it.key == selectedTag) }
+            chipTags(doc, hiddenUnlocked).map { TagChip(it.key, it.name, it.key == selectedTag) }
     }
 
     /**

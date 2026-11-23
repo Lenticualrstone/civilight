@@ -107,6 +107,23 @@ data class HomeUi(
 }
 
 /**
+ * One item of the home list, in drawing order; [key] is its lazy key. The `start` slot is always there: the
+ * 만든 직후 block folds closed inside it (height and fade together), so on `목록 닫기` the rows below follow its
+ * shrinking edge instead of moving up over a block that is still fading in place (emulator round 1).
+ */
+sealed interface HomeSlot {
+    val key: String
+
+    data object Name : HomeSlot { override val key: String get() = "name" }
+    data object Stats : HomeSlot { override val key: String get() = "stats" }
+    data object Resume : HomeSlot { override val key: String get() = "resume" }
+    data object Start : HomeSlot { override val key: String get() = "start" }
+    data object ListHeader : HomeSlot { override val key: String get() = "listHeader" }
+    data class Episode(val row: HomeRow) : HomeSlot { override val key: String get() = "row:${row.key}" }
+    data object Work : HomeSlot { override val key: String get() = "work" }
+}
+
+/**
  * Builds [HomeUi] from the project (STO-01, STO-06). Labels and counts come from `domain:story`
  * [StoryOverview]; this adds the hierarchy generalisation (`ED`, STO-02):
  * - 3+ levels: the current chapter (top-level unit of the last edit, else the first) and its episodes;
@@ -114,6 +131,24 @@ data class HomeUi(
  * - 1 level: the scenes themselves, no header.
  */
 object HomeModel {
+    /**
+     * The items of home for [ui]: name, then (board `Home` only) stats and `이어 쓰기`, the start slot (always;
+     * empty while there is no block), the chapter list, `작업`.
+     */
+    fun slots(ui: HomeUi): List<HomeSlot> = buildList {
+        add(HomeSlot.Name)
+        if (!ui.newReady) {
+            add(HomeSlot.Stats)
+            if (ui.resume != null) add(HomeSlot.Resume)
+        }
+        add(HomeSlot.Start)
+        if (ui.rows.isNotEmpty()) {
+            add(HomeSlot.ListHeader)
+            ui.rows.forEach { add(HomeSlot.Episode(it)) }
+        }
+        add(HomeSlot.Work)
+    }
+
     /**
      * The episode the right pane shows (`TwoHome`, STO-43): the `StoryStructure` right above this home on
      * the back stack (its focus unit), or null when no structure is beside home.
@@ -173,7 +208,8 @@ object HomeModel {
         val names = view.doc.project.structure.levels
         val units = view.chapters
         if (units.isEmpty()) return null
-        val written = units.count(view::hasContentUnder)
+        // An episode marked `완료` counts even before it has content (as chapter progress does, STO-06 `ED`).
+        val written = units.count(if (levels == 2) view::countsAsWritten else view::hasContentUnder)
         return HomeStat("$written/${units.size}", names.first())
     }
 

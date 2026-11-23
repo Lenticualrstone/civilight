@@ -1,6 +1,5 @@
 package io.github.lenticualrstone.civilight.feature.cast.list
 
-import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
 import io.github.lenticualrstone.civilight.domain.cast.list.CastList
 import io.github.lenticualrstone.civilight.domain.cast.list.CastListView
 import io.github.lenticualrstone.civilight.domain.cast.list.CardGroup
@@ -29,7 +28,7 @@ data class CastListUi(
 data class CastListState(
     val view: CastListView,
     val readOnly: Boolean,
-    /** The tag chip in effect (a chip whose tag was removed falls back to `전체`). */
+    /** The tag chip in effect (a chip whose tag was removed or no shown character holds any more falls back to `전체`). */
     val selectedTag: Key?,
     /** Card rows (CST-04), built in both views so the switch can animate between them; the screen draws them when `ui.cards`. */
     val cardGroups: List<CardGroup> = emptyList(),
@@ -53,7 +52,8 @@ data class FieldHitRow(val characterKey: Key, val location: String, val sentence
 /** Pure builder of the list screen (CST-01, CST-02) over `domain:cast` [CastList]. */
 object CastListModel {
     fun build(doc: ProjectDoc, ui: CastListUi, hiddenUnlocked: Boolean, readOnly: Boolean): CastListState {
-        val tag = ui.selectedTag?.takeIf { key -> CharacterEdits.tags(doc).any { it.key == key } }
+        // Only a tag that still has a chip (held by a shown character) narrows the list; otherwise `전체`.
+        val tag = ui.selectedTag?.takeIf { key -> CastList.chipTags(doc, hiddenUnlocked).any { it.key == key } }
         val query = if (ui.searching) ui.query.nfc() else ""
         val lens = doc.castLens
         val filters = CastFilterModel.clean(doc, ui.filters)

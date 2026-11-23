@@ -166,3 +166,16 @@ object PageAccessRules {
     fun canEdit(view: PageView): Boolean =
         view.access == PageAccess.OPEN && !view.readOnly && !view.hasLockedLinks
 }
+
+/** What back does on the page screen (top button and system back alike). */
+enum class PageBack { LEAVE, STOP_EDITING }
+
+object PageBackRules {
+    /**
+     * Editing the user started (tap into the text, `고치기`, the command bar) ends first and shows the page with its
+     * links again. Editing that began by itself (a blank page just made) leaves the page at once: ending such a
+     * session changes nothing visible, so that back read as ignored (emulator round 1).
+     */
+    fun onBack(editing: Boolean, autoStarted: Boolean): PageBack =
+        if (editing && !autoStarted) PageBack.STOP_EDITING else PageBack.LEAVE
+}

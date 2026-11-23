@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
 import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightColors
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.FixedColors
 import kotlin.math.cos
@@ -135,6 +137,9 @@ fun ShardArt(palette: List<Color>, modifier: Modifier = Modifier) {
 /**
  * DS-52 image tile: the image in its slot ratio (presets 86 × 114), radius 12; [name] below in `small` (6 dp
  * gap) `ink3`. Selected: a double ring (2 dp `bg` gap, then 2 dp `acc`) and the name in `ink`.
+ * The slot is backed by the opaque [imageTileBase], so a dimmed (translucent) or still-loading [image]
+ * never shows what lies behind the tile — on a glass sheet that is the blurred, saturated back screen,
+ * which tinted dimmed tiles purple / yellow over colourful galleries.
  */
 @Composable
 fun ImageTile(
@@ -168,11 +173,17 @@ fun ImageTile(
                     }
                 },
         ) {
-            Box(Modifier.matchParentSize().clip(shape), content = image)
+            Box(Modifier.matchParentSize().clip(shape).background(imageTileBase(colors)), content = image)
         }
         CivilightText(name, CivilightTheme.type.small, color = nameColor, maxLines = 1)
     }
 }
+
+/**
+ * The opaque backing of an [ImageTile] slot: `raise`, which both themes declare fully opaque. A tile's
+ * image may be translucent (the add sheet dims tiles it cannot choose to 38 %), and tiles sit on glass.
+ */
+fun imageTileBase(colors: CivilightColors): Color = colors.raise.copy(alpha = 1f)
 
 /**
  * DS-53 crop frame overlay for a stage (corners 12): outside dimmed `cropDim`, a 1.5 dp `cropOutline` frame

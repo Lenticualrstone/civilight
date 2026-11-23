@@ -51,6 +51,20 @@ class Startup(private val stores: StoreContainer) {
         return stores.appState.onboarding.update { it.copy(exampleState = ExampleState.INSTALLED) }
     }
 
+    /**
+     * The first back stack for an activity made later in an already-started process (the app left with
+     * back and opened again): read from the live onboarding state, not the one [prepare] saw at process
+     * start, so a first run finished meanwhile opens 서재 instead of onboarding again. Never throws.
+     */
+    fun currentRoutes(): List<Route> = try {
+        startRoutes(stores.appState.onboarding.state.value, exampleInstalled = isExampleInstalled())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        Log.w(TAG, "startup: current routes failed", e)
+        fallback()
+    }
+
     private fun isExampleInstalled(): Boolean = stores.library.state.value.entry(EXAMPLE_KEY)?.let { it.deletedAt == null } ?: false
 
     private suspend fun <T> attempt(what: String, block: suspend () -> T): T? = try {
@@ -67,6 +81,15 @@ class Startup(private val stores: StoreContainer) {
         val EXAMPLE_KEY: Key = ExampleKeys.PROJECT
 
         fun fallback(): List<Route> = listOf(Library)
+
+        /**
+         * The back stack a newly made activity starts from. [prepared] is null while [prepare] still runs
+         * (the splash waits for it); once it is known, a fresh activity ([restored] false) re-reads the
+         * live state through [current], because onboarding may have finished since the process started.
+         * A restored activity keeps [prepared]: Navigation3 brings back its own saved stack anyway.
+         */
+        fun forNewActivity(prepared: List<Route>?, restored: Boolean, current: () -> List<Route>): List<Route>? =
+            if (prepared == null || restored) prepared else current()
 
         /**
          * LIB-08 routing: first run → onboarding at the page it was left on (LIB-18 `ED`), else 서재.

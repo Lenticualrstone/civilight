@@ -43,6 +43,8 @@ class MainActivity : FragmentActivity() {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         val locator = locator
+        // The process may have started on an earlier activity (e.g. during onboarding); start from today's state.
+        locator.refreshStartForNewActivity(restored = savedInstanceState != null)
         splash.setKeepOnScreenCondition { locator.start.value == null }
         splash.setOnExitAnimationListener(::animateSplashExit)
         // Only a fresh start shows the splash; a recreated activity draws at once. The content also shows if

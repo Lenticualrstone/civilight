@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -137,8 +139,14 @@ class RichTextEditorState internal constructor(
 
 /**
  * The editor state for [initial], kept across recomposition and process death. [key] restarts it
- * (e.g. another field or item); a new [initial] alone does not, so typing is never interrupted.
+ * (e.g. another field or item); a new [initial] (a host saving as typed hands back what was just typed)
+ * and a new [newKey] lambda do not, so typing is never interrupted and the field is never re-seeded.
  */
 @Composable
-fun rememberRichTextEditorState(initial: RichDoc, key: Any? = null, newKey: () -> Key = Keys::newKey): RichTextEditorState =
-    rememberSaveable(key, saver = RichTextEditorState.saver(newKey)) { RichTextEditorState.of(initial, newKey) }
+fun rememberRichTextEditorState(initial: RichDoc, key: Any? = null, newKey: () -> Key = Keys::newKey): RichTextEditorState {
+    // One saver for the composable's life: it reads the latest key maker, so a host passing a fresh
+    // lambda each frame changes neither the saver nor the state.
+    val keys = rememberUpdatedState(newKey)
+    val saver = remember { RichTextEditorState.saver { keys.value() } }
+    return rememberSaveable(key, saver = saver) { RichTextEditorState.of(initial) { keys.value() } }
+}

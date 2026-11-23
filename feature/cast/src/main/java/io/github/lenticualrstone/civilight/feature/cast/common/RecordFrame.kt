@@ -55,6 +55,7 @@ fun recordTopInset(): Dp = WindowInsets.statusBars.asPaddingValues().calculateTo
  * the `Relations` board draws it. [add] is the tab's `+` (`게임 텍스트`: a voice line, CST-16) and [menu] the record `⋯` (CST-40); both sit next to the lens in either state. The bottom bar holds the five tabs above the command bar; toasts
  * and sheets work as in `CivilightScreen`.
  *
+ * [lensModifier] goes on the lens in either state (the cast tour marks it as its `시점 렌즈` hole, LIB-19).
  * [content] gets the bottom bar's height as padding; its top is [recordTopInset] (fixed, so the
  * content does not jump when the top bar changes).
  */
@@ -72,6 +73,7 @@ fun RecordFrame(
     commandBar: @Composable () -> Unit,
     sheets: SheetHost,
     localSheets: LocalSheets,
+    lensModifier: Modifier = Modifier,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     SheetHostLayout(sheets, localSheets = localSheets) {
@@ -84,7 +86,7 @@ fun RecordFrame(
                 ContentSwap(collapsed, label = "recordHeader") { bar ->
                     if (bar) {
                         TopGlassBar(collapsedTitle, smallLine = collapsedSmallLine, back = back, wide = wide) {
-                            LensChip(lens.text, lens.state, onLens)
+                            LensChip(lens.text, lens.state, onLens, lensModifier)
                             if (add != null) CivilightIconButton(IconId.Plus, add.label, add.onClick, tint = CivilightTheme.colors.ink)
                             if (menu != null) CivilightIconButton(IconId.More, menu.label, menu.onClick, tint = CivilightTheme.colors.ink)
                         }
@@ -98,7 +100,7 @@ fun RecordFrame(
                         ) {
                             if (back != null) GlassRoundButton(IconId.Back, back.label, back.onClick)
                             Spacer(Modifier.weight(1f))
-                            GlassLens(lens, onLens)
+                            GlassLens(lens, onLens, lensModifier)
                             if (add != null) GlassRoundButton(IconId.Plus, add.label, add.onClick, Modifier.padding(start = 8.dp))
                             if (menu != null) GlassRoundButton(IconId.More, menu.label, menu.onClick, Modifier.padding(start = 8.dp))
                         }
@@ -112,7 +114,10 @@ fun RecordFrame(
                 BottomGlassBar(
                     extraRow = {
                         Row(
-                            Modifier.weight(1f).clip(RoundedCornerShape(22.dp)).background(CivilightTheme.colors.raise.copy(alpha = SCRIM_ALPHA)),
+                            // The pill is fully round (radius 22 on a 44 row): without an inset `개요` and its underline
+                            // started under the left corner and were cut off. The inset clears the corner at the underline.
+                            Modifier.weight(1f).clip(RoundedCornerShape(22.dp)).background(CivilightTheme.colors.raise.copy(alpha = SCRIM_ALPHA))
+                                .padding(horizontal = TAB_ROW_INSET),
                             verticalAlignment = Alignment.CenterVertically,
                             content = tabs,
                         )
@@ -134,10 +139,13 @@ fun RecordFrame(
  * pill, so the glass top bar and the floating header animate the lens the same way.
  */
 @Composable
-private fun GlassLens(lens: LensChipLabel, onLens: () -> Unit) {
+private fun GlassLens(lens: LensChipLabel, onLens: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(22.dp)
-    Box(Modifier.heightIn(min = 44.dp), contentAlignment = Alignment.Center) {
+    Box(modifier.heightIn(min = 44.dp), contentAlignment = Alignment.Center) {
         GlassBackground(GlassSurface.CHIP, Modifier.matchParentSize(), shape = shape)
         LensChip(lens.text, lens.state, onLens, Modifier.padding(horizontal = 6.dp))
     }
 }
+
+/** Side inset of the tab row inside its round scrim: clears the 22 dp corner at the 2 dp underline (≈ 13 dp in). */
+internal val TAB_ROW_INSET: Dp = 16.dp

@@ -247,7 +247,7 @@ private fun PreviewAside(form: NewProjectForm, modifier: Modifier = Modifier) {
         CivilightText(NewProjectCopy.PREVIEW, type.sec, color = colors.ink3)
         if (form.name.isNotBlank()) CivilightText(form.name.trim(), type.emptyTitle, Modifier.padding(top = 10.dp), color = colors.ink)
         CivilightText(formatLabel(form.format), type.small, Modifier.padding(top = 4.dp), color = colors.ink3)
-        PreviewTree(NewProjectRules.preview(form), Modifier.padding(top = 16.dp))
+        PreviewTree(NewProjectRules.preview(form), Modifier.padding(top = 16.dp), swapKey = NewProjectRules.previewSwapKey(form))
         CivilightText(NewProjectCopy.PREVIEW_LIVE, type.small, Modifier.padding(top = 14.dp), color = colors.ink3)
     }
 }

@@ -31,28 +31,50 @@ data class GalleryHit(
  * out: trashed images, images of a trashed owner, and while locked hidden images and images of hidden
  * characters (GAL-19). Project gallery first, then characters in cast order; each gallery in its stored
  * order. One hit per image (title, else description, else tag).
+ *
+ * [onlyOwnerKey] narrows the search to one gallery (a character's gallery screen, GAL-04
+ * `갤러리에서 찾기`); null searches every gallery (the project command bar and the project gallery's
+ * `모든 갤러리`).
  */
-class GallerySearch(private val doc: ProjectDoc, private val locked: Boolean) {
+class GallerySearch(private val doc: ProjectDoc, private val locked: Boolean, private val onlyOwnerKey: Key? = null) {
     fun search(q: TextQuery): List<GalleryHit> {
         if (q.isEmpty || doc.gallery.isEmpty()) return emptyList()
         val tagNames = doc.project.tags.associate { it.key to it.name }
-        val owners = buildList {
-            add(GalleryOwnerKind.PROJECT to doc.project.key)
-            doc.cast.characters
-                .filter { it.deletedAt == null && !(locked && it.hidden) }
-                .sortedWith(compareBy({ it.order }, { it.key }))
-                .forEach { add(GalleryOwnerKind.CHARACTER to it.key) }
-        }
         val out = mutableListOf<GalleryHit>()
-        for ((kind, ownerKey) in owners) {
+        for ((kind, ownerKey) in owners()) {
             val ownerName = ownerName(kind, ownerKey) ?: continue
-            for (item in doc.index.galleryItemsOf(ownerKey)) {
-                if (!item.isOwnedBy(kind, ownerKey) || !doc.liveness.isLive(item) || (locked && item.hidden)) continue
+            for (item in liveItems(kind, ownerKey)) {
+                if (locked && item.hidden) continue
                 hit(q, item, kind, ownerKey, ownerName, tagNames)?.let(out::add)
             }
         }
         return out
     }
+
+    /**
+     * True while locked when the searched galleries hold a live hidden image, or a hidden character has
+     * images (`숨긴 항목 제외` under the results).
+     */
+    fun hiddenExcluded(): Boolean {
+        if (!locked || doc.gallery.isEmpty()) return false
+        if (owners().any { (kind, key) -> liveItems(kind, key).any { it.hidden } }) return true
+        return doc.cast.characters.any { c ->
+            c.deletedAt == null && c.hidden && (onlyOwnerKey == null || onlyOwnerKey == c.key) &&
+                liveItems(GalleryOwnerKind.CHARACTER, c.key).isNotEmpty()
+        }
+    }
+
+    /** Project gallery first, then visible characters in cast order; only [onlyOwnerKey] when set. */
+    private fun owners(): List<Pair<GalleryOwnerKind, Key>> = buildList {
+        add(GalleryOwnerKind.PROJECT to doc.project.key)
+        doc.cast.characters
+            .filter { it.deletedAt == null && !(locked && it.hidden) }
+            .sortedWith(compareBy({ it.order }, { it.key }))
+            .forEach { add(GalleryOwnerKind.CHARACTER to it.key) }
+    }.filter { onlyOwnerKey == null || it.second == onlyOwnerKey }
+
+    private fun liveItems(kind: GalleryOwnerKind, ownerKey: Key): List<GalleryItem> =
+        doc.index.galleryItemsOf(ownerKey).filter { it.isOwnedBy(kind, ownerKey) && doc.liveness.isLive(it) }
 
     private fun ownerName(kind: GalleryOwnerKind, key: Key): String? = when (kind) {
         GalleryOwnerKind.PROJECT -> doc.project.name

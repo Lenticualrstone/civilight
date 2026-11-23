@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.map.edit
 
+import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -475,7 +476,14 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
             val toolCells = remember(detail) { tools.map { MapTool(it.label, it.icon) } }
             val motion = CivilightTheme.motion
             val toolbar: @Composable (Modifier) -> Unit = { mod ->
-                MapToolbar(tools.indexOf(editor.tool).coerceAtLeast(0), { set(Editor.chooseTool(editor, tools[it], detail)) }, mod.animateContentSize(motion.move(CivilightMotion.standard)), tools = toolCells, label = MapCopy.TOOLBAR)
+                // LIB-19 map tour: the tool bar and its `경로` cell are the holes of `도구 줄` and `경로` (MapTourSteps).
+                MapToolbar(
+                    tools.indexOf(editor.tool).coerceAtLeast(0),
+                    { set(Editor.chooseTool(editor, tools[it], detail)) },
+                    mod.tourTarget(MapTourSteps.TOOLBAR).animateContentSize(motion.move(CivilightMotion.standard)),
+                    tools = toolCells,
+                    label = MapCopy.TOOLBAR,
+                ) { i -> MapTourSteps.stepOfTool(tools[i])?.let { Modifier.tourTarget(it) } ?: Modifier }
             }
             val shapeEdit = editor.shapeEdit
             val shapeChoice = shapeEdit?.let { pending -> d?.let { ShapeEdits.choice(it, route.mapKey, pending.regionKey, lens) } as? EditChoice.TwoButtons }

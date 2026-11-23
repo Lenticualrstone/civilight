@@ -1,8 +1,14 @@
 package io.github.lenticualrstone.civilight.feature.story.search
 
 import androidx.navigation3.runtime.NavKey
+import io.github.lenticualrstone.civilight.domain.story.search.EmptySearch
+import io.github.lenticualrstone.civilight.domain.story.search.GalleryHit
+import io.github.lenticualrstone.civilight.domain.story.search.GalleryMatchField
+import io.github.lenticualrstone.civilight.domain.story.search.GallerySearch
 import io.github.lenticualrstone.civilight.domain.story.search.SearchCommand
 import io.github.lenticualrstone.civilight.domain.story.search.SearchContext
+import io.github.lenticualrstone.civilight.domain.story.search.SearchResult
+import io.github.lenticualrstone.civilight.domain.story.search.TextQuery
 import io.github.lenticualrstone.civilight.domain.story.search.SearchFilter
 import io.github.lenticualrstone.civilight.domain.story.search.SearchItem
 import io.github.lenticualrstone.civilight.domain.story.search.SearchSectionKind
@@ -10,10 +16,12 @@ import io.github.lenticualrstone.civilight.domain.story.search.SimilarName
 import io.github.lenticualrstone.civilight.domain.story.structure.StoryOverview
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.navigation.CharacterProfile
 import io.github.lenticualrstone.civilight.navigation.CheckCenter
 import io.github.lenticualrstone.civilight.navigation.EventDetail
 import io.github.lenticualrstone.civilight.navigation.FactionCard
+import io.github.lenticualrstone.civilight.navigation.Gallery
 import io.github.lenticualrstone.civilight.navigation.PlaceCard
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.navigation.Script
@@ -34,7 +42,30 @@ sealed interface SearchTap {
 
     /** `› 번호 다시 매기기 · 1-7` (SCR-22 sheet). */
     data class Renumber(val episodeKey: Key) : SearchTap
+
+    /**
+     * A gallery result of the search opened over that gallery: closes the overlay and replaces the gallery
+     * under it with [route] (the same gallery with the item picked), so no second gallery is stacked.
+     */
+    data class ReplaceBelow(val route: Route) : SearchTap
 }
+
+/**
+ * The search opened from a gallery's command bar (GAL-04, board `GalSearch`): only gallery images, no chips,
+ * the hint line under the field. A character's gallery searches that gallery; the project gallery searches
+ * every gallery (`모든 갤러리`, GAL-10).
+ */
+data class GalleryScope(val ownerKind: GalleryOwnerKind, val ownerKey: Key) {
+    val allGalleries: Boolean get() = ownerKind == GalleryOwnerKind.PROJECT
+
+    /** The owner [GallerySearch] narrows to; null = every gallery. */
+    val onlyOwnerKey: Key? get() = if (allGalleries) null else ownerKey
+
+    val hint: String get() = if (allGalleries) SearchCopy.ALL_GALLERIES_FIND else SearchCopy.GALLERY_FIND
+}
+
+/** A header and its gallery rows: `갤러리 · 2` in the project search, `설명 · 1` by match field in [GalleryScope]. */
+data class GallerySection(val header: String, val hits: List<GalleryHit>)
 
 /** 검색 · 명령 as plain data over `domain:story` `ProjectSearch` (STO-36 … STO-38). */
 object SearchModel {
@@ -59,6 +90,50 @@ object SearchModel {
             if (n == 1) base else "$base#$n"
         }
     }
+
+    /** The gallery scope when the overlay was opened over a gallery screen, else null. */
+    fun galleryScope(below: NavKey?): GalleryScope? = (below as? Gallery)?.let { GalleryScope(it.ownerKind, it.ownerKey) }
+
+    /**
+     * The gallery-only result of [scope] for [raw]: gallery hits, `숨긴 항목 제외` while locked hidden images
+     * exist, and `결과 없음` without `비슷한 이름` when nothing matches.
+     */
+    fun galleryResult(doc: ProjectDoc, raw: String, locked: Boolean, scope: GalleryScope): SearchResult {
+        val q = TextQuery(raw)
+        val search = GallerySearch(doc, locked, scope.onlyOwnerKey)
+        val hits = search.search(q)
+        val hidden = search.hiddenExcluded()
+        val empty = if (hits.isEmpty() && !q.isEmpty) EmptySearch(q.text, hidden, emptyList()) else null
+        return SearchResult(q.text, SearchFilter.ALL, emptyList(), hidden, empty, hits)
+    }
+
+    /**
+     * The gallery rows of [result]: in the project search one `갤러리` section (count when more than one, as
+     * the other sections); in a [GalleryScope] one section per match field in `제목 · 설명 · 태그` order with
+     * its count (`설명 · 1`, board `GalSearch`).
+     */
+    fun gallerySections(result: SearchResult, scoped: Boolean): List<GallerySection> {
+        val hits = result.gallery
+        if (hits.isEmpty()) return emptyList()
+        if (!scoped) return listOf(GallerySection(if (hits.size > 1) "${SearchCopy.GALLERY} · ${hits.size}" else SearchCopy.GALLERY, hits))
+        return GalleryMatchField.entries.mapNotNull { field ->
+            hits.filter { it.field == field }.takeIf { it.isNotEmpty() }?.let { GallerySection("${field.word} · ${it.size}", it) }
+        }
+    }
+
+    /** Stable lazy key of a gallery row (one hit per image). */
+    fun galleryKey(hit: GalleryHit): String = "gallery:${hit.itemKey}"
+
+    /**
+     * Where a gallery row goes: the gallery with the item picked (GAL-04, T-GAL-19). Over a gallery ([scope])
+     * that gallery is reused (the project gallery shows every owner's images); else the image's own gallery.
+     */
+    fun tap(projectKey: Key, hit: GalleryHit, scope: GalleryScope?): SearchTap =
+        if (scope != null) {
+            SearchTap.ReplaceBelow(Gallery(projectKey, scope.ownerKind, scope.ownerKey, pickKey = hit.itemKey))
+        } else {
+            SearchTap.Open(Gallery(projectKey, hit.ownerKind, hit.ownerKey, pickKey = hit.itemKey))
+        }
 
     /**
      * The search context from the screen under the overlay: the script (no `시점 바꾸기`, but `렌즈를 이

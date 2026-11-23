@@ -45,6 +45,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.unhide
 import io.github.lenticualrstone.civilight.domain.library.masking.HiddenGroupRow
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.RecentItem
+import io.github.lenticualrstone.civilight.feature.library.tour.tourTarget
 import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
 import io.github.lenticualrstone.civilight.ui.security.WindowProtection
 import io.github.lenticualrstone.civilight.ui.theme.ThemeBridge
@@ -68,6 +69,9 @@ internal fun ProjectCardsBlock(
     onUnlock: () -> Unit,
     onNewProject: () -> Unit,
 ) {
+    // LIB-19 `서재 · 숨기기`: the first project card and the hidden group's card are the tour's holes.
+    val tourHide = ui.cards.firstOrNull()?.row?.key
+    val tourGroup = ui.cards.firstOrNull { it.hiddenOpen }?.row?.key
     val w = if (wide) ShelfCards.WIDE_CARD_W.dp else ShelfCards.COVER_CARD_W.dp
     val h = if (wide) ShelfCards.WIDE_CARD_H.dp else ShelfCards.COVER_CARD_H.dp
     val targetPx = with(LocalDensity.current) { w.roundToPx() }
@@ -90,7 +94,10 @@ internal fun ProjectCardsBlock(
                     statusChip = card.chip,
                     more = IconAction(ShelfCopy.MORE_LABEL) { onMenu(card.row.key) },
                     onClick = { onOpen(card.row.key) },
-                    modifier = Modifier.size(w, h).then(if (card.hiddenOpen) Modifier.unhide(unhide) else Modifier),
+                    modifier = Modifier.size(w, h)
+                        .then(if (card.row.key == tourHide) Modifier.tourTarget(LibraryTourSteps.HIDE) else Modifier)
+                        .then(if (card.row.key == tourGroup) Modifier.tourTarget(LibraryTourSteps.HIDDEN_GROUP) else Modifier)
+                        .then(if (card.hiddenOpen) Modifier.unhide(unhide) else Modifier),
                 ) {
                     // The shared cover first (its bounds stay still), the parallax and scale inside it.
                     Box(Modifier.matchParentSize().then(covers.cover(card.row.key.toString(), CardMetrics.radius(CardKind.PROJECT))).then(imageModifier)) {
@@ -98,7 +105,7 @@ internal fun ProjectCardsBlock(
                     }
                 }
             }
-            is ShelfCardItem.Lock -> LockCard(item.group, onUnlock, Modifier.size(w, h))
+            is ShelfCardItem.Lock -> LockCard(item.group, onUnlock, Modifier.size(w, h).tourTarget(LibraryTourSteps.HIDDEN_GROUP))
             ShelfCardItem.NewProject -> NewProjectCard(onNewProject, Modifier.size(w, h))
         }
     }

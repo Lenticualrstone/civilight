@@ -77,6 +77,8 @@ import io.github.lenticualrstone.civilight.domain.library.newproject.ProjectMenu
 import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.feature.library.tour.ModuleTourHost
+import io.github.lenticualrstone.civilight.feature.library.tour.tourTarget
+import io.github.lenticualrstone.civilight.ui.tour.TourHold
 import io.github.lenticualrstone.civilight.domain.library.onboarding.TourModule
 import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
 import io.github.lenticualrstone.civilight.feature.library.newproject.startNewProject
@@ -228,8 +230,12 @@ internal fun LibraryScreen(services: LibraryServices) {
         }
     }
 
-    // LIB-19 `서재 · 숨기기` tour (copy 2026-11-23; no anchors yet, so its card sits mid-screen).
+    // LIB-19 `서재 · 숨기기` tour (copy 2026-11-23): each step spotlights its control (`LibraryTourSteps`),
+    // or the 설정 button while that control is not on screen (an empty 서재, no hidden projects).
+    val tourMenuRow = LibraryTourSteps.menuRow(ui.rows.map { it.key }, ui.openGroup?.rows.orEmpty().map { it.key })
     ModuleTourHost(TourModule.LIBRARY_HIDING, deps) {
+    // Until the stores answered the rows are unknown: the tour waits instead of starting on the fallback.
+    if (!ui.loaded) TourHold()
     CenterColumn {
         CivilightScreen(
             title = ShelfCopy.TITLE,
@@ -238,7 +244,12 @@ internal fun LibraryScreen(services: LibraryServices) {
                 // LIB-04: `목록 | 카드` left of `+`, in both views (board `LibCards`).
                 ViewToggle(showCards = ui.showCards, onChange = vm::showCards)
                 // `ED`: no board draws the way into 설정 (LIB-63); a labelled icon button.
-                CivilightIconButton(IconId.Props, ShelfCopy.SETTINGS, { navigator.push(Settings) })
+                CivilightIconButton(
+                    IconId.Props,
+                    ShelfCopy.SETTINGS,
+                    { navigator.push(Settings) },
+                    LibraryTourSteps.SETTINGS_FALLBACK.fold(Modifier.tourTarget(LibraryTourSteps.SETTINGS)) { m, step -> m.tourTarget(step, fallback = true) },
+                )
                 // LIB-72 `ED` (§6 Q23, undrawn): 여러 프로젝트 내보내기 from the 서재 header; folds in from the start.
                 FoldReveal(ui.exportable.isNotEmpty(), horizontal = true) {
                     CivilightIconButton(IconId.Download, ExportCopy.HEADER, { sheets.open(MultiExportSheet) })
@@ -334,6 +345,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                                         modifier = civilightItem().padding(horizontal = SIDE),
                                         selected = row.key == selectedKey,
                                         thumbModifier = covers.cover(row.key.toString(), CardViewMotion.THUMB_RADIUS_DP),
+                                        menuModifier = if (row.key == tourMenuRow) Modifier.tourTarget(LibraryTourSteps.HIDE) else Modifier,
                                     )
                                 }
                                 ui.empty?.let { empty ->
@@ -369,7 +381,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                                                         subtitle = group.sub,
                                                         actionLabel = group.button,
                                                         onAction = vm::unlockHiddenGroup,
-                                                        modifier = Modifier.padding(top = 12.dp),
+                                                        modifier = Modifier.padding(top = 12.dp).tourTarget(LibraryTourSteps.HIDDEN_GROUP),
                                                     )
                                                 }
                                                 GroupKind.OPEN -> (ui.openGroup ?: groupSnapshot)?.let { group ->
@@ -383,6 +395,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                                                         onUnhide = if (closing) ({ _ -> }) else vm::unhide,
                                                         selectedKey = selectedKey.takeUnless { closing },
                                                         closing = closing,
+                                                        tourMenuRow = tourMenuRow.takeUnless { closing },
                                                     )
                                                 }
                                                 GroupKind.NONE -> Unit
@@ -459,6 +472,7 @@ private fun OpenGroup(
     onUnhide: (Key) -> Unit,
     selectedKey: Key?,
     closing: Boolean = false,
+    tourMenuRow: Key? = null,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -467,6 +481,8 @@ private fun OpenGroup(
         Modifier
             .then(if (closing) Modifier.clearAndSetSemantics { } else Modifier)
             .padding(top = 12.dp)
+            // LIB-19 `숨긴 프로젝트`: the open group is the tour's hole (not while it plays the re-lock).
+            .then(if (closing) Modifier else Modifier.tourTarget(LibraryTourSteps.HIDDEN_GROUP))
             .fillMaxWidth()
             .clip(shape)
             .background(colors.sel)
@@ -484,7 +500,7 @@ private fun OpenGroup(
         }
         Column(Modifier.unhide(unhide)) {
             group.rows.forEach { row ->
-                OpenGroupRow(row, covers, onOpen, onMenu, onUnhide, row.key == selectedKey)
+                OpenGroupRow(row, covers, onOpen, onMenu, onUnhide, row.key == selectedKey, row.key == tourMenuRow)
             }
         }
     }
@@ -494,7 +510,15 @@ private fun OpenGroup(
 private val SIDE = 24.dp
 
 @Composable
-private fun OpenGroupRow(row: ProjectRowUi, covers: SharedCovers, onOpen: (Key) -> Unit, onMenu: (Key) -> Unit, onUnhide: (Key) -> Unit, selected: Boolean) {
+private fun OpenGroupRow(
+    row: ProjectRowUi,
+    covers: SharedCovers,
+    onOpen: (Key) -> Unit,
+    onMenu: (Key) -> Unit,
+    onUnhide: (Key) -> Unit,
+    selected: Boolean,
+    tourMenu: Boolean = false,
+) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     ProtectWindow(WindowProtection.forProject(row.protections))
@@ -505,5 +529,6 @@ private fun OpenGroupRow(row: ProjectRowUi, covers: SharedCovers, onOpen: (Key) 
         selected = selected,
         thumbModifier = covers.cover(row.key.toString(), CardViewMotion.THUMB_RADIUS_DP),
         extra = { TextAction(ShelfCopy.UNHIDE, { onUnhide(row.key) }, color = colors.ink3, style = type.small) },
+        menuModifier = if (tourMenu) Modifier.tourTarget(LibraryTourSteps.HIDE) else Modifier,
     )
 }

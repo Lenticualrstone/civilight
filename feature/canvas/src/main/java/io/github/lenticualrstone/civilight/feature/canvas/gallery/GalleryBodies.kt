@@ -35,6 +35,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -359,6 +360,8 @@ private fun GalleryListRow(s: GalleryBodyState, e: GalleryEntry, modifier: Modif
     Column(
         modifier
             .fillMaxWidth()
+            // A row is never shorter than its thumbnail (12 + 64 + 12), also while it opens.
+            .heightIn(min = LIST_ROW_MIN)
             .drawBehind {
                 drawRect(fill)
                 if (bar.value > 0f) drawRect(colors.acc, size = Size(2.dp.toPx(), size.height), alpha = bar.value)
@@ -368,13 +371,26 @@ private fun GalleryListRow(s: GalleryBodyState, e: GalleryEntry, modifier: Modif
         Row(
             Modifier
                 .fillMaxWidth()
+                // Closed, the whole thumbnail height is the tap target; open, the row ends under the title.
+                .heightIn(min = if (panel == null) LIST_ROW_MIN else 0.dp)
                 .semantics { selected = picked }
                 .pressable(PressAction.Select(picked) { s.handlers.tap(e.key) }, role = Role.Button)
                 .padding(start = s.side, end = s.side - 8.dp, top = 12.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Box(Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)).then(s.sharedImage(e.key))) {
+            // The thumbnail takes no height in the row, so an opened description starts right under the title
+            // instead of under the thumbnail (it hangs into the opened part, beside the description).
+            Box(
+                Modifier
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, 0) { placeable.place(0, 0) }
+                    }
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .then(s.sharedImage(e.key)),
+            ) {
                 GalleryImage(e.item, Ratio.R1X1, GalleryImageSizes.THUMB)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -427,44 +443,62 @@ fun GalleryDetailPane(s: GalleryBodyState, padding: PaddingValues) {
     val type = CivilightTheme.type
     val picked = s.panel?.let { p -> s.view.entry(p.key)?.let { it to p } }
     ContentSwap(picked, Modifier.fillMaxSize(), contentKey = { it?.first?.key }, label = "galleryDetail") { shown ->
+      BoxWithConstraints(Modifier.fillMaxSize()) {
+        val cardH = GalleryDetailSizes.cardHeight(maxHeight.value, padding.calculateTopPadding().value, padding.calculateBottomPadding().value)
+        val card = Modifier.size(GalleryDetailSizes.cardWidth(cardH).dp, cardH.dp)
+        // The button row stays outside the scroll, right above the bottom bar: when the pane is too short for the
+        // rows (the card stops at its least height), the rows above scroll and `설명 쓰기 · 보기` stay in reach.
+        // On a tall pane the rows take their own height (`fill = false`), so the buttons follow the description.
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(top = padding.calculateTopPadding() + 16.dp, bottom = padding.calculateBottomPadding() + 24.dp)
+                .padding(bottom = padding.calculateBottomPadding() + GalleryDetailSizes.BOTTOM_GAP.dp)
                 .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (shown == null) {
-                val first = s.view.entries.firstOrNull()
-                if (first != null) {
-                    Box(Modifier.size(261.dp, 348.dp).graphicsLayer { alpha = DIMMED }.clip(RoundedCornerShape(20.dp)).align(Alignment.CenterHorizontally)) {
-                        GalleryImage(first.item, Ratio.R3X4, GalleryImageSizes.CARD)
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = padding.calculateTopPadding() + GalleryDetailSizes.TOP_GAP.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (shown == null) {
+                    val first = s.view.entries.firstOrNull()
+                    if (first != null) {
+                        Box(card.graphicsLayer { alpha = DIMMED }.clip(RoundedCornerShape(20.dp)).align(Alignment.CenterHorizontally)) {
+                            GalleryImage(first.item, Ratio.R3X4, GalleryImageSizes.CARD)
+                        }
                     }
+                    GalleryHint(GalleryUiCopy.HINT_INNER)
+                } else {
+                    val (entry, p) = shown
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CivilightText(GalleryUiCopy.PICKED_IMAGE + GalleryUiCopy.SEP + p.position, type.number, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
+                        s.handlers.menu?.let { m -> CivilightIconButton(IconId.More, GalleryUiCopy.MENU, { m(p.key) }) }
+                    }
+                    CivilightText(p.title, type.headerTitleInner, color = if (p.untitled) colors.ink3 else colors.ink)
+                    Box(card.clip(RoundedCornerShape(20.dp)).then(s.sharedImage(p.key))) {
+                        GalleryImage(entry.item, Ratio.R3X4, GalleryImageSizes.CARD)
+                        chipWithHidden(entry)?.let { ImageStatusChip(it, Modifier.align(Alignment.TopStart).padding(12.dp)) }
+                    }
+                    PanelMeta(p, away = false, handlers = s.handlers)
+                    val caption = p.caption
+                    if (caption == null) CivilightText(GalleryUiCopy.NO_DESCRIPTION, type.body, color = colors.ink3)
+                    else androidx.compose.foundation.text.BasicText(captionText(caption), style = type.body.merge(androidx.compose.ui.text.TextStyle(color = colors.ink2)))
                 }
-                GalleryHint(GalleryUiCopy.HINT_INNER)
-                return@Column
             }
-            val (entry, p) = shown
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CivilightText(GalleryUiCopy.PICKED_IMAGE + GalleryUiCopy.SEP + p.position, type.number, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
-                s.handlers.menu?.let { m -> CivilightIconButton(IconId.More, GalleryUiCopy.MENU, { m(p.key) }) }
-            }
-            CivilightText(p.title, type.headerTitleInner, color = if (p.untitled) colors.ink3 else colors.ink)
-            Box(Modifier.size(261.dp, 348.dp).clip(RoundedCornerShape(20.dp)).then(s.sharedImage(p.key))) {
-                GalleryImage(entry.item, Ratio.R3X4, GalleryImageSizes.CARD)
-                chipWithHidden(entry)?.let { ImageStatusChip(it, Modifier.align(Alignment.TopStart).padding(12.dp)) }
-            }
-            PanelMeta(p, away = false, handlers = s.handlers)
-            val caption = p.caption
-            if (caption == null) CivilightText(GalleryUiCopy.NO_DESCRIPTION, type.body, color = colors.ink3)
-            else androidx.compose.foundation.text.BasicText(captionText(caption), style = type.body.merge(androidx.compose.ui.text.TextStyle(color = colors.ink2)))
-            PanelButtons(p, s.handlers, vertical = false)
+            shown?.let { (_, p) -> PanelButtons(p, s.handlers, vertical = false) }
         }
+      }
     }
 }
 
 private const val DIMMED = 0.45f
+
+/** A list row's least height: the 64 dp thumbnail with 12 above and below (GAL-05). */
+private val LIST_ROW_MIN = 88.dp
 
 // ---------------------------------------------------------------- shared bits
 

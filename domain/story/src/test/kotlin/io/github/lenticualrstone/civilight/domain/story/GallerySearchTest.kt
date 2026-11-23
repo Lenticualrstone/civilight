@@ -93,4 +93,47 @@ class GallerySearchTest {
         assertTrue(search.search("", SearchFilter.ALL).sections.isEmpty())
         assertNull(search.search("  ", SearchFilter.COMMAND).empty)
     }
+    @Test
+    fun oneGalleryWhenAnOwnerIsNamed() {
+        assertEquals(listOf(ExampleGallery.ITEM_3), GallerySearch(g0, locked = true, onlyOwnerKey = K.RIEN).search(TextQuery("그을음")).map { it.itemKey })
+        assertEquals(emptyList<Any>(), GallerySearch(g0, locked = true, onlyOwnerKey = K.SERA).search(TextQuery("그을음")))
+        assertEquals(emptyList<Any>(), GallerySearch(g0, locked = true, onlyOwnerKey = g0.project.key).search(TextQuery("그을음")))
+    }
+
+    @Test
+    fun hiddenExcludedFollowsTheLockAndTheScope() {
+        assertTrue(GallerySearch(g0, locked = true).hiddenExcluded())
+        assertTrue(!GallerySearch(g0, locked = false).hiddenExcluded())
+        assertTrue(!GallerySearch(g0, locked = true, onlyOwnerKey = K.SERA).hiddenExcluded())
+        val noHidden = g0.withRienItems { it.copy(hidden = false) }
+        assertTrue(!GallerySearch(noHidden, locked = true).hiddenExcluded())
+    }
+
+    @Test
+    fun projectSearchFindsDescriptionWordsAndMarksHiddenImages() {
+        // Emulator round 1: a description word found nothing from the project command bar.
+        val result = ProjectSearch(g0, SearchContext(locked = true)).search("그을음", includeGallery = true)
+        assertEquals(GalleryMatchField.DESCRIPTION, result.gallery.single().field)
+        assertTrue(result.hiddenExcluded)
+        assertNull(result.empty)
+    }
+
+    /** Emulator round 1 repro: a Latin description word, any case, from the project command bar. */
+    @Test
+    fun latinDescriptionWordsAnyCase() {
+        val sentence = "Ferry lights over cold water"
+        val caption = g0.gallery.getValue(K.RIEN).items.first { it.key == ExampleGallery.ITEM_3 }.caption!!.let { blocks ->
+            listOf(blocks.first().copy(runs = listOf(io.github.lenticualrstone.civilight.model.text.TextRun.Plain(sentence))))
+        }
+        val doc = g0.withRienItems { if (it.key == ExampleGallery.ITEM_2) it.copy(caption = caption) else it }
+        for (q in listOf("Ferry", "cold", "ferry")) {
+            val result = ProjectSearch(doc, SearchContext()).search(q, includeGallery = true)
+            assertNull(q, result.empty)
+            val hit = result.gallery.single()
+            assertEquals(ExampleGallery.ITEM_2, hit.itemKey)
+            assertEquals(GalleryMatchField.DESCRIPTION, hit.field)
+            assertEquals(sentence, hit.match.text)
+            assertEquals(q.lowercase(), hit.match.boxed.single().lowercase())
+        }
+    }
 }

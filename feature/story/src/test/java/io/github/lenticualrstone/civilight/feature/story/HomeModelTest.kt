@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.story
 
 import io.github.lenticualrstone.civilight.designsystem.component.LensChipState
 import io.github.lenticualrstone.civilight.feature.story.Fx.node
+import io.github.lenticualrstone.civilight.feature.story.common.StoryActions
 import io.github.lenticualrstone.civilight.feature.story.Fx.withUnit
 import io.github.lenticualrstone.civilight.feature.story.home.HomeModel
 import io.github.lenticualrstone.civilight.feature.story.home.HomeShortcut
@@ -128,6 +129,10 @@ class HomeModelTest {
         assertEquals("—", ui.rows[1].title)
         assertEquals("1/2" to "막", ui.stats.first().let { it.value to it.label })
         assertEquals("1막 장면 1 · 들판", ui.resume!!.where)
+        // The empty `2막` marked `완료` counts and reads `완료` (STO-06 `ED`, emulator round 2).
+        val marked = home(StoryActions.setDone(d, "A2", true, Fx.ctx()))
+        assertEquals("2/2", marked.stats.first().value)
+        assertEquals("완료", marked.rows[1].status)
     }
 
     @Test

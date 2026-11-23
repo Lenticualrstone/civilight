@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,11 +21,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
-import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
+import io.github.lenticualrstone.civilight.designsystem.foundation.animatedInsetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightColors
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ThemeMode
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 
 /**
  * DS-01 theme swatch (onboarding `OnbLook`, screen LIB): previews a theme with its own `bg`, `ink` and
@@ -42,6 +45,11 @@ fun ThemeSwatch(
 ) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(14.dp)
+    // The selection fades like the other choice controls (chips, segments): outline colour and width and the
+    // label colour move on the standard token (120 ms linear when reduced), read in the draw phase.
+    val outlineColor = animatedColor(if (selected) colors.acc else colors.edge, label = "swatchOutline")
+    val outlineWidth = animatedAlpha(if (selected) 1.5f else 1f, label = "swatchOutlineWidth")
+    val labelColor by animatedColor(if (selected) colors.ink else colors.ink2, label = "swatchLabel")
     Column(
         modifier.pressable(PressAction.Select(selected, onClick), role = Role.RadioButton, shape = shape),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -52,7 +60,7 @@ fun ThemeSwatch(
                 .fillMaxWidth()
                 .height(height)
                 .clip(shape)
-                .insetOutline(if (selected) colors.acc else colors.edge, if (selected) 1.5.dp else 1.dp, shape),
+                .animatedInsetOutline(outlineColor, { outlineWidth.value.dp }, shape),
         ) {
             when (mode) {
                 ThemeMode.LIGHT -> drawSample(CivilightColors.light)
@@ -65,7 +73,7 @@ fun ThemeSwatch(
                 }
             }
         }
-        CivilightText(label, CivilightTheme.type.small, color = if (selected) colors.ink else colors.ink2, maxLines = 1)
+        CivilightText(label, CivilightTheme.type.small, color = labelColor, maxLines = 1)
     }
 }
 

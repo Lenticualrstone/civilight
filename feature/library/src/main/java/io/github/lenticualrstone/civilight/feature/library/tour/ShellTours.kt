@@ -34,8 +34,10 @@ object ShellTours {
 
 /**
  * The shell's wrapper of one route's content: the module tour of [route] ([ShellTours.moduleOf])
- * over [content], or [content] as is. The other areas mark no targets yet, so their cards sit in the
- * middle without a hole (`TourHost`'s fallback).
+ * over [content], or [content] as is. Each area marks its own holes with `Modifier.tourTarget(step)`
+ * (스크립트 `ScriptTourSteps`, 인물 `CastTourSteps`, 지도 `MapTourSteps`); a step with no marked,
+ * on-screen target or fallback (세계 · 레코더 · 장소와 때 so far) shows its card in the middle without
+ * a hole (`TourHost`'s last resort).
  */
 @Composable
 fun ModuleTourFrame(route: Any?, deps: FeatureDeps, content: @Composable () -> Unit) {

@@ -47,6 +47,7 @@ object TabGap {
  * DS-37 text tabs: `tab` role, selected `ink` with a 2 dp `acc` underline at the bottom of its 44 dp box that
  * slides with `Standard`; label colours cross over (S6). Reduced motion: the underline does not move, it
  * crossfades from the old tab to the new one. One line only; the row scrolls horizontally when it does not fit.
+ * [tabModifier] adds to one tab's box by index (a tour marks a tab as its hole, LIB-19).
  */
 @Composable
 fun CivilightTabs(
@@ -55,6 +56,7 @@ fun CivilightTabs(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     gap: Dp = TabGap.Default,
+    tabModifier: (Int) -> Modifier = { Modifier },
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -76,7 +78,7 @@ fun CivilightTabs(
             val style = tabStyle(i == selectedIndex, colors)
             val text by animatedColor(style.text, label = "tabText")
             Box(
-                modifier = Modifier
+                modifier = tabModifier(i)
                     .heightIn(min = 44.dp)
                     .onPlaced { indicator.bounds[i] = it.positionInParent().x to it.size.width.toFloat() }
                     .pressable(PressAction.Select(i == selectedIndex) { onSelect(i) }, role = Role.Tab, scaleOnPress = false),

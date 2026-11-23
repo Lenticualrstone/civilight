@@ -89,15 +89,46 @@ class SnapTicker {
 /**
  * The image of a card moves less than the card (parallax 8 %, CNV-22, T-CNV-42), under a constant scale of
  * 1.1 so the shifted image never shows its edge; reduce motion: no shift and scale 1.
+ *
+ * The 1.1 scale (about the image centre) leaves only `(scale - 1) / 2` of the image width beyond each card
+ * edge, 5 %. The raw shift `-displacement × 8 %` passes that after about 0.6 of a pitch (the second card at
+ * rest is displaced a whole pitch: 18.9 dp against an 11.1 dp margin), which bared a strip at the card's end.
+ * With the image width given, the shift is clamped to that margin, so the image always covers its card.
  */
 object CardParallax {
     const val FACTOR = CivilightMotion.cardParallax
 
-    /** The image's shift relative to its card when the card is displaced by [cardDisplacement] (any unit). */
-    fun imageShift(cardDisplacement: Float, reduced: Boolean): Float = if (reduced) 0f else -cardDisplacement * FACTOR
+    /**
+     * The room the scaled image has on each side of its card: `(scale - 1) / 2 × imageWidth`, less [guard]
+     * (a pixel against an anti-aliased seam at the clip), never negative. Same unit as [imageWidth].
+     */
+    fun maxShift(imageWidth: Float, reduced: Boolean, guard: Float = 0f): Float =
+        ((imageScale(reduced) - 1f) / 2f * imageWidth - guard).coerceAtLeast(0f)
+
+    /**
+     * The image's shift relative to its card when the card is displaced by [cardDisplacement] (any unit),
+     * clamped to [maxShift] of [imageWidth] (same unit; unbounded when not given).
+     */
+    fun imageShift(
+        cardDisplacement: Float,
+        reduced: Boolean,
+        imageWidth: Float = Float.POSITIVE_INFINITY,
+        guard: Float = 0f,
+    ): Float {
+        if (reduced) return 0f
+        val raw = -cardDisplacement * FACTOR
+        if (imageWidth == Float.POSITIVE_INFINITY) return raw
+        val limit = maxShift(imageWidth, reduced, guard)
+        return raw.coerceIn(-limit, limit)
+    }
 
     /** The image's displacement relative to the screen. */
-    fun imageOnScreen(cardDisplacement: Float, reduced: Boolean): Float = cardDisplacement + imageShift(cardDisplacement, reduced)
+    fun imageOnScreen(
+        cardDisplacement: Float,
+        reduced: Boolean,
+        imageWidth: Float = Float.POSITIVE_INFINITY,
+        guard: Float = 0f,
+    ): Float = cardDisplacement + imageShift(cardDisplacement, reduced, imageWidth, guard)
 
     /** The constant image scale: [CivilightMotion.cardImageScale], or 1 when reduced. */
     fun imageScale(reduced: Boolean): Float = if (reduced) 1f else CivilightMotion.cardImageScale

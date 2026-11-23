@@ -49,6 +49,7 @@ Pure logic with passing tests. The screens that use it are listed under Partial,
 - **STO-06 statuses, progress, char counts, the `완료` flag:**
   - Row values: `StructureModelTest.str01…`, `str02…`, `str04…`, `HomeModelTest.str05_currentChapterRows`.
   - The flag: `StoryActionsTest.doneFlagIsTheAuthorsAndRepeatsAreNoOps_STO06`.
+  - `ED` (emulator round 2, 2026-11-23): an episode marked `완료` is done before it has content. Its row reads `완료`, its ⋯ value line says `완료`, and chapter progress and the home stat count it (`StoryOverview.countsAsWritten`; a chapter with one is no longer `계획`). Scene status keeps `미정` first. Tests: `StructureModelTest.anEmptyEpisodeMarkedDoneReadsDoneAndCountsInItsChapter_STO06`, `markingTheExamplesEmptyEpisodeDoneCountsIt_STO06`, `domain:story` `StructureAdditionsTest.anEmptyEpisodeMarkedDoneIsDoneAndCounts_STO06`.
 - **STO-10 delete and undo through `SceneActions`:** `StoryActionsTest.del01_…`, `del02_…`, `lens12_…`, `deleteIsOnlyForLiveScenes`.
 - **STO-17 `때 표기`:** `NotationModelTest` (samples `1-7 · 2일째 · 새벽` / `1-7 · 약 13일째 · 새벽`), `StoryActionsTest.notationChangesLabelsOnly_STO17`.
 - **STO-05 new scene form:** `NewSceneFormTest` (INS-01 both ways, TIME-12 base skipping the flashback, `앞에 새 씬`, empty episode, picked place, direct text, `자동` needs a place, stale sheets). New units: `StoryActionsTest.newEpisode…`, `newChapter…`.

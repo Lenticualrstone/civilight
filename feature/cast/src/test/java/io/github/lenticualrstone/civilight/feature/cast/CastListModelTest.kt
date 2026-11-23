@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.cast
 
+import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
 import io.github.lenticualrstone.civilight.feature.cast.CastFx.atLens
 import io.github.lenticualrstone.civilight.feature.cast.list.CastListModel
 import io.github.lenticualrstone.civilight.feature.cast.list.CastListUi
@@ -10,6 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import io.github.lenticualrstone.civilight.model.sample.ExampleGallery as G
 import io.github.lenticualrstone.civilight.model.sample.ExampleKeys as K
 
 /** The list screen state (CST-01, CST-02, CST-05) on the example project. */
@@ -61,6 +63,39 @@ class CastListModelTest {
         val gone = CastListModel.build(doc, CastListUi(selectedTag = "no-such-tag"), false, false)
         assertNull(gone.selectedTag)
         assertTrue(gone.view.chips.first().selected)
+    }
+
+    @Test
+    fun `CST-02 a tag used only on a hidden gallery image gets no chip, locked or unlocked`() {
+        val g0 = G.build()
+        val (tagged, harbor) = CharacterEdits.addTag(g0, "harbor", CastFx.ctx())
+        val withImage = tagged.copy(
+            gallery = tagged.gallery.mapValues { (_, file) ->
+                file.copy(items = file.items.map { if (it.key == G.ITEM_H1) it.copy(tagKeys = it.tagKeys + harbor.key) else it })
+            },
+        )
+        for (unlocked in listOf(false, true)) {
+            val state = CastListModel.build(withImage, CastListUi(), hiddenUnlocked = unlocked, readOnly = false)
+            assertFalse("unlocked=$unlocked", state.view.chips.any { it.tagKey == harbor.key })
+            // A chip remembered from before falls back to `전체` instead of an empty list.
+            val picked = CastListModel.build(withImage, CastListUi(selectedTag = harbor.key), hiddenUnlocked = unlocked, readOnly = false)
+            assertNull(picked.selectedTag)
+            assertTrue(picked.view.chips.first().selected)
+            assertTrue(picked.view.rows.isNotEmpty())
+        }
+    }
+
+    @Test
+    fun `CST-02 a tag held only by a locked hidden character has no chip until unlocked`() {
+        val ctx = CastFx.ctx()
+        val (tagged, harbor) = CharacterEdits.addTag(doc, "harbor", ctx)
+        val owenHidden = CharacterEdits.setHidden(CharacterEdits.setTags(tagged, K.OWEN, listOf(harbor.key), ctx), K.OWEN, true, ctx)
+        val locked = CastListModel.build(owenHidden, CastListUi(selectedTag = harbor.key), hiddenUnlocked = false, readOnly = false)
+        assertFalse(locked.view.chips.any { it.tagKey == harbor.key })
+        assertNull(locked.selectedTag)
+        val open = CastListModel.build(owenHidden, CastListUi(selectedTag = harbor.key), hiddenUnlocked = true, readOnly = false)
+        assertTrue(open.view.chips.single { it.tagKey == harbor.key }.selected)
+        assertEquals(listOf(K.OWEN), open.view.rows.map { it.key })
     }
 
     @Test

@@ -100,11 +100,11 @@ fun SheetScope.DeleteSheetContent(key: DeleteSheet, vm: WorldViewModel, readOnly
     SheetScrollBody {
         if (ui.owned.isNotEmpty()) {
             SectionLabel(ui.ownedTitle, Modifier.padding(top = 14.dp, bottom = 2.dp))
-            ui.owned.forEach { FieldTableRow(it.label.substringBeforeLast(' '), it.label.substringAfterLast(' ') + (it.sub?.let { s -> WorldCopy.SEP + s } ?: "")) }
+            ui.owned.forEach { FieldTableRow(it.head, it.count + (it.sub?.let { s -> WorldCopy.SEP + s } ?: "")) }
         }
         if (ui.staying.isNotEmpty()) {
             SectionLabel(ui.stayingTitle, Modifier.padding(top = 14.dp, bottom = 2.dp))
-            ui.staying.forEach { FieldTableRow(it.label.substringBeforeLast(' '), it.label.substringAfterLast(' ') + (it.sub?.let { s -> WorldCopy.SEP + s } ?: "")) }
+            ui.staying.forEach { FieldTableRow(it.head, it.count + (it.sub?.let { s -> WorldCopy.SEP + s } ?: "")) }
             FieldTableRow(ui.checkRow.first, ui.checkRow.second)
         }
         FieldTableRow(ui.duplicateRow.first, ui.duplicateRow.second)

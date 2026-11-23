@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +37,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -88,11 +94,15 @@ import io.github.lenticualrstone.civilight.model.asset.ImageUse
 import io.github.lenticualrstone.civilight.model.asset.Ratio
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.gallery.GalleryItem
+import io.github.lenticualrstone.civilight.designsystem.component.BottomGlassBar
+import io.github.lenticualrstone.civilight.designsystem.component.CommandBar
 import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
 import io.github.lenticualrstone.civilight.navigation.Gallery
 import io.github.lenticualrstone.civilight.navigation.GalleryAddSheet
 import io.github.lenticualrstone.civilight.navigation.GalleryInfoSheet
 import io.github.lenticualrstone.civilight.navigation.GalleryMenuSheet
+import io.github.lenticualrstone.civilight.navigation.ProjectSearch
+import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.Script
 import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
@@ -106,8 +116,12 @@ import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
 import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
 import io.github.lenticualrstone.civilight.ui.window.SplitPanes
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
@@ -165,6 +179,8 @@ fun GalleryScreen(route: Gallery, deps: FeatureDeps) {
     var multiActive by rememberSaveable { mutableStateOf(false) }
     var multiKeys by rememberSaveable { mutableStateOf(listOf<String>()) }
     var scrollRequest by remember { mutableIntStateOf(0) }
+    /** The request that arrival made: it jumps (the rows may not be laid out yet) instead of animating. */
+    var arrivalRequest by remember { mutableIntStateOf(-1) }
     val multi = MultiPick(multiActive, multiKeys)
     fun setMulti(next: MultiPick) {
         multiActive = next.active
@@ -200,7 +216,12 @@ fun GalleryScreen(route: Gallery, deps: FeatureDeps) {
         if (!routePickUsed) {
             routePickUsed = true
             val arrived = GalleryPick.arrive(next, route.pickKey, v.keys)
-            if (arrived != next) scrollRequest++
+            // Also when the route item already was the saved pick: the rows still start at 0 (scroll restore is
+            // skipped when arriving with an item), so the picked card would sit off screen.
+            if (GalleryReveal.scrollsOnArrival(route.pickKey, v.keys)) {
+                scrollRequest++
+                arrivalRequest = scrollRequest
+            }
             next = arrived
         }
         setPick(GalleryPick.reconcile(next, v.keys))
@@ -366,6 +387,7 @@ fun GalleryScreen(route: Gallery, deps: FeatureDeps) {
                     listState = listState,
                     mainRow = mainRow,
                     scrollRequest = scrollRequest,
+                    scrollInstant = scrollRequest == arrivalRequest,
                     sheets = sheets,
                     canAdd = canAdd,
                     onAdd = { sheets.open(addKey) },
@@ -423,6 +445,7 @@ private fun GalleryFrame(
     listState: LazyListState,
     mainRow: LazyListState,
     scrollRequest: Int,
+    scrollInstant: Boolean,
     sheets: io.github.lenticualrstone.civilight.ui.scaffold.SheetHost,
     canAdd: Boolean,
     onAdd: () -> Unit,
@@ -464,20 +487,33 @@ private fun GalleryFrame(
             }
         },
         bottomBar = {
-            FoldRevealValue(multi.takeIf { it.active && open }, label = "multiBar") { mp ->
-                MultiBar(
-                    multi = mp,
-                    editable = editable,
-                    hiddenOnly = view?.let { v -> mp.keys.isNotEmpty() && mp.keys.all { k -> v.entry(k)?.item?.hidden == true } } == true,
-                    onClose = { onMulti(MultiPick.OFF) },
-                    onTags = { sheets.open(GalleryTagsSheet(route.projectKey, mp.keys)) },
-                    onHide = { hidden -> if (hidden) batch.unhide(mp.keys) else batch.hide(mp.keys) },
-                    onDelete = {
-                        batch.delete(mp.keys)
-                        onMulti(MultiPick.OFF)
-                    },
-                    onCopy = { sheets.open(GalleryCopySheet(route.projectKey, mp.keys)) },
-                )
+            // GAL-04 search: the command bar (`갤러리에서 찾기 · 제목 · 설명 · 태그`) opens the project search over
+            // this gallery, which then searches only gallery images. `여러 장 고르기` replaces it with its bar.
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+                FoldReveal((view == null || open) && !multi.active, label = "galleryFind") {
+                    BottomGlassBar {
+                        CommandBar(
+                            hint = if (route.ownerKind == GalleryOwnerKind.PROJECT) GalleryUiCopy.FIND_ALL else GalleryUiCopy.FIND,
+                            onClick = { deps.navigator.push(ProjectSearch(route.projectKey)) },
+                            onMic = { deps.navigator.push(Recording(projectKey = route.projectKey)) },
+                        )
+                    }
+                }
+                FoldRevealValue(multi.takeIf { it.active && open }, label = "multiBar") { mp ->
+                    MultiBar(
+                        multi = mp,
+                        editable = editable,
+                        hiddenOnly = view?.let { v -> mp.keys.isNotEmpty() && mp.keys.all { k -> v.entry(k)?.item?.hidden == true } } == true,
+                        onClose = { onMulti(MultiPick.OFF) },
+                        onTags = { sheets.open(GalleryTagsSheet(route.projectKey, mp.keys)) },
+                        onHide = { hidden -> if (hidden) batch.unhide(mp.keys) else batch.hide(mp.keys) },
+                        onDelete = {
+                            batch.delete(mp.keys)
+                            onMulti(MultiPick.OFF)
+                        },
+                        onCopy = { sheets.open(GalleryCopySheet(route.projectKey, mp.keys)) },
+                    )
+                }
             }
         },
     ) { padding ->
@@ -502,7 +538,7 @@ private fun GalleryFrame(
                 GalleryBody.EMPTY -> shown?.let { v -> ready?.let { EmptyGallery(deps, vm, v, it, locked, canAdd, onAdd, padding) } }
                 GalleryBody.ITEMS -> shown?.let { v ->
                     val doc = ready?.doc ?: return@let
-                    ItemsBody(route, doc, v, viewKind, layout, pick, locked, handlers, sharedImage, listState, mainRow, scrollRequest, padding, sheets, onFilter, onRelock, multi, if (editable && handlers.menu != null || multi.active) onMulti else null)
+                    ItemsBody(route, doc, v, viewKind, layout, pick, locked, handlers, sharedImage, listState, mainRow, scrollRequest, scrollInstant, padding, sheets, onFilter, onRelock, multi, if (editable && handlers.menu != null || multi.active) onMulti else null)
                 }
             }
         }
@@ -523,6 +559,7 @@ private fun ItemsBody(
     listState: LazyListState,
     mainRow: LazyListState,
     scrollRequest: Int,
+    scrollInstant: Boolean,
     padding: PaddingValues,
     sheets: io.github.lenticualrstone.civilight.ui.scaffold.SheetHost,
     onFilter: (GalleryFilter) -> Unit,
@@ -541,30 +578,69 @@ private fun ItemsBody(
         multi = multi,
     )
     // `고른 카드로`, arriving with an item and closing the viewer bring the picked item into view (GAL-01, GAL-08).
+    // Arriving jumps: the rows may not be laid out yet, and an animated scroll needs a laid-out row.
     LaunchedEffect(scrollRequest) {
         if (scrollRequest == 0) return@LaunchedEffect
         val key = pick.pickedKey ?: return@LaunchedEffect
         val section = v.sections.firstOrNull { s -> s.entries.any { it.key == key } } ?: return@LaunchedEffect
+        val jump = motion.reduced || scrollInstant
         when (viewKind) {
             GalleryViewKind.CARD -> {
                 val row = rowStates[section.id] ?: return@LaunchedEffect
                 val index = section.entries.indexOfFirst { it.key == key }
-                if (motion.reduced) row.scrollToItem(index) else row.animateScrollToItem(index)
+                if (jump || row.layoutInfo.visibleItemsInfo.isEmpty()) row.scrollToItem(index) else row.animateScrollToItem(index)
             }
             GalleryViewKind.GRID, GalleryViewKind.LIST -> {
                 // Chips, order line and the bar come first; the row's index is found by its key.
                 val at = GalleryColumn.indexOfItem(key, v, viewKind, layout) ?: return@LaunchedEffect
                 if (listState.layoutInfo.visibleItemsInfo.none { it.index == at }) {
-                    if (motion.reduced) listState.scrollToItem(at) else listState.animateScrollToItem(at)
+                    if (jump || listState.layoutInfo.visibleItemsInfo.isEmpty()) listState.scrollToItem(at) else listState.animateScrollToItem(at)
                 }
             }
         }
     }
+    // A picked row (`목록`) or the panel under a picked tile line (`격자`) opens in place; when it would end below
+    // the bars, the column follows it up while it unfolds (never past the row's own top). A drag stops it.
+    val currentView by rememberUpdatedState(v)
+    LaunchedEffect(pick.pickedKey, viewKind, layout) {
+        val key = pick.pickedKey ?: return@LaunchedEffect
+        if (!GalleryReveal.applies(viewKind, layout)) return@LaunchedEffect
+        val withPanelLine = GalleryPlacement.panel(viewKind, layout) == PanelPlace.UNDER_ROW
+        coroutineScope {
+            val follow = launch {
+                snapshotFlow {
+                    val info = listState.layoutInfo
+                    if (listState.isScrollInProgress) return@snapshotFlow null
+                    val at = GalleryColumn.indexOfItem(key, currentView, viewKind, layout) ?: return@snapshotFlow null
+                    val first = info.visibleItemsInfo.firstOrNull { it.index == at } ?: return@snapshotFlow null
+                    val end = info.viewportEndOffset - info.afterContentPadding
+                    if (!withPanelLine) return@snapshotFlow RevealSpan(first.offset, first.offset + first.size, end)
+                    val next = info.visibleItemsInfo.firstOrNull { it.index == at + 1 }
+                    when {
+                        // The panel line is laid out: the tile line and the panel together.
+                        (next?.key as? String)?.endsWith(GRID_PANEL_KEY_SUFFIX) == true -> RevealSpan(first.offset, next.offset + next.size, end)
+                        // Still the layout from before the pick (another line follows): wait for the next one.
+                        next != null -> null
+                        // The panel line lies past the end: bring the tile line's end in, then measure the panel.
+                        else -> RevealSpan(first.offset, maxOf(first.offset + first.size, end) + 1, end)
+                    }
+                }.filterNotNull().distinctUntilChanged().collect { span ->
+                    val d = GalleryReveal.delta(span.top, span.bottom, 0, span.end)
+                    if (d > 0) listState.scrollBy(d.toFloat())
+                }
+            }
+            listState.interactionSource.interactions.first { it is DragInteraction.Start }
+            follow.cancel()
+        }
+    }
+    // The bottom bar folds away (multi-pick, inner list + detail without it): then the gesture bar still needs room.
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val clear = PaddingValues(top = padding.calculateTopPadding(), bottom = maxOf(padding.calculateBottomPadding(), navBottom))
     val column = @Composable { withPanel: GalleryBodyState, modifier: Modifier ->
         LazyColumn(
             modifier.fillMaxSize(),
             state = listState,
-            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 8.dp, bottom = padding.calculateBottomPadding() + 24.dp),
+            contentPadding = PaddingValues(top = clear.calculateTopPadding() + 8.dp, bottom = clear.calculateBottomPadding() + 24.dp),
         ) {
             item(key = "chips") { ChipsRow(v, withPanel.side, onFilter, civilightItem()) }
             item(key = "orderLine") {
@@ -587,12 +663,18 @@ private fun ItemsBody(
             module = PaneSplit.Modules.GALLERY,
             // One shared image per key: the right pane's image is the one that grows into `보기`.
             left = { column(GalleryBodyState(v, viewKind, layout, pick, panel, state.inner, handlers, { Modifier }, state.captionOf, multi), Modifier) },
-            right = { GalleryDetailPane(state, padding) },
+            right = { GalleryDetailPane(state, clear) },
         )
         GalleryLayout.INNER_COLUMN -> CenterColumn { column(state, Modifier) }
         else -> column(state, Modifier)
     }
 }
+
+/** The column key of the grid's panel line ends so (`<section>-panel`, see [gridRows]). */
+private const val GRID_PANEL_KEY_SUFFIX = "-panel"
+
+/** A picked item's span in the column and the end of the clear area (item offsets: 0 = under the top bar). */
+private data class RevealSpan(val top: Int, val bottom: Int, val end: Int)
 
 /** `전체 8` · `삽화 4` …: one choice, scrolls when long. */
 @Composable

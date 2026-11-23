@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.cast
 
+import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
 import io.github.lenticualrstone.civilight.domain.cast.map.MapPositions
 import io.github.lenticualrstone.civilight.domain.cast.map.MapSlotFilter
 import io.github.lenticualrstone.civilight.domain.cast.relation.FactionRelations
@@ -53,6 +54,15 @@ class RelationMapModelTest {
         val between = RelationMapModel.build(doc, MapUi(slots = MapSlotFilter.BETWEEN), hiddenUnlocked = false, inner = false)
         assertTrue(between.scene.lines.none { it.key == rienHart })
         assertTrue(between.filtered)
+    }
+
+    @Test
+    fun `CST-33 a tag no shown character holds gets no map chip and a remembered one falls back to 전체`() {
+        val (tagged, harbor) = CharacterEdits.addTag(doc, "harbor", CastFx.ctx())
+        val map = RelationMapModel.build(tagged, MapUi(tagKey = harbor.key), hiddenUnlocked = false, inner = true)
+        assertFalse(map.tags.any { it.tagKey == harbor.key })
+        assertTrue(map.tags.first().selected)
+        assertEquals(listOf("전체", "주연", "등불 결사", "하층 구역", "상층"), map.tags.map { it.label })
     }
 
     @Test

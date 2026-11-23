@@ -1,7 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.cast.map
 
+import io.github.lenticualrstone.civilight.domain.cast.list.CastList
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
-import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
 import io.github.lenticualrstone.civilight.domain.cast.map.LayoutConfig
 import io.github.lenticualrstone.civilight.domain.cast.map.LineStyle
 import io.github.lenticualrstone.civilight.domain.cast.map.MapFilter
@@ -94,16 +94,18 @@ object RelationMapModel {
         moved: Map<Key, Pt> = emptyMap(),
     ): RelationMapState {
         val lens = doc.castLens
-        val filter = MapFilter(ui.slots, ui.kindKeys, ui.tagKey)
+        // Tag chips as on the list: only tags a shown character holds (gallery-only and locked-hidden-only tags have none).
+        val tags = CastList.chipTags(doc, hiddenUnlocked)
+        val tagKey = ui.tagKey?.takeIf { key -> tags.any { it.key == key } }
+        val filter = MapFilter(ui.slots, ui.kindKeys, tagKey)
         val view = RelationMap.build(doc, lens, filter, hiddenUnlocked, ui.selectedRelation)
-        val tags = CharacterEdits.tags(doc)
         return RelationMapState(
             view = view,
             title = if (inner) RelationMap.TITLE_INNER else RelationMap.TITLE_COVER,
             smallLine = if (inner) innerHeader(view.header) else view.header,
             scene = scene(view, MapPositions.saved(doc), moved),
-            tags = listOf(MapTagChip(null, CastUiCopy.ALL, ui.tagKey == null)) +
-                tags.map { MapTagChip(it.key, it.name, it.key == ui.tagKey) },
+            tags = listOf(MapTagChip(null, CastUiCopy.ALL, tagKey == null)) +
+                tags.map { MapTagChip(it.key, it.name, it.key == tagKey) },
             kinds = RelationKinds.ordered(doc).map { MapKindChip(it.key, it.name, it.key in ui.kindKeys) },
             selected = ui.selectedRelation
                 ?.takeIf { key -> view.lines.any { it.relationKey == key } }

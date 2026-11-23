@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,10 +40,10 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.designsystem.theme.rememberUnhide
 import io.github.lenticualrstone.civilight.designsystem.theme.unhide
-import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.domain.recorder.put.SourceMarkTarget
 import io.github.lenticualrstone.civilight.domain.trash.ItemKind
 import io.github.lenticualrstone.civilight.domain.trash.Toast
@@ -102,25 +103,30 @@ fun PageDocScreen(route: PageDoc, deps: FeatureDeps) {
         ready?.let { PageViews.build(it.doc, route.pageKey, gate.open, it.readOnly, zone, recorder.library) }
     }
     var editing by rememberSaveable(route.pageKey) { mutableStateOf(false) }
+    /** Editing began by itself (a blank page just made); then back leaves the page instead of ending editing. */
+    var autoStarted by rememberSaveable(route.pageKey) { mutableStateOf(false) }
     /** Bumped when `/` rewrites the body, so the editor starts again from the new blocks. */
     var bodyVersion by rememberSaveable(route.pageKey) { mutableIntStateOf(0) }
     // Every editing session (and every `/` rewrite) gets its own editor key: the editor's saveable draft
     // would otherwise come back on the next session and overwrite changes made in read mode since
     // (`글로 풀기`, `다른 항목에 잇기`, undo).
-    val beginEditing = {
+    val beginEditing = { auto: Boolean ->
         if (!editing) {
             bodyVersion++
             editing = true
+            autoStarted = auto
         }
     }
     val readOnlyToast = { deps.toasts.show(PageCopy.READ_ONLY, actionLabel = null) }
 
     // A page just made from the list opens straight into editing.
     LaunchedEffect(view?.key, view?.isBlank) {
-        if (view != null && view.isBlank && !view.readOnly && view.access == PageAccess.OPEN) beginEditing()
+        if (view != null && view.isBlank && !view.readOnly && view.access == PageAccess.OPEN) beginEditing(true)
     }
     val stopEditing = { editing = false }
-    LocalBackHandler.current(editing, stopEditing)
+    // A page that opened straight into editing leaves on the first back (nothing visible changes when such a
+    // session ends, so that back read as ignored); editing the user started ends first, back to links.
+    LocalBackHandler.current(PageBackRules.onBack(editing, autoStarted) == PageBack.STOP_EDITING, stopEditing)
 
     val startEditing: () -> Unit = {
         when {
@@ -128,7 +134,7 @@ fun PageDocScreen(route: PageDoc, deps: FeatureDeps) {
             view.readOnly -> readOnlyToast()
             // The editor shows stored link text: links to hidden items wait for `지문으로 보기`.
             !PageAccessRules.canEdit(view) -> gate.unlock()
-            else -> beginEditing()
+            else -> beginEditing(false)
         }
     }
     val caret = remember { CaretHolder() }
@@ -136,7 +142,12 @@ fun PageDocScreen(route: PageDoc, deps: FeatureDeps) {
     CivilightScreen(
         title = "",
         smallLine = PageCopy.SMALL_LINE,
-        back = IconAction(PageCopy.BACK) { if (editing) stopEditing() else deps.navigator.pop() },
+        back = IconAction(PageCopy.BACK) {
+            when (PageBackRules.onBack(editing, autoStarted)) {
+                PageBack.STOP_EDITING -> stopEditing()
+                PageBack.LEAVE -> deps.navigator.pop()
+            }
+        },
         actions = {
             FoldReveal(view != null && view.access == PageAccess.OPEN, horizontal = true) {
                 CivilightIconButton(IconId.More, PageCopy.MENU, { sheets.open(PageMenuSheet(route.projectKey, route.pageKey)) })
@@ -148,7 +159,7 @@ fun PageDocScreen(route: PageDoc, deps: FeatureDeps) {
                 onClick = {
                     // `/로 블록 추가`: the command bar starts editing and offers the block kinds.
                     if (view != null && PageAccessRules.canEdit(view)) {
-                        beginEditing()
+                        beginEditing(false)
                         sheets.open(BlockAddSheet(route.projectKey, route.pageKey))
                     } else {
                         startEditing()
@@ -302,8 +313,19 @@ private fun PageEditor(route: PageDoc, doc: ProjectDoc, vm: PageDocViewModel, ga
     // Taken once: a later editor (stop editing, edit again) starts from the stored blocks, not a stale rewrite.
     val seed = remember(bodyVersion) { caret.rewritten.also { caret.rewritten = null } ?: page.blocks }
     val state = rememberRichTextEditorState(seed, key = "${route.pageKey}-$bodyVersion")
+    // The last change is written when the editor leaves too (back in the same frame as the last key).
+    val written = remember(state) { arrayOf(state.result) }
     LaunchedEffect(state) {
-        snapshotFlow { state.result }.drop(1).collect { vm.setBlocks(route.pageKey, it) }
+        snapshotFlow { state.result }.drop(1).collect {
+            written[0] = it
+            vm.setBlocks(route.pageKey, it)
+        }
+    }
+    DisposableEffect(state) {
+        onDispose {
+            val last = state.result
+            if (last != written[0]) vm.setBlocks(route.pageKey, last)
+        }
     }
     caret.blockKey = { RichDocEdit.paragraphAt(state.doc, state.field.selection.min)?.key }
     caret.blocks = { state.doc }

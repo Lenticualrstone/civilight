@@ -89,6 +89,34 @@ class StructureAdditionsTest {
         assertEquals("쓰는 중 · 씬 3", StoryOverview(undone).episodeStatus(undone.unit(K.EPISODE_1_7)))
     }
 
+    /**
+     * Emulator round 2: an episode marked `완료` before it has content stayed `미정` and its chapter
+     * `0/n · 계획`. The mark wins over "no content": status `완료`, counted in progress and the stat.
+     */
+    @Test
+    fun anEmptyEpisodeMarkedDoneIsDoneAndCounts_STO06() {
+        val v0 = StoryOverview(doc)
+        assertEquals("미정", v0.episodeStatus(doc.unit(K.EPISODE_1_8)))
+        assertFalse(v0.countsAsWritten(doc.unit(K.EPISODE_1_8)))
+        val done = UnitSettingsEdit.setDone(doc, K.EPISODE_1_8, true, ctx)
+        val v = StoryOverview(done)
+        assertEquals("완료", v.episodeStatus(done.unit(K.EPISODE_1_8)))
+        assertEquals("1-8 | — | 완료", v.homeRow(done.unit(K.EPISODE_1_8)).line)
+        assertTrue(v.countsAsWritten(done.unit(K.EPISODE_1_8)))
+        assertEquals("8/10", v.progress(done.unit(K.CHAPTER_1)))
+        assertEquals("8/10", v.chapterStat()?.first)
+        // Chapter 2 has nothing written: marking one of its episodes ends `계획`.
+        val ch2Episode = v.episodesOf(done.unit(K.CHAPTER_2)).first()
+        val ch2 = UnitSettingsEdit.setDone(done, ch2Episode.key, true, ctx)
+        val row = StoryOverview(ch2).chapterRow(ch2.unit(K.CHAPTER_2))
+        assertEquals("1/8", row.progress)
+        assertFalse(row.planned)
+        assertNull(row.synopsis)
+        // Content-only facts are unchanged.
+        assertFalse(v.hasContentUnder(done.unit(K.EPISODE_1_8)))
+        assertEquals(v0.writtenRange(), v.writtenRange())
+    }
+
     @Test
     fun notationChangesLabelsNotStoredTime() {
         val story = UnitSettingsEdit.setNotation(doc, SceneNotation.STORY_START, ctx)

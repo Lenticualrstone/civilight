@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -49,6 +50,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.LayoutMetrics
  * optional back button (`Back`, 44, shifted −12 dp onto the 20 dp gutter), a column with the small line
  * (`number` 11 / 15 `ink3`) and the title (`headerTitle`, 21 / 28 when [wide]), then [actions]
  * (lens chip, `Layers`, ViewToggle, `⋯`). [back] carries the back button's accessibility label (owner copy).
+ * In a narrow pane the actions move to a second row under the title ([TopBarFit]); the bar grows to fit.
  */
 @Composable
 fun TopGlassBar(
@@ -72,25 +74,89 @@ fun TopGlassBar(
     Box(modifier.fillMaxWidth().heightIn(min = barHeight + inset)) {
         GlassBackground(GlassSurface.TOP_BAR, Modifier.matchParentSize())
         OnGlass {
-            Row(
+            TopBarRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = inset + top, start = startPadding, end = 12.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                FoldReveal(back != null, horizontal = true, label = "barBack") {
-                    if (lastBack != null) CivilightIconButton(IconId.Back, lastBack.label, lastBack.onClick, tint = colors.ink)
-                }
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .padding(top = if (back != null) 2.dp else 0.dp),
-                ) {
-                    if (smallLine != null) CivilightText(smallLine, type.numberHeader, color = colors.ink3, maxLines = 1)
-                    CivilightText(title, if (wide) type.headerTitleInner else type.headerTitle, color = colors.ink, maxLines = 1)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), content = actions)
-            }
+                back = {
+                    FoldReveal(back != null, horizontal = true, label = "barBack") {
+                        if (lastBack != null) CivilightIconButton(IconId.Back, lastBack.label, lastBack.onClick, tint = colors.ink)
+                    }
+                },
+                title = {
+                    Column(Modifier.padding(top = if (back != null) 2.dp else 0.dp)) {
+                        if (smallLine != null) CivilightText(smallLine, type.numberHeader, color = colors.ink3, maxLines = 1)
+                        CivilightText(title, if (wide) type.headerTitleInner else type.headerTitle, color = colors.ink, maxLines = 1)
+                    }
+                },
+                actions = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), content = actions)
+                },
+            )
+        }
+    }
+}
+
+/**
+ * Where the top bar's actions go (펼친 화면 비율, CNV-47): beside the title while the title keeps
+ * `min(its own width, MIN_TITLE_DP)`; in a narrower bar (a 280 dp list pane at 1:2, where the actions left
+ * the title 0 to 24 dp) they move to their own row under the title, end-aligned and [ROW_GAP_DP] below it.
+ * A short title (`인물`) that already fits beside the actions at cover width keeps the one-row bar.
+ */
+object TopBarFit {
+    /** The narrowest title the actions may leave beside them (a longer title may be ellipsised to it). */
+    const val MIN_TITLE_DP: Float = 64f
+
+    /** Gap between the title row and the wrapped actions row. */
+    const val ROW_GAP_DP: Float = 8f
+
+    /**
+     * True when [actions] (wide) next to [leading] (the back button) would leave the title less than
+     * `min(titleNatural, minTitle)` of [width].
+     */
+    fun wraps(width: Int, leading: Int, actions: Int, minTitle: Int, titleNatural: Int = Int.MAX_VALUE): Boolean =
+        actions > 0 && width - leading - actions < minOf(minTitle, titleNatural)
+
+    /** The title's width: everything after [leading], less [actions] unless they [wrap]. */
+    fun titleWidth(width: Int, leading: Int, actions: Int, wrap: Boolean): Int =
+        (width - leading - if (wrap) 0 else actions).coerceAtLeast(0)
+
+    /**
+     * Start of the actions: end-aligned; when they are wider than the bar (wrapped row) they start at 0 and
+     * run into the bar's end padding instead of squeezing the last action.
+     */
+    fun actionsX(width: Int, actions: Int): Int = (width - actions).coerceAtLeast(0)
+}
+
+/** back · title (fills) · actions, with the actions on a second row when [TopBarFit.wraps]. */
+@Composable
+private fun TopBarRow(
+    modifier: Modifier,
+    back: @Composable () -> Unit,
+    title: @Composable () -> Unit,
+    actions: @Composable () -> Unit,
+) {
+    Layout(contents = listOf(back, title, actions), modifier = modifier) { (backM, titleM, actionsM), constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val backP = backM.map { it.measure(loose) }
+        // Actions keep their natural width (never squeezed); the decision below gives them room.
+        val actionsP = actionsM.map { it.measure(loose.copy(maxWidth = Constraints.Infinity)) }
+        val leading = backP.maxOfOrNull { it.width } ?: 0
+        val actionsW = actionsP.maxOfOrNull { it.width } ?: 0
+        val minTitle = TopBarFit.MIN_TITLE_DP.dp.roundToPx()
+        val titleNatural = titleM.maxOfOrNull { it.maxIntrinsicWidth(Constraints.Infinity) } ?: 0
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else leading + actionsW + minTitle
+        val wrap = TopBarFit.wraps(width, leading, actionsW, minTitle, titleNatural)
+        val titleW = TopBarFit.titleWidth(width, leading, actionsW, wrap)
+        val titleP = titleM.map { it.measure(loose.copy(minWidth = titleW, maxWidth = titleW)) }
+        val topH = maxOf(backP.maxOfOrNull { it.height } ?: 0, titleP.maxOfOrNull { it.height } ?: 0)
+        val actionsH = actionsP.maxOfOrNull { it.height } ?: 0
+        val actionsY = if (wrap) topH + TopBarFit.ROW_GAP_DP.dp.roundToPx() else 0
+        val height = if (wrap) actionsY + actionsH else maxOf(topH, actionsH)
+        layout(width, height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
+            backP.forEach { it.placeRelative(0, 0) }
+            titleP.forEach { it.placeRelative(leading, 0) }
+            actionsP.forEach { it.placeRelative(TopBarFit.actionsX(width, it.width), actionsY) }
         }
     }
 }

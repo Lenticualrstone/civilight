@@ -114,13 +114,15 @@ fun <T> SnapCardRow(
 /**
  * The parallax of item [index] of a card row: shift `-displacement × 8 %` and scale 1.1, both read in the
  * draw phase; nothing when [reduced] returns true. Displacement is the item's offset from its resting place
- * at the row start (`LazyListItemInfo.offset` is already measured after the start content padding).
+ * at the row start (`LazyListItemInfo.offset` is already measured after the start content padding). The
+ * shift is clamped to the scaled image's overhang ([CardParallax.maxShift] of this layer's width, less a
+ * pixel), so cards further along the row never show a bare strip at their end.
  */
 fun Modifier.cardParallax(state: LazyListState, index: Int, reduced: () -> Boolean): Modifier = graphicsLayer {
     val r = reduced()
     val info = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
     val displacement = info?.offset?.toFloat() ?: 0f
-    translationX = CardParallax.imageShift(displacement, r)
+    translationX = CardParallax.imageShift(displacement, r, imageWidth = size.width, guard = 1f)
     val s = CardParallax.imageScale(r)
     scaleX = s
     scaleY = s

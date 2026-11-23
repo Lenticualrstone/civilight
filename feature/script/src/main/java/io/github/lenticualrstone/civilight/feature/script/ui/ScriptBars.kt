@@ -26,6 +26,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.State
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -274,21 +283,34 @@ fun KeyboardToolbar(
         Box(Modifier.fillMaxWidth().height(TOOLBAR).topHairline(colors.line)) {
             GlassBackground(GlassSurface.BOTTOM_BAR, Modifier.matchParentSize())
             OnGlass {
+                // A narrow column (1:2 split, 280 dp) cannot hold all six tools: `◆` and undo stay pinned at
+                // the end, the rest scroll, and a faded edge shows that more lies that way (emulator QA).
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .height(TOOLBAR)
-                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    KindTool(kindLabel + ScriptCopy.KIND_CHEVRON, onKind)
-                    if (showSpeaker) SpeakerTool(speakerName ?: ScriptCopy.NO_SPEAKER, onSpeaker)
-                    if (onParen != null) {
-                        KeyboardTool(onClick = onParen, text = ScriptCopy.PAREN_TOOL, on = parenOn, contentDescription = ScriptCopy.PAREN_LABEL)
+                    val scroll = rememberScrollState()
+                    val fadeStart = animatedFraction(scroll.canScrollBackward, label = "toolsFadeStart")
+                    val fadeEnd = animatedFraction(scroll.canScrollForward, label = "toolsFadeEnd")
+                    Row(
+                        Modifier
+                            .weight(1f, fill = false)
+                            .scrollEdgeFade(fadeStart, fadeEnd, EDGE_FADE)
+                            .horizontalScroll(scroll),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        KindTool(kindLabel + ScriptCopy.KIND_CHEVRON, onKind)
+                        if (showSpeaker) SpeakerTool(speakerName ?: ScriptCopy.NO_SPEAKER, onSpeaker)
+                        if (onParen != null) {
+                            KeyboardTool(onClick = onParen, text = ScriptCopy.PAREN_TOOL, on = parenOn, contentDescription = ScriptCopy.PAREN_LABEL)
+                        }
+                        KeyboardTool(onClick = onLink, text = ScriptCopy.LINK_TOOL)
                     }
-                    KeyboardTool(onClick = onLink, text = ScriptCopy.LINK_TOOL)
                     Box(Modifier.dimmedWhen(onChange == null)) {
                         KeyboardTool(onClick = { onChange?.invoke() }, text = ScriptCopy.CHANGE_TOOL, contentDescription = ScriptCopy.CHANGE_LABEL)
                     }
@@ -301,6 +323,37 @@ fun KeyboardToolbar(
 }
 
 private val TOOLBAR: Dp = 56.dp
+
+/** Width of the faded edge on the scrolling part of the toolbar. */
+private val EDGE_FADE: Dp = 24.dp
+
+/**
+ * Fades the viewport's start and end edges ([start] and [end] are 0..1, 1 = fully faded) so tools cut
+ * by the edge read as "more this way". Goes before `horizontalScroll`, so it draws on the viewport.
+ */
+private fun Modifier.scrollEdgeFade(start: State<Float>, end: State<Float>, width: Dp): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val w = width.toPx().coerceAtMost(size.width / 2f)
+            val s = start.value
+            val e = end.value
+            if (s > 0f) {
+                drawRect(
+                    Brush.horizontalGradient(0f to Color.Black.copy(alpha = 1f - s), 1f to Color.Black, startX = 0f, endX = w),
+                    size = Size(w, size.height),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+            if (e > 0f) {
+                drawRect(
+                    Brush.horizontalGradient(0f to Color.Black, 1f to Color.Black.copy(alpha = 1f - e), startX = size.width - w, endX = size.width),
+                    topLeft = Offset(size.width - w, 0f),
+                    size = Size(w, size.height),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+        }
 
 @Composable
 private fun KindTool(label: String, onClick: () -> Unit) {

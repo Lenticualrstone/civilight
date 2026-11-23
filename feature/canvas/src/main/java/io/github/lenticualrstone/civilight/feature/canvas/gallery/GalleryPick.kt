@@ -242,3 +242,49 @@ object GalleryColumn {
         return null
     }
 }
+
+/** Bringing the picked item and its opened description into view (GAL-01, GAL-05, GAL-06). */
+object GalleryReveal {
+    /**
+     * Pixels to scroll forward so an item spanning [top]..[bottom] ends above [viewEnd] (the end of the area the
+     * bars leave clear), without moving its [top] above [viewStart]; 0 when it already fits. A span taller than
+     * the clear area stops with its top at [viewStart].
+     */
+    fun delta(top: Int, bottom: Int, viewStart: Int, viewEnd: Int): Int {
+        if (bottom <= viewEnd) return 0
+        return minOf(bottom - viewEnd, maxOf(top - viewStart, 0))
+    }
+
+    /** A tap pick opens a description inside the column (`목록` row, `격자` panel line); cards and the right pane do not. */
+    fun applies(view: GalleryViewKind, layout: GalleryLayout): Boolean =
+        view != GalleryViewKind.CARD && GalleryPlacement.panel(view, layout) != PanelPlace.RIGHT_PANE
+
+    /**
+     * Arriving with a route item (search result, `보기` back): the picked item is scrolled to whenever it is
+     * visible, also when it already was the saved pick (then the pick does not change, but the row starts at 0).
+     */
+    fun scrollsOnArrival(routeKey: Key?, visible: Collection<Key>): Boolean = routeKey != null && routeKey in visible
+}
+
+/**
+ * The right pane of inner `목록 + 상세` (GAL-23): the card crop is drawn at 261 × 348 when the pane is tall enough,
+ * else it shrinks (3:4 kept) so `설명 쓰기` · `보기` stay on screen without scrolling; a long description still scrolls.
+ */
+object GalleryDetailSizes {
+    const val CARD_W = 261f
+    const val CARD_H = 348f
+    const val MIN_CARD_H = 240f
+
+    /** Rows besides the card at one description line: position line 44, title 34, meta 22, description 24, buttons 48, five gaps of 10. */
+    const val OTHER_ROWS = 222f
+
+    /** Padding the pane adds above and below its content (dp), on top of the bars' padding. */
+    const val TOP_GAP = 16f
+    const val BOTTOM_GAP = 24f
+
+    /** The card height (dp) in a pane [paneHeight] tall whose bars take [top] and [bottom]. */
+    fun cardHeight(paneHeight: Float, top: Float, bottom: Float): Float =
+        (paneHeight - top - TOP_GAP - bottom - BOTTOM_GAP - OTHER_ROWS).coerceIn(MIN_CARD_H, CARD_H)
+
+    fun cardWidth(height: Float): Float = height * CARD_W / CARD_H
+}

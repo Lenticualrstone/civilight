@@ -54,6 +54,18 @@ class CastViewsTest {
     }
 
     @Test
+    fun `chips skip tags no shown character holds`() {
+        // A tag only gallery images use (the tag list is shared, 55 §3.4) has no chip.
+        val (galleryOnly, harbor) = CharacterEdits.addTag(doc, "harbor", ctx)
+        assertEquals(listOf("전체 11", "주연", "등불 결사", "하층 구역", "상층"), CastList.chips(galleryOnly, null).map { it.label })
+        // Held only by a locked hidden character: no chip while locked, a chip once unlocked.
+        val hidden = CharacterEdits.setHidden(CharacterEdits.setTags(galleryOnly, K.OWEN, listOf(harbor.key), ctx), K.OWEN, true, ctx)
+        assertFalse(CastList.chips(hidden, null, hiddenUnlocked = false).any { it.tagKey == harbor.key })
+        assertTrue(CastList.chips(hidden, null, hiddenUnlocked = true).any { it.tagKey == harbor.key })
+        assertEquals(listOf(harbor.key), CastList.chipTags(hidden, hiddenUnlocked = true).filter { it.name == "harbor" }.map { it.key })
+    }
+
+    @Test
     fun `search by name, 초성 and tag`() {
         // 초성 match anywhere in the name: 리엔, and 엘리오 (`리오`).
         assertEquals(listOf("리엔", "엘리오"), CastList.build(doc, Fx.LATEST, query = "ㄹㅇ").rows.map { it.name })

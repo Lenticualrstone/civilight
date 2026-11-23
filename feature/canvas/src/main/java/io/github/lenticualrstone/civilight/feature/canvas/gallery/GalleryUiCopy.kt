@@ -13,6 +13,10 @@ object GalleryUiCopy {
     const val BACK = "뒤로"
     const val ADD = "이미지 넣기"
 
+    // Command bar (GAL-04): a character's gallery, the project gallery (GAL-10)
+    const val FIND = "갤러리에서 찾기 · 제목 · 설명 · 태그"
+    const val FIND_ALL = "모든 갤러리 · 제목 · 설명 · 태그"
+
     // Filter chips and order line (GAL-04, GAL-10)
     const val FILTER_ALL = "전체"
     const val FILTER_PROJECT = "프로젝트"

@@ -14,8 +14,23 @@ data class Toast(val message: String, val action: String? = null) {
     val text: String get() = TrashCopy.join(message, action)
 }
 
-/** One count row of a sheet. */
-data class SheetRow(val label: String, val sub: String? = null)
+/**
+ * One count row of a sheet. [label] is the whole line (`관계 1`, `이미지 8 · 숨김 2`); a two-column
+ * renderer shows [head] on the left and [count] on the right. [countText] names the right column
+ * when it is more than the label's last word (the gallery row's `8 · 숨김 2`), so renderers never
+ * cut a compound count apart.
+ */
+data class SheetRow(val label: String, val sub: String? = null, val countText: String? = null) {
+    /** Right column: [countText], else the label's last word (`관계 1` → `1`). */
+    val count: String get() = countText ?: label.substringAfterLast(' ', "")
+
+    /** Left column: the label without [count] (`관계 1` → `관계`, `이미지 8 · 숨김 2` → `이미지`). */
+    val head: String get() = when {
+        countText != null && label.endsWith(countText) -> label.removeSuffix(countText).trimEnd()
+        countText != null -> label
+        else -> label.substringBeforeLast(' ')
+    }
+}
 
 /** The impact sheet (`RCDeleteImpact`, CST-40). Rows with a zero count are left out. */
 data class ImpactSheet(
@@ -83,7 +98,8 @@ object Messages {
         if (total == 0) return null
         val hidden = impact.hiddenGalleryItems
         return if (hiddenLocked && hidden > 0) {
-            SheetRow(TrashCopy.join("이미지 ${total - hidden}", "${TrashCopy.HIDDEN_TAG} $hidden"))
+            val count = TrashCopy.join("${total - hidden}", "${TrashCopy.HIDDEN_TAG} $hidden")
+            SheetRow("이미지 $count", countText = count)
         } else {
             SheetRow("이미지 $total")
         }

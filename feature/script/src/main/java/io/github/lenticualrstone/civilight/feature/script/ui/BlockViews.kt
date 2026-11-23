@@ -303,11 +303,15 @@ private fun dottedIndices(start: Int, marks: List<MarkModel>): Set<Int> =
  */
 @Composable
 fun HeadView(row: HeadRow, selected: Boolean, onOpen: () -> Unit, onMenu: (() -> Unit)?) {
+    // DS-08: wraps between 어절 only (emulator QA: `때 없 / 음` in the 1:2 split's 280 dp column).
+    val title = remember(row.title) { HeadLines.unbroken(row.title) }
+    val subtitle = HeadLines.subtitle(row)
+    val subtitleShown = remember(subtitle) { subtitle?.let(HeadLines::unbroken) }
     SceneHead(
-        title = row.title,
+        title = title,
         modifier = Modifier.pressable(PressAction.Click(onOpen), role = Role.Button, scaleOnPress = false),
         // SCR-58 `[PROPOSED]`: an unlocked hidden scene's head carries a small `숨김` tag.
-        subtitle = HeadLines.subtitle(row),
+        subtitle = subtitleShown,
         menu = onMenu?.let { IconAction(ScriptCopy.sceneMenuLabel(row.ordinal), it) },
         selected = selected,
     )
@@ -349,4 +353,47 @@ object HeadLines {
     fun subtitle(row: HeadRow): String? =
         listOfNotNull(row.transitionLine, io.github.lenticualrstone.civilight.feature.script.scenes.SceneCopy.HIDDEN.takeIf { row.hiddenTag })
             .joinToString(" · ").ifEmpty { null }
+
+    /** U+2060 WORD JOINER: no line break on either side of it (UAX #14 class WJ), drawn as nothing. */
+    const val WORD_JOINER: Char = '\u2060'
+
+    /** U+00A0 NO-BREAK SPACE: keeps a ` · ` separator on the line of the word before it. */
+    const val NO_BREAK_SPACE: Char = '\u00A0'
+
+    /** Words longer than this stay breakable, so a very long name still wraps instead of running off. */
+    const val MAX_JOINED: Int = 16
+
+    /**
+     * Display form of a head line that breaks only between 어절 (DS-08), whatever the platform's
+     * Korean line breaking does (the phrase word-break is API 33+ and locale-bound): the letters of each
+     * word up to [MAX_JOINED] letters are joined with [WORD_JOINER], and the space before a `·`
+     * becomes [NO_BREAK_SPACE] so no line starts with `·`. Display only: rows, tests and search keep
+     * the plain text.
+     */
+    fun unbroken(text: String): String {
+        val out = StringBuilder(text.length * 2)
+        val words = text.split(' ')
+        words.forEachIndexed { i, word ->
+            if (i > 0) out.append(if (word == "·") NO_BREAK_SPACE else ' ')
+            val letters = graphemes(word)
+            if (letters.size > MAX_JOINED) out.append(word) else out.append(letters.joinToString(WORD_JOINER.toString()))
+        }
+        return out.toString()
+    }
+
+    /** The user-perceived letters of [word] (a joiner never splits a combining mark or an emoji sequence). */
+    private fun graphemes(word: String): List<String> {
+        if (word.isEmpty()) return emptyList()
+        val it = java.text.BreakIterator.getCharacterInstance()
+        it.setText(word)
+        val out = ArrayList<String>()
+        var start = it.first()
+        var end = it.next()
+        while (end != java.text.BreakIterator.DONE) {
+            out += word.substring(start, end)
+            start = end
+            end = it.next()
+        }
+        return out
+    }
 }

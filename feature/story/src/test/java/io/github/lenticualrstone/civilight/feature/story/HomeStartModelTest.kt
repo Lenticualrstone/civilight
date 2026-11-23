@@ -71,4 +71,31 @@ class HomeStartModelTest {
         assertFalse(written.newReady)
         assertFalse(ui(Fx.doc().copy(app = HomeStartModel.dismiss(Fx.doc().app))).newReady)
     }
+
+    /**
+     * Emulator round 1 (`목록 닫기`): the rows below moved up over the block while it was still fading in place,
+     * because its lazy item was removed. The start slot stays in the list across the dismiss (the block folds
+     * inside it), and every item that is in both lists keeps its order.
+     */
+    @Test
+    fun dismissKeepsTheStartSlotSoTheRowsBelowFollowTheFold() {
+        fun ui(doc: io.github.lenticualrstone.civilight.model.doc.ProjectDoc) =
+            HomeModel.build(doc, readOnly = false, locked = false, today = Fx.today, zone = Fx.zone)
+                .copy(start = HomeStartModel.build(doc, RecorderLibrary(), readOnly = false))
+        val before = ui(fresh)
+        val after = ui(fresh.copy(app = HomeStartModel.dismiss(fresh.app)))
+        assertTrue(before.newReady)
+        assertNull(after.start)
+        val keysBefore = HomeModel.slots(before).map { it.key }
+        val keysAfter = HomeModel.slots(after).map { it.key }
+        assertTrue("start" in keysBefore && "start" in keysAfter)
+        assertEquals(listOf("name", "start"), keysBefore.take(2))
+        assertEquals(listOf("name", "stats", "start"), keysAfter.take(3))
+        val common = keysBefore.filter { it in keysAfter }
+        assertEquals(common, keysAfter.filter { it in keysBefore })
+        assertEquals("work", keysAfter.last())
+        assertTrue(keysAfter.any { it.startsWith("row:") })
+        // A project that never had the block still has the (empty) slot.
+        assertTrue("start" in HomeModel.slots(ui(Fx.doc().copy(app = HomeStartModel.dismiss(Fx.doc().app)))).map { it.key })
+    }
 }

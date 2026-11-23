@@ -75,9 +75,24 @@ object GalleryCardRules {
         GalleryCardCopy.HOLO.takeIf { holo },
     ).joinToString(GalleryCardCopy.SEP).ifEmpty { null }
 
+    /**
+     * The selection ring's `bg` gap stroke (centre line) around a card drawn [width] × [height] px with a
+     * [stroke] px line and [radius] px corners: 2 dp `bg` gap, then 2 dp `acc`. Uses the drawn size, never
+     * [size], so a card shrunk by its caller (group rows, 162 × 216) gets a ring that hugs it.
+     */
+    fun ringGap(width: Float, height: Float, stroke: Float, radius: Float): RingRect =
+        RingRect(-stroke / 2, -stroke / 2, width + stroke, height + stroke, radius + stroke / 2)
+
+    /** The selection ring's `acc` stroke (centre line), just outside [ringGap]. */
+    fun ringAcc(width: Float, height: Float, stroke: Float, radius: Float): RingRect =
+        RingRect(-stroke * 1.5f, -stroke * 1.5f, width + stroke * 3, height + stroke * 3, radius + stroke * 1.5f)
+
     /** A title worth drawing; a blank title is an untitled card (no shade, no text). */
     fun shownTitle(title: String?): String? = title?.takeIf { it.isNotBlank() }
 }
+
+/** One ring stroke's rounded rect in px, relative to the card's top-left. */
+data class RingRect(val left: Float, val top: Float, val width: Float, val height: Float, val corner: Float)
 
 /**
  * The shared gallery card (GAL-07; `ProjectCard` anatomy, 3:4): the item's `카드 3:4` crop in [image], the
@@ -115,10 +130,14 @@ fun GalleryCard(
             drawContent()
             val a = ring.value
             if (a > 0f) {
+                // The drawn card's own size: a caller may shrink the card (group rows use 162 × 216).
+                val drawn = this.size
                 val g = 2.dp.toPx()
                 val r = radius.dp.toPx()
-                drawRoundRect(colors.bg, Offset(-g / 2, -g / 2), Size(size.width.dp.toPx() + g, size.height.dp.toPx() + g), CornerRadius(r + g / 2), style = Stroke(g), alpha = a)
-                drawRoundRect(colors.acc, Offset(-g * 1.5f, -g * 1.5f), Size(size.width.dp.toPx() + g * 3, size.height.dp.toPx() + g * 3), CornerRadius(r + g * 1.5f), style = Stroke(g), alpha = a)
+                val gap = GalleryCardRules.ringGap(drawn.width, drawn.height, g, r)
+                val acc = GalleryCardRules.ringAcc(drawn.width, drawn.height, g, r)
+                drawRoundRect(colors.bg, Offset(gap.left, gap.top), Size(gap.width, gap.height), CornerRadius(gap.corner), style = Stroke(g), alpha = a)
+                drawRoundRect(colors.acc, Offset(acc.left, acc.top), Size(acc.width, acc.height), CornerRadius(acc.corner), style = Stroke(g), alpha = a)
             }
         }
     val more = onMenu?.let { IconAction(GalleryCardCopy.MENU, it) }

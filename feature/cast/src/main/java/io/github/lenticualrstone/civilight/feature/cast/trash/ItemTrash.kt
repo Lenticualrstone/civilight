@@ -103,11 +103,8 @@ object ItemTrash {
         )
     }
 
-    /** `관계 1` → `관계` | `1`: the count is the row's last word. */
-    fun split(row: SheetRow): ImpactRowView {
-        val cut = row.label.lastIndexOf(' ')
-        return if (cut <= 0) ImpactRowView(row.label, "", row.sub) else ImpactRowView(row.label.substring(0, cut), row.label.substring(cut + 1), row.sub)
-    }
+    /** `관계 1` → `관계` | `1`; `이미지 8 · 숨김 2` → `이미지` | `8 · 숨김 2` ([SheetRow.head], [SheetRow.count]). */
+    fun split(row: SheetRow): ImpactRowView = ImpactRowView(row.head, row.count, row.sub)
 
     /** `휴지통으로`. Null when the item is gone or already in the trash. */
     fun delete(doc: ProjectDoc, kind: EntityKind, key: Key, ctx: ActionContext, recorder: RecorderLibrary?): ItemDeleted? {

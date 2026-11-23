@@ -3,8 +3,6 @@ package io.github.lenticualrstone.civilight.ui.nav
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.fadeIn
@@ -37,6 +35,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.Motion
 import io.github.lenticualrstone.civilight.navigation.OverlayRoute
+import io.github.lenticualrstone.civilight.ui.window.EmptyDetailPane
 import io.github.lenticualrstone.civilight.ui.window.ListDetailPanes
 
 /** Which pane an entry is drawn in; lets a screen drop its own back button in the detail pane. */
@@ -94,7 +93,9 @@ private class ListDetailScene(
  * The detail pane's swap (S3): another item crossfades in place (`standard` in, `exit` out); the first
  * detail beside a list slides in 48 dp from the right on `foldOpen` and a closed detail fades on
  * `foldClose` (CNV-34). Reduced motion: fades only (inside the helpers). The outgoing entry stays composed
- * while it fades, so Nav3 pops it (view model, saved state) only after it has left.
+ * while it fades, so Nav3 pops it (view model, saved state) only after it has left. With no detail the pane
+ * shows [EmptyDetailPane] (Q-LY-02): it fades out on `exit` under the first detail and back in on `standard`
+ * when the detail closes.
  */
 @Composable
 private fun DetailSwap(detail: NavEntry<NavKey>?) {
@@ -106,8 +107,8 @@ private fun DetailSwap(detail: NavEntry<NavKey>?) {
         contentKey = { it?.contentKey },
         transitionSpec = {
             when {
-                initialState == null -> ContentTransform(motion.panelEnter(), ExitTransition.None, sizeTransform = null)
-                targetState == null -> ContentTransform(EnterTransition.None, motion.panelExit(), sizeTransform = null)
+                initialState == null -> ContentTransform(motion.panelEnter(), fadeOut(motion.spec(CivilightMotion.exit)), sizeTransform = null)
+                targetState == null -> ContentTransform(fadeIn(motion.spec(CivilightMotion.standard)), motion.panelExit(), sizeTransform = null)
                 else -> ContentTransform(
                     fadeIn(motion.spec(CivilightMotion.standard)),
                     fadeOut(motion.spec(CivilightMotion.exit)),
@@ -119,6 +120,8 @@ private fun DetailSwap(detail: NavEntry<NavKey>?) {
     ) { entry ->
         if (entry != null) {
             CompositionLocalProvider(LocalPaneRole provides PaneRole.DETAIL) { entry.Content() }
+        } else {
+            EmptyDetailPane()
         }
     }
 }

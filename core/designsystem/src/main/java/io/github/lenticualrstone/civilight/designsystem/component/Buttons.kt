@@ -21,6 +21,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.text.TextStyle
@@ -148,4 +151,48 @@ internal fun TextStyle.withFamily(base: TextStyle): TextStyle = base.merge(this)
 @Composable
 fun ButtonRow(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = content)
+}
+
+/**
+ * Whether equal-width buttons fit side by side (펼친 화면 비율, CNV-47): in a 280 dp list pane at 1:2 the
+ * empty block's `라이프 레코더에서` was cut to `라이프 ...` at flex 1. Each button gets
+ * `(width - gaps) / n`; when any label's natural width needs more, the buttons stack full width, [gap] apart.
+ */
+object ButtonRowFit {
+    fun sideBySide(natural: List<Int>, width: Int, gap: Int): Boolean {
+        if (natural.size <= 1) return true
+        val slot = slot(natural.size, width, gap)
+        return natural.all { it <= slot }
+    }
+
+    /** One button's width in the side-by-side row. */
+    fun slot(count: Int, width: Int, gap: Int): Int = ((width - gap * (count - 1)) / count.coerceAtLeast(1)).coerceAtLeast(0)
+}
+
+/**
+ * [ButtonRow] for equal-flex buttons that keeps every label whole: side by side at flex 1 while each label fits
+ * its half ([ButtonRowFit]), else stacked full width in the given order, [gap] apart. Children take no weight.
+ */
+@Composable
+fun FittingButtonRow(modifier: Modifier = Modifier, gap: Dp = 8.dp, content: @Composable () -> Unit) {
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val gapPx = gap.roundToPx()
+        val natural = measurables.map { it.maxIntrinsicWidth(Constraints.Infinity) }
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else natural.sum() + gapPx * (natural.size - 1).coerceAtLeast(0)
+        if (ButtonRowFit.sideBySide(natural, width, gapPx)) {
+            val slot = ButtonRowFit.slot(measurables.size, width, gapPx)
+            val placeables = measurables.map { it.measure(Constraints(minWidth = slot, maxWidth = slot)) }
+            val height = placeables.maxOfOrNull { it.height } ?: 0
+            layout(width, height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
+                placeables.forEachIndexed { i, p -> p.placeRelative(i * (slot + gapPx), (height - p.height) / 2) }
+            }
+        } else {
+            val placeables = measurables.map { it.measure(Constraints(minWidth = width, maxWidth = width)) }
+            val height = placeables.sumOf { it.height } + gapPx * (placeables.size - 1).coerceAtLeast(0)
+            layout(width, height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
+                var y = 0
+                placeables.forEach { p -> p.placeRelative(0, y); y += p.height + gapPx }
+            }
+        }
+    }
 }

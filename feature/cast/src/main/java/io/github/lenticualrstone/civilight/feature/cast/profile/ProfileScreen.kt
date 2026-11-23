@@ -87,6 +87,7 @@ import io.github.lenticualrstone.civilight.navigation.FieldHistorySheet
 import io.github.lenticualrstone.civilight.navigation.FieldValueEditSheet
 import io.github.lenticualrstone.civilight.navigation.LensSheet
 import io.github.lenticualrstone.civilight.navigation.ProfileTab
+import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import io.github.lenticualrstone.civilight.navigation.ProjectSearch
 import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.RelationEditSheet
@@ -202,7 +203,13 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
             collapsed = collapsed,
             collapsedTitle = state.name,
             collapsedSmallLine = state.header.title.substringBefore(CastCopy.SEP),
-            tabs = { CivilightTabs(CastUiCopy.TABS, tab, { tab = it }, Modifier.weight(1f)) },
+            // LIB-19 cast tour: the lens and the `관계` tab are the holes of `시점 렌즈` and `관계` (CastTourSteps).
+            lensModifier = Modifier.tourTarget(CastTourSteps.LENS),
+            tabs = {
+                CivilightTabs(CastUiCopy.TABS, tab, { tab = it }, Modifier.weight(1f)) { i ->
+                    CastTourSteps.stepOfTab(i)?.let { Modifier.tourTarget(it) } ?: Modifier
+                }
+            },
             commandBar = {
                 CommandBarView(
                     hint = CommandHints.placeholder(CommandScreen.PROFILE),

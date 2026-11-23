@@ -126,7 +126,8 @@ class InboxTest {
         f.controller.onFilter(FilterAction.Kind(KindFilter.VOICE))
         val voice = f.view(this)
         assertEquals(listOf(r1, r3), voice.rows.map { it.row.recordKey })
-        assertEquals("전체 2", voice.screen.filters.first().label)
+        // The kind chip narrows the rows only; `전체 6` stays the status total (emulator round 1).
+        assertEquals("전체 6", voice.screen.filters.first().label)
         // A second tap on the same kind turns it off (none on = both kinds).
         f.controller.onFilter(FilterAction.Kind(KindFilter.VOICE))
         assertEquals(KindFilter.NONE, f.view(this).filter.kind)

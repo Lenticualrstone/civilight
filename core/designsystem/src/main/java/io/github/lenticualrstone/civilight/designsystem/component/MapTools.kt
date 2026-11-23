@@ -73,7 +73,8 @@ private val Micro500 = TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeigh
 /**
  * DS-55 map tool bar (`.mbar`): glass container, padding 4, gap 2, radius 18, 1 dp `line` inset; cells
  * 52 × 50, radius 14, icon 18 + label 500 11 / 14 `ink2`; the selected tool `pri` / `onpri`. Visible mode
- * switching instead of hidden gestures. Labelled [label] (`지도 도구`).
+ * switching instead of hidden gestures. Labelled [label] (`지도 도구`). [toolModifier] adds to one cell by
+ * index (a tour marks a tool as its hole, LIB-19).
  */
 @Composable
 fun MapToolbar(
@@ -82,6 +83,7 @@ fun MapToolbar(
     modifier: Modifier = Modifier,
     tools: List<MapTool> = MapToolDefaults.tools,
     label: String = "지도 도구",
+    toolModifier: (Int) -> Modifier = { Modifier },
 ) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(18.dp)
@@ -100,7 +102,7 @@ fun MapToolbar(
                 val fill = animatedFraction(selected, label = "toolFill")
                 val cellShape = RoundedCornerShape(14.dp)
                 Column(
-                    Modifier
+                    toolModifier(i)
                         .pressable(PressAction.Select(selected) { onSelect(i) }, role = Role.RadioButton, shape = cellShape)
                         .size(52.dp, 50.dp)
                         .clip(cellShape)

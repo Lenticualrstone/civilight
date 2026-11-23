@@ -41,7 +41,8 @@ internal fun BadgeLine(rating: Rating, text: String, modifier: Modifier = Modifi
 /**
  * One 서재 project row (LIB-01): the 48 dp cover thumbnail (D6), title 800 20 / 28, then badge + meta;
  * right `쓰는 중` (`acc`), optional [extra] (`숨김 풀기` in the open group) and the ⋯ button. Tapping the
- * row opens it. [thumbModifier] carries the shared cover of the `목록 ↔ 카드` switch (CNV-45).
+ * row opens it. [thumbModifier] carries the shared cover of the `목록 ↔ 카드` switch (CNV-45);
+ * [menuModifier] goes on the ⋯ button (the `서재 · 숨기기` tour's hole, `LibraryTourSteps`).
  */
 @Composable
 internal fun ProjectRow(
@@ -52,6 +53,7 @@ internal fun ProjectRow(
     selected: Boolean = false,
     thumbModifier: Modifier = Modifier,
     extra: (@Composable () -> Unit)? = null,
+    menuModifier: Modifier = Modifier,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -75,6 +77,6 @@ internal fun ProjectRow(
             CivilightText(ShelfCopy.WRITING, type.chip.merge(TextStyle(fontWeight = FontWeight.SemiBold)), color = colors.acc, maxLines = 1)
         }
         extra?.invoke()
-        CivilightIconButton(IconId.More, ShelfCopy.MORE_LABEL, onMenu, Modifier.offset(x = 12.dp))
+        CivilightIconButton(IconId.More, ShelfCopy.MORE_LABEL, onMenu, Modifier.offset(x = 12.dp).then(menuModifier))
     }
 }

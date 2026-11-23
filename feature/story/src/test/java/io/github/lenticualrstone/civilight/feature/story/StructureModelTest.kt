@@ -2,6 +2,10 @@ package io.github.lenticualrstone.civilight.feature.story
 
 import io.github.lenticualrstone.civilight.domain.actions.SceneActions
 import io.github.lenticualrstone.civilight.feature.story.Fx.node
+import io.github.lenticualrstone.civilight.feature.story.common.StoryActions
+import io.github.lenticualrstone.civilight.feature.story.menu.MenuAction
+import io.github.lenticualrstone.civilight.feature.story.menu.MenuSurface
+import io.github.lenticualrstone.civilight.feature.story.menu.UnitMenuModel
 import io.github.lenticualrstone.civilight.feature.story.structure.EpisodeItem
 import io.github.lenticualrstone.civilight.feature.story.structure.GroupItem
 import io.github.lenticualrstone.civilight.feature.story.structure.NewSceneTarget
@@ -138,5 +142,100 @@ class StructureModelTest {
         assertEquals("씬 4 · 숨긴 씬", locked.row.label)
         val open = build(hidden, locked = false).items.filterIsInstance<SceneItem>().single { it.row.key == K.SCENE_1_7_4 }
         assertEquals("씬 4 · 문 앞", open.row.label)
+    }
+
+    /**
+     * Emulator round 1: `완료 표시` on an episode changed nothing in the list (only its ⋯ said `완료`). The
+     * episode row ends in ` · 완료`, and its scenes, the one being written included, read `<n>자 · 완료`.
+     */
+    @Test
+    fun markingAnEpisodeDoneShowsInTheList_STO06() {
+        val before = build()
+        val ep = before.items.filterIsInstance<EpisodeItem>().single { it.row.key == K.EPISODE_1_7 }
+        assertFalse(ep.done)
+        assertEquals(ep.row.meta, ep.meta)
+        val writing = before.items.filterIsInstance<SceneItem>().single { it.row.key == K.SCENE_1_7_3 }
+        assertEquals("쓰는 중", writing.meta)
+        assertTrue(writing.writing)
+
+        val marked = StoryActions.setDone(doc, K.EPISODE_1_7, true, Fx.ctx())
+        val after = build(marked, listOf(K.EPISODE_1_7))
+        val doneEp = after.items.filterIsInstance<EpisodeItem>().single { it.row.key == K.EPISODE_1_7 }
+        assertTrue(doneEp.done)
+        assertTrue(doneEp.meta.startsWith("씬 4개 · ") && doneEp.meta.endsWith(" · 완료"))
+        val scenes = after.items.filterIsInstance<SceneItem>()
+        val current = scenes.single { it.row.key == K.SCENE_1_7_3 }
+        assertTrue(current.row.current)
+        assertTrue(current.done)
+        assertFalse(current.writing)
+        val view = StoryOverview(marked)
+        assertEquals("${StoryOverview.chars(view.charCount(marked.index.unit(K.SCENE_1_7_3)!!))} · 완료", current.meta)
+        // An empty scene stays `—`: its status is `미정`, not `완료`.
+        assertEquals("—", scenes.single { it.row.key == K.SCENE_1_7_4 }.meta)
+
+        val unmarked = StoryActions.setDone(marked, K.EPISODE_1_7, false, Fx.ctx())
+        val back = build(unmarked, listOf(K.EPISODE_1_7))
+        assertFalse(back.items.filterIsInstance<EpisodeItem>().single { it.row.key == K.EPISODE_1_7 }.done)
+        assertEquals("쓰는 중", back.items.filterIsInstance<SceneItem>().single { it.row.key == K.SCENE_1_7_3 }.meta)
+    }
+
+    @Test
+    fun theFixturesDoneEpisodesReadDoneInTheList_STO06() {
+        val episodes = build().items.filterIsInstance<EpisodeItem>().associateBy { it.row.key }
+        assertTrue(episodes.getValue(K.EPISODE_1_5).done)
+        assertTrue(episodes.getValue(K.EPISODE_1_5).meta.endsWith(" · 완료"))
+        assertFalse(episodes.getValue(K.EPISODE_1_7).done)
+    }
+
+    /**
+     * Emulator round 2 (Demo project): `완료 표시` on the only, still empty episode `1-1` was saved (its ⋯
+     * then offered `완료 표시 빼기`) but the list kept `1-1 미정 —` and the chapter `0/1 · 계획`. A marked
+     * episode is done before it has content: its row reads `완료`, the chapter counts it and is no
+     * longer planned, and the ⋯ value line says `완료` too. Taking the mark off brings all of it back.
+     */
+    @Test
+    fun anEmptyEpisodeMarkedDoneReadsDoneAndCountsInItsChapter_STO06() {
+        val demo = Fx.mini(listOf("장", "에피소드", "씬"), node("C1", "1장", null, node("E1", null, null, node("S1"))))
+        // A planned chapter shows its rows only when opened (as in the Demo screenshot).
+        val before = build(demo, listOf("C1"))
+        val group = before.items.filterIsInstance<GroupItem>().single()
+        assertEquals("0/1 · 계획", group.row.progress)
+        assertTrue(group.row.planned)
+        val ep = before.items.filterIsInstance<EpisodeItem>().single()
+        assertFalse(ep.done)
+        assertEquals("—", ep.meta)
+
+        val marked = StoryActions.setDone(demo, "E1", true, Fx.ctx())
+        val after = build(marked, listOf("C1"))
+        val doneGroup = after.items.filterIsInstance<GroupItem>().single()
+        assertEquals("1/1", doneGroup.row.progress)
+        assertFalse(doneGroup.row.planned)
+        assertFalse(doneGroup.expandable)
+        assertNull(doneGroup.row.synopsis)
+        val doneEp = after.items.filterIsInstance<EpisodeItem>().single()
+        assertTrue(doneEp.done)
+        assertEquals("완료", doneEp.meta)
+        val menuRow = UnitMenuModel.build(marked, "E1", MenuSurface.STORY_LIST, readOnly = false)!!.rows.last()
+        assertEquals(MenuAction.UNMARK_DONE to "완료", menuRow.action to menuRow.value)
+
+        val unmarked = StoryActions.setDone(marked, "E1", false, Fx.ctx())
+        val back = build(unmarked, listOf("C1"))
+        assertEquals("0/1 · 계획", back.items.filterIsInstance<GroupItem>().single().row.progress)
+        assertFalse(back.items.filterIsInstance<EpisodeItem>().single().done)
+        assertEquals("—", back.items.filterIsInstance<EpisodeItem>().single().meta)
+    }
+
+    /** In the example project: marking the empty `1-8` done makes chapter 1 `8/10`; its empty scenes stay `—`. */
+    @Test
+    fun markingTheExamplesEmptyEpisodeDoneCountsIt_STO06() {
+        val marked = StoryActions.setDone(doc, K.EPISODE_1_8, true, Fx.ctx())
+        val ui = build(marked, listOf(K.EPISODE_1_8))
+        assertEquals("8/10", ui.items.filterIsInstance<GroupItem>().first().row.progress)
+        val ep = ui.items.filterIsInstance<EpisodeItem>().single { it.row.key == K.EPISODE_1_8 }
+        assertTrue(ep.done)
+        assertEquals("완료", ep.meta)
+        val scenes = ui.items.filterIsInstance<SceneItem>().filter { marked.index.unit(it.row.key)?.parentKey == K.EPISODE_1_8 }
+        assertTrue(scenes.isNotEmpty())
+        assertTrue(scenes.all { it.meta == "—" && !it.done })
     }
 }

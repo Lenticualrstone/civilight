@@ -32,7 +32,8 @@ class ItemTrashTest {
         val open = ItemTrash.sheet(EntityKind.CHARACTER, impact)
         val locked = ItemTrash.sheet(EntityKind.CHARACTER, impact, hiddenLocked = true)
         assertTrue(open.owned.any { it.label == "이미지" && it.count == "10" })
-        assertTrue(locked.owned.any { "${it.label} ${it.count}" == "이미지 8 · 숨김 2" })
+        // The whole `8 · 숨김 2` sits in the count column (emulator: `이미지 0 · 숨김` | `1`).
+        assertTrue(locked.owned.any { it.label == "이미지" && it.count == "8 · 숨김 2" })
     }
 
     @Test

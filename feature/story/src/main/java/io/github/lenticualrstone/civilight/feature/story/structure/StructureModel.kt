@@ -5,9 +5,12 @@ import io.github.lenticualrstone.civilight.domain.story.search.CommandScreen
 import io.github.lenticualrstone.civilight.domain.story.structure.ChapterRow
 import io.github.lenticualrstone.civilight.domain.story.structure.EpisodeRow
 import io.github.lenticualrstone.civilight.domain.story.structure.SceneRow
+import io.github.lenticualrstone.civilight.domain.story.structure.SceneStatus
 import io.github.lenticualrstone.civilight.domain.story.structure.StoryOverview
+import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.story.StoryUnit
 
 /** One line of the 스토리 list (STO-04), in screen order. */
 sealed interface StructureItem {
@@ -22,17 +25,40 @@ data class GroupItem(val row: ChapterRow, val depth: Int, val expandable: Boolea
     override val id: String get() = "group:${row.key}"
 }
 
-/** `1-5 | 첫 번째 신호 | 씬 3개`; the title is bold when expanded or [current] (the episode of the last edit). */
-data class EpisodeItem(val row: EpisodeRow, val current: Boolean) : StructureItem {
+/**
+ * `1-5 | 첫 번째 신호 | 씬 3개`; the title is bold when expanded or [current] (the episode of the last edit).
+ * [done]: the episode status is `완료` (STO-06, the same word its ⋯ shows); [meta] then ends in ` · 완료`,
+ * or is `완료` alone for an episode marked done before it has content (not `— · 완료`)
+ * (`ED`: the list's place for the status is not drawn).
+ */
+data class EpisodeItem(val row: EpisodeRow, val current: Boolean, val done: Boolean = false) : StructureItem {
     override val id: String get() = "episode:${row.key}"
+
+    /** The right meta as drawn: `씬 3개`, `씬 4개 · 5,210자`, or either + ` · 완료`; `완료` for an unwritten done one. */
+    val meta: String get() = when {
+        !done -> row.meta
+        row.unwritten -> StoryCopy.DONE
+        else -> "${row.meta} · ${StoryCopy.DONE}"
+    }
 }
 
 /**
  * `1일째 새벽 | 씬 1 · 새벽 순찰 | 1,820자`, indented under its episode (not in a 1-level structure).
  * [masked]: a hidden scene while locked (`씬 4 · 숨긴 씬`, STO-11); its tap asks to unlock first.
+ * [done]: the scene status is `완료` (STO-06: marked, or its episode is); [meta] is then `1,820자 · 완료`,
+ * never `쓰는 중`, even for the scene of the last edit.
  */
-data class SceneItem(val row: SceneRow, val indented: Boolean, val masked: Boolean = false) : StructureItem {
+data class SceneItem(
+    val row: SceneRow,
+    val indented: Boolean,
+    val masked: Boolean = false,
+    val done: Boolean = false,
+    val meta: String = row.meta,
+) : StructureItem {
     override val id: String get() = "scene:${row.key}"
+
+    /** `쓰는 중` in `acc`: only for the scene of the last edit that is not done. */
+    val writing: Boolean get() = row.current && !done
 }
 
 /** Where `새 씬` creates its scene: under [parentKey] right after [afterKey] (null = first, an empty episode). */
@@ -70,10 +96,11 @@ object StructureModel {
             for (unit in doc.index.children(parentKey)) {
                 if (!doc.liveness.isUnitLive(unit.key)) continue
                 when (unit.level) {
-                    structure.sceneLevel -> items += SceneItem(view.sceneRow(unit), indented = episodeLevel != null, masked = locked && unit.hidden)
+                    structure.sceneLevel -> items += sceneItem(view, unit, indented = episodeLevel != null, masked = locked && unit.hidden)
                     episodeLevel -> {
                         val isOpen = unit.key in open
-                        items += EpisodeItem(view.episodeRow(unit, isOpen), current = unit.key == currentEpisode)
+                        val done = view.episodeStatus(unit) == SceneStatus.DONE.word
+                        items += EpisodeItem(view.episodeRow(unit, isOpen), current = unit.key == currentEpisode, done = done)
                         if (isOpen) visit(unit.key, depth + 1)
                     }
                     else -> {
@@ -95,6 +122,13 @@ object StructureModel {
             readOnly = readOnly,
             commandHint = CommandBar.placeholder(CommandScreen.STORY),
         )
+    }
+
+    /** A scene row; a `완료` scene shows its char count and `완료` instead of `쓰는 중` (STO-06). */
+    private fun sceneItem(view: StoryOverview, unit: StoryUnit, indented: Boolean, masked: Boolean): SceneItem {
+        val row = view.sceneRow(unit)
+        if (row.status != SceneStatus.DONE) return SceneItem(row, indented, masked)
+        return SceneItem(row, indented, masked, done = true, meta = "${StoryOverview.chars(view.charCount(unit))} · ${StoryCopy.DONE}")
     }
 
     /**

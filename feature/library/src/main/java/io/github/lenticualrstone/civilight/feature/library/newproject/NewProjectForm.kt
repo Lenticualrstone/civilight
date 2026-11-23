@@ -110,6 +110,15 @@ object NewProjectRules {
     fun r18Block(form: NewProjectForm, defaults: RatingDefaults, recoverySet: Boolean): R18DefaultsBlock? =
         if (form.rating == Rating.R18) R18DefaultsBlock.of(defaults, recoverySet) else null
 
+    /**
+     * What makes the step-2 `미리 보기` swap (crossfade + height) instead of updating in place: the picked
+     * structure and the tree's shape (depths). Typing a level name keeps the key, so the text just changes.
+     */
+    fun previewSwapKey(form: NewProjectForm): Any = previewSwapKey(form.structurePreset, preview(form))
+
+    /** [previewSwapKey] from a preset (null when unknown) and the preview lines. */
+    fun previewSwapKey(preset: StructurePreset?, lines: List<Pair<Int, String>>): Any = preset to lines.map { it.first }
+
     /** Step-2 `미리 보기` lines (depth, text); empty while a custom level is unnamed. */
     fun preview(form: NewProjectForm): List<Pair<Int, String>> {
         val levels = levels(form)

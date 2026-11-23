@@ -207,14 +207,14 @@ class OnboardingTest {
         assertEquals("워크스루" to "3단계 · 봤음", ui.walkthrough.title to ui.walkthrough.sub)
         assertEquals(
             listOf(
-                "스크립트 | 4단계 · 봤음", "인물 | 3단계 · 봤음", "세계 · 연표 | 3단계 · 아직 안 봄", "라이프 레코더 | 3단계 · 봤음",
+                "스크립트 | 3단계 · 봤음", "인물 | 3단계 · 봤음", "세계 · 연표 | 3단계 · 아직 안 봄", "라이프 레코더 | 3단계 · 봤음",
                 "서재 · 숨기기 | 3단계 · 아직 안 봄", "지도 만들기 | 3단계 · 아직 안 봄", "인물 동선 · 장소와 때 | 3단계 · 아직 안 봄",
             ),
             ui.modules.map { "${it.title} | ${it.sub}" },
         )
         assertTrue(ui.tipsOn)
         val reset = ModuleTours.reset(state, TourModule.SCRIPT)
-        assertEquals("4단계 · 아직 안 봄", HelpReplayState.build(reset, tipsOn = false).modules.first().sub)
+        assertEquals("3단계 · 아직 안 봄", HelpReplayState.build(reset, tipsOn = false).modules.first().sub)
     }
 
     @Test

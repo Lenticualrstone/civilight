@@ -16,10 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +38,10 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.rememberUnhide
 import io.github.lenticualrstone.civilight.designsystem.theme.unhide
 import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
+import io.github.lenticualrstone.civilight.feature.script.ScriptTourSteps
+import io.github.lenticualrstone.civilight.ui.tour.TourStepAbsent
+import io.github.lenticualrstone.civilight.ui.tour.tourRunning
+import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import io.github.lenticualrstone.civilight.feature.script.layout.ScriptLayout
 import io.github.lenticualrstone.civilight.feature.script.motion.ScriptMotion
 import io.github.lenticualrstone.civilight.feature.script.motion.StaggeredSwipeRow
@@ -140,6 +146,8 @@ fun Manuscript(
     val motion = CivilightTheme.motion
     val column = if (layout.wide) Modifier.padding(start = layout.columnStart.dp).width(layout.columnWidth.dp) else Modifier.fillMaxWidth()
     if (rows.isEmpty()) {
+        // LIB-19: no block and no scene head to point at, so those steps leave the tour.
+        if (tourRunning()) ScriptTourSteps.missing(null, null, readOnly).forEach { step -> key(step) { TourStepAbsent(step) } }
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
             EmptyBlock(
                 title = ScriptCopy.NO_SCENES,
@@ -162,6 +170,23 @@ fun Manuscript(
         if (opened.isNotEmpty()) rows.filter { it.sceneKey in opened && it.key !in before }.forEach { revealKeys.add(it.key) }
     }
     val structural = ScriptMotion.structural(lastKeys.keys, keys)
+    // LIB-19: while the script tour shows, a block and a scene head on screen are its holes.
+    val tourKeys = if (tourRunning()) {
+        val blockKeys = remember(rows) { rows.filterIsInstance<BlockRow>().mapTo(HashSet()) { it.key } }
+        val headKeys = remember(rows) { rows.filterIsInstance<HeadRow>().mapTo(HashSet()) { it.key } }
+        val picked by remember(listState, blockKeys, headKeys) {
+            derivedStateOf {
+                val info = listState.layoutInfo
+                val items = info.visibleItemsInfo.map { ScriptTourSteps.Item(it.key, it.offset, it.offset + it.size) }
+                val bottom = info.viewportEndOffset - info.afterContentPadding
+                ScriptTourSteps.firstVisible(items, 0, bottom) { it in blockKeys } to
+                    ScriptTourSteps.firstVisible(items, 0, bottom) { it in headKeys }
+            }
+        }
+        picked
+    } else null
+    // A step whose row is not on screen leaves the tour (its card would float with no hole).
+    tourKeys?.let { (block, head) -> ScriptTourSteps.missing(block, head, readOnly).forEach { step -> key(step) { TourStepAbsent(step) } } }
     SideEffect { lastKeys.keys = keys }
     LazyColumn(
         state = listState,
@@ -187,7 +212,12 @@ fun Manuscript(
             )
             // SCR-58 / CNV-43: the rows of a hidden scene that appear because the gate opened unblur in.
             val reveal = if (row.key in revealKeys) Modifier.revealOnAppear(row.key, revealedRows) else Modifier
-            Box(place.then(reveal)) {
+            val tourMark = when (row.key) {
+                tourKeys?.first -> Modifier.tourTarget(ScriptTourSteps.BLOCK)
+                tourKeys?.second -> Modifier.tourTarget(ScriptTourSteps.HEAD)
+                else -> Modifier
+            }
+            Box(place.then(reveal).then(tourMark)) {
                 when (row) {
                     is HeadRow -> HeadView(
                         row,

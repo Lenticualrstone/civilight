@@ -106,10 +106,11 @@ fun EmptyBlock(
             CivilightText(subtitle, type.small.merge(TextStyle(fontSize = 13.sp)), color = colors.ink3)
         }
         if (primaryLabel != null && onPrimary != null) {
-            ButtonRow(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                CivilightButton(primaryLabel, onPrimary, Modifier.weight(1f))
+            // Flex 1 + flex 1 (DS-47) while both labels fit; stacked in a narrow pane so no label is cut (CNV-47).
+            FittingButtonRow(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                CivilightButton(primaryLabel, onPrimary)
                 if (secondaryLabel != null && onSecondary != null) {
-                    CivilightButton(secondaryLabel, onSecondary, Modifier.weight(1f), variant = ButtonVariant.GHOST)
+                    CivilightButton(secondaryLabel, onSecondary, variant = ButtonVariant.GHOST)
                 }
             }
         }

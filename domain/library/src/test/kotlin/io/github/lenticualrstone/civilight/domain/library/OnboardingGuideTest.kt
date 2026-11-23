@@ -22,15 +22,18 @@ import org.junit.Test
 class OnboardingGuideTest {
     @Test
     fun `LIB-19 step counts and drawn copy follow the spec table`() {
-        assertEquals(4, ModuleTours.stepCount(TourModule.SCRIPT))
-        TourModule.entries.filter { it != TourModule.SCRIPT }.forEach { assertEquals(it.name, 3, ModuleTours.stepCount(it)) }
+        // The script tour ends at `씬 머리`: no `시점 렌즈` step, the script has no lens (STO-16).
+        TourModule.entries.forEach { assertEquals(it.name, 3, ModuleTours.stepCount(it)) }
         val script = ModuleTours.steps(TourModule.SCRIPT)
         assertEquals("명령 칸" to "이동 · 검색 · 블록 추가 · 마이크", script[0].title to script[0].sub)
         assertEquals("블록을 왼쪽으로" to "시간 · 참고 · 속성 → 옆 패널 탭", script[1].title to script[1].sub)
-        assertEquals("시점 렌즈" to "고른 시점까지의 인물 · 관계 · 용어", script[3].title to script[3].sub)
+        assertEquals("씬 머리" to "장소와 때 · 전환 문구 · ⋯ 메뉴", script[2].title to script[2].sub)
+        assertTrue(script.none { it.title == "시점 렌즈" })
         assertEquals("연결", ModuleTours.steps(TourModule.RECORDER)[1].title)
         assertEquals("인물 안내", TourModule.CAST.label)
-        assertNull(TourModule.SCRIPT.label)
+        // Every card reads `<area> 안내 · k/n`, the script's too.
+        assertEquals("스크립트 안내", TourModule.SCRIPT.label)
+        TourModule.entries.forEach { assertTrue(it.name, it.label?.endsWith(" 안내") == true) }
         assertEquals(
             listOf("스크립트", "인물", "세계 · 연표", "라이프 레코더", "서재 · 숨기기", "지도 만들기", "인물 동선 · 장소와 때"),
             TourModule.entries.map { it.rowTitle },
@@ -61,12 +64,12 @@ class OnboardingGuideTest {
         var run = TourRun(TourModule.SCRIPT)
         assertFalse(run.hasPrevious)
         assertEquals("다음", run.primaryLabel)
-        run = run.next()!!.next()!!.next()!!
+        run = run.next()!!.next()!!
         assertTrue(run.isLast)
         assertEquals("마치기", run.primaryLabel)
-        assertEquals("시점 렌즈", run.step.title)
+        assertEquals("씬 머리", run.step.title)
         assertNull(run.next())
-        assertEquals(2, run.previous().index)
+        assertEquals(1, run.previous().index)
         assertEquals(0, TourRun(TourModule.MAP).previous().index)
     }
 

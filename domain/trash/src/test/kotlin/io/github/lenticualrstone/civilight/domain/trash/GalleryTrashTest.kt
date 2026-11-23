@@ -79,6 +79,13 @@ class GalleryTrashTest {
         assertEquals(2, impact.hiddenGalleryItems)
         assertTrue(Messages.impactSheet(impact).ownedRows.any { it.label == "이미지 10" })
         assertTrue(Messages.impactSheet(impact, hiddenLocked = true).ownedRows.any { it.label == "이미지 8 · 숨김 2" })
+        // Two-column rows keep the compound count together: `이미지` | `8 · 숨김 2`, never `이미지 8 · 숨김` | `2`.
+        val locked = Messages.impactSheet(impact, hiddenLocked = true).ownedRows.single { it.label.startsWith("이미지") }
+        assertEquals("이미지", locked.head)
+        assertEquals("8 · 숨김 2", locked.count)
+        val open = Messages.impactSheet(impact).ownedRows.single { it.label.startsWith("이미지") }
+        assertEquals("이미지", open.head)
+        assertEquals("10", open.count)
 
         val result = deleteRien()
         // Not live by derivation, no own trash entries, their originals still referenced.
@@ -205,5 +212,13 @@ class GalleryTrashTest {
         val caption = merged.doc.index.galleryItem(ITEM_3)!!.caption!!
         assertEquals(K.SERA, caption.flatMap { it.runs }.filterIsInstance<TextRun.Link>().single().target.key)
         assertTrue(merged.record.movedRefs.any { it.ownerKind == "galleryItem" && it.field == "caption" })
+    }
+
+    @Test
+    fun `sheet row columns split on the last word unless the count is named`() {
+        assertEquals("관계" to "1", SheetRow("관계 1").let { it.head to it.count })
+        assertEquals("◆ 변화 기록" to "2", SheetRow("◆ 변화 기록 2").let { it.head to it.count })
+        assertEquals("이미지" to "0 · 숨김 1", SheetRow("이미지 0 · 숨김 1", countText = "0 · 숨김 1").let { it.head to it.count })
+        assertEquals("블록" to "", SheetRow("블록").let { it.head to it.count })
     }
 }

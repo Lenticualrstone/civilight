@@ -48,6 +48,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.domain.story.search.GalleryHit
 import io.github.lenticualrstone.civilight.domain.story.search.Highlight
 import io.github.lenticualrstone.civilight.domain.story.search.SearchFilter
 import io.github.lenticualrstone.civilight.domain.story.search.SearchItem
@@ -81,6 +82,8 @@ fun SearchScreen(route: ProjectSearch, deps: FeatureDeps) {
     var filterName by rememberSaveable { mutableStateOf(SearchFilter.ALL.name) }
     val filter = SearchFilter.valueOf(filterName)
     val below = navigator.backStack.let { stack -> stack.getOrNull(stack.size - 2) }
+    // Opened from a gallery's command bar (GAL-04): gallery images only, the hint line instead of chips.
+    val galleryScope = SearchModel.galleryScope(below)
     LaunchedEffect(below) { vm.setBelow(below) }
     LaunchedEffect(filter) { vm.setFilter(filter) }
     // The overlay opens ready to type (STO-36: the command bar tap goes straight to the query).
@@ -97,6 +100,10 @@ fun SearchScreen(route: ProjectSearch, deps: FeatureDeps) {
                 navigator.pop()
             }
             is SearchTap.Renumber -> sheets.open(RenumberSheet(p, tap.episodeKey))
+            is SearchTap.ReplaceBelow -> {
+                navigator.pop()
+                navigator.replace(tap.route)
+            }
         }
     }
 
@@ -113,19 +120,26 @@ fun SearchScreen(route: ProjectSearch, deps: FeatureDeps) {
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp).focusRequester(focus),
                     onClose = { navigator.pop() },
                 )
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    SearchFilter.entries.forEach { f -> FilterChip(f.word, f == filter, { filterName = f.name }) }
+                if (galleryScope != null) {
+                    CivilightText(galleryScope.hint, CivilightTheme.type.small, Modifier.padding(top = 8.dp, bottom = 10.dp), color = CivilightTheme.colors.ink3, maxLines = 1)
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        SearchFilter.entries.forEach { f -> FilterChip(f.word, f == filter, { filterName = f.name }) }
+                    }
                 }
                 val u = ui
                 val result = u?.result
                 // QA #11: the `명령` chip lists the commands with an empty query too (SearchModel.listsWithoutQuery).
-                if (u != null && result != null && SearchModel.listsWithoutQuery(field.text, filter)) {
+                val shows = if (galleryScope != null) field.text.isNotBlank() && u?.gallery == galleryScope else SearchModel.listsWithoutQuery(field.text, filter)
+                if (u != null && result != null && shows) {
                     Results(
                         result = result,
+                        scoped = galleryScope != null,
                         onItem = { item -> go(SearchModel.tap(p, item, u.context)) },
+                        onGallery = { hit -> go(SearchModel.tap(p, hit, galleryScope)) },
                         onSimilar = { go(SearchModel.tap(p, it)) },
                         onCreateTerm = { navigator.replace(SearchModel.createTerm(p)) },
                     )
@@ -136,15 +150,23 @@ fun SearchScreen(route: ProjectSearch, deps: FeatureDeps) {
 }
 
 @Composable
-private fun Results(result: SearchResult, onItem: (SearchItem) -> Unit, onSimilar: (SimilarName) -> Unit, onCreateTerm: () -> Unit) {
+private fun Results(
+    result: SearchResult,
+    scoped: Boolean,
+    onItem: (SearchItem) -> Unit,
+    onGallery: (GalleryHit) -> Unit,
+    onSimilar: (SimilarName) -> Unit,
+    onCreateTerm: () -> Unit,
+) {
     val colors = CivilightTheme.colors
     val empty = result.empty
     if (empty != null) {
+        // A gallery search makes no term (board `GalSearch`).
         NoResults(
             title = empty.title,
             context = empty.line,
-            actionLabel = empty.createAction,
-            onAction = onCreateTerm,
+            actionLabel = if (scoped) null else empty.createAction,
+            onAction = if (scoped) null else onCreateTerm,
             similar = if (empty.similar.isEmpty()) null else {
                 {
                     SectionLabel(empty.similarHeader)
@@ -167,6 +189,12 @@ private fun Results(result: SearchResult, onItem: (SearchItem) -> Unit, onSimila
         result.sections.forEach { section ->
             item(key = "h:${section.kind}") { SectionLabel(section.header, civilightItem().padding(top = 14.dp)) }
             rows(section.kind.name, section.items, onItem)
+        }
+        SearchModel.gallerySections(result, scoped).forEach { section ->
+            item(key = "h:gallery:${section.header.substringBefore(' ')}") { SectionLabel(section.header, civilightItem().padding(top = 14.dp)) }
+            section.hits.forEach { hit ->
+                item(key = SearchModel.galleryKey(hit)) { GalleryHitRow(hit, civilightItem()) { onGallery(hit) } }
+            }
         }
         result.footer?.let { footer ->
             item(key = "footer") { CivilightText(footer, CivilightTheme.type.small, civilightItem().padding(top = 14.dp), color = colors.ink3) }

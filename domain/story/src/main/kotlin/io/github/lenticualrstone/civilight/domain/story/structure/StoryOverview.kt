@@ -90,15 +90,21 @@ class StoryOverview(
 
     fun charCount(unit: StoryUnit): Int = scenesOf(unit).sumOf { s -> doc.manuscript.liveBlocksOf(s.key).sumOf(BlockText::charCount) }
 
-    /** `k/n` or `0/n · 계획` (k = episodes with content). */
+    /**
+     * An episode that counts toward chapter progress: it has content, or the author marked it `완료`
+     * (`ED`, emulator round 2: an empty episode marked done read `0/1 · 계획` and `미정`).
+     */
+    fun countsAsWritten(episode: StoryUnit): Boolean = episode.doneMarked || hasContentUnder(episode)
+
+    /** `k/n` or `0/n · 계획` (k = episodes with content or marked `완료`, [countsAsWritten]). */
     fun progress(chapter: StoryUnit): String {
         val episodes = episodesOf(chapter)
-        val k = episodes.count(::hasContentUnder)
+        val k = episodes.count(::countsAsWritten)
         return if (k == 0) "0/${episodes.size} · 계획" else "$k/${episodes.size}"
     }
 
     fun chapterRow(chapter: StoryUnit): ChapterRow {
-        val planned = episodesOf(chapter).none(::hasContentUnder)
+        val planned = episodesOf(chapter).none(::countsAsWritten)
         return ChapterRow(chapter.key, codes.chapterHeader(chapter), progress(chapter), planned, if (planned) chapter.synopsis else null)
     }
 
@@ -135,15 +141,16 @@ class StoryOverview(
     // --- Home ------------------------------------------------------------------------------------
 
     /**
-     * Episode status on home: `미정` (no content), `완료` (the episode is marked done, or every scene
-     * with content is, `ED`), else `쓰는 중 · 씬 n` with n = the scene of the last edit, or the highest-numbered scene
+     * Episode status on home: `완료` when the episode is marked done (even with no content yet, `ED`),
+     * `미정` (no content), `완료` (every scene with content is marked, `ED`), else `쓰는 중 · 씬 n` with n = the scene of the last edit, or the highest-numbered scene
      * with content when the last edit is elsewhere (`ED`).
      */
     fun episodeStatus(episode: StoryUnit): String {
         val scenes = scenesOf(episode)
+        if (episode.doneMarked) return SceneStatus.DONE.word
         val written = scenes.filter(::hasContent)
         if (written.isEmpty()) return SceneStatus.UNDECIDED.word
-        if (episode.doneMarked || written.all { it.doneMarked }) return SceneStatus.DONE.word
+        if (written.all { it.doneMarked }) return SceneStatus.DONE.word
         val scene = scenes.firstOrNull { it.key == currentSceneKey } ?: written.last()
         return "쓰는 중 · ${codes.sceneLabel(scene)}"
     }
@@ -159,7 +166,7 @@ class StoryOverview(
     /** Stat `7/10` · `1장 에피소드`. */
     fun chapterStat(): Pair<String, String>? = currentChapter?.let { c ->
         val episodes = episodesOf(c)
-        "${episodes.count(::hasContentUnder)}/${episodes.size}" to "${codes.levelLabel(c)} ${structure.levels.getOrElse(episodeLevel ?: 0) { "" }}"
+        "${episodes.count(::countsAsWritten)}/${episodes.size}" to "${codes.levelLabel(c)} ${structure.levels.getOrElse(episodeLevel ?: 0) { "" }}"
     }
 
     /** Stat `12` · `인물`: non-deleted characters, hidden ones included (`ED`). */

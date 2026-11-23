@@ -15,8 +15,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,7 +41,6 @@ import io.github.lenticualrstone.civilight.designsystem.text.MarkerGlyph
 import io.github.lenticualrstone.civilight.designsystem.text.MarkerKind
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
@@ -66,28 +69,40 @@ fun StaggeredSwipeRow(
     val width = CivilightTheme.sizes.swipeRow
     val widthPx = with(LocalDensity.current) { width.toPx() }
     val density = LocalDensity.current
-    val offset = remember { Animatable(if (revealed) -widthPx else 0f) }
-    // Reduced motion: the block never slides on its own, the buttons fade on their own run (motion audit, row 7).
-    val fade = remember { Animatable(if (revealed) 1f else 0f) }
-    val scope = rememberCoroutineScope()
-    val progress = { (-offset.value / widthPx).coerceIn(0f, 1f) }
-    suspend fun settle(open: Boolean) {
-        val target = if (open) -widthPx else 0f
+    // The finger writes the offset at once (no coroutine per delta), so a release always sees the last
+    // delta and no late delta can stop the settle half way (emulator QA: rows left between open and closed).
+    val drag = remember { SwipeDrag(open = revealed, widthPx = widthPx) }
+    drag.widthPx = widthPx
+    // The one owner of the settle: after every release, and whenever [revealed] changes; a drag wins.
+    LaunchedEffect(revealed, widthPx, drag.releases, drag.dragging) {
+        if (drag.dragging) return@LaunchedEffect
+        val target = SwipeDrag.anchor(revealed, widthPx)
+        val fadeTarget = if (revealed) 1f else 0f
         if (reduced) {
-            offset.snapTo(target)
-            fade.animateTo(if (open) 1f else 0f, motion.spec(CivilightMotion.swipe))
+            // Reduced motion: the block never slides on its own, the buttons fade on their own run (motion audit, row 7).
+            drag.place(target)
+            if (drag.fade != fadeTarget) {
+                Animatable(drag.fade).animateTo(fadeTarget, motion.spec(CivilightMotion.swipe)) { drag.placeFade(value) }
+            }
         } else {
-            val token = ScriptMotion.settle(distanceLeft = kotlin.math.abs(target - offset.value) / widthPx)
-            offset.animateTo(target, motion.move(token))
+            drag.placeFade(fadeTarget)
+            if (drag.offset != target) {
+                val token = ScriptMotion.settle(distanceLeft = kotlin.math.abs(target - drag.offset) / widthPx)
+                Animatable(drag.offset).animateTo(target, motion.move(token)) { drag.place(value) }
+            }
         }
+        drag.place(target)
     }
-    LaunchedEffect(revealed, widthPx) { settle(revealed) }
-    val buttonsShown = { if (reduced) fade.value > 0f else progress() > 0f }
+    // Typing starts mid-drag (the row turns off): the drag ends where [revealed] says, never stuck as a drag.
+    LaunchedEffect(enabled) { if (!enabled) drag.cancel() }
+    val progress = { drag.progress }
+    // Closed (at its actual place, not only by [revealed]), the buttons are not read by TalkBack (the row's
+    // custom actions offer the same three).
+    val buttonsShown by remember(reduced) { derivedStateOf { if (reduced) drag.fade > 0f else drag.progress > 0f } }
     Box(modifier) {
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
-            // Closed, the buttons are not read by TalkBack (the row's custom actions offer the same three).
-            val hidden = if (revealed) Modifier else Modifier.clearAndSetSemantics { }
-            Row(Modifier.width(width).fillMaxHeight().then(hidden).graphicsLayer { alpha = if (buttonsShown()) 1f else 0f }.background(colors.raise)) {
+            val hidden = if (buttonsShown) Modifier else Modifier.clearAndSetSemantics { }
+            Row(Modifier.width(width).fillMaxHeight().then(hidden).graphicsLayer { alpha = if (buttonsShown) 1f else 0f }.background(colors.raise)) {
                 val actions = listOf(onTime, onReference, onProperties)
                 actions.forEachIndexed { i, action ->
                     SwipeButton(
@@ -95,7 +110,7 @@ fun StaggeredSwipeRow(
                         onClick = action,
                         labelColor = if (i == 0 && timeHasChange) colors.acc else colors.ink,
                         modifier = Modifier.graphicsLayer {
-                            val p = if (reduced) fade.value else ScriptMotion.buttonProgress(progress(), i, reduced = false)
+                            val p = if (reduced) drag.fade else ScriptMotion.buttonProgress(progress(), i, reduced = false)
                             alpha = p
                             translationX = with(density) { ScriptMotion.buttonShiftDp(p, reduced).dp.toPx() }
                         },
@@ -111,25 +126,84 @@ fun StaggeredSwipeRow(
         }
         Box(
             Modifier
-                .offset { IntOffset(offset.value.roundToInt(), 0) }
+                .offset { IntOffset(drag.offset.roundToInt(), 0) }
                 .background(colors.bg)
                 .draggable(
                     orientation = Orientation.Horizontal,
                     enabled = enabled,
-                    state = rememberDraggableState { delta ->
-                        scope.launch {
-                            offset.snapTo((offset.value + delta).coerceIn(-widthPx, 0f))
-                            // The buttons follow the finger under reduced motion too.
-                            if (reduced) fade.snapTo(progress())
-                        }
-                    },
+                    // The buttons follow the finger under reduced motion too ([SwipeDrag.onDelta] sets the fade).
+                    state = rememberDraggableState { delta -> drag.onDelta(delta) },
                     onDragStopped = {
-                        val open = offset.value < -widthPx / 2
-                        settle(open)
+                        // Decided and reported at once, before any animation: the settle effect then runs to it.
+                        val open = drag.release()
                         if (open != revealed) onRevealedChange(open)
                     },
                 ),
         ) { content() }
+    }
+}
+
+/**
+ * The swipe row's finger state (CNV-40), plain so it is JVM-tested: [offset] in px (0 = closed,
+ * −[widthPx] = open), written synchronously by each drag delta; [release] decides open or closed
+ * (past half stays open) and bumps [releases] so the settle runs even when the state did not change.
+ */
+class SwipeDrag(open: Boolean, var widthPx: Float) {
+    private val offsetState = mutableFloatStateOf(anchor(open, widthPx))
+    private val fadeState = mutableFloatStateOf(if (open) 1f else 0f)
+    private val draggingState = mutableStateOf(false)
+    private val releasesState = mutableIntStateOf(0)
+
+    /** Where the block is drawn, in px. */
+    val offset: Float get() = offsetState.floatValue
+
+    /** The buttons' fade under reduced motion (follows the finger, then its own run). */
+    val fade: Float get() = fadeState.floatValue
+
+    val dragging: Boolean get() = draggingState.value
+    val releases: Int get() = releasesState.intValue
+
+    /** 0 = closed, 1 = fully open. */
+    val progress: Float get() = if (widthPx <= 0f) 0f else (-offset / widthPx).coerceIn(0f, 1f)
+
+    /** One drag delta (px, negative = left), applied at once and kept between open and closed. */
+    fun onDelta(delta: Float) {
+        draggingState.value = true
+        offsetState.floatValue = (offset + delta).coerceIn(-widthPx, 0f)
+        fadeState.floatValue = progress
+    }
+
+    /** The finger lifted: true = settle open. */
+    fun release(): Boolean {
+        draggingState.value = false
+        releasesState.intValue++
+        return opensOnRelease(offset, widthPx)
+    }
+
+    /** A drag that ends without a release (the row turned off): settles back to the open state as it was. */
+    fun cancel() {
+        if (!draggingState.value) return
+        draggingState.value = false
+        releasesState.intValue++
+    }
+
+    /** The settle animation's frame; ignored while a finger holds the row (the drag wins at once). */
+    fun place(value: Float) {
+        if (draggingState.value) return
+        offsetState.floatValue = value.coerceIn(-widthPx, 0f)
+    }
+
+    /** The reduced-motion fade's frame; ignored while a finger holds the row. */
+    fun placeFade(value: Float) {
+        if (draggingState.value) return
+        fadeState.floatValue = value.coerceIn(0f, 1f)
+    }
+
+    companion object {
+        fun anchor(open: Boolean, widthPx: Float): Float = if (open) -widthPx else 0f
+
+        /** Released past half the buttons' width stays open. */
+        fun opensOnRelease(offset: Float, widthPx: Float): Boolean = offset < -widthPx / 2
     }
 }
 

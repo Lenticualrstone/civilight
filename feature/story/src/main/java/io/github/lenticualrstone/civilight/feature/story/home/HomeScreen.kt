@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,7 +37,6 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
-import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
@@ -144,33 +142,34 @@ private fun HomeContent(
         modifier = Modifier.fillMaxSize().background(colors.bg),
         contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 24.dp),
     ) {
-        item(key = "name") {
-            Column(civilightItem()) {
-                CivilightText(ui.name, type.displayM, color = colors.ink)
-                if (start != null && ui.newReady) {
-                    StartSummary(ui, start)
-                } else {
-                    ui.oneLiner?.let { CivilightText(it, type.leadCompact, Modifier.padding(top = 12.dp), color = colors.ink2) }
+        HomeModel.slots(ui).forEach { slot ->
+            item(key = slot.key) {
+                when (slot) {
+                    HomeSlot.Name -> Column(civilightItem()) {
+                        CivilightText(ui.name, type.displayM, color = colors.ink)
+                        // The summary line and the one-liner fold, so the name item changes height smoothly
+                        // when `NewReady` ends (`목록 닫기`).
+                        FoldRevealValue(start?.takeIf { ui.newReady }, label = "startSummary") { s -> StartSummary(ui, s) }
+                        FoldRevealValue(ui.oneLiner?.takeIf { !ui.newReady }, label = "oneLiner") { line ->
+                            CivilightText(line, type.leadCompact, Modifier.padding(top = 12.dp), color = colors.ink2)
+                        }
+                    }
+                    HomeSlot.Stats -> HomeStats(ui, civilightItem())
+                    HomeSlot.Resume -> ui.resume?.let { ResumeBlock(it, onResume, civilightItem()) }
+                    // The block folds away on `목록 닫기` and back in on a new project (P1, fold tokens). The
+                    // item itself stays, so its height shrinks with the fold and the rows below follow it.
+                    HomeSlot.Start -> FoldRevealValue(start, civilightItem(fadeIn = null, fadeOut = null), label = "startBlock") { s ->
+                        StartBlockView(s, onStartRoute, onDismissStart)
+                    }
+                    HomeSlot.ListHeader -> Column(civilightItem().padding(top = 28.dp, bottom = 6.dp)) {
+                        ui.listHeader?.let { ChapterHeaderLabel(it) }
+                    }
+                    is HomeSlot.Episode -> EpisodeLine(slot.row, onEpisode, selected = slot.row.key == selectedKey, modifier = civilightItem())
+                    HomeSlot.Work -> Column(civilightItem().padding(top = 28.dp)) {
+                        SectionLabel(HomeCopy.WORK)
+                        ShortcutGrid(ui.shortcuts, onShortcut, Modifier.padding(top = 4.dp))
+                    }
                 }
-            }
-        }
-        if (!ui.newReady) homeHead(ui, onResume)
-        if (start != null) {
-            // The block folds away on `목록 닫기` and back in on a new project (P1, fold tokens).
-            item(key = "start") { StartBlockView(start, onStartRoute, onDismissStart, civilightItem(CivilightMotion.foldOpen, fadeOut = CivilightMotion.foldClose)) }
-        }
-        if (ui.rows.isNotEmpty()) {
-            item(key = "listHeader") {
-                Column(civilightItem().padding(top = 28.dp, bottom = 6.dp)) {
-                    ui.listHeader?.let { ChapterHeaderLabel(it) }
-                }
-            }
-            ui.rows.forEach { row -> item(key = "row:${row.key}") { EpisodeLine(row, onEpisode, selected = row.key == selectedKey, modifier = civilightItem()) } }
-        }
-        item(key = "work") {
-            Column(civilightItem().padding(top = 28.dp)) {
-                SectionLabel(HomeCopy.WORK)
-                ShortcutGrid(ui.shortcuts, onShortcut, Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -182,22 +181,18 @@ private fun ChapterHeaderLabel(text: String) {
     ChapterHeaderText(text, CivilightTheme.type.sec, color = CivilightTheme.colors.ink3)
 }
 
-/** Stats and `이어 쓰기` (board `Home`); not drawn in the `NewReady` state. */
-private fun LazyListScope.homeHead(ui: HomeUi, onResume: (HomeResume) -> Unit) {
-    item(key = "stats") {
-        val colors = CivilightTheme.colors
-        val type = CivilightTheme.type
-        Row(civilightItem().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-            ui.stats.forEach { stat ->
-                Column {
-                    ValueSwap(stat.value, type.stat, color = colors.ink)
-                    ValueSwap(stat.label, type.small, color = colors.ink3)
-                }
+/** The stats row of board `Home`; not drawn in the `NewReady` state. */
+@Composable
+private fun HomeStats(ui: HomeUi, modifier: Modifier = Modifier) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    Row(modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+        ui.stats.forEach { stat ->
+            Column {
+                ValueSwap(stat.value, type.stat, color = colors.ink)
+                ValueSwap(stat.label, type.small, color = colors.ink3)
             }
         }
-    }
-    ui.resume?.let { resume ->
-        item(key = "resume") { ResumeBlock(resume, onResume, civilightItem()) }
     }
 }
 

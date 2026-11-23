@@ -15,6 +15,7 @@ import io.github.lenticualrstone.civilight.ui.gallery.GalleryCardCopy
 import io.github.lenticualrstone.civilight.ui.gallery.GalleryCardRules
 import io.github.lenticualrstone.civilight.ui.nav.ListDetailPairs
 import io.github.lenticualrstone.civilight.ui.project.PROJECT_OPEN_FAILED
+import io.github.lenticualrstone.civilight.ui.window.ListDetailCopy
 import io.github.lenticualrstone.civilight.ui.window.PaneSplitCopy
 import io.github.lenticualrstone.civilight.ui.window.PaneSplitRules
 import org.junit.Assert.assertEquals
@@ -104,9 +105,16 @@ class PaneSplitAndMotionTest {
     @Test
     fun `new shell copy passes CopyLint`() {
         val values = listOf(PaneSplitCopy.HANDLE, PaneSplitCopy.DEFAULT, PaneSplitCopy.ONE_TWO, PROJECT_OPEN_FAILED) +
-            listOf(GalleryCardCopy.MENU, GalleryCardCopy.UNTITLED, GalleryCardCopy.PORTRAIT, GalleryCardCopy.BACKGROUND, GalleryCardCopy.COVER, GalleryCardCopy.HOLO)
+            listOf(GalleryCardCopy.MENU, GalleryCardCopy.UNTITLED, GalleryCardCopy.PORTRAIT, GalleryCardCopy.BACKGROUND, GalleryCardCopy.COVER, GalleryCardCopy.HOLO) +
+            ListDetailCopy.all
         for (v in values) assertTrue("$v: ${CopyLint.lint(v)}", CopyLint.lint(v).isEmpty())
         assertFalse(PROJECT_OPEN_FAILED.startsWith("TODO_COPY"))
+    }
+
+    @Test
+    fun `empty right pane has a drawn line - Q-LY-02`() {
+        assertEquals("고른 항목 없음", ListDetailCopy.NO_SELECTION)
+        assertTrue(ListDetailCopy.all.none { it.isBlank() || it.startsWith("TODO_COPY") })
     }
 
     @Test

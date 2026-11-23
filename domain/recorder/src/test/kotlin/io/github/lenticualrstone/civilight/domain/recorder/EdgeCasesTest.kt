@@ -146,8 +146,36 @@ class EdgeCasesTest {
         assertEquals(KindFilter.TEXT, InboxFilters.toggleKind(voice, KindFilter.TEXT).kind)
         assertEquals("잿빛 새벽의 등불 ▾", Inbox.projectChipLabel(ProjectFilter.Project(Fx.P1), env))
         assertEquals("연결 없음 ▾", Inbox.projectChipLabel(ProjectFilter.NoLink, env))
-        // Counts follow the kind filter.
-        assertEquals(listOf("전체 2", "정리 안 됨 2"), Inbox.screen(library, voice, env, Fx.NOW).filters.take(2).map { it.label })
+        // Counts do not follow the kind filter (emulator round 1): `전체` stays the status total.
+        val noKind = Inbox.screen(library, InboxFilterState(), env, Fx.NOW).filters.take(2).map { it.label }
+        assertEquals(noKind, Inbox.screen(library, voice, env, Fx.NOW).filters.take(2).map { it.label })
+    }
+
+    @Test
+    fun kindChipsLeaveTheStatusCountsAlone() {
+        val library = Fx.openLibrary()
+        fun labels(lib: RecorderLibrary, f: InboxFilterState) = Inbox.screen(lib, f, env, Fx.NOW).filters.take(2).map { it.label }
+        val base = InboxFilterState()
+        val all = labels(library, base)
+        val voice = InboxFilters.toggleKind(base, KindFilter.VOICE)
+        val text = InboxFilters.toggleKind(base, KindFilter.TEXT)
+        assertEquals(all, labels(library, voice))
+        assertEquals(all, labels(library, text))
+        // The rows still narrow, and both 전체 (status) and 음성 (kind) stay selected.
+        val voiceScreen = Inbox.screen(library, voice, env, Fx.NOW)
+        assertTrue(voiceScreen.rows.size < Inbox.screen(library, base, env, Fx.NOW).rows.size)
+        assertEquals(listOf("전체", "음성"), voiceScreen.filters.filter { it.selected }.map { it.label.substringBefore(' ') })
+        // No voice record at all: the list is filtered-empty but `전체 <n>` still counts the text records.
+        val textOnly = library.copy(records = library.records.filter { it.kind.known == RecordKind.TEXT })
+        val n = textOnly.records.count { it.deletedAt == null && !it.hidden }
+        assertTrue(n > 0)
+        val voiceOnText = Inbox.screen(textOnly, voice, env, Fx.NOW)
+        assertTrue(voiceOnText.filteredEmpty)
+        assertEquals("전체 $n", voiceOnText.filters.first().label)
+        assertEquals(labels(textOnly, base), labels(textOnly, voice))
+        // The project filter still scopes the counts (the `정리 안 됨 n ›` line matches the inbox).
+        val inP3 = labels(library, InboxFilterState(project = ProjectFilter.Project(Fx.P3)))
+        assertEquals(listOf("전체 0", "정리 안 됨 0"), inP3)
     }
 
     @Test

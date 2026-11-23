@@ -117,11 +117,15 @@ object Inbox {
     }
 
     /**
-     * Counts over records not in the trash that pass the kind, project and target filters,
-     * excluding hidden records while they are locked: `전체 <n>` and `정리 안 됨 <u>`.
+     * Counts over records not in the trash that pass the project and target filters, excluding
+     * hidden records while they are locked: `전체 <n>` and `정리 안 됨 <u>`. The kind chips
+     * (`음성` · `글`) do not change them: they only narrow the list, so `전체` keeps reading as the
+     * status total (emulator round 1; departs from the LRC-27 `[PROPOSED]` "after the kind filter").
+     * Project and target stay in, so `정리 안 됨 <u>` matches the `레코더 · 정리 안 됨 n ›` line that opened it.
      */
     fun counts(library: RecorderLibrary, filter: InboxFilterState, env: RecorderEnv): Pair<Int, Int> {
-        val visible = ordered(library).filter { (!it.hidden || env.recordsOpen) && InboxFilters.passesNonStatus(library, it, filter, env) }
+        val scope = filter.copy(kind = KindFilter.NONE)
+        val visible = ordered(library).filter { (!it.hidden || env.recordsOpen) && InboxFilters.passesNonStatus(library, it, scope, env) }
         return visible.size to visible.count { RecordStates.state(library, it, env) == RecordState.UNSORTED }
     }
 
