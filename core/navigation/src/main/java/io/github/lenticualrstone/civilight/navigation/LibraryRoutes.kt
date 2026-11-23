@@ -50,6 +50,14 @@ data object SettingsMotion : LibraryRoute
 @Serializable
 data object SettingsMore : LibraryRoute
 
+/** (0.2.0, U-16, LIB-94) 설정 › 화면 › 서재 보기: the 3D shelf style list. */
+@Serializable
+data object SettingsLibraryView : LibraryRoute
+
+/** (0.2.0, U-16, LIB-94) 설정 › 화면 › 카드 보기: the character card style list. */
+@Serializable
+data object SettingsCardView : LibraryRoute
+
 /** 설정 · 숨기기 (LIB-64). */
 @Serializable
 data object SettingsHiding : LibraryRoute

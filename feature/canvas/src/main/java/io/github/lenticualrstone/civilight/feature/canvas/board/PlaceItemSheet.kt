@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.canvas.board
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.feature.canvas.common.canvasPickerCreator
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,6 +54,7 @@ fun ColumnScope.PlaceItemContent(
             onPick = { onPick(CanvasNodeKind.CHARACTER, it) },
             onClose = onClose,
             title = CanvasCopy.pickTitle(CanvasCopy.KIND_CHARACTER),
+            creator = canvasPickerCreator(CreateKind.CHARACTER),
         )
         return
     }
@@ -62,8 +65,8 @@ fun ColumnScope.PlaceItemContent(
         Column(Modifier.fillMaxWidth()) {
             val title = CanvasCopy.pickTitle(CanvasCopy.NODE_TOOL_KINDS[shown])
             when (NodeToolKinds[shown]) {
-                CanvasNodeKind.FACTION -> FactionPickerSheet(doc, gate, title, { onPick(CanvasNodeKind.FACTION, it) }, onClose)
-                CanvasNodeKind.TERM -> TermPickerSheet(doc, gate, title, { key, _ -> onPick(CanvasNodeKind.TERM, key) }, onClose)
+                CanvasNodeKind.FACTION -> FactionPickerSheet(doc, gate, title, { onPick(CanvasNodeKind.FACTION, it) }, onClose, creator = canvasPickerCreator(CreateKind.FACTION))
+                CanvasNodeKind.TERM -> TermPickerSheet(doc, gate, title, { key, _ -> onPick(CanvasNodeKind.TERM, key) }, onClose, creator = canvasPickerCreator(CreateKind.TERM))
                 else -> EventPickerSheet(doc, title, { onPick(CanvasNodeKind.EVENT, it) }, onClose)
             }
         }

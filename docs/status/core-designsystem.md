@@ -222,3 +222,9 @@ Wave 0 of `docs/status/motion-audit.md` (§3.1 / §3.2), built 2026-11-23 by cor
 - **DS-62 repo-wide lint**: an app-level or CI test that runs `CopyLint.lintStringsXml` over every module's `src/main/res/values/strings.xml`. Alternatively, permission for this module's tests to scan the repository.
 - **Optional catalog additions**: `pretendard_extrabold.otf` (Q-DS-01; no code change needed beyond a `Font` entry in `Pretendard`), and Haze if the native glass shows problems on devices.
 - **FEATURES.md**: update the DS rows from this file (not this module's file to edit).
+
+## 0.2.0 integration (wave 3, orchestrator)
+
+- DS-74 tilt source: `card/DeviceTilt.kt` with `rememberTilt(enabled)` (rotation-vector sensor, registered only while enabled and resumed, removed on pause and dispose; base pose at the first event, a display rotation takes a new base), `DeviceTilt` (`x`, `y` in −1 … 1, read in layer and draw blocks only; `Still` when disabled) and `TiltMath` (±12° clamp, 120 ms low-pass, `offset` with depth ≤ 8 dp). Used by the 서재 views and the character card views; canvas holo keeps its own `AndroidTiltSensor`. Test `DeviceTiltTest` (T-DS-52 except the `Tilt.follows` cases, which live with `core:model` `Tilt`). New dependency: `lifecycle-runtime-compose`.
+- Tokens: `CivilightMotion.viewSettleStiffness` / `viewSettleDamping` (3D focus settle, critically damped until a board value for the overshoot exists) and `starOrbitPeriodMs` (90 s 별자리 orbit).
+- Not built: `Modifier.parallax` / `Modifier.sheen` as DS modifiers (each view keeps its layer code built on `TiltMath.offset`).

@@ -403,6 +403,14 @@ object MergeOps {
                         u.copy(silentCast = cast, updatedAt = at, updatedBy = by)
                     },
                 ),
+                // (0.2.0, WLD-74) an event's `관련 인물` follows the merge.
+                world = d.world.copy(
+                    events = d.world.events.map { e ->
+                        if (from !in e.relatedCharacterKeys) return@map e
+                        moved += MovedRef("event", e.key, "relatedCharacterKeys")
+                        e.copy(relatedCharacterKeys = e.relatedCharacterKeys.map { if (it == from) to else it }.distinct(), updatedAt = at, updatedBy = by)
+                    },
+                ),
             )
         }
         if (kind == ItemKind.PLACE) {

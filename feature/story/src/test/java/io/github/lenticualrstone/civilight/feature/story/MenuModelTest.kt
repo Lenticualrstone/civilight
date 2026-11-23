@@ -73,7 +73,8 @@ class MenuModelTest {
             }
         }
         val episode = UnitMenuModel.build(doc, K.EPISODE_1_7, MenuSurface.STORY_LIST, readOnly = true)!!
-        assertTrue(episode.rows.none { it.enabled })
+        // (0.2.0, N-29) `지난 판` only reads, so it stays usable in a read-only project.
+        assertEquals(listOf(MenuAction.VERSIONS), episode.rows.filter { it.enabled }.map { it.action })
         val structure = StructureMenuModel.build(doc, readOnly = true)
         assertEquals(listOf(true, true, false), structure.rows.map { it.enabled })
         assertEquals("읽기 전용", structure.rows[2].value)
@@ -84,10 +85,14 @@ class MenuModelTest {
         val menu = UnitMenuModel.build(doc, K.EPISODE_1_7, MenuSurface.STORY_LIST, readOnly = false)!!
         assertEquals("1-7 · 잿빛 새벽의 등불", menu.title)
         // `새 에피소드` and `완료 표시` follow the drawn rows (Q34 words, 2026-11-23).
-        assertEquals(listOf(MenuAction.RENUMBER, MenuAction.MOVE, MenuAction.NEW_UNIT_AFTER, MenuAction.MARK_DONE), menu.rows.map { it.action })
+        assertEquals(
+            listOf(MenuAction.RENUMBER, MenuAction.KEEP_VERSION, MenuAction.VERSIONS, MenuAction.MOVE, MenuAction.NEW_UNIT_AFTER, MenuAction.MARK_DONE),
+            menu.rows.map { it.action },
+        )
         assertEquals("번호 다시 매기기 · 1-7", menu.rows[0].label)
-        assertEquals("새 에피소드", menu.rows[2].label)
-        assertEquals("완료 표시", menu.rows[3].label)
+        assertEquals(listOf("판 남기기", "지난 판"), menu.rows.subList(1, 3).map { it.label })
+        assertEquals("새 에피소드", menu.rows[4].label)
+        assertEquals("완료 표시", menu.rows[5].label)
         assertEquals("1-8 · 미정", UnitMenuModel.build(doc, K.EPISODE_1_8, MenuSurface.STORY_LIST, readOnly = false)!!.title)
     }
 

@@ -569,3 +569,10 @@ Status: **partial** (logic JVM-tested; nothing seen on an emulator yet). Build: 
 ## 0.2.0 integration (wave 2, orchestrator)
 
 Applied: `ScriptViewState.draft` (the draft is now kept in `_app/view.json` through `updateApp`, debounced and on clear; read back in `openDraft`; test `DraftPersistTest`). `ScriptInputBar(nextSceneEnabled)` dims `다음 씬` (`다음 씬 만들기 · 꺼짐`), fed by `NextScene.emptyAfter`. Script tour `명령 칸` step left out always (LIB-96). Not applied: core:navigation sheet keys for `지난 판` · `판 남기기` · replace-mode 찾기 (story, cast and world entries stay hidden); picker create rows.
+
+
+## 0.2.0 integration (wave 2 requests applied)
+
+Applied in shared modules: `core:ui` pickers take `creator: PickerCreator?` (U-15.3 create row, picker-mode card, `상위 지역` picked in place, the new item returned as the pick; written through `domain:actions` `CreateActions.inPicker`; no row in read-only projects); trashed tags make no picker chip, subtitle or match (N-44). `core:navigation`: SCRIPT-owned `EpisodeVersionsSheet` · `VersionCompareSheet` · `ManuscriptReplaceSheet`; routes `MarksList`, `SettingsLibraryView`, `SettingsCardView`. `core:model` `TimelineEvent.relatedCharacterKeys` (additive; merges remap it). DS: `TagColor` palette, `TagDot`, `TagColorRow`, `FilterChip(tagColor)`, `LensChip(small)` (the `CivilightScreen` head chip is small), `ListRow(highlighted)` and `Modifier.createdHighlight`.
+
+Script: speaker (chip and block), `@` (draft and block, kind chips `전체 · 인물 · 용어 · 장소`, row for the kind in view, `인물` under `전체`), scene-split place and change-partner pickers have the create row. `지난 판` / `판 남기기` / compare and replace-mode 찾기 are the shared SCRIPT sheets (local `VersionsSheetKey` / `VersionCompareSheetKey` removed). Still not built: asset create row in the cue picker.

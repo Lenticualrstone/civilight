@@ -86,7 +86,7 @@ fun RecordFrame(
                 ContentSwap(collapsed, label = "recordHeader") { bar ->
                     if (bar) {
                         TopGlassBar(collapsedTitle, smallLine = collapsedSmallLine, back = back, wide = wide) {
-                            LensChip(lens.text, lens.state, onLens, lensModifier)
+                            LensChip(lens.text, lens.state, onLens, lensModifier, small = true)
                             if (add != null) CivilightIconButton(IconId.Plus, add.label, add.onClick, tint = CivilightTheme.colors.ink)
                             if (menu != null) CivilightIconButton(IconId.More, menu.label, menu.onClick, tint = CivilightTheme.colors.ink)
                         }
@@ -143,7 +143,7 @@ private fun GlassLens(lens: LensChipLabel, onLens: () -> Unit, modifier: Modifie
     val shape = RoundedCornerShape(22.dp)
     Box(modifier.heightIn(min = 44.dp), contentAlignment = Alignment.Center) {
         GlassBackground(GlassSurface.CHIP, Modifier.matchParentSize(), shape = shape)
-        LensChip(lens.text, lens.state, onLens, Modifier.padding(horizontal = 6.dp))
+        LensChip(lens.text, lens.state, onLens, Modifier.padding(horizontal = 6.dp), small = true)
     }
 }
 

@@ -39,6 +39,9 @@ object CastUiCopy {
     val VIEW_MODES = listOf("목록", "관계도")
     const val NAME = "이름"
 
+    /** (0.2.0, N-28) Under a name field: `원고 속 3곳 · 바꾸기`. */
+    fun manuscriptReplace(count: Int): String = "원고 속 ${count}곳 · 바꾸기"
+
     // --- 인물 기록 (CST-07 … CST-12) ---
     val TABS = listOf("개요", "말투", "관계", "게임 텍스트", "비밀")
     const val CURRENT_VALUE = "지금 값"

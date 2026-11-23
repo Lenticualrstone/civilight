@@ -40,7 +40,7 @@ import java.lang.reflect.Modifier
 
 /** DECISIONS §3: every value of this module's copy objects passes the design-system copy lint. */
 class LibraryCopyLintTest {
-    private val objects: List<Any> = listOf(ShelfCopy, NewProjectCopy, RatingCopy, ProtectionCopy, ProjectSettingsCopy, TrashScreenCopy, ExportCopy, SettingsCopy, OpenFileCopy, OnboardingCopy, HelpCopy, BackupCopy, RecoveryCopy, RestoreCopy, LayoutSettingsCopy, MotionSettingsCopy, MoreSettingsCopy, io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary)
+    private val objects: List<Any> = listOf(ShelfCopy, NewProjectCopy, RatingCopy, ProtectionCopy, ProjectSettingsCopy, TrashScreenCopy, ExportCopy, SettingsCopy, OpenFileCopy, OnboardingCopy, HelpCopy, BackupCopy, RecoveryCopy, RestoreCopy, LayoutSettingsCopy, MotionSettingsCopy, MoreSettingsCopy, io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfViewCopy, io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary)
 
     /** `Object.FIELD` → string value, for every constant of every copy object. */
     private fun values(): Map<String, String> = objects.flatMap { obj ->
@@ -79,6 +79,8 @@ class LibraryCopyLintTest {
         io.github.lenticualrstone.civilight.model.app.RelockPolicy.entries.forEach { add(io.github.lenticualrstone.civilight.domain.library.lock.Relock.openGroupNote(it)) }
         BackupFailure.entries.forEach { add(it.label) }
         add(R18DefaultsBlock.RECORDER_LINE)
+        // 0.2.0 LIB-93: the 3D view position line.
+        add(io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfViewCopy.position(2, 8))
         add(StartBlock.PROTAGONIST_SUB)
         add(LibraryNotices.RESTORE_DONE)
         add(LibraryNotices.EXPORT_DONE)

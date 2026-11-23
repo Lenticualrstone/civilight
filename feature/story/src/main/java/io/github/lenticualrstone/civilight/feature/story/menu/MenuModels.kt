@@ -36,6 +36,12 @@ enum class MenuAction {
     /** Episode ⋯ → `번호 다시 매기기 · 1-7` preview sheet (SCR-22, [RenumberSheet]). */
     RENUMBER,
 
+    /** (0.2.0, N-29) Episode ⋯ `판 남기기` → `EpisodeVersionsSheet(keepOnly)` (SCR-76). */
+    KEEP_VERSION,
+
+    /** (0.2.0, N-29) Episode ⋯ `지난 판` → `EpisodeVersionsSheet` (SCR-76). */
+    VERSIONS,
+
     /** A new unit of the same level after this one (`새 에피소드` / `새 장`, STO-05). */
     NEW_UNIT_AFTER,
 
@@ -114,7 +120,7 @@ object UnitMenuModel {
     }
 
     /**
-     * Episode ⋯: `번호 다시 매기기 · 1-7` (the drawn item, STO-07 → SCR-22), `옮기기` (STO-08), then
+     * Episode ⋯: `번호 다시 매기기 · 1-7` (the drawn item, STO-07 → SCR-22), (0.2.0) `판 남기기 · 지난 판` (N-29), `옮기기` (STO-08), then
      * `새 에피소드` and `완료 표시` / `완료 표시 빼기`. Units above the episode level: `옮기기` and `새 장`.
      */
     private fun unitMenu(doc: ProjectDoc, unit: StoryUnit, readOnly: Boolean): MenuModel {
@@ -124,6 +130,9 @@ object UnitMenuModel {
         val newLabel = if (isEpisode) StoryCopy.NEW_EPISODE else StoryCopy.NEW_CHAPTER
         val rows = buildList {
             if (isEpisode) add(mutating(MenuAction.RENUMBER, "${MenuCopy.RENUMBER} · ${view.codes.episodeCode(unit)}", null, readOnly))
+            // (0.2.0, N-29) versions per episode; `지난 판` stays readable in a read-only project.
+            if (isEpisode) add(mutating(MenuAction.KEEP_VERSION, MenuCopy.KEEP_VERSION, null, readOnly))
+            if (isEpisode) add(MenuRow(MenuAction.VERSIONS, MenuCopy.VERSIONS, null))
             // `옮기기` (STO-08): the explicit path for reordering episodes and chapters (no drag needed).
             add(mutating(MenuAction.MOVE, MenuCopy.MOVE, null, readOnly))
             add(mutating(MenuAction.NEW_UNIT_AFTER, newLabel, null, readOnly))

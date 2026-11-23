@@ -353,6 +353,8 @@ internal fun LibraryScreen(services: LibraryServices) {
                                             onMenu = { sheets.open(ShelfMenuSheet(it)) },
                                             onUnlock = vm::unlockHiddenGroup,
                                             onNewProject = { services.startNewProject() },
+                                            tilt = view.viewTilt && !motion.reduced,
+                                            unhide = unhide,
                                         ),
                                     )
                                 }

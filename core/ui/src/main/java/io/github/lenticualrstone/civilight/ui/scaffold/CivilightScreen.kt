@@ -131,7 +131,8 @@ private fun ScreenFrame(
                 topBar()
             } else {
                 TopGlassBar(title = title, smallLine = smallLine, back = back, wide = wide) {
-                    if (lens != null) LensChip(lens.text, lens.state, onLens)
+                    // S-1, CST-70, WLD-71: the lens chip left on the cast and world heads is the small one.
+                    if (lens != null) LensChip(lens.text, lens.state, onLens, small = true)
                     actions()
                 }
             }

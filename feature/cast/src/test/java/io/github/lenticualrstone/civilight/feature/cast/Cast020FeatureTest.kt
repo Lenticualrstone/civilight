@@ -76,10 +76,22 @@ class Cast020FeatureTest {
     }
 
     @Test
-    fun `the card draws only fields with a working control (no 이미지, no 색 yet)`() {
+    fun `the card draws only fields with a working control (no 이미지)`() {
         assertEquals(listOf("이름", "표시 이름", "한 줄 소개", "태그"), CastCreate.fields(CreateKind.CHARACTER).map { it.label })
         assertEquals(listOf(CreateFieldType.IMAGE), CastCreate.hiddenFields(CreateKind.CHARACTER).map { it.type })
-        assertEquals(listOf("이름"), CastCreate.fields(CreateKind.TAG).map { it.label })
+        // CST-75: `색` is drawn since the DS tag palette exists.
+        assertEquals(listOf("이름", "색"), CastCreate.fields(CreateKind.TAG).map { it.label })
+    }
+
+    @Test
+    fun `a tag card writes its palette colour, an unknown token is no colour`() {
+        val doc = CastFx.doc()
+        val ctx = io.github.lenticualrstone.civilight.domain.actions.ActionContext(io.github.lenticualrstone.civilight.model.sample.ExampleClock.NOW)
+        val card = io.github.lenticualrstone.civilight.designsystem.component.CreateCardState.open(CreateKind.TAG, io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode.LIST, "새 태그1")
+        val (d1, k1) = CastCreate.createTag(doc, card.with("color", "teal"), ctx)!!
+        assertEquals("teal", d1.index.tag(k1)!!.color)
+        val (d2, k2) = CastCreate.createTag(doc, card.with("color", "magenta"), ctx)!!
+        assertNull(d2.index.tag(k2)!!.color)
     }
 
     @Test
@@ -236,8 +248,12 @@ class Cast020FeatureTest {
     fun `TC-U16-01 with no 3D renderer the list is shown and no head toggle is drawn`() {
         val defaults = AppSettings()
         assertEquals(CardStyle.FAN_DECK, defaults.castCardStyle)
-        assertEquals(CardStyle.LIST, CastCardViews.shown(defaults))
-        assertFalse(CastCardViews.showsToggle(defaults))
+        assertEquals(CardStyle.LIST, CastCardViews.shown(defaults, emptyMap()))
+        assertFalse(CastCardViews.showsToggle(defaults, emptyMap()))
+        // Wave 3: every 3D style has a renderer, so the default shows the fan deck with the toggle.
+        assertEquals(CardStyle.entries.filterNot { it.isList }.toSet(), CastCardViews.renderers.keys)
+        assertEquals(CardStyle.FAN_DECK, CastCardViews.shown(defaults))
+        assertTrue(CastCardViews.showsToggle(defaults))
         val listChosen = defaults.copy(castCardStyle = CardStyle.LIST)
         assertFalse(CastCardViews.showsToggle(listChosen))
         // With a renderer for the chosen style the toggle shows and the stored toggle decides.
@@ -467,5 +483,18 @@ class Cast020SweepTest {
         assertNull(preview.value(c, slot, trashed))
         assertEquals("", preview.text(trashed, c, slot))
         assertNotNull(preview.value(tagged.index.character(K.RIEN)!!, slot, tagged))
+    }
+
+    @Test
+    fun `원고 속 n곳 counts the manuscript hits of a name and never a locked hidden scene`() {
+        val doc = CastFx.doc()
+        val name = doc.index.character(K.RIEN)!!.name
+        val open = io.github.lenticualrstone.civilight.feature.cast.profile.ManuscriptHits.count(doc, name, unlocked = true)
+        assertEquals(io.github.lenticualrstone.civilight.domain.script.Replace.find(doc, name, true).size, open)
+        assertTrue(open > 0)
+        val allHidden = doc.copy(story = doc.story.copy(units = doc.story.units.map { it.copy(hidden = true) }))
+        assertEquals(0, io.github.lenticualrstone.civilight.feature.cast.profile.ManuscriptHits.count(allHidden, name, unlocked = false))
+        assertEquals(0, io.github.lenticualrstone.civilight.feature.cast.profile.ManuscriptHits.count(doc, " ", unlocked = true))
+        assertEquals("원고 속 3곳 · 바꾸기", io.github.lenticualrstone.civilight.feature.cast.CastUiCopy.manuscriptReplace(3))
     }
 }

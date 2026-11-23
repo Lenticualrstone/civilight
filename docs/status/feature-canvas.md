@@ -580,3 +580,10 @@ Batch 3:
 ## 0.2.0 integration (wave 2, orchestrator)
 
 Applied: page and gallery command-bar mics removed (S-8); `SheetHeader` close is the A6 icon. Not applied: `ListRow` highlight state (local `createdFlash` kept), tappable `TopGlassBar` title, `CanvasActions.reorder`, asset create in place (feature:script; asset create rows stay unbuilt).
+
+
+## 0.2.0 integration (wave 2 requests applied)
+
+Applied in shared modules: `core:ui` pickers take `creator: PickerCreator?` (U-15.3 create row, picker-mode card, `상위 지역` picked in place, the new item returned as the pick; written through `domain:actions` `CreateActions.inPicker`; no row in read-only projects); trashed tags make no picker chip, subtitle or match (N-44). `core:navigation`: SCRIPT-owned `EpisodeVersionsSheet` · `VersionCompareSheet` · `ManuscriptReplaceSheet`; routes `MarksList`, `SettingsLibraryView`, `SettingsCardView`. `core:model` `TimelineEvent.relatedCharacterKeys` (additive; merges remap it). DS: `TagColor` palette, `TagDot`, `TagColorRow`, `FilterChip(tagColor)`, `LensChip(small)` (the `CivilightScreen` head chip is small), `ListRow(highlighted)` and `Modifier.createdHighlight`.
+
+Canvas: item pickers (인물 · 세력 · 용어 nodes) have create rows. Local `createdFlash` kept (card shapes and outsets the DS highlight does not draw).

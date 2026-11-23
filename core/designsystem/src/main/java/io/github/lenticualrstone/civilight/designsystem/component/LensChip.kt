@@ -42,11 +42,14 @@ fun LensChip(
     state: LensChipState,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    small: Boolean = false,
 ) {
     val colors = CivilightTheme.colors
     val motion = LocalMotion.current
     val style = lensChipStyle(state, colors)
-    val shape = RoundedCornerShape(16.dp)
+    // (0.2.0, S-1, CST-70, WLD-71) the small chip of the cast and world heads: 28 tall, padding 10, `small` text.
+    val chipSize = LensChipSize.of(small)
+    val shape = RoundedCornerShape(chipSize.radius.dp)
     val sweep = remember { Animatable(1f) }
     val previous = remember { mutableStateOf(text) }
     val outline = animatedColor(style.outline ?: style.text.copy(alpha = 0f), label = "lensOutline")
@@ -63,17 +66,18 @@ fun LensChip(
     Box(
         modifier = modifier
             .pressable(onClick = onClick, hitTarget = HitTarget.LENS_CHIP, shape = shape)
-            .heightIn(min = 32.dp)
+            .heightIn(min = chipSize.height.dp)
             .clip(shape)
             .animatedInsetOutline(outline, { 1.dp }, shape)
             .drawWithContent {
                 drawContent()
                 if (sweep.value < 1f) {
                     val h = 1.5.dp.toPx()
-                    drawRect(colors.acc, Offset(12.dp.toPx(), size.height - 7.dp.toPx()), Size((size.width - 24.dp.toPx()) * sweep.value, h))
+                    val side = chipSize.side
+                    drawRect(colors.acc, Offset(side.dp.toPx(), this.size.height - 7.dp.toPx()), Size((this.size.width - 2 * side.dp.toPx()) * sweep.value, h))
                 }
             }
-            .padding(start = 12.dp, end = style.endPadding),
+            .padding(start = chipSize.side.dp, end = if (style.endPadding > 0.dp) chipSize.side.dp else style.endPadding),
         contentAlignment = Alignment.Center,
     ) {
         AnimatedContent(
@@ -81,7 +85,17 @@ fun LensChip(
             transitionSpec = { motion.valueSwap() },
             label = "lens",
         ) { value ->
-            CivilightText(value, CivilightTheme.type.chip, color = textColor, maxLines = 1)
+            CivilightText(value, if (small) CivilightTheme.type.small else CivilightTheme.type.chip, color = textColor, maxLines = 1)
         }
+    }
+}
+
+/** DS-38 lens chip sizes: regular 32 tall, padding 12, radius 16; small (CST-70) 28 tall, padding 10, radius 14. */
+data class LensChipSize(val height: Int, val side: Int, val radius: Int) {
+    companion object {
+        val REGULAR = LensChipSize(height = 32, side = 12, radius = 16)
+        val SMALL = LensChipSize(height = 28, side = 10, radius = 14)
+
+        fun of(small: Boolean): LensChipSize = if (small) SMALL else REGULAR
     }
 }

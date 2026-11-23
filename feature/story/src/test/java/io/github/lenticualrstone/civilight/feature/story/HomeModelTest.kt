@@ -92,7 +92,7 @@ class HomeModelTest {
         val p = K.PROJECT
         assertEquals(
             listOf(
-                StoryStructure(p), null, CastList(p), World(p), Timeline(p), CanvasBoard(p),
+                StoryStructure(p), io.github.lenticualrstone.civilight.navigation.MarksList(p), CastList(p), World(p), Timeline(p), CanvasBoard(p),
                 Gallery.ofProject(p), PageList(p), CheckCenter(p), ProjectSettings(p),
             ),
             HomeShortcut.entries.map { it.route(p) },
@@ -150,5 +150,42 @@ class HomeModelTest {
         assertEquals("Ⅰ 1부 · 첫 부", ui.listHeader)
         assertEquals(listOf("1-1-1", "1-1-2"), ui.rows.map { it.code })
         assertEquals("1/2" to "1부 화", ui.stats.first().let { it.value to it.label })
+    }
+}
+
+/** (0.2.0, N-41) The `할 일 · 복선` route's filter. */
+class MarksListRouteTest {
+    @org.junit.Test
+    fun `the route filter is a mark state name, 열림 otherwise`() {
+        val p = io.github.lenticualrstone.civilight.model.sample.ExampleKeys.PROJECT
+        org.junit.Assert.assertEquals(
+            io.github.lenticualrstone.civilight.model.marks.MarkState.OPEN,
+            io.github.lenticualrstone.civilight.feature.story.home.MarksListRoute.filterOf(io.github.lenticualrstone.civilight.navigation.MarksList(p)),
+        )
+        val done = io.github.lenticualrstone.civilight.model.marks.MarkState.entries.last()
+        org.junit.Assert.assertEquals(done, io.github.lenticualrstone.civilight.feature.story.home.MarksListRoute.filterOf(io.github.lenticualrstone.civilight.navigation.MarksList(p, done.name)))
+        org.junit.Assert.assertEquals(
+            io.github.lenticualrstone.civilight.model.marks.MarkState.OPEN,
+            io.github.lenticualrstone.civilight.feature.story.home.MarksListRoute.filterOf(io.github.lenticualrstone.civilight.navigation.MarksList(p, "NOPE")),
+        )
+    }
+}
+
+/** (0.2.0, N-29) The story episode ⋯ and the script open `EpisodeVersionsSheet` with the same key. */
+class EpisodeVersionKeyTest {
+    @org.junit.Test
+    fun `the episode row's key is the script's numbering unit of its scenes`() {
+        val doc = io.github.lenticualrstone.civilight.model.sample.ExampleProject.build()
+        val k = io.github.lenticualrstone.civilight.model.sample.ExampleKeys
+        org.junit.Assert.assertEquals(k.EPISODE_1_7, doc.index.numberingUnitKeyOfScene(k.SCENE_1_7_3))
+        val ctx = io.github.lenticualrstone.civilight.domain.actions.ActionContext(io.github.lenticualrstone.civilight.model.sample.ExampleClock.NOW)
+        val kept = io.github.lenticualrstone.civilight.domain.actions.VersionActions.capture(
+            doc, k.EPISODE_1_7, "11월 23일 · 초고", io.github.lenticualrstone.civilight.model.version.VersionOrigin.MANUAL, ctx,
+        ).first
+        val scriptKey = kept.index.numberingUnitKeyOfScene(k.SCENE_1_7_3)!!
+        org.junit.Assert.assertEquals(
+            listOf("11월 23일 · 초고"),
+            io.github.lenticualrstone.civilight.domain.actions.VersionActions.versionsOf(kept, scriptKey).map { it.name }.takeLast(1),
+        )
     }
 }

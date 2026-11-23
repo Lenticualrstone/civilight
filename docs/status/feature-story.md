@@ -322,3 +322,10 @@ UI features are built and wired to the store, but have not been seen on a device
 ## 0.2.0 integration (wave 2, orchestrator)
 
 Applied: `SearchField` draws the A5 icon close; both searches pass `onClose` again (local icon buttons removed). `SheetHeader` draws `닫기` as the A6 icon. `ProjectSearch` takes `autoReveal`. Not applied: core:navigation route for `할 일 · 복선` (home-local sheet kept).
+
+
+## 0.2.0 integration (wave 2 requests applied)
+
+Applied in shared modules: `core:ui` pickers take `creator: PickerCreator?` (U-15.3 create row, picker-mode card, `상위 지역` picked in place, the new item returned as the pick; written through `domain:actions` `CreateActions.inPicker`; no row in read-only projects); trashed tags make no picker chip, subtitle or match (N-44). `core:navigation`: SCRIPT-owned `EpisodeVersionsSheet` · `VersionCompareSheet` · `ManuscriptReplaceSheet`; routes `MarksList`, `SettingsLibraryView`, `SettingsCardView`. `core:model` `TimelineEvent.relatedCharacterKeys` (additive; merges remap it). DS: `TagColor` palette, `TagDot`, `TagColorRow`, `FilterChip(tagColor)`, `LensChip(small)` (the `CivilightScreen` head chip is small), `ListRow(highlighted)` and `Modifier.createdHighlight`.
+
+Story: episode ⋯ `판 남기기 · 지난 판`; `할 일 · 복선` is the `MarksList` route (home-local sheet removed); scene `등장`, scene place, new-scene place and `화자 고르기` pickers have the create row.

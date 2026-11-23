@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.cast.settings
 
+import io.github.lenticualrstone.civilight.feature.cast.common.toAction
 import androidx.compose.runtime.saveable.Saver
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
@@ -115,6 +116,10 @@ fun TagSettingsScreen(route: TagSettings, deps: FeatureDeps) {
                         row.name,
                         civilightItem(),
                         subtitle = row.line,
+                        // CST-75: the tag's colour dot before its name (none without a colour).
+                        leading = ready.doc.index.tag(row.key)?.color?.takeIf { io.github.lenticualrstone.civilight.designsystem.component.TagColor.of(it) != null }?.let { c ->
+                            { io.github.lenticualrstone.civilight.designsystem.component.TagDot(c) }
+                        },
                         compact = true,
                         onClick = if (editable) ({ sheets.open(TagNameSheet(route.projectKey, row.key)) }) else null,
                     )
@@ -198,10 +203,17 @@ private fun SheetScope.TagNameContent(key: TagNameSheet, doc: ProjectDoc, vm: Ta
     }
     if (!seen) SideEffect { seen = true }
     var name by rememberSaveable(key) { mutableStateOf(current.name) }
-    val usable = TagSettingsModel.canName(doc, name, except = key.tagKey) && name.trim() != current.name
+    val storedColor = io.github.lenticualrstone.civilight.designsystem.component.TagColor.of(current.color)?.token
+    var color by rememberSaveable(key) { mutableStateOf(storedColor) }
+    val renamed = TagSettingsModel.canName(doc, name, except = key.tagKey) && name.trim() != current.name
+    val recoloured = color != storedColor
+    val usable = (renamed || recoloured) && name.isNotBlank() && TagSettingsModel.canName(doc, name, except = key.tagKey)
     val scope = this
     SheetHeader(current.name, onClose = ::close, closeLabel = CastUiCopy.BTN_CLOSE)
     CivilightTextField(name, { name = it }, Modifier.fillMaxWidth().padding(top = 14.dp), label = CastUiCopy.NAME)
+    // CST-75: the colour is set or cleared here too (primary `저장`, U-10).
+    CivilightText(io.github.lenticualrstone.civilight.designsystem.component.CreateCardCopy.FIELD_COLOR, CivilightTheme.type.label, Modifier.padding(top = 14.dp, bottom = 6.dp), color = CivilightTheme.colors.ink2)
+    io.github.lenticualrstone.civilight.designsystem.component.TagColorRow(selected = color, onPick = { color = it })
     SheetActions {
         // N-44: `지우기` (ghost) sends only the tag to the trash after a confirm.
         CivilightButton(CastUiCopy.BTN_DELETE, { onDelete(current.key) }, Modifier.weight(1f), variant = ButtonVariant.GHOST)
@@ -210,7 +222,13 @@ private fun SheetScope.TagNameContent(key: TagNameSheet, doc: ProjectDoc, vm: Ta
             {
                 val typed = name
                 val tagKey = current.key
-                vm.act(CastUiCopy.BTN_SAVE) { d, ctx -> TagSettingsModel.rename(d, tagKey, typed, ctx) ?: d }
+                val picked = color
+                val doRename = renamed
+                val doColor = recoloured
+                vm.act(CastUiCopy.BTN_SAVE) { d, ctx ->
+                    val named = if (doRename) TagSettingsModel.rename(d, tagKey, typed, ctx) ?: d else d
+                    if (doColor) TagActions.setColor(named, tagKey, picked, ctx.toAction()) else named
+                }
                 scope.close()
             },
             Modifier.weight(1f),

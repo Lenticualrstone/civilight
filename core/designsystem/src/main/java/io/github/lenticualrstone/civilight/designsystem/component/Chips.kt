@@ -58,6 +58,7 @@ fun FilterChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    tagColor: String? = null,
 ) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(15.dp)
@@ -81,7 +82,18 @@ fun FilterChip(
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        CivilightText(label, CivilightTheme.type.chip, color = text, maxLines = 1)
+        if (TagColor.of(tagColor) == null) {
+            CivilightText(label, CivilightTheme.type.chip, color = text, maxLines = 1)
+        } else {
+            // CST-75: a coloured tag's chip has its dot before the name.
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+            ) {
+                TagDot(tagColor)
+                CivilightText(label, CivilightTheme.type.chip, color = text, maxLines = 1)
+            }
+        }
     }
 }
 

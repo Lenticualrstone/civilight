@@ -71,6 +71,13 @@ object PickerCopy {
     const val ALIAS_OF = "의 별칭"
     const val SEP = " · "
 
+    /** (0.2.0, U-15.7) A place card's `상위 지역` picker and its action. */
+    const val PICK_PARENT = "장소 고르기"
+    const val HIDDEN_ITEM = "숨긴 항목"
+
+    /** An empty picked value (the DS stand-alone `—`). */
+    const val EMPTY_VALUE = "—"
+
     fun hiddenRow(kindWord: String, count: Int) = "$HIDDEN_PREFIX $kindWord $count"
 }
 
@@ -98,7 +105,7 @@ object PickerModels {
         val hiddenCount = live.count { it.hidden && !hiddenOpen }
         val matching = visible.filter { c ->
             (tagKey == null || tagKey in c.tagKeys) &&
-                (query.isBlank() || KoreanSearch.matchesAny(listOf(c.name, c.displayNameBase) + c.tagKeys.mapNotNull { doc.index.tag(it)?.name }, query))
+                (query.isBlank() || KoreanSearch.matchesAny(listOf(c.name, c.displayNameBase) + liveTagNames(doc, c), query))
         }
         val byKey = matching.associateBy { it.key }
         val inScene = sceneCast.distinct().mapNotNull(byKey::get)
@@ -123,8 +130,12 @@ object PickerModels {
 
     /** Row sub line of a character: its tags (`주연 · 등불 결사`), else its one-liner. */
     fun defaultSubtitle(doc: ProjectDoc, c: Character): String? =
-        c.tagKeys.mapNotNull { doc.index.tag(it)?.name }.takeIf { it.isNotEmpty() }?.joinToString(PickerCopy.SEP)
+        liveTagNames(doc, c).takeIf { it.isNotEmpty() }?.joinToString(PickerCopy.SEP)
             ?: c.oneLiner?.takeIf { it.isNotBlank() }
+
+    /** The names of [c]'s live tags; a trashed tag appears nowhere (N-44, CST-75). */
+    fun liveTagNames(doc: ProjectDoc, c: Character): List<String> =
+        c.tagKeys.mapNotNull { doc.index.tag(it)?.takeIf { t -> t.deletedAt == null }?.name }
 
     /** 용어 고르기: names and aliases; an alias hit reads `오리지늄 · 오리지늄 등불의 별칭` and inserts the alias. */
     fun terms(doc: ProjectDoc, query: String = "", hiddenOpen: Boolean = false): PickerModel {

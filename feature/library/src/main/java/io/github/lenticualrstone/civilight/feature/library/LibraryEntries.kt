@@ -65,6 +65,12 @@ fun EntryProviderScope<NavKey>.libraryEntries(deps: FeatureDeps) {
     entry<Library> { LibraryScreen(services) }
     entry<NewProject> { route -> NewProjectScreen(route, services) }
     entry<Settings> { SettingsScreen(services) }
+    entry<io.github.lenticualrstone.civilight.navigation.SettingsLibraryView> {
+        io.github.lenticualrstone.civilight.feature.library.settings.ViewStyleScreen(io.github.lenticualrstone.civilight.feature.library.settings.ViewKind.LIBRARY, services)
+    }
+    entry<io.github.lenticualrstone.civilight.navigation.SettingsCardView> {
+        io.github.lenticualrstone.civilight.feature.library.settings.ViewStyleScreen(io.github.lenticualrstone.civilight.feature.library.settings.ViewKind.CARD, services)
+    }
     entry<SettingsHiding> { HidingSettingsScreen(services) }
     entry<SettingsTextSize> { TextSizeScreen(services) }
     entry<SettingsLayout> { LayoutSettingsScreen(services) }

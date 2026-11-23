@@ -50,6 +50,7 @@ fun EntryProviderScope<NavKey>.storyEntries(deps: FeatureDeps) {
     entry<DayBandSettings> { route -> DayBandScreen(route, deps) }
     entry<BulkPlaceTime> { route -> BulkScreen(route, deps) }
     entry<LibrarySearch> { route -> LibrarySearchScreen(route, deps) }
+    entry<io.github.lenticualrstone.civilight.navigation.MarksList> { route -> io.github.lenticualrstone.civilight.feature.story.home.MarksListScreen(route, deps) }
     deps.sheets.register<UnitMenuSheet> { sheet -> UnitMenuContent(sheet, deps) }
     deps.sheets.register<NewUnitSheet> { sheet -> NewUnitContent(sheet, deps) }
     deps.sheets.register<SceneWhereSheet> { sheet -> SceneWhereContent(sheet, deps) }

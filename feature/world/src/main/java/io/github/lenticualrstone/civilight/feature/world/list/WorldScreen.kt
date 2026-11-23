@@ -6,7 +6,7 @@ import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
 import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateCard
 import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateCards
 import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateDraft
-import io.github.lenticualrstone.civilight.feature.world.common.createdHighlight
+import io.github.lenticualrstone.civilight.designsystem.component.createdHighlight
 import io.github.lenticualrstone.civilight.model.story.PlaceRef
 import io.github.lenticualrstone.civilight.model.story.PlaceRefKind
 import io.github.lenticualrstone.civilight.ui.picker.PlacePickerSheet

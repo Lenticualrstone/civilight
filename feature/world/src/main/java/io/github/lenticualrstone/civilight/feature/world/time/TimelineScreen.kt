@@ -7,7 +7,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.ListCreateRow
 import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateCard
 import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateCards
 import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateDraft
-import io.github.lenticualrstone.civilight.feature.world.common.createdHighlight
+import io.github.lenticualrstone.civilight.designsystem.component.createdHighlight
 import io.github.lenticualrstone.civilight.ui.picker.UnitPickerSheet
 import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import kotlinx.coroutines.launch
@@ -156,6 +156,22 @@ fun TimelineScreen(route: Timeline, deps: FeatureDeps) {
                         )
                     }
                 }
+                is CreatePeoplePickSheet -> doc?.let { d ->
+                    {
+                        PeopleTicks(
+                            doc = d,
+                            selected = draft?.characterKeys.orEmpty(),
+                            gate = gate,
+                            onToggle = { key ->
+                                WorldCreateDraft.decode(createText)?.let { cur ->
+                                    val keys = if (key in cur.characterKeys) cur.characterKeys - key else cur.characterKeys + key
+                                    createText = cur.copy(characterKeys = keys).encode()
+                                }
+                            },
+                            onClose = ::close,
+                        )
+                    }
+                }
                 is AnchorPickSheet -> doc?.let { d ->
                     {
                         EventPickerSheet(
@@ -202,7 +218,7 @@ fun TimelineScreen(route: Timeline, deps: FeatureDeps) {
             }
         }
         // The card is hidden while its `씬 고르기` picker is on top, and comes back when it closes.
-        if (draft != null && !readOnly && timeline?.available == true && sheets.top !is CreateScenePickSheet) {
+        if (draft != null && !readOnly && timeline?.available == true && sheets.top !is CreateScenePickSheet && sheets.top !is CreatePeoplePickSheet) {
             WorldCreateCard(
                 draft = draft,
                 doc = doc,
@@ -212,6 +228,7 @@ fun TimelineScreen(route: Timeline, deps: FeatureDeps) {
                 onCreate = { create(open = false) },
                 onCreateAndOpen = { create(open = true) },
                 onPickScene = { sheets.open(CreateScenePickSheet) },
+                onPickPeople = { sheets.open(CreatePeoplePickSheet) },
             )
         }
     }
@@ -220,6 +237,10 @@ fun TimelineScreen(route: Timeline, deps: FeatureDeps) {
 /** (0.2.0, WLD-74) `씬 고르기` of the event create card (feature-local). */
 @Serializable
 data object CreateScenePickSheet : SheetKey
+
+/** (0.2.0, WLD-74) `관련 인물` of the event create card (feature-local; no create row inside). */
+@Serializable
+data object CreatePeoplePickSheet : SheetKey
 
 @Composable
 private fun TimelineList(

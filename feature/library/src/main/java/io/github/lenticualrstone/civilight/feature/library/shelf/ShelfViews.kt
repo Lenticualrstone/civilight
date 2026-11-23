@@ -1,7 +1,10 @@
 package io.github.lenticualrstone.civilight.feature.library.shelf
 
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.designsystem.theme.Unhide
 import io.github.lenticualrstone.civilight.feature.library.settings.SettingsCopy
+import io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfScene
+import io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfScene3D
 import io.github.lenticualrstone.civilight.feature.library.settings.ViewStyles
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.AppSettings
@@ -20,6 +23,10 @@ data class ShelfViewInput(
     val onMenu: (Key) -> Unit,
     val onUnlock: () -> Unit,
     val onNewProject: () -> Unit,
+    /** DS-74: tilt follows the device (`Tilt.follows`: the LIB-94 switch on and motion not reduced). */
+    val tilt: Boolean = false,
+    /** CNV-43: the open hidden group's items come out of the blur with the list's unhide. */
+    val unhide: Unhide? = null,
 )
 
 /** One 서재 3D view (U-16 boards `u16_lib_a` … `c`). Motion only through `CivilightMotion`. */
@@ -27,11 +34,13 @@ typealias ShelfViewRenderer = @Composable (ShelfViewInput) -> Unit
 
 /**
  * The extension point of the 서재 views: one lookup `style → renderer`. A style with no renderer draws the
- * list. Wave 3 (U-16) fills [renderers]; until then every style draws the list and the head toggle is not
- * drawn (a toggle between two identical lists would be a control that does nothing).
+ * list. Wave 3 (U-16) registers the six views (`shelf/views`); a style left out draws the list and gets no
+ * head toggle (a toggle between two identical lists would be a control that does nothing).
  */
 object ShelfViewRenderers {
-    val renderers: Map<LibraryStyle, ShelfViewRenderer> = emptyMap()
+    val renderers: Map<LibraryStyle, ShelfViewRenderer> = ShelfScene.styles.associateWith { style ->
+        { input: ShelfViewInput -> ShelfScene3D(style, input) }
+    }
 
     fun of(style: LibraryStyle): ShelfViewRenderer? = renderers[style]
 
@@ -51,6 +60,8 @@ data class ShelfViewUi(
     val shown: LibraryStyle,
     val rendered: LibraryStyle?,
     val toggle: ShelfToggleUi?,
+    /** `AppSettings.viewTilt` (LIB-94); the screen adds the reduced-motion half of `Tilt.follows`. */
+    val viewTilt: Boolean = true,
 )
 
 object ShelfViews {
@@ -63,7 +74,7 @@ object ShelfViews {
             null
         }
         val rendered = shown.takeIf { !it.isList && it in available }
-        return ShelfViewUi(chosen, shown, rendered, toggle)
+        return ShelfViewUi(chosen, shown, rendered, toggle, settings.viewTilt)
     }
 
     /** The 3D view is drawn only with projects to show: 0 projects shows the LIB-70 empty card (V-05). */

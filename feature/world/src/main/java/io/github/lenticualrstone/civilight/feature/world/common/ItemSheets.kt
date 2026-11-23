@@ -71,7 +71,7 @@ fun itemSheet(
         is DeleteSheet -> { { DeleteSheetContent(key, vm, readOnly) } }
         is MergePickSheet -> { { MergePickContent(key, doc, gate) } }
         is MergeSheet -> { { MergeSheetContent(key, doc, vm, readOnly) } }
-        is RenameSheet -> { { RenameContent(WorldKind.valueOf(key.kind), key.key, doc, vm, readOnly) } }
+        is RenameSheet -> { { RenameContent(WorldKind.valueOf(key.kind), key.key, doc, vm, readOnly, gate) } }
         is DescriptionSheet -> { { DescriptionContent(WorldKind.valueOf(key.kind), key.key, doc, vm, readOnly, gate) } }
         else -> null
     }
@@ -135,7 +135,7 @@ private fun SheetScope.ItemMenuContent(kind: WorldKind, key: Key, doc: ProjectDo
 }
 
 @Composable
-private fun SheetScope.RenameContent(kind: WorldKind, key: Key, doc: ProjectDoc, vm: WorldViewModel, readOnly: Boolean) {
+private fun SheetScope.RenameContent(kind: WorldKind, key: Key, doc: ProjectDoc, vm: WorldViewModel, readOnly: Boolean, gate: HiddenGate) {
     val current = ItemEdits.nameAndText(doc, kind, key)?.first.orEmpty()
     var text by rememberSaveable(key) { mutableStateOf(current) }
     val scope = rememberCoroutineScope()
@@ -149,6 +149,20 @@ private fun SheetScope.RenameContent(kind: WorldKind, key: Key, doc: ProjectDoc,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             enabled = !readOnly,
         )
+        // (0.2.0, N-28) Term and place names: `원고 속 n곳 · 바꾸기` (the stored name's manuscript hits; locked hidden
+        // scenes are neither counted nor listed) opens the script's 바꾸기 with `찾을 말` filled in. Not in read-only.
+        if (!readOnly && kind != WorldKind.FACTION) {
+            val hits = androidx.compose.runtime.remember(doc, current, gate.open) {
+                if (current.isBlank()) 0 else io.github.lenticualrstone.civilight.domain.script.Replace.find(doc, current, gate.open).size
+            }
+            if (hits > 0) {
+                io.github.lenticualrstone.civilight.designsystem.component.TextAction(
+                    WorldCopy.manuscriptReplace(hits),
+                    { sheet.open(io.github.lenticualrstone.civilight.navigation.ManuscriptReplaceSheet(vm.projectKey, current)) },
+                    Modifier.padding(top = 6.dp),
+                )
+            }
+        }
     }
     SheetActions {
         CivilightButton(
@@ -194,6 +208,12 @@ private fun SheetScope.DescriptionContent(kind: WorldKind, key: Key, doc: Projec
                     picking = false
                 },
                 onClose = { picking = false },
+                // (0.2.0, U-15.3, SCR-55) the `@` picker's create row for the kind in view.
+                creator = worldPickerCreator(
+                    io.github.lenticualrstone.civilight.designsystem.component.CreateKind.CHARACTER,
+                    io.github.lenticualrstone.civilight.designsystem.component.CreateKind.TERM,
+                    io.github.lenticualrstone.civilight.designsystem.component.CreateKind.PLACE,
+                ),
             )
         } else {
             SheetHeader(title = WorldCopy.EDIT_DESCRIPTION, onClose = sheet::close)

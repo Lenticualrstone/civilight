@@ -101,6 +101,7 @@ fun SheetScope.SceneSplitSheetContent(sheet: SceneSplitSheet, deps: FeatureDeps)
             },
             onClose = { picking = false },
             selected = choices.picked,
+            creator = io.github.lenticualrstone.civilight.feature.script.ui.scriptPickerCreator(io.github.lenticualrstone.civilight.designsystem.component.CreateKind.PLACE),
         )
         },
     ) {

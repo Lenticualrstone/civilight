@@ -309,3 +309,10 @@ Rows of `motion-audit.md` §4 feature:world, built with the shared helpers only 
 ## 0.2.0 integration (wave 2, orchestrator)
 
 Applied: library hides `이동 수단`, so `SHOWS_TRAVEL_MODES = false`; the map tour and 인물 동선 tour are not offered (LIB-96); domain:checks `TermSource` scans only with `용어 후보` on; domain:story `ProjectSearch` reads the automatic reveal (passed in by feature:story); world command-bar mic removed (S-8); locked secret text left out of `TermQueries`. Not applied: `PlacePickerSheet` create forwarding, `TimelineEvent.relatedCharacterKeys`, `TermCard` scroll-target route flag.
+
+
+## 0.2.0 integration (wave 2 requests applied)
+
+Applied in shared modules: `core:ui` pickers take `creator: PickerCreator?` (U-15.3 create row, picker-mode card, `상위 지역` picked in place, the new item returned as the pick; written through `domain:actions` `CreateActions.inPicker`; no row in read-only projects); trashed tags make no picker chip, subtitle or match (N-44). `core:navigation`: SCRIPT-owned `EpisodeVersionsSheet` · `VersionCompareSheet` · `ManuscriptReplaceSheet`; routes `MarksList`, `SettingsLibraryView`, `SettingsCardView`. `core:model` `TimelineEvent.relatedCharacterKeys` (additive; merges remap it). DS: `TagColor` palette, `TagDot`, `TagColorRow`, `FilterChip(tagColor)`, `LensChip(small)` (the `CivilightScreen` head chip is small), `ListRow(highlighted)` and `Modifier.createdHighlight`.
+
+World: `WorldPlacePicker` replaced by the shared picker (`worldPickerCreator`); `연결` value pickers and the description `@` picker have create rows; term and place rename sheets `원고 속 n곳 · 바꾸기`; event `관련 인물` on the create card, the event sheet and the detail row; DS highlight. Still hidden: create card `이미지`, create rows in the `기준 사건` and term `관련` pickers, `TermCard` scroll-target route flag.

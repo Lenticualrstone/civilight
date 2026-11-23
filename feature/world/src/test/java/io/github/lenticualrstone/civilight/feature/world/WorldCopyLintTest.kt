@@ -25,6 +25,7 @@ class WorldCopyLintTest {
 
     /** Formatted copy, with arguments from the example project. */
     private fun formatted(): List<String> = buildList {
+        add(WorldCopy.manuscriptReplace(3))
         WorldKind.entries.forEach {
             add(WorldCopy.createLabel(it))
             add(WorldCopy.smallLine(it))

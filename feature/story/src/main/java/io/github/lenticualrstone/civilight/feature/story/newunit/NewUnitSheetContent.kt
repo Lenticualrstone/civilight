@@ -112,6 +112,7 @@ fun SheetScope.NewUnitContent(sheet: NewUnitSheet, deps: FeatureDeps) {
                     },
                     onClose = { picking = false },
                     selected = NewSceneForms.place(setup, form),
+                    creator = io.github.lenticualrstone.civilight.feature.story.common.storyPickerCreator(io.github.lenticualrstone.civilight.designsystem.component.CreateKind.PLACE),
                 )
             } else {
                 SheetHeader(title = setup?.title ?: NewUnitCopy.TITLE_AFTER, onClose = host::close, subtitle = setup?.subtitle?.ifEmpty { null })

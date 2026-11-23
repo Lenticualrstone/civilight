@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.script.ui
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -191,6 +192,7 @@ fun SheetScope.SpeakerSheet(
             val display = blockKey?.let { Manuscript.displayNameAt(doc, c.key, it) }
             if (display != null && display != c.name) "${ScriptCopy.DISPLAY_NAME} $display" else PickerModels.defaultSubtitle(doc, c)
         },
+        creator = scriptPickerCreator(CreateKind.CHARACTER),
     )
 }
 
@@ -206,6 +208,7 @@ fun SheetScope.LinkSheet(key: LinkSheetKey, doc: ProjectDoc, onPick: (PickKind, 
             onPick(kind, target, text)
         },
         onClose = ::close,
+        creator = scriptPickerCreator(*LINK_CREATE_KINDS),
     )
 }
 

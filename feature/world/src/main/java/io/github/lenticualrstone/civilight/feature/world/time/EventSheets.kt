@@ -43,7 +43,8 @@ import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
 import io.github.lenticualrstone.civilight.ui.picker.HiddenGate
 import io.github.lenticualrstone.civilight.ui.picker.PickerCopy
-import io.github.lenticualrstone.civilight.feature.world.common.WorldPlacePicker
+import io.github.lenticualrstone.civilight.feature.world.common.worldPickerCreator
+import io.github.lenticualrstone.civilight.ui.picker.PlacePickerSheet
 import io.github.lenticualrstone.civilight.ui.picker.UnitPickerSheet
 import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.project.currentProjectStore
@@ -55,7 +56,7 @@ import kotlinx.serialization.Serializable
 data class EventEditSheet(val eventKey: Key) : SheetKey
 
 /** Which picker replaces the form inside the same sheet (the draft stays saved under it). */
-private enum class EventPick { NONE, SCENE, PLACE, TERMS, REVEAL }
+private enum class EventPick { NONE, SCENE, PLACE, TERMS, PEOPLE, REVEAL }
 
 /** `사건 만들기` (shared WORLD sheet, WLD-32): opened from the 연표 `+` and from other areas. */
 @Composable
@@ -72,7 +73,7 @@ fun SheetScope.EventEditSheetContent(projectKey: Key, sheet: EventEditSheet) {
 /**
  * The 사건 form (`[PROPOSED]` layout, fields from the boards): `종류` (`세계 사건 · 이야기 사건`, new
  * events only), `이름`, `설명`, the time (`연도` and in calendar mode `월 · 일`; a story event's `씬`),
- * `장소`, `관련 용어`, `공개 시점`, primary `넣기` / `고치기`. Pickers open in place.
+ * `장소`, `관련 용어`, `관련 인물`, `공개 시점`, primary `넣기` / `고치기`. Pickers open in place.
  */
 @Composable
 private fun SheetScope.EventFormContent(projectKey: Key, eventKey: Key?, saveId: String) {
@@ -103,12 +104,12 @@ private fun SheetScope.EventFormContent(projectKey: Key, eventKey: Key?, saveId:
                 levels = io.github.lenticualrstone.civilight.feature.world.term.RevealOptions.sceneLevels(doc),
             )
             // (0.2.0, U-15.3, WLD-70) The event place picker has the `＋ 새 장소` row on top.
-            EventPick.PLACE -> WorldPlacePicker(
-                doc = doc, gate = gate, title = WorldCopy.PICK_PLACE, readOnly = readOnly,
+            EventPick.PLACE -> PlacePickerSheet(
+                doc = doc, gate = gate, title = WorldCopy.PICK_PLACE,
                 onPick = { draft = draft.withPlace(it); pick = EventPick.NONE },
                 onClose = { pick = EventPick.NONE },
-                onCreate = { item -> editor.createPlace(item) },
                 selected = draft.place,
+                creator = worldPickerCreator(io.github.lenticualrstone.civilight.designsystem.component.CreateKind.PLACE),
             )
             EventPick.REVEAL -> UnitPickerSheet(
                 doc = doc, gate = gate, title = WorldCopy.EVENT_REVEAL,
@@ -118,6 +119,7 @@ private fun SheetScope.EventFormContent(projectKey: Key, eventKey: Key?, saveId:
                 levels = io.github.lenticualrstone.civilight.feature.world.term.RevealOptions.pointLevels(doc),
             )
             EventPick.TERMS -> TermTicks(doc, draft.termKeys, gate, onToggle = { draft = draft.toggleTerm(it) }, onClose = { pick = EventPick.NONE })
+            EventPick.PEOPLE -> PeopleTicks(doc, draft.characterKeys, gate, onToggle = { draft = draft.toggleCharacter(it) }, onClose = { pick = EventPick.NONE })
             EventPick.NONE -> {
                 val descriptionLocked = existing != null && CardText.hasLockedLinks(doc, existing.description, gate.open)
                 SheetHeader(title = if (eventKey == null) WorldCopy.CREATE_EVENT else existing!!.title, onClose = sheet::close)
@@ -179,6 +181,7 @@ private fun SheetScope.EventFormContent(projectKey: Key, eventKey: Key?, saveId:
                     FoldReveal(ui.showScene) { FieldTableRow(WorldCopy.EVENT_SCENE, ui.sceneLabel, Modifier.padding(top = 12.dp), onClick = rowClick(EventPick.SCENE)) }
                     FieldTableRow(WorldCopy.EVENT_PLACE, ui.placeLabel, onClick = rowClick(EventPick.PLACE))
                     FieldTableRow(WorldCopy.EVENT_TERMS, ui.termsLabel, onClick = rowClick(EventPick.TERMS))
+                    FieldTableRow(WorldCopy.EVENT_PEOPLE, ui.peopleLabel, onClick = rowClick(EventPick.PEOPLE))
                     FoldReveal(ui.showReveal) { FieldTableRow(WorldCopy.EVENT_REVEAL, ui.revealLabel, onClick = rowClick(EventPick.REVEAL)) }
                 }
                 SheetActions {
@@ -193,6 +196,28 @@ private fun SheetScope.EventFormContent(projectKey: Key, eventKey: Key?, saveId:
                         enabled = !readOnly && ui.canSave,
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * (0.2.0, WLD-74) `관련 인물`: tick live characters (no create row, so no card inside the sheet); hidden ones
+ * only after `지문으로 보기`. A ticked key whose character is gone stays stored and is not listed.
+ */
+@Composable
+internal fun androidx.compose.foundation.layout.ColumnScope.PeopleTicks(doc: ProjectDoc, selected: List<Key>, gate: HiddenGate, onToggle: (Key) -> Unit, onClose: () -> Unit) {
+    val people = remember(doc) { doc.cast.characters.filter { it.deletedAt == null }.sortedWith(compareBy({ it.order }, { it.key })) }
+    val visible = people.filter { gate.open || !it.hidden }
+    val hiddenCount = people.size - visible.size
+    SheetHeader(title = WorldCopy.EVENT_PEOPLE, onClose = onClose)
+    LazyColumn(Modifier.weight(1f, fill = false).padding(top = 8.dp)) {
+        items(visible, key = { it.key }) { c ->
+            CheckboxRow(label = c.name, checked = c.key in selected, onCheckedChange = { onToggle(c.key) })
+        }
+        if (hiddenCount > 0) {
+            item(key = "hidden") {
+                LockRow(title = PickerCopy.hiddenRow(PickerCopy.KIND_CHARACTER, hiddenCount), actionLabel = WorldCopy.UNLOCK, onAction = gate.unlock)
             }
         }
     }

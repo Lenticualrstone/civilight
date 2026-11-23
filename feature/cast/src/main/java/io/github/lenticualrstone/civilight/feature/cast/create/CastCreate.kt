@@ -27,14 +27,13 @@ data class Created(val key: Key, val open: Boolean)
  * rather than drawn without a working control (release rule: nothing visible that does nothing):
  * - `이미지` (CST-66): the shared image pick needs an owner key, and the character does not exist
  *   before `만들기`, so the pick cannot be held by the card. Requested.
- * - `색` (CST-75): there is no tag palette in `core:designsystem`. Requested.
  */
 object CastCreate {
     /** Multi-pick values are stored in the card as keys joined with this separator. */
     private const val SEP = ","
 
     /** Field types the cast cards can draw today. */
-    private val DRAWN = setOf(CreateFieldType.TEXT, CreateFieldType.MULTI_PICK)
+    private val DRAWN = setOf(CreateFieldType.TEXT, CreateFieldType.MULTI_PICK, CreateFieldType.COLOR)
 
     /** The fields the card shows for [kind], in the DS-72 order, without the ones listed above. */
     fun fields(kind: CreateKind): List<CreateField> = kind.fields.filter { it.type in DRAWN }
@@ -160,9 +159,13 @@ object CastCreate {
     fun canCreateTag(doc: ProjectDoc, state: CreateCardState): Boolean =
         canCreate(state) && TagActions.canName(doc, state.name)
 
-    /** The tag write: `TagActions.create` (DECISIONS §1). No colour until the palette exists. */
+    /** The tag write: `TagActions.create` (DECISIONS §1) with the card's `색` (a palette token, or none). */
     fun createTag(doc: ProjectDoc, state: CreateCardState, ctx: ActionContext): Pair<ProjectDoc, Key>? =
-        if (!canCreateTag(doc, state)) null else TagActions.create(doc, state.name.trim().nfc(), null, ctx)?.let { (d, t) -> d to t.key }
+        if (!canCreateTag(doc, state)) null else TagActions.create(doc, state.name.trim().nfc(), tagColor(state), ctx)?.let { (d, t) -> d to t.key }
+
+    /** The `색` picked on a tag card: a known palette token, else none (CST-75). */
+    fun tagColor(state: CreateCardState): String? =
+        io.github.lenticualrstone.civilight.designsystem.component.TagColor.of(state.values[CreateFields.color.key])?.token
 
     /**
      * From the character `태그` sheet (picker mode): the tag is created and checked on the character at

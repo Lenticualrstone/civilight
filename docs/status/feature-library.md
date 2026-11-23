@@ -9,7 +9,7 @@ Batch 6 of 6 done (2026-11-23): LIB-61 62 66 67 68 70 71, CNV-18 19 20, WLD-67, 
 
 ## 0.2.0 wave 2 review fixes (2026-11-24)
 
-- **LIB-94 view rows hidden until they work.** `서재 보기`, `카드 보기` and the tilt switch are drawn only when a 3D view they would change has a renderer: `서재 보기` while `ShelfViewRenderers.available` is non-empty, `카드 보기` while `CardViewMirror.available` (a feature-local mirror of `feature:cast` `CastCardViews.renderers.keys`, since this module does not depend on feature:cast) is non-empty, tilt while either is. The pickers offer `목록` plus the styles with a renderer; a stored style with no renderer reads and checks `목록`. Both sets are empty in this wave, so 설정 › 화면 shows none of the three rows. Wave 3 fills `ShelfViewRenderers`, `CastCardViews` and `CardViewMirror` together; `Library020Test` has a tripwire for each.
+- **LIB-94 view rows hidden until they work.** `서재 보기`, `카드 보기` and the tilt switch are drawn only when a 3D view they would change has a renderer: `서재 보기` while `ShelfViewRenderers.available` is non-empty, `카드 보기` while `CardViewMirror.available` (a feature-local mirror of `feature:cast` `CastCardViews.renderers.keys`, since this module does not depend on feature:cast) is non-empty, tilt while either is. The pickers offer `목록` plus the styles with a renderer; a stored style with no renderer reads and checks `목록`. Both sets are empty in this wave, so 설정 › 화면 shows none of the three rows. Wave 3 fills `ShelfViewRenderers`, `CastCardViews` and `CardViewMirror` together; `Library020Test` has a tripwire for each. **(wave 3, lane lib3d: `ShelfViewRenderers` now holds the six 서재 views, so `서재 보기` and the tilt row are shown; `CardViewMirror` is still empty. See the lib3d section below.) (Wave 3 integration: `CardViewMirror.available` = every 3D `CardStyle`, so `카드 보기` shows too.)**
 - **LIB-92 multi-export rows.** The 여러 프로젝트 checklist has no rating badge: the sub-line is `암호` when the file locks by default (still keyed on the stored R-18, D34), else none.
 - **LIB-92 recorder link label.** `domain:library` `ProjectSurfaces.recorderLinkLabel` returns `RatingLabels.MASKED_PROJECT` (`이름 가림`) when 라이프 레코더 연결 가리기 is on, never a rating. The recorder still prints its own `LinkViews.ratingBadge` until the recorder lane follows (Request below), and the recents/task label is core:ui's `R-18 프로젝트` until core:ui follows (Request 1).
 - **Deviation, LIB-91 `게임 제작 도구` and `용어 후보`:** the spec says these toggles are not an undo step. They are still written through `ProjectViewModel.edit` and record an undo step, because core:store has no content write without undo (`ProjectStore.update` always records a whole-document snapshot) and core:ui / core:store are frozen. A later undo in the project can flip them back. No feature-local workaround is safe: `clearUndo` would wipe the user's history, and app-only state would not travel with the project. Fix needs the Request below.
@@ -21,6 +21,46 @@ Batch 6 of 6 done (2026-11-23): LIB-61 62 66 67 68 70 71, CNV-18 19 20, WLD-67, 
 - **core:ui (Request 1, repeated):** `CaptureGuard.TaskLabel.MASKED_PROJECT` from `R-18 프로젝트` to the `이름 가림`-class copy (`RatingLabels.MASKED_PROJECT`).
 - **feature:recorder / domain:recorder:** the link mask label (`LinkViews.ratingBadge`, `RecorderUiCopy`) to `RatingLabels.MASKED_PROJECT` (or call `ProjectSurfaces.recorderLinkLabel`), so the `기록의 연결에 이름 가림` sub is true end to end.
 - **wave 3 (feature:cast + feature:library):** one shared registry of 3D card styles in a common module, or flip `CardViewMirror.available` with `CastCardViews.renderers`.
+
+## 0.2.0 wave 3 · lane lib3d (서재 3D views, 2026-11-24)
+
+Build: `tools/gw :feature:library:compileDebugKotlin :feature:library:testDebugUnitTest` exits 0, 217 tests (207 + `ShelfSceneTest` 10; `Library020Test` tripwires rewritten). No emulator: **every row below is partial** until the device pass (cover and inner width, 0 / 1 / many projects, lock item alone, reduced motion, tilt switch off, animator scale 0).
+
+- **Registered:** `ShelfViewRenderers.renderers` now holds all six styles (`shelf/views/ShelfScene3D`). So `서재 보기` and the tilt row (`기울이면 따라옴`) appear in 설정 › 화면; `카드 보기` stays hidden while `CardViewMirror` is empty (feature:cast). (Integration: filled, row shown.)
+- **Shared scaffold** (`ShelfScene3D`): items are `ShelfCards.cardItems` (projects, one lock item at the end, `새 프로젝트` on the wide row). One scroll position (`Animatable` + finger), item in front and picked item kept by key in `rememberSaveable` (a re-lock drops a hidden one). Frame with fixed height, `clipToBounds`, horizontal drag. Under it: caption (title · meta or lock words, `n / N`), ◀ ▶ (`이전` · `다음`), `열기`, the view's pair, ⋯ (LIB-02), or `지문으로 보기` / `새 프로젝트`. Composed items capped at 7 (cover) / 9 (inner) around the front (`ShelfScene.window`).
+- **Views** (`ScenePoses.place` / `.star`, pure, dp and degrees):
+  - `3D 책장`: spines on a shelf; `꺼내기` turns the spine away and the cover in, neighbours step aside; `제자리`.
+  - `표지 회전`: cover flow, ±58° sides.
+  - `원고 더미`: pile on a desk, read sheets fan left; `꺼내기` lifts the top sheet; `돌려놓기`.
+  - `서고 회랑`: items on both walls converge on a vanishing point; the front one turns to face you.
+  - `색인 카드 서랍`: rolodex hinged at the foot, drawer front over the feet; `꺼내기` · `돌려놓기`.
+  - `별자리`: clusters by 형식 (`연재 장편 · 단편 · 설정만`, lock and new apart), joined by lines, slow orbit (90 s); `앞으로` · `제자리`.
+- **Hidden:** the lock item draws only the lock mark, `숨긴 프로젝트 <M>`, `이름 · 표지 가림`. LIB-89 `ProtectWindow` per drawn item (open-hidden, captureBlock cover); open-group items use the list's `unhide`.
+- **Tilt** (`ViewTilt`, feature-local DS-74): rotation-vector sensor registered only while enabled and resumed, removed on pause and dispose; relative to the first pose, ±12°, low-pass 120 ms; parallax ≤ 8 dp plus a small rotation and a sheen band in its own layer. `enabled = viewTilt && !motion.reduced`.
+- **Reduced motion:** the item in front drawn flat; changes are the `ContentSwap` fade; no 3D, no tilt, no orbit, no pair buttons.
+- **60 fps:** position, lift, orbit and tilt read only in `graphicsLayer {}` and draw lambdas. `zIndex` comes from a `derivedStateOf` in half steps. Poses go into a reused `Pose` per item. Backdrop and sheen sit in their own layers.
+- **Taps:** the target is what is visible (a spine on the shelf, the cover once pulled); a passed or faded item takes no tap and no accessibility focus (`ScenePoses.visibleAtRest`, `hitWidth`).
+- **Tour:** ⋯ of a front project is `HIDE`, the lock item is `HIDDEN_GROUP` (absent while the lock item is outside the composed window or faded).
+- **Not built:** LIB-93 "a view that cannot draw shows the list for the session" (no detection), haptic tick on settle, the shared `목록 ↔ 3D` cover transition (the views crossfade).
+- **Decided without a board (`ED`):** every size, angle and frame height in `ShelfScene.size` / `ScenePoses`; the pair per view; tap on the front item (pickable views toggle the pick, others open; lock unlocks, new starts a project); `n / N` line; constellation cluster order; ◀ ▶ names `이전` · `다음` (DS-70).
+
+- **Review fixes (2026-11-24, `ShelfSceneTest` 12, `Library020Test` tilt case):**
+  - Window per style (`ShelfScene.reach`): 3D 책장 · 표지 회전 · 별자리 even (3 · 3 cover, 4 · 4 inner); 원고 더미 · 서고 회랑 · 색인 카드 서랍 keep 1 behind and 5 / 7 ahead. `ScenePoses.edgeAlpha` multiplies every style's alpha (stars and their lines too): 1 at |rel| = reach, 0 at reach + 0.5, where an item enters or leaves the window, so nothing pops while dragging or stepping.
+  - 별자리: one `StarLayout` over all items (keyed on items), indexed by item; lines join each cluster in slot order, skipping other clusters' stars. Known look to check on device: with many projects, windowed neighbours sit on adjacent slots of a crowded orbit, and a cluster label can stand over a cluster with no star in the window.
+  - Accessibility: faces are cleared in every view (cover, paper, spine, star, flat); the tap target carries the name (`ShelfScene.itemName`: title, or the group words for the lock item) and, in front, the action (`ShelfScene.tapLabel`: the view's pick word or `제자리` / `돌려놓기` once picked, `열기`, `지문으로 보기`, `새 프로젝트`). Away from the front no label (no DS-70 word for "bring forward"); the default action is read.
+  - Orbit: one frame callback for the whole loop (`withInfiniteAnimationFrameNanos`); backdrop lines use an index loop and reused arrays.
+  - Tour: ⋯ registers `HIDE` only on the incoming caption row; `HIDDEN_GROUP` only while the lock item is visible at rest.
+  - The item in front is not written while there are no items (restored front kept).
+  - Tilt row hidden under reduced motion (`ViewStyles.tiltShown`; spec 60 §LIB-94 note updated). `TODO_COPY_LIB_VIEW_TILT` (`기울이면 따라옴`) is still unconfirmed copy and is on screen.
+
+### Requests (lane lib3d)
+
+- **core:designsystem:** DS-74 primitives (`rememberTilt`, `Modifier.parallax`, `Modifier.sheen`, `Tilt.offset`) to replace `shelf/views/ViewTilt` + `TiltMath` (and to share with the cast card views). 3D motion tokens: a settle spring (now `holoTiltStiffness` / `holoTiltDamping`) and an idle orbit period (now `ShelfScene.ORBIT_PERIOD_MS`).
+- **feature:cast:** fill `CastCardViews.renderers` and flip `CardViewMirror.available` together (Library020Test tripwire).
+
+### 0.2.0 integration (wave 3, orchestrator)
+
+Applied: `CardViewMirror.available = CardStyle.entries - LIST` (same expression `Cast020FeatureTest` TC-U16-01 pins for `CastCardViews.renderers.keys`), so 설정 › 화면 shows `서재 보기`, `카드 보기` and the tilt row; the `Library020Test` tripwire now asserts it. DS-74 tilt source lifted to `core:designsystem` `card/DeviceTilt.kt` (`rememberTilt`, `DeviceTilt`, `TiltMath`, test `DeviceTiltTest` T-DS-52); `shelf/views/ViewTilt.kt` and the local `TiltMath` removed. Tokens `CivilightMotion.viewSettleStiffness` / `viewSettleDamping` (same values as `holoTilt*`, no overshoot: no source gives one) and `starOrbitPeriodMs` (`ShelfScene.ORBIT_PERIOD_MS` reads it). LIB-94 reversal (tilt row hidden under reduced motion) accepted. Not applied: `Modifier.parallax` / `Modifier.sheen` as DS modifiers (the views' own layer code stays).
 
 ## Motion wave (0.1.0, 2026-11-23)
 
@@ -573,3 +613,10 @@ Every UI feature of batches 1 and 2 is partial: none has been seen on a device.
 ## 0.2.0 integration (wave 2, orchestrator)
 
 Applied: `ProjectStore.updateWithoutUndo` (core:store) with `ProjectViewModel.updateWithoutUndo` and `ProjectWriter.editWithoutUndo`; `게임 제작 도구` and `용어 후보` are no undo step; `ExportRunner.afterSave` is written without an undo step and carried onto kept steps by `carryAfterSave` (version rows and voice states only). `CaptureGuard.TaskLabel.MASKED_PROJECT` reads `이름 가림`. `이동 수단` row, `OnbVoice` widget choice, 서재 mic, `인물 동선` and `지도 만들기` tours and their help rows removed. `LockRow` draws `fingerprint` for `지문으로 보기`; `FingerprintLockRow` deleted. Not applied: routes `SettingsLibraryView` · `SettingsCardView` (sheets kept).
+
+
+## 0.2.0 integration (wave 2 requests applied)
+
+Applied in shared modules: `core:ui` pickers take `creator: PickerCreator?` (U-15.3 create row, picker-mode card, `상위 지역` picked in place, the new item returned as the pick; written through `domain:actions` `CreateActions.inPicker`; no row in read-only projects); trashed tags make no picker chip, subtitle or match (N-44). `core:navigation`: SCRIPT-owned `EpisodeVersionsSheet` · `VersionCompareSheet` · `ManuscriptReplaceSheet`; routes `MarksList`, `SettingsLibraryView`, `SettingsCardView`. `core:model` `TimelineEvent.relatedCharacterKeys` (additive; merges remap it). DS: `TagColor` palette, `TagDot`, `TagColorRow`, `FilterChip(tagColor)`, `LensChip(small)` (the `CivilightScreen` head chip is small), `ListRow(highlighted)` and `Modifier.createdHighlight`.
+
+Library: `서재 보기` / `카드 보기` open the routes `SettingsLibraryView` / `SettingsCardView` (sheet removed). The rows stay hidden until wave 3 registers renderers. (Wave 3 lane lib3d: `서재 보기` and the tilt row now show; `카드 보기` waits for feature:cast.) (Wave 3 integration: `카드 보기` shows.)

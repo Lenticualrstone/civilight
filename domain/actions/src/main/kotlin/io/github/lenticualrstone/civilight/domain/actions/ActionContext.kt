@@ -31,6 +31,10 @@ data class ActionContext(
     /** `domain:trash` operations. */
     val trash: TrashContext get() = TrashContext(now = now, zone = zone, deviceId = device, newKey = newKey)
 
+    /** (0.2.0) `domain:world` edits (create in place, U-15). */
+    val world: io.github.lenticualrstone.civilight.domain.world.common.EditContext
+        get() = io.github.lenticualrstone.civilight.domain.world.common.EditContext(newKey = newKey, now = { now }, device = device)
+
     /** `domain:recorder` edits. */
     val recorder: RecorderEditContext get() = RecorderEditContext(newKey = newKey, now = now, device = device, zone = zone)
 }

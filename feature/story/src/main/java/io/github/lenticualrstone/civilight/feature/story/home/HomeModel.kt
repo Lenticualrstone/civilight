@@ -57,7 +57,7 @@ data class HomeRow(
 enum class HomeShortcut(val label: String, val dim: Boolean = false) {
     STORY(HomeCopy.SHORTCUT_STORY),
 
-    /** (0.2.0, N-41) `할 일 · 복선`: opens the list sheet over home ([HomeMarksSheet]), not a route. */
+    /** (0.2.0, N-41) `할 일 · 복선`: the `MarksList` route. */
     MARKS(HomeCopy.SHORTCUT_MARKS),
     CAST(HomeCopy.SHORTCUT_CAST),
     WORLD(HomeCopy.SHORTCUT_WORLD),
@@ -72,7 +72,7 @@ enum class HomeShortcut(val label: String, val dim: Boolean = false) {
     /** Where the shortcut goes; `설정` is the 프로젝트 설정 container (LIB-69). Null: `할 일 · 복선` opens a sheet. */
     fun route(projectKey: Key): Route? = when (this) {
         STORY -> StoryStructure(projectKey)
-        MARKS -> null
+        MARKS -> io.github.lenticualrstone.civilight.navigation.MarksList(projectKey)
         CAST -> CastList(projectKey)
         WORLD -> World(projectKey)
         TIMELINE -> Timeline(projectKey)

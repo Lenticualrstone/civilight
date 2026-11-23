@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.script
 
+import io.github.lenticualrstone.civilight.feature.script.ui.scriptPickerCreator
+import io.github.lenticualrstone.civilight.feature.script.ui.LINK_CREATE_KINDS
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -103,10 +106,6 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import io.github.lenticualrstone.civilight.feature.script.input.ReadAloudPlayer
 import io.github.lenticualrstone.civilight.feature.script.input.SceneInView
 import io.github.lenticualrstone.civilight.feature.script.input.BottomAnchor
-import io.github.lenticualrstone.civilight.feature.script.input.VersionCompareSheet
-import io.github.lenticualrstone.civilight.feature.script.input.VersionCompareSheetKey
-import io.github.lenticualrstone.civilight.feature.script.input.VersionsSheet
-import io.github.lenticualrstone.civilight.feature.script.input.VersionsSheetKey
 import io.github.lenticualrstone.civilight.feature.script.input.WriteCopy
 import io.github.lenticualrstone.civilight.feature.script.layers.LayersModel
 import io.github.lenticualrstone.civilight.feature.script.layers.LayersSheet
@@ -315,6 +314,7 @@ private fun scriptSheet(
                     sceneCast = ScriptOps.sceneCast(doc, key.sceneKey),
                     recent = doc.app.view.script.recentSpeakers,
                     currentKey = draft.speakerKey,
+                    creator = scriptPickerCreator(CreateKind.CHARACTER),
                 )
             }
         }
@@ -329,6 +329,7 @@ private fun scriptSheet(
                         vm.insertDraftLink(kind, target, text)
                     },
                     onClose = ::close,
+                    creator = scriptPickerCreator(*LINK_CREATE_KINDS),
                 )
             }
         }
@@ -341,7 +342,7 @@ private fun scriptSheet(
                     // SCR-28: `낭독` is offered only when the episode has a step (as the `표시` chip).
                     listOfNotNull(WriteCopy.READ_ALOUD_CMD.takeIf { LayersModel.readAloudEnabled(doc, c.unitKey, unlocked) }, WriteCopy.VERSIONS_CMD)
                 FindSheet(
-                    key, doc, c.unitKey, unlocked, c.readOnly, commands,
+                    key.replace, key.query, doc, c.unitKey, unlocked, c.readOnly, commands,
                     FindActions(
                         jumpTo = { block ->
                             vm.selectBlock(block)
@@ -358,14 +359,6 @@ private fun scriptSheet(
                 DraftCueSheet(key, doc, onPick = vm::addDraftCue, onNewAsset = { kind ->
                     AssetForm.kindOf(kind)?.let { open(AssetFormSheetKey(route.projectKey, kind = it)) }
                 })
-            }
-        }
-        is VersionsSheetKey -> {
-            { VersionsSheet(key, doc, c.readOnly, vm.defaultVersionName(), vm::keepVersion) }
-        }
-        is VersionCompareSheetKey -> {
-            {
-                VersionCompareSheet(key, doc, unlocked, c.readOnly, onUnlock = unlock) { block -> vm.restoreVersionText(key.versionKey, block) }
             }
         }
         is PlantSheetKey -> {
@@ -687,7 +680,7 @@ private fun ScriptFrame(
     fun runCommand(text: String) {
         when (text) {
             WriteCopy.READ_ALOUD_CMD -> return startReadAloud()
-            WriteCopy.VERSIONS_CMD -> return sheets.open(VersionsSheetKey(route.projectKey, c.unitKey))
+            WriteCopy.VERSIONS_CMD -> return sheets.open(io.github.lenticualrstone.civilight.navigation.EpisodeVersionsSheet(route.projectKey, c.unitKey))
         }
         when (val action = CommandRouting.route(doc, c.unitKey, text)) {
             is CommandAction.Jump -> {

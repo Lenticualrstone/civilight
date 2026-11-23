@@ -15,6 +15,7 @@ import io.github.lenticualrstone.civilight.model.position.PointRef
 import io.github.lenticualrstone.civilight.model.project.WorldTimeMode
 import io.github.lenticualrstone.civilight.model.story.PlaceRef
 import io.github.lenticualrstone.civilight.model.story.PlaceRefKind
+import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.world.EventKind
 import io.github.lenticualrstone.civilight.model.world.TimelineEvent
 import io.github.lenticualrstone.civilight.model.world.WorldDate
@@ -39,6 +40,8 @@ data class EventDraft(
     val placeKind: String? = null,
     val placeKey: Key? = null,
     val termKeys: List<Key> = emptyList(),
+    /** (0.2.0, WLD-74) `관련 인물`. */
+    val characterKeys: List<Key> = emptyList(),
     /** Unit whose start is the `공개 시점` (world events only). */
     val revealUnitKey: Key? = null,
 ) {
@@ -48,6 +51,8 @@ data class EventDraft(
     fun withPlace(ref: PlaceRef?): EventDraft = copy(placeKind = ref?.kind?.known?.name, placeKey = ref?.key)
 
     fun toggleTerm(key: Key): EventDraft = copy(termKeys = if (key in termKeys) termKeys - key else termKeys + key)
+
+    fun toggleCharacter(key: Key): EventDraft = copy(characterKeys = if (key in characterKeys) characterKeys - key else characterKeys + key)
 
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
@@ -69,6 +74,7 @@ data class EventDraft(
             placeKind = event.place?.kind?.known?.name,
             placeKey = event.place?.key,
             termKeys = event.relatedTermKeys,
+            characterKeys = event.relatedCharacterKeys,
             revealUnitKey = event.revealPoint?.unitKey,
         )
     }
@@ -87,6 +93,8 @@ data class EventFormUi(
     val sceneLabel: String,
     val placeLabel: String,
     val termsLabel: String,
+    /** (0.2.0, WLD-74) `관련 인물`: names, `숨긴 인물` while locked, `—` when none. */
+    val peopleLabel: String = WorldCopy.EMPTY_VALUE,
     /** World events only. */
     val showReveal: Boolean,
     val revealLabel: String,
@@ -123,12 +131,19 @@ object EventForms {
             termsLabel = draft.termKeys.mapNotNull { key ->
                 doc.index.term(key)?.takeIf { it.deletedAt == null }?.let { if (it.hidden && !hiddenOpen) WorldCopy.HIDDEN_ITEM else it.name }
             }.joinToString(WorldCopy.SEP).ifEmpty { WorldCopy.EMPTY_VALUE },
+            peopleLabel = peopleLabel(doc, draft.characterKeys, hiddenOpen),
             showReveal = world,
             revealLabel = draft.revealUnitKey?.let { labels.code(it) } ?: WorldCopy.EMPTY_VALUE,
             dateInvalid = dateInvalid,
             canSave = draft.title.isNotBlank() && !dateInvalid && (world || scene != null),
         )
     }
+
+    /** `관련 인물 | 리엔 · 세라`: live characters only; a hidden one reads `숨긴 인물` while locked. */
+    fun peopleLabel(doc: ProjectDoc, keys: List<Key>, hiddenOpen: Boolean): String =
+        io.github.lenticualrstone.civilight.domain.world.time.EventDetails.relatedPeopleOf(
+            doc, TimelineEvent(key = "", order = "", kind = EventKind.WORLD.open(), title = "", relatedCharacterKeys = keys), hiddenOpen,
+        ).joinToString(WorldCopy.SEP).ifEmpty { WorldCopy.EMPTY_VALUE }
 
     /** `장소 | 하층 구역`: a place or region name, `숨긴 항목` while locked. */
     fun placeLabel(doc: ProjectDoc, ref: PlaceRef?, hiddenOpen: Boolean): String = when {
@@ -167,9 +182,9 @@ object EventForms {
         val reveal = draft.revealUnitKey?.let { PointRef.unitStart(it) }
         if (eventKey == null) {
             val result = if (draft.story) {
-                EventEdits.createStoryEvent(doc, draft.title, draft.sceneKey!!, ctx, draft.description, draft.place, draft.termKeys)
+                EventEdits.createStoryEvent(doc, draft.title, draft.sceneKey!!, ctx, draft.description, draft.place, draft.termKeys, draft.characterKeys)
             } else {
-                EventEdits.createWorldEvent(doc, draft.title, date, ctx, draft.description, draft.place, draft.termKeys, reveal)
+                EventEdits.createWorldEvent(doc, draft.title, date, ctx, draft.description, draft.place, draft.termKeys, reveal, draft.characterKeys)
             }
             return when (result) {
                 is EventEdit.Applied -> EventSave.Saved(result.doc, result.event.key)
@@ -190,6 +205,7 @@ object EventForms {
                 sceneKey = if (draft.story) draft.sceneKey else e.sceneKey,
                 place = draft.place,
                 relatedTermKeys = draft.termKeys,
+                relatedCharacterKeys = draft.characterKeys,
                 revealPoint = if (draft.story) e.revealPoint else reveal,
             )
         }

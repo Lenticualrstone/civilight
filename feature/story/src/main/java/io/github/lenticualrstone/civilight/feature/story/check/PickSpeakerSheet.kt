@@ -38,6 +38,7 @@ fun SheetScope.PickSpeakerContent(sheet: PickSpeakerSheet, deps: FeatureDeps) {
         },
         onClose = ::close,
         sceneCast = sceneKey?.let { Appearance.of(doc, it).speakers }.orEmpty(),
+        creator = io.github.lenticualrstone.civilight.feature.story.common.storyPickerCreator(io.github.lenticualrstone.civilight.designsystem.component.CreateKind.CHARACTER),
     )
 }
 

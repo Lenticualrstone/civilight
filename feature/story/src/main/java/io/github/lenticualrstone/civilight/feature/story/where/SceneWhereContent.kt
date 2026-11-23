@@ -124,6 +124,7 @@ fun SheetScope.SceneWhereContent(sheet: SceneWhereSheet, deps: FeatureDeps) {
                     onClose = { picking = null },
                     selected = ui.place,
                     includeRegions = body == WhereBody.PICK_REGIONS,
+                    creator = io.github.lenticualrstone.civilight.feature.story.common.storyPickerCreator(io.github.lenticualrstone.civilight.designsystem.component.CreateKind.PLACE),
                 )
                 WhereBody.PICK_EVENT -> EventPickerSheet(
                     doc = doc,
@@ -145,6 +146,7 @@ fun SheetScope.SceneWhereContent(sheet: SceneWhereSheet, deps: FeatureDeps) {
                     onClose = { picking = null },
                     title = WhereCopy.CAST,
                     sceneCast = ui.cast.inScene,
+                    creator = io.github.lenticualrstone.civilight.feature.story.common.storyPickerCreator(io.github.lenticualrstone.civilight.designsystem.component.CreateKind.CHARACTER),
                 )
                 WhereBody.FORM -> {
                     SheetHeader(title = ui.sheet.title, onClose = host::close)

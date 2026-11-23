@@ -36,7 +36,7 @@ data class EventDetail(
     val name: String,
     val time: String,
     val description: String,
-    /** Field rows `장소 | 하층 거리`, `그때 나이 | 리엔 12세 · 세라 16세`, `원고 | 1-4 씬 2 · 회상`, `관련 용어 | …`. */
+    /** Field rows `장소 | 하층 거리`, `그때 나이 | 리엔 12세 · 세라 16세`, `원고 | 1-4 씬 2 · 회상`, `관련 용어 | …`, `관련 인물 | …`. */
     val rows: List<Pair<String, String>>,
     val changes: List<EventChangeRow>,
 )
@@ -48,6 +48,23 @@ class EventDetails(private val doc: ProjectDoc, times: SceneTimeSource) {
     private val codes = StoryCodes(doc)
 
     fun detail(eventKey: Key): EventDetail? = detail(eventKey, hiddenUnlocked = true)
+
+    /**
+     * (0.2.0, WLD-74) The event's `관련 인물` as shown: live characters in stored order; trashed or purged
+     * keys are skipped; a hidden character reads `숨긴 인물` while locked (several collapse into one).
+     */
+    fun relatedPeople(event: TimelineEvent, hiddenUnlocked: Boolean): List<String> =
+        relatedPeopleOf(doc, event, hiddenUnlocked)
+
+    companion object {
+        const val RELATED_PEOPLE = "관련 인물"
+        const val HIDDEN_PERSON = "숨긴 인물"
+
+        fun relatedPeopleOf(doc: ProjectDoc, event: TimelineEvent, hiddenUnlocked: Boolean): List<String> =
+            event.relatedCharacterKeys.distinct().mapNotNull { key ->
+                doc.index.character(key)?.takeIf { it.deletedAt == null }?.let { c -> if (!hiddenUnlocked && c.hidden) HIDDEN_PERSON else c.name }
+            }.let { names -> names.filter { it != HIDDEN_PERSON } + listOfNotNull(HIDDEN_PERSON.takeIf { it in names }) }
+    }
 
     /**
      * [detail] for a reader whose hidden items are open or locked (WLD-13, rule 19): while locked,
@@ -83,6 +100,9 @@ class EventDetails(private val doc: ProjectDoc, times: SceneTimeSource) {
             doc.index.term(key)?.takeIf { t -> t.deletedAt == null }?.let { t -> if (!hiddenUnlocked && t.hidden) EventMasks.HIDDEN_ITEM else t.name }
         }
         if (terms.isNotEmpty()) rows += "관련 용어" to terms.joinToString(Copy.SEP)
+        // (0.2.0, WLD-74) `관련 인물`: live characters only; a locked hidden one reads `숨긴 항목`.
+        val people = relatedPeople(event, hiddenUnlocked)
+        if (people.isNotEmpty()) rows += RELATED_PEOPLE to people.joinToString(Copy.SEP)
         return EventDetail(
             eventKey = eventKey,
             paneTitle = if (story) "연표${Copy.SEP}이야기 사건" else "연표${Copy.SEP}세계 사건",
@@ -193,6 +213,7 @@ object EventEdits {
         place: PlaceRef? = null,
         relatedTermKeys: List<Key> = emptyList(),
         revealPoint: PointRef? = null,
+        relatedCharacterKeys: List<Key> = emptyList(),
     ): EventEdit {
         val clean = title.trim()
         if (clean.isEmpty()) return EventEdit.EmptyTitle
@@ -202,7 +223,8 @@ object EventEdits {
         return add(doc, TimelineEvent(
             key = ctx.newKey(), order = nextOrder(doc), kind = EventKind.WORLD.open(), title = clean,
             description = paragraph(ctx, description), worldDate = stored, place = place,
-            relatedTermKeys = relatedTermKeys, revealPoint = revealPoint, updatedAt = ctx.now(), updatedBy = ctx.device,
+            relatedTermKeys = relatedTermKeys, relatedCharacterKeys = relatedCharacterKeys.distinct(), revealPoint = revealPoint,
+            updatedAt = ctx.now(), updatedBy = ctx.device,
         ))
     }
 
@@ -215,13 +237,14 @@ object EventEdits {
         description: String = "",
         place: PlaceRef? = null,
         relatedTermKeys: List<Key> = emptyList(),
+        relatedCharacterKeys: List<Key> = emptyList(),
     ): EventEdit {
         val clean = title.trim()
         if (clean.isEmpty()) return EventEdit.EmptyTitle
         return add(doc, TimelineEvent(
             key = ctx.newKey(), order = nextOrder(doc), kind = EventKind.STORY.open(), title = clean,
             description = paragraph(ctx, description), sceneKey = sceneKey, place = place ?: doc.index.unit(sceneKey)?.place,
-            relatedTermKeys = relatedTermKeys, updatedAt = ctx.now(), updatedBy = ctx.device,
+            relatedTermKeys = relatedTermKeys, relatedCharacterKeys = relatedCharacterKeys.distinct(), updatedAt = ctx.now(), updatedBy = ctx.device,
         ))
     }
 

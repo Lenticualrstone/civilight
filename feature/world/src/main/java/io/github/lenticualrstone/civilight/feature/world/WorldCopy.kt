@@ -184,6 +184,13 @@ object WorldCopy {
     const val EVENT_PLACE = "장소"
     const val PICK_PLACE = "장소 고르기"
     const val EVENT_TERMS = "관련 용어"
+
+    /** (0.2.0, N-28) Under a term or place name: `원고 속 3곳 · 바꾸기`. */
+    fun manuscriptReplace(count: Int): String = "원고 속 ${count}곳 · 바꾸기"
+
+    /** (0.2.0, U-15.7, WLD-74) An event's characters; also the create card field. */
+    const val EVENT_PEOPLE = "관련 인물"
+    const val PICK_PEOPLE = "인물 고르기"
     const val EVENT_REVEAL = "공개 시점"
     const val BTN_PUT = "넣기"
     const val EVENT_CHANGES = "이 사건에서 바뀐 것"

@@ -116,7 +116,7 @@ Sheets are not back-stack entries. They are saveable state of the screen that sh
 1. Declare the sheet key as a `@Serializable` class implementing `SheetKey`. Feature-local keys may live in your module. Sheets other areas open over their own screens are the `SharedSheet`s in core:navigation `Sheets.kt`, each naming its `owner`:
    - SHELL: `LensSheet`, `RichLinkPickerSheet` (the shared editor's `@` picker)
    - STORY: `UnitMenuSheet`, `NewUnitSheet`, `SceneMoveSheet`, `SceneWhereSheet`
-   - SCRIPT: `SceneSplitSheet`, `SceneMergeSheet`, `RenumberSheet`
+   - SCRIPT: `SceneSplitSheet`, `SceneMergeSheet`, `RenumberSheet`, (0.2.0) `EpisodeVersionsSheet`, `VersionCompareSheet`, `ManuscriptReplaceSheet`
    - CAST: `FieldHistorySheet`, `FieldValueEditSheet`, `AddFieldSheet`, `RelationEditSheet`, `DeleteImpactSheet`, `MergeItemsSheet`
    - WORLD: `LinkCandidatesSheet`, `EventCreateSheet`
    - CANVAS: `LineLabelSheet` (`LineLabelSheet.forCharacters(p, a, b)` for relationship-map lines), `ImagePickSheet`, `GalleryAddSheet(p, ownerKind, ownerKey)` (GAL-11), `GalleryInfoSheet(p, itemKey, focusDescription)` (GAL-13), `GalleryMenuSheet(p, itemKey)` (GAL-14)
@@ -459,3 +459,7 @@ Core agent C, 2026-11-23: motion audit §3.3 rows for core:ui and app, CNV-47, g
 - app has no unit tests, so app's MotionLint and the `Startup` tests still wait for test sources.
 - Emulator pass: everything in the motion table above, plus the CNV-47 handle (drag, settle tick, popover, restart keeps the ratio, cover screen shows no handle, 280 dp clamp on a narrow Medium window).
 
+
+## 0.2.0 integration (wave 2 requests applied)
+
+Applied in shared modules: `core:ui` pickers take `creator: PickerCreator?` (U-15.3 create row, picker-mode card, `상위 지역` picked in place, the new item returned as the pick; written through `domain:actions` `CreateActions.inPicker`; no row in read-only projects); trashed tags make no picker chip, subtitle or match (N-44). `core:navigation`: SCRIPT-owned `EpisodeVersionsSheet` · `VersionCompareSheet` · `ManuscriptReplaceSheet`; routes `MarksList`, `SettingsLibraryView`, `SettingsCardView`. `core:model` `TimelineEvent.relatedCharacterKeys` (additive; merges remap it). DS: `TagColor` palette, `TagDot`, `TagColorRow`, `FilterChip(tagColor)`, `LensChip(small)` (the `CivilightScreen` head chip is small), `ListRow(highlighted)` and `Modifier.createdHighlight`.

@@ -58,3 +58,10 @@ data class SceneNotationSettings(override val projectKey: Key) : StoryRoute, Pro
 /** 프로젝트 설정 › 하루 · 시간대 (STO-19). */
 @Serializable
 data class DayBandSettings(override val projectKey: Key) : StoryRoute, ProjectRoute
+
+/**
+ * (0.2.0, N-41) 할 일 · 복선: foreshadowing and memo to-dos of the project, filters `열림 · 거둠 · 끝냄`
+ * ([filter] = `domain:script`-side filter name, null = `열림`). Opened from home `작업`.
+ */
+@Serializable
+data class MarksList(override val projectKey: Key, val filter: String? = null) : StoryRoute, ProjectRoute

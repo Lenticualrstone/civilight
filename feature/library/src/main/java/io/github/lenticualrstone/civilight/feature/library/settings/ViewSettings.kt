@@ -5,31 +5,32 @@ import io.github.lenticualrstone.civilight.model.app.CardStyle
 import io.github.lenticualrstone.civilight.model.app.LibraryStyle
 import kotlinx.serialization.Serializable
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfViewRenderers
-import io.github.lenticualrstone.civilight.navigation.SheetKey
+import io.github.lenticualrstone.civilight.navigation.Route
+import io.github.lenticualrstone.civilight.navigation.SettingsCardView
+import io.github.lenticualrstone.civilight.navigation.SettingsLibraryView
 
 /** Which of the two view lists a picker shows (LIB-94). */
 @Serializable
-enum class ViewKind { LIBRARY, CARD }
+enum class ViewKind {
+    LIBRARY,
+    CARD,
+    ;
 
-/**
- * (0.2.0, LIB-94) The picker of `서재 보기` or `카드 보기`. The spec draws a screen (head `설정` / `서재 보기`);
- * `core:navigation` routes are sealed and frozen in this wave, so it opens as a local sheet with the same
- * radio list (Request: routes `SettingsLibraryView`, `SettingsCardView`).
- */
-@Serializable
-data class ViewStyleSheet(val kind: ViewKind) : SheetKey
+    /** (0.2.0, LIB-94) The screen of this list (head `설정` / `서재 보기`). */
+    val route: Route get() = if (this == LIBRARY) SettingsLibraryView else SettingsCardView
+}
 
 /** One radio of the picker; [id] is the enum name of [LibraryStyle] or [CardStyle]. */
 data class ViewStyleOption(val id: String, val title: String, val selected: Boolean)
 
 /**
  * (0.2.0, LIB-94) Mirror of `feature:cast` `CastCardViews.renderers.keys`: `feature:library` does not depend
- * on `feature:cast`, so the card styles that can be drawn are listed here. Wave 3 fills both this set and
- * `CastCardViews.renderers` together (Request: one shared registry in a common module). While it is empty
- * `카드 보기` is not drawn, since picking a style would change nothing.
+ * on `feature:cast`, so the card styles that can be drawn are listed here. Both are every 3D style
+ * (wave 3); `Library020Test` and `Cast020FeatureTest` TC-U16-01 each pin the same expression, so the two
+ * cannot drift apart. An empty set would hide `카드 보기`, since picking a style would change nothing.
  */
 object CardViewMirror {
-    val available: Set<CardStyle> = emptySet()
+    val available: Set<CardStyle> = CardStyle.entries.filterNot { it.isList }.toSet()
 }
 
 /** Labels and picker rows of the 0.2.0 view settings (U-16, LIB-93, LIB-94, CST-67). */
@@ -100,8 +101,8 @@ object ViewStyles {
     }
 
     /**
-     * `TODO_COPY_LIB_VIEW_TILT` (default on). The row stays enabled under reduced motion (`ED`); its effect
-     * is nil then (`Tilt.follows`). Null (not drawn) while neither kind has a renderer: tilt only moves 3D views.
+     * `TODO_COPY_LIB_VIEW_TILT` (default on). Null (not drawn) while neither kind has a renderer: tilt only
+     * moves 3D views. Under reduced motion see [tiltShown].
      */
     fun tiltRow(
         settings: AppSettings,
@@ -109,6 +110,13 @@ object ViewStyles {
         cards: Set<CardStyle> = CardViewMirror.available,
     ): SettingsSwitchRow? =
         if (library.isEmpty() && cards.isEmpty()) null else SettingsSwitchRow(SettingsCopy.VIEW_TILT, null, settings.viewTilt)
+
+    /**
+     * The tilt row as drawn: hidden under reduced motion, where tilt is off whatever the switch says (`ED`,
+     * 2026-11-24 review: no control that does nothing; a disabled row would need a reason line, copy not in
+     * sources). The stored value is kept and applies again once motion is no longer reduced.
+     */
+    fun tiltShown(row: SettingsSwitchRow?, reduced: Boolean): SettingsSwitchRow? = row.takeUnless { reduced }
 
     fun libraryStyleOf(id: String): LibraryStyle? = LibraryStyle.entries.firstOrNull { it.name == id }
 

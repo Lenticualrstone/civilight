@@ -60,6 +60,8 @@ data class WorldCreateDraft(
     val month: String = "",
     val day: String = "",
     val sceneKey: Key? = null,
+    /** (0.2.0, WLD-74) An event's `관련 인물`. */
+    val characterKeys: List<Key> = emptyList(),
 ) {
     val isEvent: Boolean get() = kind == EVENT
     val worldKind: WorldKind? get() = WorldKind.entries.firstOrNull { it.name == kind }
@@ -67,7 +69,7 @@ data class WorldCreateDraft(
 
     /** Something typed or picked: a scrim tap then does nothing (DS-72). */
     val hasContent: Boolean
-        get() = listOf(name, alias, note, year, month, day).any { it.isNotBlank() } || parentKey != null || sceneKey != null
+        get() = listOf(name, alias, note, year, month, day).any { it.isNotBlank() } || parentKey != null || sceneKey != null || characterKeys.isNotEmpty()
 
     fun encode(): String = json.encodeToString(serializer(), this)
 
@@ -86,9 +88,8 @@ data class WorldCreateDraft(
 
 /**
  * Pure rules of the world create cards (U-15.7): which fields are drawn, the card title, and what is
- * written. The `이미지` field of places and factions and the event's `관련 인물` are left out in 0.2.0
- * (hidden, see the lane's Requests): an image needs an owner that exists before `만들기`, and
- * `TimelineEvent` has no field for related characters yet. Hidden fields are not drawn at all.
+ * written. The `이미지` field of places and factions is left out in 0.2.0 (hidden, see the lane's
+ * Requests): an image needs an owner that exists before `만들기`. Hidden fields are not drawn at all.
  */
 object WorldCreateCards {
     /** The DS create kind of a world kind. */
@@ -99,7 +100,7 @@ object WorldCreateCards {
     }
 
     /** Keys of the fields left out in 0.2.0 (see the class comment). */
-    val HIDDEN_FIELD_KEYS: Set<String> = setOf(CreateFields.image.key, CreateFields.people.key)
+    val HIDDEN_FIELD_KEYS: Set<String> = setOf(CreateFields.image.key)
 
     /** The drawn fields of [kind], in the order of U-15.7. */
     fun fields(kind: CreateKind): List<CreateField> = kind.fields.filterNot { it.key in HIDDEN_FIELD_KEYS }
@@ -129,6 +130,7 @@ object WorldCreateCards {
         month = draft.month,
         day = draft.day,
         sceneKey = draft.sceneKey,
+        characterKeys = draft.characterKeys,
     )
 
     fun canCreate(doc: ProjectDoc?, draft: WorldCreateDraft): Boolean {
@@ -159,6 +161,7 @@ fun WorldCreateCard(
     onCreateAndOpen: () -> Unit,
     onPickParent: () -> Unit = {},
     onPickScene: () -> Unit = {},
+    onPickPeople: () -> Unit = {},
 ) {
     CreateCardOverlay(
         title = WorldCreateCards.title(draft),
@@ -169,7 +172,7 @@ fun WorldCreateCard(
         onCreateAndOpen = onCreateAndOpen,
         dismissOnScrim = !draft.hasContent,
     ) {
-        WorldCreateFieldsContent(draft, doc, hiddenOpen, onChange, onPickParent, onPickScene)
+        WorldCreateFieldsContent(draft, doc, hiddenOpen, onChange, onPickParent, onPickScene, onPickPeople)
     }
 }
 
@@ -181,6 +184,7 @@ private fun ColumnScope.WorldCreateFieldsContent(
     onChange: (WorldCreateDraft) -> Unit,
     onPickParent: () -> Unit,
     onPickScene: () -> Unit,
+    onPickPeople: () -> Unit,
 ) {
     val focus = remember { FocusRequester() }
     WorldCreateCards.fields(draft).forEach { field ->
@@ -210,6 +214,13 @@ private fun ColumnScope.WorldCreateFieldsContent(
                 onPick = onPickParent,
             )
             field.key == CreateFields.time.key && doc != null -> EventTimeField(field.label, draft, doc, onChange, onPickScene)
+            field.key == CreateFields.people.key && doc != null -> PickField(
+                label = field.label,
+                value = io.github.lenticualrstone.civilight.feature.world.time.EventForms.peopleLabel(doc, draft.characterKeys, hiddenOpen)
+                    .takeIf { draft.characterKeys.isNotEmpty() },
+                action = WorldCopy.PICK_PEOPLE,
+                onPick = onPickPeople,
+            )
         }
     }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -252,21 +263,4 @@ private fun EventTimeField(label: String, draft: WorldCreateDraft, doc: ProjectD
         val scene = draft.sceneKey?.let { doc.index.unit(it) }?.let { UnitLabels(doc).reference(it) }
         PickField(WorldCopy.EVENT_SCENE, scene, WorldCopy.PICK_SCENE, onPickScene)
     }
-}
-
-/**
- * The `hl` highlight of a row just made with `만들기` (DS-72, U-15.6): full at first, faded out over
- * `createdRowHighlightMs` on the standard curve (the reduced-motion fade when motion is reduced).
- */
-@Composable
-fun Modifier.createdHighlight(active: Boolean, onDone: () -> Unit): Modifier {
-    if (!active) return this
-    val motion = CivilightTheme.motion
-    val color = CivilightTheme.colors.hl
-    val alpha = remember { Animatable(1f) }
-    LaunchedEffect(Unit) {
-        alpha.animateTo(0f, motion.spec(MotionToken(CivilightMotion.standardCurve, CivilightMotion.createdRowHighlightMs)))
-        onDone()
-    }
-    return drawBehind { drawRect(color, alpha = alpha.value) }
 }

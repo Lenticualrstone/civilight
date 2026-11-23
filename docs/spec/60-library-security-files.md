@@ -2057,7 +2057,7 @@ Priority **P1** · needsExternal **no** · scope U-16
 - LIB-63 section `화면` gains three rows after `펼친 화면 배치` (the third is the tilt switch below): `서재 보기` · value `<label>` › and `카드 보기` · value `<label>` › (DS-68 chevron). No sub-line.
 - Each opens a screen (head `설정` / `서재 보기` or `카드 보기`) with one radio list of the seven values (00 §13.4), the current one checked. Picking applies at once. Picking a 3D value also sets that screen's head toggle to the 3D view (`libraryToggle` or `castToggle` = `CARD`) so the choice is visible on return (`ED`); picking `목록` leaves the toggle as stored.
 - `카드 보기` drives the **character card list** (D2; behaviour CST hand-off, §8.7). The gallery card shelf (U-11) is separate and not affected.
-- Third row: `TODO_COPY_LIB_VIEW_TILT` + switch (`AppSettings.viewTilt`, default on). Off → no tilt in any 서재 or card view. On → tilt follows unless motion is reduced (LIB-67, CNV-46): `Tilt.follows(viewTilt, motion)`. The switch row stays enabled under reduced motion (`ED`); its effect is then nil until motion is no longer reduced.
+- Third row: `TODO_COPY_LIB_VIEW_TILT` + switch (`AppSettings.viewTilt`, default on). Off → no tilt in any 서재 or card view. On → tilt follows unless motion is reduced (LIB-67, CNV-46): `Tilt.follows(viewTilt, motion)`. Under reduced motion the switch row is not drawn (`ED`, 2026-11-24: it would change nothing); the stored value is kept and applies again once motion is no longer reduced.
 
 #### LIB-95 · 레코더 입구 (서재 and onboarding side)
 Priority **P1** · needsExternal **no** · scope S-8; recorder side LRC-48

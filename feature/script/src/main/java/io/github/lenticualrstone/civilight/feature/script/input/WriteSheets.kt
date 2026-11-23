@@ -52,7 +52,9 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.marks.Marks
 import io.github.lenticualrstone.civilight.model.script.BlockKind
+import io.github.lenticualrstone.civilight.navigation.EpisodeVersionsSheet
 import io.github.lenticualrstone.civilight.navigation.SheetKey
+import io.github.lenticualrstone.civilight.navigation.VersionCompareSheet
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
 import kotlinx.serialization.Serializable
 
@@ -73,14 +75,6 @@ data class DraftLinkSheetKey(val projectKey: Key) : SheetKey
 /** `찾기` (SCR-68) and its `바꾸기` mode (SCR-75). */
 @Serializable
 data class FindSheetKey(val projectKey: Key, val replace: Boolean = false, val query: String = "") : SheetKey
-
-/** `지난 판` with `판 남기기` (SCR-76). */
-@Serializable
-data class VersionsSheetKey(val projectKey: Key, val unitKey: Key) : SheetKey
-
-/** One version compared with the episode (SCR-76). */
-@Serializable
-data class VersionCompareSheetKey(val projectKey: Key, val unitKey: Key, val versionKey: Key) : SheetKey
 
 /** `복선 심기` on a block (SCR-77). */
 @Serializable
@@ -190,7 +184,8 @@ class FindActions(
  */
 @Composable
 fun SheetScope.FindSheet(
-    key: FindSheetKey,
+    replace: Boolean,
+    initialQuery: String,
     doc: ProjectDoc,
     unitKey: Key,
     unlocked: Boolean,
@@ -199,8 +194,8 @@ fun SheetScope.FindSheet(
     actions: FindActions,
 ) {
     val sheet = this
-    var replaceMode by rememberSaveable { mutableStateOf(key.replace && !readOnly) }
-    var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(key.query, TextRange(key.query.length))) }
+    var replaceMode by rememberSaveable { mutableStateOf(replace && !readOnly) }
+    var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(initialQuery, TextRange(initialQuery.length))) }
     var with by rememberSaveable { mutableStateOf("") }
     // Replace mode keeps its list after a `바꾸기` ([frozen], remapped to the new offsets); checks are by index in it.
     var checked by remember { mutableStateOf(setOf<Int>()) }
@@ -307,10 +302,15 @@ fun SheetScope.FindSheet(
     }
 }
 
-/** `지난 판` (SCR-76): `판 남기기` with its default name, then the versions, newest first. */
+/**
+ * `지난 판` (SCR-76, shared `EpisodeVersionsSheet`): `판 남기기` with its default name, then the versions, newest
+ * first. [keepOnly] (the episode ⋯ `판 남기기` row) shows the name and the button only; after keeping, the list
+ * shows, so the new version is seen.
+ * Nothing to keep in a read-only project.
+ */
 @Composable
 fun SheetScope.VersionsSheet(
-    key: VersionsSheetKey,
+    key: EpisodeVersionsSheet,
     doc: ProjectDoc,
     readOnly: Boolean,
     defaultName: String,
@@ -318,19 +318,25 @@ fun SheetScope.VersionsSheet(
 ) {
     val sheet = this
     var name by rememberSaveable { mutableStateOf(defaultName) }
-    SheetHeader(title = WriteCopy.VERSIONS_TITLE, onClose = ::close, subtitle = Labels.unitCode(doc, key.unitKey))
+    var showList by rememberSaveable { mutableStateOf(!key.keepOnly) }
+    SheetHeader(title = if (showList) WriteCopy.VERSIONS_TITLE else WriteCopy.KEEP_VERSION, onClose = ::close, subtitle = Labels.unitCode(doc, key.episodeKey))
     if (!readOnly) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CivilightTextField(name, { name = it }, Modifier.weight(1f), label = WriteCopy.VERSION_NAME)
-            CivilightButton(WriteCopy.KEEP_VERSION, onClick = { onKeep(name); name = defaultName }, variant = ButtonVariant.COMPACT_PRIMARY)
+            CivilightButton(WriteCopy.KEEP_VERSION, onClick = {
+                onKeep(name)
+                name = defaultName
+                showList = true
+            }, variant = ButtonVariant.COMPACT_PRIMARY)
         }
     }
+    if (!showList) return
     SheetScrollBody(Modifier.padding(top = 8.dp)) {
-        val versions = VersionActions.versionsOf(doc, key.unitKey).reversed()
+        val versions = VersionActions.versionsOf(doc, key.episodeKey).reversed()
         if (versions.isEmpty()) CivilightText(WriteCopy.NO_VERSIONS, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
         versions.forEach { v ->
             ListRow(title = v.name, subtitle = WriteCopy.versionBlocks(v.blocks.size), compact = true, onClick = {
-                sheet.open(VersionCompareSheetKey(key.projectKey, key.unitKey, v.key))
+                sheet.open(VersionCompareSheet(key.projectKey, key.episodeKey, v.key))
             })
         }
     }
@@ -341,8 +347,8 @@ fun SheetScope.VersionsSheet(
  * per changed block. A locked hidden scene is one row with no text of it.
  */
 @Composable
-fun SheetScope.VersionCompareSheet(
-    key: VersionCompareSheetKey,
+fun SheetScope.VersionCompareSheetBody(
+    key: VersionCompareSheet,
     doc: ProjectDoc,
     unlocked: Boolean,
     readOnly: Boolean,
@@ -352,10 +358,10 @@ fun SheetScope.VersionCompareSheet(
     val sheet = this
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val version = VersionActions.versionsOf(doc, key.unitKey).firstOrNull { it.key == key.versionKey }
-    SheetHeader(title = version?.name.orEmpty(), onClose = ::close, subtitle = Labels.unitCode(doc, key.unitKey))
+    val version = VersionActions.versionsOf(doc, key.episodeKey).firstOrNull { it.key == key.versionKey }
+    SheetHeader(title = version?.name.orEmpty(), onClose = ::close, subtitle = Labels.unitCode(doc, key.episodeKey))
     version ?: return
-    val rows = remember(doc, version, unlocked) { VersionDiff.rows(version, doc, key.unitKey, unlocked) }
+    val rows = remember(doc, version, unlocked) { VersionDiff.rows(version, doc, key.episodeKey, unlocked) }
     val boxed = SpanStyle(background = colors.sel, color = colors.ink)
     val struck = SpanStyle(color = colors.ink3, textDecoration = TextDecoration.LineThrough)
     SheetScrollBody(Modifier.padding(top = 8.dp)) {

@@ -467,7 +467,7 @@ class Writing020Test {
 
     @Test
     fun `0_2_0 component copy passes CopyLint`() {
-        (IconButtonCopy.all + ScriptInputCopy.all + CreateCardCopy.all + InputKind.entries.map { it.label })
+        (IconButtonCopy.all + ScriptInputCopy.all + CreateCardCopy.all + io.github.lenticualrstone.civilight.designsystem.component.TagColorCopy.all + InputKind.entries.map { it.label })
             .forEach { assertTrue("$it: ${CopyLint.lint(it)}", CopyLint.lint(it).isEmpty()) }
         IconButtonSpec.entries.forEach {
             listOfNotNull(it.text, it.accessibilityName).forEach { v -> assertTrue("$v: ${CopyLint.lint(v, isButton = true)}", CopyLint.lint(v, isButton = true).isEmpty()) }

@@ -69,9 +69,17 @@ private fun ColumnScope.CastCardFields(state: CreateCardState, fields: List<Crea
                     CivilightText(field.label, CivilightTheme.type.label, color = CivilightTheme.colors.ink2)
                     val picked = CastCreate.tagKeys(state)
                     ChipFlow {
-                        for (tag in tags) FilterChip(tag.name, tag.key in picked, { onChange(CastCreate.toggleTag(state, tag.key)) })
+                        for (tag in tags) FilterChip(tag.name, tag.key in picked, { onChange(CastCreate.toggleTag(state, tag.key)) }, tagColor = tag.color)
                     }
                 }
+            }
+            // CST-75 `색`: `없음` and the palette swatches.
+            CreateFieldType.COLOR -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                CivilightText(field.label, CivilightTheme.type.label, color = CivilightTheme.colors.ink2)
+                io.github.lenticualrstone.civilight.designsystem.component.TagColorRow(
+                    selected = CastCreate.tagColor(state),
+                    onPick = { onChange(state.with(CreateFields.color.key, it.orEmpty())) },
+                )
             }
             else -> Unit
         }

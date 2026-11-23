@@ -134,6 +134,8 @@ fun ListRow(
     divider: RowDivider = RowDivider.SOLID,
     titleDotted: Boolean = false,
     subtitleLines: Int = 1,
+    highlighted: Boolean = false,
+    onHighlightDone: () -> Unit = {},
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -142,6 +144,8 @@ fun ListRow(
         modifier = modifier
             .fillMaxWidth()
             .then(if (divider != RowDivider.NONE) Modifier.topHairline(colors.line, dashed = divider == RowDivider.DASHED) else Modifier)
+            // U-15.6: a row just made with `만들기` is briefly highlighted (not selected).
+            .createdHighlight(highlighted, onHighlightDone)
             .selectedRowBackground(selected, colors.sel, colors.acc)
             .then(if (onClick != null) Modifier.pressable(PressAction.Click(onClick), role = Role.Button, scaleOnPress = false) else Modifier)
             .heightIn(min = 44.dp)

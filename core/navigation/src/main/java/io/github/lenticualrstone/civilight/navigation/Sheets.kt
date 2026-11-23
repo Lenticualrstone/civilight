@@ -71,6 +71,31 @@ data class SceneWhereSheet(override val projectKey: Key, val sceneKey: Key) : Pr
     override val owner: FeatureModule get() = FeatureModule.STORY
 }
 
+/**
+ * (0.2.0, N-29, SCR-76) `지난 판` of [episodeKey]: `판 남기기` with its default name on top, then the
+ * versions, newest first. [keepOnly] = the episode ⋯ `판 남기기` row (only the name and the button).
+ * Opened from the story episode ⋯ and the script's `찾기` command.
+ */
+@Serializable
+data class EpisodeVersionsSheet(override val projectKey: Key, val episodeKey: Key, val keepOnly: Boolean = false) : ProjectSheet {
+    override val owner: FeatureModule get() = FeatureModule.SCRIPT
+}
+
+/** (0.2.0, N-29, SCR-76) The compare screen of one version of [episodeKey] (`이 판 글로` per block). */
+@Serializable
+data class VersionCompareSheet(override val projectKey: Key, val episodeKey: Key, val versionKey: Key) : ProjectSheet {
+    override val owner: FeatureModule get() = FeatureModule.SCRIPT
+}
+
+/**
+ * (0.2.0, N-28, SCR-75) Manuscript `바꾸기` with `찾을 말` = [query]: the cast and world name fields'
+ * `원고 속 n곳 · 바꾸기` line. Never offered in a read-only project.
+ */
+@Serializable
+data class ManuscriptReplaceSheet(override val projectKey: Key, val query: String) : ProjectSheet {
+    override val owner: FeatureModule get() = FeatureModule.SCRIPT
+}
+
 /** 씬 나누기 (SCR-50) at [blockKey]. */
 @Serializable
 data class SceneSplitSheet(override val projectKey: Key, val blockKey: Key) : ProjectSheet {

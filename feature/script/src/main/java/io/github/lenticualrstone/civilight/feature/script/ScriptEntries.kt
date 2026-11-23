@@ -4,6 +4,9 @@ package io.github.lenticualrstone.civilight.feature.script
 
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import io.github.lenticualrstone.civilight.feature.script.input.EpisodeVersionsSheetContent
+import io.github.lenticualrstone.civilight.feature.script.input.ManuscriptReplaceSheetContent
+import io.github.lenticualrstone.civilight.feature.script.input.VersionCompareSheetContent
 import io.github.lenticualrstone.civilight.feature.script.renumber.RenumberSheetContent
 import io.github.lenticualrstone.civilight.feature.script.scenes.SceneMergeSheetContent
 import io.github.lenticualrstone.civilight.feature.script.scenes.SceneSplitSheetContent
@@ -22,7 +25,8 @@ import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 /**
  * The script area's entries (shell.md §1). Registered: `Script` (SCR-01 …), `ScriptFieldSettings`
  * (SCR-24/25), `TransitionTextSettings` (SCR-48), `ScriptAssets` (SCR-61) and the shared sheets
- * `RenumberSheet` (SCR-22), `SceneSplitSheet` (SCR-50) and `SceneMergeSheet` (SCR-51). Every script
+ * `RenumberSheet` (SCR-22), `SceneSplitSheet` (SCR-50), `SceneMergeSheet` (SCR-51) and (0.2.0)
+ * `EpisodeVersionsSheet` · `VersionCompareSheet` (SCR-76) and `ManuscriptReplaceSheet` (SCR-75). Every script
  * route is registered.
  */
 fun EntryProviderScope<NavKey>.scriptEntries(deps: FeatureDeps) {
@@ -33,4 +37,14 @@ fun EntryProviderScope<NavKey>.scriptEntries(deps: FeatureDeps) {
     deps.sheets.register<RenumberSheet> { sheet -> RenumberSheetContent(sheet, deps) }
     deps.sheets.register<SceneSplitSheet> { sheet -> SceneSplitSheetContent(sheet, deps) }
     deps.sheets.register<SceneMergeSheet> { sheet -> SceneMergeSheetContent(sheet, deps) }
+    // (0.2.0, N-28, N-29) opened from the story episode ⋯ and the cast and world name fields too.
+    deps.sheets.register<io.github.lenticualrstone.civilight.navigation.EpisodeVersionsSheet> { sheet ->
+        EpisodeVersionsSheetContent(sheet, deps)
+    }
+    deps.sheets.register<io.github.lenticualrstone.civilight.navigation.VersionCompareSheet> { sheet ->
+        VersionCompareSheetContent(sheet, deps)
+    }
+    deps.sheets.register<io.github.lenticualrstone.civilight.navigation.ManuscriptReplaceSheet> { sheet ->
+        ManuscriptReplaceSheetContent(sheet, deps)
+    }
 }

@@ -17,5 +17,9 @@ object MenuCopy {
 
     /** Episode ⋯ `번호 다시 매기기 · 1-7` (STO-07 → SCR-22 `RTRenumber`). */
     const val RENUMBER = "번호 다시 매기기"
+
+    /** (0.2.0, N-29) Episode ⋯ versions (scope N-29). */
+    const val KEEP_VERSION = "판 남기기"
+    const val VERSIONS = "지난 판"
     const val CANCEL = "취소"
 }

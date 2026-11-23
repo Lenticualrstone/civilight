@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.world.time
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.feature.world.common.worldPickerCreator
 import androidx.compose.foundation.layout.Arrangement
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.feature.world.common.SheetSteps
@@ -124,9 +126,10 @@ fun SheetScope.EventChangeContent(eventKey: Key, onAdd: suspend (ChangeDraft) ->
                 }
                 val back = { step = ChangeStep.VALUE }
                 when (EventChanges.linkPick(def)) {
-                    PickKind.PLACE -> PlacePickerSheet(doc, gate, def.name, onPick = { add(it.key) }, onClose = back, includeRegions = false)
-                    PickKind.TERM -> TermPickerSheet(doc, gate, def.name, onPick = { key, _ -> add(key) }, onClose = back)
-                    else -> FactionPickerSheet(doc, gate, def.name, onPick = add, onClose = back)
+                    // (0.2.0, U-15.3, WLD-70) `연결` value pickers have the create row of their kind.
+                    PickKind.PLACE -> PlacePickerSheet(doc, gate, def.name, onPick = { add(it.key) }, onClose = back, includeRegions = false, creator = worldPickerCreator(CreateKind.PLACE))
+                    PickKind.TERM -> TermPickerSheet(doc, gate, def.name, onPick = { key, _ -> add(key) }, onClose = back, creator = worldPickerCreator(CreateKind.TERM))
+                    else -> FactionPickerSheet(doc, gate, def.name, onPick = add, onClose = back, creator = worldPickerCreator(CreateKind.FACTION))
                 }
             }
             ChangeStep.VALUE -> {

@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.cast.field
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.feature.cast.create.castPickerCreator
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -156,9 +158,10 @@ fun FieldValueEditor(
 fun ColumnScope.LinkPicker(doc: ProjectDoc, gate: HiddenGate, kind: FieldLinkTargetKind, onPick: (Key) -> Unit, onClose: () -> Unit) {
     val title = CastUiCopy.pickTitle(kind.entityKind)
     when (kind) {
-        FieldLinkTargetKind.FACTION -> FactionPickerSheet(doc, gate, title, onPick, onClose)
-        FieldLinkTargetKind.TERM -> TermPickerSheet(doc, gate, title, { key, _ -> onPick(key) }, onClose)
-        FieldLinkTargetKind.PLACE -> PlacePickerSheet(doc, gate, title, { onPick(it.key) }, onClose, includeRegions = false)
+        // (0.2.0, U-15.3, WLD-70) the `연결` field pickers have the create row of their kind.
+        FieldLinkTargetKind.FACTION -> FactionPickerSheet(doc, gate, title, onPick, onClose, creator = castPickerCreator(CreateKind.FACTION))
+        FieldLinkTargetKind.TERM -> TermPickerSheet(doc, gate, title, { key, _ -> onPick(key) }, onClose, creator = castPickerCreator(CreateKind.TERM))
+        FieldLinkTargetKind.PLACE -> PlacePickerSheet(doc, gate, title, { onPick(it.key) }, onClose, includeRegions = false, creator = castPickerCreator(CreateKind.PLACE))
     }
 }
 

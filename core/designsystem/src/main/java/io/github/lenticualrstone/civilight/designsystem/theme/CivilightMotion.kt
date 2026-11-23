@@ -97,6 +97,19 @@ object CivilightMotion {
     /** Damping ratio of the tilt follow: critically damped (no bounce). */
     const val holoTiltDamping: Float = Spring.DampingRatioNoBouncy
 
+    // 0.2.0 (U-16, DS-74): the 3D 서재 views and character card views.
+    /**
+     * A 3D view's focus settling after a drag, a step or a pick (서재 views, card views). Critically damped
+     * like the tilt follow: the boards draw a light overshoot, but give no value for it (open in the spec).
+     */
+    const val viewSettleStiffness: Float = Spring.StiffnessMediumLow
+
+    /** Damping ratio of [viewSettleStiffness]: no bounce. */
+    const val viewSettleDamping: Float = Spring.DampingRatioNoBouncy
+
+    /** One slow turn of the 별자리 view's idle orbit (LIB-93); no orbit under reduced motion. */
+    const val starOrbitPeriodMs: Long = 90_000L
+
     /** Fold pane shift (CNV-34): the second pane comes in from 48 dp to the right. */
     val foldPaneShift: Dp = 48.dp
 

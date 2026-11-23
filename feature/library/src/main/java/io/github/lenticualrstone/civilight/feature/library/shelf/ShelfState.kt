@@ -23,6 +23,7 @@ import io.github.lenticualrstone.civilight.model.app.OnboardingState
 import io.github.lenticualrstone.civilight.model.app.RecentItem
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.project.ProjectFormat
 import io.github.lenticualrstone.civilight.model.project.Protections
 import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
@@ -45,6 +46,8 @@ data class ProjectRowUi(
     val readOnly: Boolean,
     /** The 48 dp list thumbnail (D6): the cover's 1:1 crop, a preset, or the initial letter. */
     val thumb: CoverUi = CoverUi(null, null, null, "", holo = false),
+    /** (0.2.0, LIB-93 별자리) The project's 형식; null while the document loads or for a value this version does not know. */
+    val format: ProjectFormat? = null,
 )
 
 /** The open hidden group (`LibUnlocked`): `숨긴 프로젝트 <M> · 열림`, the re-lock note, its rows. */
@@ -195,6 +198,7 @@ object ShelfState {
             protections = doc?.project?.protections ?: Protections(hidden = p.entry.hidden),
             readOnly = p.entry.readOnly || p.entry.isExample,
             thumb = ShelfCards.thumb(doc, doc?.project?.name ?: p.entry.name, fileExists),
+            format = doc?.project?.format?.known,
         )
     }
 }

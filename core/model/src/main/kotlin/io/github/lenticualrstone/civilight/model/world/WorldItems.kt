@@ -128,6 +128,8 @@ data class TimelineEvent(
     val sceneKey: Key? = null,
     val place: PlaceRef? = null,
     @EncodeDefault val relatedTermKeys: List<Key> = emptyList(),
+    /** (0.2.0, U-15.7, WLD-74) `관련 인물`: characters tied to the event. Additive; absent in 0.1.0 files. */
+    val relatedCharacterKeys: List<Key> = emptyList(),
     val revealPoint: PointRef? = null,
     override val deletedAt: Timestamp? = null,
     override val trashEntryKey: Key? = null,

@@ -40,7 +40,7 @@ class World020FeatureTest {
         assertEquals(listOf("이름", "상위 지역", "한 줄 설명"), labels(CreateKind.PLACE))
         assertEquals(listOf("이름", "다른 이름", "한 줄 설명"), labels(CreateKind.TERM))
         assertEquals(listOf("이름", "한 줄 설명"), labels(CreateKind.FACTION))
-        assertEquals(listOf("이름", "때"), labels(CreateKind.EVENT))
+        assertEquals(listOf("이름", "때", "관련 인물"), labels(CreateKind.EVENT))
         assertEquals("새 장소", WorldCreateCards.title(WorldCreateDraft.of(WorldKind.PLACE)))
         assertEquals("새 용어", WorldCreateCards.title(WorldCreateDraft.of(WorldKind.TERM)))
         assertEquals("새 세력", WorldCreateCards.title(WorldCreateDraft.of(WorldKind.FACTION)))

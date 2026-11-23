@@ -7,13 +7,6 @@ import io.github.lenticualrstone.civilight.model.marks.MarkItem
 import io.github.lenticualrstone.civilight.model.marks.MarkState
 import io.github.lenticualrstone.civilight.model.marks.Marks
 import io.github.lenticualrstone.civilight.model.text.plainText
-import io.github.lenticualrstone.civilight.navigation.SheetKey
-import kotlinx.serialization.Serializable
-
-/** (0.2.0, N-41) The `할 일 · 복선` list sheet over home; local to home (no route exists for it yet, Requests). */
-@Serializable
-data class HomeMarksSheet(val projectKey: Key) : SheetKey
-
 /** One filter chip: `열림 3`. */
 data class MarkChip(val state: MarkState, val label: String, val count: Int)
 

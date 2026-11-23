@@ -27,6 +27,7 @@ class CastCopyLintTest {
     /** Formatted copy, with sample arguments from the example project. */
     private fun formatted(): List<String> = buildList {
         add(CastUiCopy.emptyRow(3))
+        add(CastUiCopy.manuscriptReplace(3))
         add(CastUiCopy.stepStatus("지금 시점보다 뒤"))
         EntityKind.entries.forEach {
             add(CastUiCopy.pickTitle(it))

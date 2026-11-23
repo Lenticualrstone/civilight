@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.component.CreateCard
 import io.github.lenticualrstone.civilight.designsystem.component.CreateCardCopy
 import io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode
@@ -65,6 +66,7 @@ private fun SheetScope.TextValueSheet(
     initial: String,
     singleLine: Boolean,
     canSave: (String) -> Boolean,
+    below: (@Composable () -> Unit)? = null,
     onSave: (String) -> Unit,
 ) {
     val host = this
@@ -72,6 +74,7 @@ private fun SheetScope.TextValueSheet(
     val readOnly = currentProjectStore.readOnly
     SheetHeader(title, onClose = ::close, closeLabel = CastUiCopy.BTN_CLOSE)
     CivilightTextField(text, { text = it }, Modifier.fillMaxWidth().padding(top = 14.dp), singleLine = singleLine, enabled = !readOnly)
+    below?.invoke()
     if (!readOnly) {
         SheetActions {
             CivilightButton(CastUiCopy.BTN_SAVE, {
@@ -91,7 +94,15 @@ fun SheetScope.NameSheetContent(sheet: NameEditSheet) {
         LaunchedEffect(Unit) { close() }
         return
     }
-    TextValueSheet(CastUiCopy.NAME, current, singleLine = true, canSave = { FixedFieldEdits.canRename(it, current) }) { name ->
+    // (0.2.0, N-28) `원고 속 n곳 · 바꾸기` under the name: the stored name's manuscript hits (locked hidden scenes
+    // are neither counted nor listed); it opens the script's 바꾸기 with `찾을 말` filled in. Not in read-only.
+    val gate = io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate(sheet.projectKey)
+    val hits = remember(doc, current, gate.open) { ManuscriptHits.count(doc, current, gate.open) }
+    val readOnly = currentProjectStore.readOnly
+    val below: (@Composable () -> Unit)? = if (readOnly || hits == 0) null else ({
+        TextAction(CastUiCopy.manuscriptReplace(hits), { open(io.github.lenticualrstone.civilight.navigation.ManuscriptReplaceSheet(sheet.projectKey, current)) }, Modifier.padding(top = 6.dp))
+    })
+    TextValueSheet(CastUiCopy.NAME, current, singleLine = true, canSave = { FixedFieldEdits.canRename(it, current) }, below = below) { name ->
         editor.act(CastUiCopy.BTN_SAVE) { d, ctx -> FixedFieldEdits.rename(d, sheet.characterKey, name, ctx) }
     }
 }
@@ -182,3 +193,9 @@ private val TagFieldCardSaver: Saver<CreateCardState?, String> = Saver(
     save = { it?.let(CreateCardCodec::encode) ?: "" },
     restore = { CreateCardCodec.decode(it) },
 )
+
+/** (0.2.0, N-28) The manuscript hits of a name (the count of `원고 속 n곳 · 바꾸기`), as the 바꾸기 sheet lists them. */
+object ManuscriptHits {
+    fun count(doc: io.github.lenticualrstone.civilight.model.doc.ProjectDoc, name: String, unlocked: Boolean): Int =
+        if (name.isBlank()) 0 else io.github.lenticualrstone.civilight.domain.script.Replace.find(doc, name, unlocked).size
+}

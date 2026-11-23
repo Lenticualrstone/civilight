@@ -103,17 +103,28 @@ class Library020Test {
     }
 
     @Test
-    fun `LIB-93 without a renderer every style draws the list and no toggle is drawn`() {
-        assertEquals(emptySet<LibraryStyle>(), ShelfViewRenderers.available)
-        for (style in LibraryStyle.entries) {
+    fun `LIB-93 every 3D style has a renderer, the list has none, and a style left out draws the list`() {
+        // Wave 3 (lane lib3d): the six 서재 views are registered; 목록 never is.
+        assertEquals(LibraryStyle.entries.filterNot { it.isList }.toSet(), ShelfViewRenderers.available)
+        for (style in LibraryStyle.entries.filterNot { it.isList }) {
             val view = ShelfViews.of(AppSettings(libraryStyle = style))
-            assertNull("$style draws the list", view.rendered)
-            assertNull("$style: no control that does nothing", view.toggle)
+            assertEquals("$style draws itself", style, view.rendered)
+            assertNotNull("$style: the head toggle", view.toggle)
         }
+        val list = ShelfViews.of(AppSettings(libraryStyle = LibraryStyle.LIST))
+        assertNull(list.rendered)
+        assertNull("목록: no toggle", list.toggle)
+        // A style without a renderer (as before wave 3) still draws the list with no toggle.
+        val none = ShelfViews.of(AppSettings(libraryStyle = LibraryStyle.BOOKSHELF), available = emptySet())
+        assertNull(none.rendered)
+        assertNull(none.toggle)
         // V-05: with 0 projects no 3D view is drawn even when one exists.
         val v = ShelfViews.of(AppSettings(), available = setOf(LibraryStyle.BOOKSHELF))
         assertFalse(ShelfViews.drawsView(v, ShelfUi(loaded = true, empty = io.github.lenticualrstone.civilight.domain.library.newproject.EmptyLibrary(showDeletedNotice = false))))
         assertTrue(ShelfViews.drawsView(v, ShelfUi(loaded = true)))
+        // LIB-94 tilt switch reaches the view.
+        assertFalse(ShelfViews.of(AppSettings(viewTilt = false)).viewTilt)
+        assertTrue(ShelfViews.of(AppSettings()).viewTilt)
     }
 
     @Test
@@ -132,6 +143,9 @@ class Library020Test {
         assertEquals(SettingsCopy.VIEW_TILT, ui.tilt!!.title)
         assertFalse(ui.tilt!!.on)
         assertTrue(SettingsState.root(AppSettings(), 0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = libAll, cardViews = cardAll).tilt!!.on)
+        // Under reduced motion tilt is off whatever the switch says: the row is not drawn (no control that does nothing).
+        assertNull(ViewStyles.tiltShown(ui.tilt, reduced = true))
+        assertEquals(ui.tilt, ViewStyles.tiltShown(ui.tilt, reduced = false))
 
         val lib = ViewStyles.options(ViewKind.LIBRARY, AppSettings(), library = libAll)
         assertEquals(listOf("3D 책장", "표지 회전", "원고 더미", "서고 회랑", "색인 카드 서랍", "별자리", "목록"), lib.map { it.title })
@@ -144,13 +158,20 @@ class Library020Test {
     }
 
     @Test
-    fun `LIB-94 no view rows while no 3D view has a renderer`() {
-        // Tripwire with the ShelfViews one: wave 3 flips both renderer sets (and CardViewMirror with CastCardViews).
-        assertEquals(emptySet<CardStyle>(), CardViewMirror.available)
+    fun `LIB-94 view rows follow the renderers`() {
+        // Tripwire: CardViewMirror is the same set as feature:cast CastCardViews.renderers.keys (TC-U16-01).
+        assertEquals(CardStyle.entries.filterNot { it.isList }.toSet(), CardViewMirror.available)
         val ui = SettingsState.root(AppSettings(libraryStyle = LibraryStyle.BOOKSHELF, castCardStyle = CardStyle.FAN_DECK), 0, false, null, LibFx.NOW, LibFx.ZONE)
-        assertNull("서재 보기 does nothing without a renderer", ui.libraryView)
-        assertNull("카드 보기 does nothing without a renderer", ui.cardView)
-        assertNull("tilt does nothing without a renderer", ui.tilt)
+        assertEquals("3D 책장", ui.libraryView!!.value)
+        assertEquals("부채꼴 덱", ui.cardView!!.value)
+        assertEquals(CardStyle.entries.map { ViewStyles.label(it) }, ViewStyles.options(ViewKind.CARD, AppSettings()).map { it.title })
+        assertNotNull("tilt changes the 서재 views", ui.tilt)
+        assertEquals(LibraryStyle.entries.map { ViewStyles.label(it) }, ViewStyles.options(ViewKind.LIBRARY, AppSettings()).map { it.title })
+        // None drawable: no row does nothing.
+        val bare = SettingsState.root(AppSettings(), 0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = emptySet(), cardViews = emptySet())
+        assertNull(bare.libraryView)
+        assertNull(bare.cardView)
+        assertNull(bare.tilt)
 
         // One kind drawable: only its row, plus tilt; the picker offers 목록 and the drawable styles only.
         val some = SettingsState.root(AppSettings(libraryStyle = LibraryStyle.ARCHIVE_HALL), 0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = setOf(LibraryStyle.BOOKSHELF), cardViews = emptySet())

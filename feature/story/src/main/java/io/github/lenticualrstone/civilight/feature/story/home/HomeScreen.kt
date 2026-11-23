@@ -89,12 +89,6 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
                 )
             },
             sheets = sheets,
-            localSheets = { key ->
-                when (key) {
-                    is HomeMarksSheet -> { { HomeMarksContent(key, deps) } }
-                    else -> null
-                }
-            },
         ) { padding ->
             // Loading -> content swaps on the kind (loaded or not), never on the data, so an edit does
             // not cross-fade the whole screen (motion audit, feature:story 7).
@@ -110,7 +104,7 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
                         onEpisode = { navigator.openDetail(StoryStructure(u.projectKey, focusUnitKey = it.key)) },
                         onShortcut = { shortcut ->
                             when (val target = shortcut.route(u.projectKey)) {
-                                null -> sheets.open(HomeMarksSheet(u.projectKey))
+                                null -> Unit
                                 is StoryStructure -> navigator.openDetail(target)
                                 else -> navigator.push(target)
                             }

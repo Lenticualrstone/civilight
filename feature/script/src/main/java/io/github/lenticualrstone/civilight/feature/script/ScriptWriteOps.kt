@@ -436,31 +436,5 @@ fun ScriptViewModel.replaceHits(hits: List<Replace.Hit>, query: String, with: St
     }
 }
 
-// --- Versions (SCR-76) ---
-
-/** `판 남기기` of the open episode; [name] blank takes `11월 23일 · 초고`. */
-fun ScriptViewModel.keepVersion(name: String) {
-    if (readOnly) return
-    val unit = unitKey ?: return
-    enqueue {
-        runOp(WriteCopy.KEEP_VERSION) { d -> ScriptOps.Outcome(VersionActions.capture(d, unit, name, VersionOrigin.MANUAL, actionCtx()).first) }
-    }
-}
-
-/** `이 판 글로` on one block (one undo step). */
-fun ScriptViewModel.restoreVersionText(versionKey: Key, blockKey: Key) {
-    if (readOnly) return
-    val unit = unitKey ?: return
-    enqueue {
-        runOp(WriteCopy.UNDO_VERSION_TEXT) { d ->
-            VersionActions.restoreBlockText(d, unit, versionKey, blockKey, actionCtx())?.takeIf { it !== d }?.let { ScriptOps.Outcome(it) }
-        } ?: return@enqueue
-        latestDoc?.index?.block(blockKey)?.let { showUndoToast("${Labels.number(it.number)} · ${WriteCopy.UNDO_VERSION_TEXT}") }
-    }
-}
-
-/** The default name of a new version (`11월 23일 · 초고`). */
-fun ScriptViewModel.defaultVersionName(): String = VersionActions.defaultName(ctx().today, VersionOrigin.MANUAL)
-
 /** Plain text of the draft (tests and the read-only check). */
 internal val Draft.plain: String get() = runs.plainText

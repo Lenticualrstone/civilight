@@ -269,5 +269,6 @@ fun SheetScope.ChangePickSheet(key: ChangePickSheetKey, doc: ProjectDoc, sceneCa
         onClose = ::close,
         sceneCast = sceneCast,
         recent = doc.app.view.script.recentSpeakers,
+        creator = io.github.lenticualrstone.civilight.feature.script.ui.scriptPickerCreator(io.github.lenticualrstone.civilight.designsystem.component.CreateKind.CHARACTER),
     )
 }

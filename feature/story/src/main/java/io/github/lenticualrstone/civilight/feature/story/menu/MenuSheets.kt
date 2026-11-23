@@ -92,6 +92,8 @@ fun SheetScope.UnitMenuContent(sheet: UnitMenuSheet, deps: FeatureDeps) {
                         if (parent != null) host.replaceWith(NewUnitSheet(p, parentKey = parent, beforeKey = key)) else host.close()
                     }
                     MenuAction.RENUMBER -> host.replaceWith(RenumberSheet(p, key))
+                    MenuAction.KEEP_VERSION -> host.replaceWith(io.github.lenticualrstone.civilight.navigation.EpisodeVersionsSheet(p, key, keepOnly = true))
+                    MenuAction.VERSIONS -> host.replaceWith(io.github.lenticualrstone.civilight.navigation.EpisodeVersionsSheet(p, key))
                     MenuAction.NEW_UNIT_AFTER -> {
                         actions.newUnitAfter(key, row.label)
                         host.close()
