@@ -126,8 +126,6 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
         title = MapCopy.TRACK_TITLE,
         smallLine = ui?.small,
         back = mapBack(deps),
-        lens = d?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
         sheets = sheets,
     ) { padding ->
         val u = ui ?: return@CivilightScreen

@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.library.openfile
 
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import kotlinx.coroutines.delay
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
@@ -142,7 +144,8 @@ private fun SheetHead(onClose: () -> Unit) {
     val type = CivilightTheme.type
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         CivilightText(OpenFileSheet.HEADER, type.small, Modifier.weight(1f), color = colors.ink3, maxLines = 1)
-        TextAction(OpenFileSheet.CLOSE, onClose, color = colors.ink2, style = type.label)
+        // DS-70 A6: the sheet head `닫기` is the `close` icon with its name.
+        CivilightIconButton(IconButtonSpec.CLOSE, onClose)
     }
 }
 
@@ -152,7 +155,7 @@ private fun TitleAndSummary(title: String, rating: Rating?, summary: String) {
     val type = CivilightTheme.type
     CivilightText(title, type.emptyTitle, Modifier.padding(top = 6.dp), color = colors.ink, maxLines = 2)
     Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        rating?.let { RatingBadge(ThemeBridge.rating(it)) }
+        // (0.2.0, LIB-92, S-4) No rating badge anywhere; the file's stored rating is kept as it is.
         CivilightText(summary, type.dir, color = colors.ink3, maxLines = 1)
     }
 }

@@ -11,6 +11,13 @@ import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.SettingsRow
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
+import io.github.lenticualrstone.civilight.ui.feature.SheetScope
+import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
+import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
+import io.github.lenticualrstone.civilight.designsystem.component.RadioRow
+import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
+import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
+import androidx.compose.runtime.remember
 
 /**
  * 설정 (LIB-63, board `Settings`; head `Civilight` / `설정`). Sections `화면` (theme segmented, 글자
@@ -24,11 +31,28 @@ internal fun SettingsScreen(services: LibraryServices) {
     val vm = entryViewModel { SettingsViewModel(services) }
     val ui by vm.root.collectAsState()
     val open: (SettingsRootRow) -> Unit = { row -> navigator.push(SettingsRoutes.routeOf(row)) }
-    SettingsFrame(title = SettingsCopy.TITLE, smallLine = SettingsCopy.SMALL, onBack = { navigator.pop() }) {
+    val sheets = rememberSheetHost()
+    SettingsFrame(
+        title = SettingsCopy.TITLE,
+        smallLine = SettingsCopy.SMALL,
+        onBack = { navigator.pop() },
+        sheets = sheets,
+        localSheets = { key ->
+            when (key) {
+                is ViewStyleSheet -> sheetBody { ViewStylePickContent(key.kind, vm, services) }
+                else -> null
+            }
+        },
+    ) {
         SettingsSection(SettingsCopy.SECTION_SCREEN, first = true)
         ThemeSegmented(ui.themeIndex, vm::setTheme, Modifier.padding(top = 4.dp, bottom = 6.dp))
         LinkRow(ui.textSize) { open(SettingsRootRow.TEXT_SIZE) }
         LinkRow(ui.layout) { open(SettingsRootRow.LAYOUT) }
+        // (0.2.0, LIB-94) After `펼친 화면 배치`: `서재 보기`, `카드 보기`, then the tilt switch, each drawn
+        // only while a 3D view it would change has a renderer (no control that does nothing).
+        ui.libraryView?.let { row -> LinkRow(row) { sheets.open(ViewStyleSheet(ViewKind.LIBRARY)) } }
+        ui.cardView?.let { row -> LinkRow(row) { sheets.open(ViewStyleSheet(ViewKind.CARD)) } }
+        ui.tilt?.let { row -> SwitchSettingRow(row, vm::setViewTilt) }
         LinkRow(ui.motion) { open(SettingsRootRow.MOTION) }
         LinkRow(ui.more) { open(SettingsRootRow.MORE) }
 
@@ -48,5 +72,26 @@ internal fun SettingsScreen(services: LibraryServices) {
         SettingsRow(title = SettingsCopy.TRASH, onClick = { open(SettingsRootRow.TRASH) })
         SettingsRow(title = SettingsCopy.RECORDER, onClick = { open(SettingsRootRow.RECORDER) })
         SettingsRow(title = SettingsCopy.HELP, onClick = { open(SettingsRootRow.HELP) })
+    }
+}
+
+/** (0.2.0, LIB-94) Head = `서재 보기` or `카드 보기`; one radio per value; a pick applies at once and closes. */
+@Composable
+private fun SheetScope.ViewStylePickContent(kind: ViewKind, vm: SettingsViewModel, services: LibraryServices) {
+    val scope = this
+    val settings by services.deps.settings.collectAsState()
+    val options = remember(settings, kind) { ViewStyles.options(kind, settings) }
+    SheetHeader(title = ViewStyles.title(kind), onClose = scope::close, closeLabel = MoreSettingsCopy.CLOSE)
+    SheetScrollBody(Modifier.padding(top = 8.dp, bottom = 12.dp)) {
+        options.forEach { option ->
+            RadioRow(
+                title = option.title,
+                selected = option.selected,
+                onClick = {
+                    vm.chooseView(kind, option.id)
+                    scope.close()
+                },
+            )
+        }
     }
 }

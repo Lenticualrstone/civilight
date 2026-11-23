@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.script.ui
 
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -109,22 +112,35 @@ fun BlockView(
     popover: (@Composable () -> Unit)? = null,
     /** The margin `▲` (SCR-56): opens the check center's term items. */
     onMarginWarning: (() -> Unit)? = null,
+    /** (0.2.0, SCR-04, SCR-21) `고치는 중`, new, `이 뒤에` target and open-swipe looks. */
+    look: BlockLook = BlockLook(),
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    Box(modifier) {
-    BlockFrame(selected, Modifier.pressable(PressAction.Click({ onTapText(null) }), role = Role.Button, scaleOnPress = false)) {
+    val numbered = selected || look.numbered
+    val afterLine = if (look.afterTarget) Modifier.drawBehind {
+        val y = size.height + 6.dp.toPx()
+        drawLine(colors.acc, Offset(8.dp.toPx(), y), Offset(size.width, y), strokeWidth = 2.dp.toPx())
+        drawCircle(colors.acc, radius = 4.dp.toPx(), center = Offset(8.dp.toPx(), y))
+    } else Modifier
+    Box(modifier.then(afterLine)) {
+    BlockFrame(selected || look.tag != null, Modifier.pressable(PressAction.Click({ onTapText(null) }), role = Role.Button, scaleOnPress = false)) {
         AddressHints(row.addressHints)
         if (row.kind == BlockKind.DIALOGUE) {
             row.speaker?.let { speaker ->
                 ScriptSpeakerLine(
-                    speaker, selected, row.number.takeIf { selected }, row.speakerMarks,
-                    extraLabel = ScriptCopy.INHERITED_SPEAKER.takeIf { inheritedHint },
+                    speaker, numbered, row.number.takeIf { numbered }, row.speakerMarks,
+                    extraLabel = look.tag,
                     onClick = onSpeaker,
                 )
             }
         } else {
-            row.slot(selected)?.let { SlotLine(it) }
+            val slot = row.slot(numbered)
+            if (slot != null) {
+                SlotLine(slot.label, listOfNotNull(slot.sub, look.tag).joinToString(" · ").ifEmpty { null }, slot.number)
+            } else if (look.tag != null) {
+                SlotLine(io.github.lenticualrstone.civilight.domain.script.Labels.kindLabel(row.kind), look.tag, row.number)
+            }
         }
         when (row.kind) {
             BlockKind.DIRECTION -> CivilightText(row.text, type.dir, color = colors.ink3)
@@ -168,6 +184,9 @@ private fun MarginWarning(selected: Boolean, onClick: (() -> Unit)?, modifier: M
  * cutting. Null = the frame decides (`12 dp` selected).
  */
 val LocalBlockPad = staticCompositionLocalOf<State<Dp>?> { null }
+
+/** (0.2.0) How a block reads beyond selection: [tag] `고치는 중 · 새로 · 나눔 · 합침`, [numbered], [afterTarget]. */
+data class BlockLook(val tag: String? = null, val numbered: Boolean = false, val afterTarget: Boolean = false)
 
 /** Shared block frame: column gap 6, side padding 24 (the caller's column), selection look. */
 @Composable

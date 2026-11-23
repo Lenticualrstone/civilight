@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library
 
+import io.github.lenticualrstone.civilight.model.project.Protections
 import io.github.lenticualrstone.civilight.domain.library.newproject.StartBlock
 import androidx.navigation3.runtime.NavKey
 import io.github.lenticualrstone.civilight.feature.library.newproject.CreateResult
@@ -151,11 +152,17 @@ class NewProjectTest {
     }
 
     @Test
-    fun `R19-11 to R19-13 step 4 hide switch follows the rating until touched`() {
-        assertTrue(NewProjectRules.hideSwitch(NewProjectForm(rating = Rating.R18), defaults))
-        assertFalse(NewProjectRules.hideSwitch(NewProjectForm(rating = Rating.R15), defaults))
-        assertFalse(NewProjectRules.hideSwitch(NewProjectForm(rating = Rating.R18), defaults.copy(r18Hide = false)))
-        assertFalse(NewProjectRules.hideSwitch(NewProjectForm(rating = Rating.R18, step4Hide = false), defaults))
+    fun `R-06 step 4 hide switch starts off and the author's choice is final (R19-11 to R19-13 rating parts no longer apply)`() {
+        // (0.2.0, LIB-92) No rating to derive it from: off, whatever the stored defaults say.
+        assertFalse(NewProjectRules.hideSwitch(NewProjectForm()))
+        assertFalse(NewProjectRules.hideSwitch(NewProjectForm(rating = Rating.R18)))
+        assertTrue(NewProjectRules.hideSwitch(NewProjectForm(step4Hide = true)))
+        assertFalse(NewProjectRules.hideSwitch(NewProjectForm(step4Hide = false)))
+        // G-01: a new project is `all` with every protection off.
+        val plain = LibFx.created(NewProjectForm(name = "새 글")).project
+        assertEquals(Rating.ALL, plain.rating.known)
+        assertEquals(Protections(), plain.protections)
+        // A project built from a stored R-18 form (the creator's own rule, kept while the code exists):
 
         val created = LibFx.created(NewProjectForm(name = "검은 서약", rating = Rating.R18, step4Hide = false))
         val p = created.project.protections

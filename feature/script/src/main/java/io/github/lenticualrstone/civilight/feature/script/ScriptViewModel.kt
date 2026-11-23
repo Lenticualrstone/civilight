@@ -7,6 +7,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import io.github.lenticualrstone.civilight.domain.actions.ActionContext
 import io.github.lenticualrstone.civilight.domain.actions.CharacterActions
 import io.github.lenticualrstone.civilight.domain.script.BlockOps
@@ -125,7 +127,7 @@ data class ScriptContent(
  *   Backspace never interleave and every operation is one undo step (SCR-17).
  * - **Read-only** projects (the example) never get a caret; edits return `READ_ONLY`.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 class ScriptViewModel(
     private val route: Script,
     private val deps: FeatureDeps,
@@ -150,7 +152,7 @@ class ScriptViewModel(
      */
     private val candidateIndex: StateFlow<CandidateIndex> = combine(state.filterIsInstance<ProjectLoad.Ready>(), unlocked) { r, open -> r.doc to open }
         .mapLatest { (doc, open) ->
-            if (!doc.app.view.script.layers.termCandidates) {
+            if (!doc.project.termCandidates) {
                 // One shared instance: the state flow drops it as unchanged, so rows are not rebuilt twice.
                 NO_CANDIDATES
             } else {
@@ -170,7 +172,7 @@ class ScriptViewModel(
         val doc = ready.doc
         val time = StoryTimes.source(doc)
         val view = doc.app.view.script
-        val terms = TermMarksModel.Source(doc, index, open, candidatesOn = view.layers.termCandidates)
+        val terms = TermMarksModel.Source(doc, index, open, candidatesOn = doc.project.termCandidates)
         ScriptContent(
             doc, target.unitKey,
             ScriptRows.build(doc, target.unitKey, time, view.layers, LayersModel.effective(view.preview), open, ready.readOnly, deps.clock.zone, terms),
@@ -281,6 +283,18 @@ class ScriptViewModel(
             }
         }
         viewModelScope.launch { content.filterNotNull().collect(::dropHiddenPosition) }
+        // The draft follows the gate too: on re-lock a 고치기 of a now-locked block leaves the field (T-U14-25).
+        viewModelScope.launch {
+            unlocked.collect {
+                gateOpen = it
+                content.value?.let { c -> reconcileDraft(c.doc, c.unitKey) }
+            }
+        }
+        viewModelScope.launch { content.filterNotNull().collect { c -> reconcileDraft(c.doc, c.unitKey) } }
+        // (0.2.0, U-14) The unsent draft survives process death: `_app/view.json › script.draft`, no undo step.
+        viewModelScope.launch {
+            draftFlow.drop(1).debounce(DRAFT_SAVE_MS).collect { d -> if (draftOpened) saveDraft(d) }
+        }
 
     }
 
@@ -373,6 +387,43 @@ class ScriptViewModel(
 
     internal val changeDraft = MutableStateFlow<io.github.lenticualrstone.civilight.feature.script.change.ChangeDraft?>(null)
 
+    // --- (0.2.0, U-14) The input bar's draft (SCR-70) and its view state ---
+
+    /** The draft: runs, chips, mark. Mirrored into [DraftMemory] at every change (SCR-70 persistence). */
+    internal val draftFlow = MutableStateFlow(io.github.lenticualrstone.civilight.feature.script.input.Draft())
+    val draft: StateFlow<io.github.lenticualrstone.civilight.feature.script.input.Draft> = draftFlow.asStateFlow()
+
+    /** The scene the last `다음 씬` tap made (double-tap guard, `NextScene.emptyAfter`). */
+    internal var lastNextScene: Key? = null
+
+    /** A refused `다음 씬` tap: the screen flashes the place label (`씬 {n} 끝에`, SCR-71) so the tap shows. */
+    internal val placeFlash = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    val placeFlashes: SharedFlow<Unit> = placeFlash.asSharedFlow()
+
+    /** Blocks with the `새로 · 나눔 · 합침` look (SCR-04), until the next send, tap, swipe or `고치기`. */
+    internal val freshFlow = MutableStateFlow<Map<Key, String>>(emptyMap())
+    val fresh: StateFlow<Map<Key, String>> = freshFlow.asStateFlow()
+
+    internal fun clearFresh() {
+        if (freshFlow.value.isNotEmpty()) freshFlow.value = emptyMap()
+    }
+
+    /** Row keys to place directly above the input bar (a send, `고치기`, `이 뒤에`, `다음 씬`; SCR-71). */
+    internal val aboveInput = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val scrollAboveInput: SharedFlow<String> = aboveInput.asSharedFlow()
+
+    /** The scene in view (SCR-71), as the screen last measured it (낭독 starts there). */
+    var sceneInViewKey: Key? = null
+
+    /** Commands picked in `찾기` (SCR-68): the screen runs them. */
+    internal val commandRequests = MutableSharedFlow<String>(extraBufferCapacity = 4)
+
+    /** The input bar's draft restored from the screen's saved state (process death) or the process memory. */
+    internal var draftOpened = false
+
+    /** The hidden gate's last value (the draft follows it: a locked block's text never stays in the field). */
+    internal var gateOpen = false
+
     internal fun requestSheet(key: SheetKey) {
         _sheetRequests.tryEmit(key)
     }
@@ -390,19 +441,10 @@ class ScriptViewModel(
         _panelTab.value = PanelTab.fromStored(d.app.view.script.panel.tab)
         val t = ScriptTarget.resolve(d, route.sceneKey, route.blockKey, route.caretAtEnd)
         _target.value = t
-        val empty = t.emptyScene
-        val writing = LayersModel.isEditable(d.app.view.script.preview)
-        if (empty != null) {
-            // SCR-01: an empty scene opens with the caret in its first line (the keyboard follows).
-            if (!isReadOnly && writing) enterVirtual(empty)
-            return
-        }
+        // (0.2.0, SCR-14) No caret in blocks: the target block is selected, the draft comes back or starts.
+        openDraft(d, t)
         val block = t.blockKey ?: return
-        if (t.caretOffset != null && !isReadOnly && writing && t.caretOffset >= 0) {
-            startEditingIn(d, block, t.caretOffset, hint = null)
-        } else {
-            _editor.value = EditorRules.select(_editor.value, block)
-        }
+        if (route.blockKey != null) _editor.value = EditorRules.select(_editor.value, block)
     }
 
     private fun reconcile(d: ProjectDoc? = latestDoc) {
@@ -435,50 +477,25 @@ class ScriptViewModel(
 
     // --- Caret and selection ---
 
-    /** A tap on a block: the caret goes there for a text block (SCR-14), else the block is selected. */
+    /**
+     * (0.2.0, SCR-14) A block tap only selects: no caret, no keyboard. Tapping the selected block again
+     * clears the selection. In `대사만` a tap goes back to `쓰기` at the block.
+     */
     fun tapBlock(blockKey: Key, isText: Boolean, rawOffset: Int?) {
         if (!writing()) {
             leavePreviewAt(blockKey)
             return
         }
-        if (isReadOnly || !isText) {
-            flushPending()
-            _editor.update { EditorRules.select(it, blockKey) }
-            return
-        }
-        flushPending()
-        enqueue {
-            val d = latestDoc ?: return@enqueue
-            val block = d.index.block(blockKey)?.takeIf { d.manuscript.isLiveBlock(it.key) } ?: return@enqueue
-            startEditingIn(d, blockKey, rawOffset ?: Runs.length(block.runs), hint = _editor.value.inheritedHint?.takeIf { it == blockKey })
-        }
+        _editor.update { if (it.selected == blockKey) it.copy(selected = null) else EditorRules.select(it, blockKey) }
+        clearFresh()
     }
 
-    /** A tap on an option line of a choice block (SCR-09): the caret goes to its end. */
-    fun tapOption(blockKey: Key, optionKey: Key) {
-        if (!writing()) {
-            leavePreviewAt(blockKey)
-            return
-        }
-        if (isReadOnly) {
-            flushPending()
-            _editor.update { EditorRules.select(it, blockKey) }
-            return
-        }
-        flushPending()
-        enqueue {
-            val d = latestDoc ?: return@enqueue
-            val block = d.index.block(blockKey)?.takeIf { d.manuscript.isLiveBlock(it.key) } ?: return@enqueue
-            val option = block.options.firstOrNull { it.key == optionKey } ?: return@enqueue
-            startEditingIn(d, blockKey, Runs.length(option.runs), hint = null, optionKey = optionKey)
-        }
-    }
+    /** A tap on an option line selects its choice block (SCR-14). */
+    fun tapOption(blockKey: Key, optionKey: Key) = tapBlock(blockKey, isText = false, rawOffset = null)
 
-    /** A tap on the virtual first line of an empty scene. */
+    /** A tap on empty manuscript space clears the selection (SCR-14 `[DEFAULT]`). */
     fun tapEmptyScene(sceneKey: Key) {
-        if (isReadOnly || !writing()) return
-        flushPending()
-        enterVirtual(sceneKey)
+        _editor.update { it.copy(selected = null) }
     }
 
     internal fun enterVirtual(sceneKey: Key) {
@@ -766,8 +783,9 @@ class ScriptViewModel(
         val caret = outcome.caret
         val select = outcome.select
         when {
-            caret != null && !isReadOnly -> {
-                startEditingIn(outcome.doc, caret.blockKey, caret.offset, hint = caret.blockKey.takeIf { outcome.inherited }, optionKey = caret.optionKey)
+            // (0.2.0, SCR-14) No caret in blocks: an operation that used to place one selects the block.
+            caret != null -> {
+                _editor.update { EditorRules.select(it, caret.blockKey) }
                 _scrollTo.tryEmit("block:${caret.blockKey}")
             }
             select != null -> {
@@ -987,7 +1005,7 @@ class ScriptViewModel(
 
     // --- 표시 sheet (SCR-26 … SCR-28) ---
 
-    private fun writing(): Boolean = LayersModel.isEditable(latestDoc?.app?.view?.script?.preview ?: ScriptPreview.WRITE)
+    internal fun writing(): Boolean = LayersModel.isEditable(latestDoc?.app?.view?.script?.preview ?: ScriptPreview.WRITE)
 
     /** A layer switch of the `표시` sheet: view state only (no undo step, also in read-only projects). */
     fun setLayer(row: LayerRow, on: Boolean) {
@@ -1089,7 +1107,7 @@ class ScriptViewModel(
         }
     }
 
-    private suspend fun saveLastPosition(blockKey: Key, offset: Int) {
+    internal suspend fun saveLastPosition(blockKey: Key, offset: Int) {
         if (isReadOnly) return
         val now = deps.clock.now()
         updateApp { app ->
@@ -1098,9 +1116,21 @@ class ScriptViewModel(
         }
     }
 
+    private suspend fun saveDraft(d: io.github.lenticualrstone.civilight.feature.script.input.Draft) {
+        if (isReadOnly) return
+        val encoded = persistedDraft(d)
+        updateApp { app -> app.copy(view = app.view.copy(script = app.view.script.copy(draft = encoded))) }
+    }
+
     override fun onCleared() {
         val p = pending
         val store = projectStore
+        if (draftOpened && store != null && !store.readOnly) {
+            val encoded = persistedDraft(draftFlow.value)
+            deps.appScope.launch {
+                runCatching { store.updateApp { app -> app.copy(view = app.view.copy(script = app.view.script.copy(draft = encoded))) } }
+            }
+        }
         val memo = pendingMemo
         if (memo != null && store != null && !store.readOnly) {
             val context = ctx()
@@ -1125,6 +1155,9 @@ class ScriptViewModel(
     companion object {
         /** Pause after which typing is written (SCR-17 `[PROPOSED]` coalescing). */
         const val COMMIT_DELAY_MS = 500L
+
+        /** Pause after which the unsent draft is kept in `_app/view.json`. */
+        const val DRAFT_SAVE_MS = 400L
 
         /** Candidate re-scan after the text stops changing (rule 21 §2, ~0.5 s). */
         const val RESCAN_DELAY_MS = 500L

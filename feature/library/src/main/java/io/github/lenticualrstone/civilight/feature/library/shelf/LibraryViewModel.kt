@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -55,7 +56,8 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
             now = deps.clock.now(),
             zone = deps.clock.zone,
             loaded = library.loaded,
-            showCards = ShelfCards.showCards(settings),
+            // (0.2.0, LIB-93) A 3D view is drawn only when the shown style has a renderer (ShelfViews).
+            showCards = ShelfViews.of(settings).rendered != null,
             recentItems = recents.items,
             fileExists = stores.blobs::contains,
         )
@@ -110,9 +112,17 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
         super.onCleared()
     }
 
-    /** `목록 | 카드` (LIB-04): remembered for the 서재 in `AppSettings.viewByScreen`. */
-    fun showCards(cards: Boolean) {
-        viewModelScope.launch { stores.settings.setViewMode(ShelfCards.SCREEN, if (cards) ViewMode.CARD else ViewMode.LIST) }
+    /** (0.2.0, LIB-93) The 서재 view: chosen style, shown style and the head toggle. */
+    val view: StateFlow<ShelfViewUi> = deps.settings
+        .map { ShelfViews.of(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ShelfViews.of(deps.settings.value))
+
+    /**
+     * The head toggle (LIB-93): `목록` ↔ the chosen 3D view, remembered across restarts in
+     * `AppSettings.libraryToggle` (the 0.1.0 `viewByScreen["library"]` is kept and not written).
+     */
+    fun showStyle(on: Boolean) {
+        viewModelScope.launch { stores.settings.setLibraryToggle(if (on) ViewMode.CARD else ViewMode.LIST) }
     }
 
     /** `지문으로 보기` (LIB-32): one prompt opens the whole group; cancel or failure changes nothing. */

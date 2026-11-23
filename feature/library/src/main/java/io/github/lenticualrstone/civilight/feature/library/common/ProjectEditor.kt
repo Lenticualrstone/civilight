@@ -18,6 +18,16 @@ interface ProjectWriter {
     suspend fun read(projectKey: Key): ProjectDoc
 
     /**
+     * (0.2.0) A write that is no undo step and that undo and redo never revert (core:store
+     * `updateWithoutUndo`): what an export writes after its save (`내보낸 판`, fixed voice IDs).
+     */
+    suspend fun editWithoutUndo(
+        projectKey: Key,
+        carry: ((step: ProjectDoc, before: ProjectDoc, after: ProjectDoc) -> ProjectDoc)? = null,
+        transform: (ProjectDoc, EditStamp) -> ProjectDoc,
+    ): EditResult = edit(projectKey, "") { d, s -> transform(d, s) }
+
+    /**
      * A permanent delete (휴지통 `영구 삭제`, `비우기`, the 30-day purge): written as one step, then the
      * project's undo history is cleared, since undoing an earlier step would restore whole-document
      * snapshots that still hold the purged rows. [label] names the step while it is written.
@@ -34,6 +44,27 @@ internal class SessionProjectWriter(private val sessions: ProjectSessions) : Pro
             } else {
                 val stamp = store.stamp()
                 store.update(label) { transform(it, stamp) }
+                EditResult.APPLIED
+            }
+        } catch (e: ReadOnlyProjectException) {
+            EditResult.READ_ONLY
+        } finally {
+            sessions.release(projectKey)
+        }
+    }
+
+    override suspend fun editWithoutUndo(
+        projectKey: Key,
+        carry: ((step: ProjectDoc, before: ProjectDoc, after: ProjectDoc) -> ProjectDoc)?,
+        transform: (ProjectDoc, EditStamp) -> ProjectDoc,
+    ): EditResult {
+        val store = sessions.acquire(projectKey)
+        return try {
+            if (store.readOnly) {
+                EditResult.READ_ONLY
+            } else {
+                val stamp = store.stamp()
+                store.updateWithoutUndo(carry) { transform(it, stamp) }
                 EditResult.APPLIED
             }
         } catch (e: ReadOnlyProjectException) {

@@ -50,7 +50,6 @@ import io.github.lenticualrstone.civilight.feature.story.menu.StructureMenuSheet
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.navigation.NewUnitSheet
 import io.github.lenticualrstone.civilight.navigation.ProjectSearch
-import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.Script
 import io.github.lenticualrstone.civilight.navigation.StoryStructure
 import io.github.lenticualrstone.civilight.navigation.UnitMenuSheet
@@ -90,13 +89,14 @@ fun StructureScreen(route: StoryStructure, deps: FeatureDeps) {
                 CommandBar(
                     hint = ui?.commandHint.orEmpty(),
                     onClick = { navigator.push(ProjectSearch(p)) },
-                    onMic = { navigator.push(Recording(projectKey = p)) },
                 )
             },
             bottomExtraRow = {
                 Spacer(Modifier.weight(1f))
+                // DS-70 B9: plus icon + `새 씬`.
                 CivilightButton(
                     text = StructureCopy.NEW_SCENE,
+                    icon = IconId.Plus,
                     onClick = { ui?.newScene?.let { sheets.open(NewUnitSheet(p, parentKey = it.parentKey, afterKey = it.afterKey)) } },
                     variant = ButtonVariant.PRIMARY,
                     enabled = ui?.newScene != null && ui.readOnly.not(),

@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.cast.field
 
+import io.github.lenticualrstone.civilight.model.game.GameTools
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
 import io.github.lenticualrstone.civilight.domain.cast.label
 import io.github.lenticualrstone.civilight.model.Key
@@ -59,6 +60,16 @@ object FieldSettings {
 
     fun fixedFields(kind: EntityKind): List<String> = if (kind == EntityKind.CHARACTER) FIXED_CHARACTER else FIXED_OTHER
 
+    /** `보이스 진행`, the fixed field that belongs to the game tools (G-2). */
+    const val VOICE_PROGRESS = "보이스 진행"
+
+    /**
+     * (0.2.0, CST-74, §7.9) The fixed fields shown: without `보이스 진행` while `게임 제작 도구` is off
+     * (`고정 항목 · 6`). A template has no switch value, so its editor reads off.
+     */
+    fun fixedFields(kind: EntityKind, gameTools: Boolean): List<String> =
+        fixedFields(kind).filter { gameTools || it != VOICE_PROGRESS }
+
     /** Project fields of a kind (live, not `이 인물만`), hidden ones included, in order. */
     fun projectFields(doc: ProjectDoc, kind: EntityKind): List<FieldDef> =
         FieldDefinitions.live(doc, kind).filter { it.scopeCharacterKey == null }
@@ -109,7 +120,7 @@ object FieldSettings {
         TITLE,
         CastCopy.join(
             bundleName(doc, EntityKind.CHARACTER),
-            "고정 ${FIXED_CHARACTER.size}",
+            "고정 ${fixedFields(EntityKind.CHARACTER, GameTools.on(doc)).size}",
             "프로젝트 ${projectFields(doc, EntityKind.CHARACTER).size}",
             "장소 · 용어 · 세력도",
         ),
@@ -118,7 +129,7 @@ object FieldSettings {
 
     fun screen(doc: ProjectDoc, kind: EntityKind = EntityKind.CHARACTER): FieldSettingsScreen {
         val defs = projectFields(doc, kind)
-        val fixed = fixedFields(kind)
+        val fixed = fixedFields(kind, GameTools.on(doc))
         return FieldSettingsScreen(
             head = HEAD,
             title = TITLE,

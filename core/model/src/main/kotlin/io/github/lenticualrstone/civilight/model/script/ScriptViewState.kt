@@ -17,6 +17,11 @@ data class ScriptViewState(
     /** Speaker picker `최근`, most recent first. */
     val recentSpeakers: List<Key> = emptyList(),
     val restore: ScriptRestore? = null,
+    /**
+     * (0.2.0, U-14) The unsent input-bar draft, encoded by `feature:script` (`Drafts.encode`). Kept in
+     * `_app/view.json` so it survives process death; never exported. Null = no draft.
+     */
+    val draft: String? = null,
 )
 
 /** `표시` sheet layers (SCR-26) with their defaults. */

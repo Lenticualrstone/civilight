@@ -70,11 +70,11 @@ object PlacementLabels {
         null -> false
     }
 
-    /** The label as shown, with LRC-22 masking (`숨긴 프로젝트`, `R-18`, `숨긴 항목`) and the stored last label once gone. */
+    /** The label as shown, with LRC-22 masking (`숨긴 프로젝트`, `이름 가림`, `숨긴 항목`) and the stored last label once gone. */
     fun shown(placement: Placement, env: RecorderEnv): String {
         val project = env.project(placement.projectKey)
         if (project != null && env.isLockedHidden(project)) return RecorderCopy.HIDDEN_PROJECT
-        if (project != null && project.linkMask) return LinkViews.ratingBadge(project.rating)
+        if (project != null && project.linkMask) return LinkViews.maskedLabel()
         if (project == null || placement.purgedAt != null) return placement.lastLabel
         if (inHiddenItem(placement, project.doc) && !env.itemsOpen(placement.projectKey)) return RecorderCopy.HIDDEN_ITEM
         return current(placement, project.doc) ?: placement.lastLabel

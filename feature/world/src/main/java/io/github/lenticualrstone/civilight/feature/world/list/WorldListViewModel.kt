@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.world.list
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCard
+import io.github.lenticualrstone.civilight.domain.world.item.NewWorldItem
+import io.github.lenticualrstone.civilight.domain.world.item.WorldCreate
+import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateCards
 import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.domain.world.item.CreateResult
 import io.github.lenticualrstone.civilight.domain.world.item.WorldItems
@@ -79,6 +83,22 @@ class WorldListViewModel(projectKey: Key, private val routeTab: WorldTab, env: W
                 WorldKind.FACTION -> WorldItems.createFaction(d, name, ctx, description)
             }
             when (r) {
+                is CreateResult.Created -> r.doc.also { created = r.key }
+                CreateResult.EmptyName -> d
+            }
+        }
+        return if (result == EditResult.APPLIED) created else null
+    }
+
+    /**
+     * (0.2.0, U-15, WLD-70) `만들기` / `만들고 열기` of the create card: one edit and one undo step through
+     * `domain:world` [WorldCreate]; returns the new key, or null when nothing was made.
+     */
+    suspend fun createInPlace(kind: WorldKind, item: NewWorldItem): Key? {
+        var created: Key? = null
+        val ctx = editContext()
+        val result = apply(CreateCard.title(WorldCreateCards.createKind(kind))) { d ->
+            when (val r = WorldCreate.create(d, kind, item, ctx)) {
                 is CreateResult.Created -> r.doc.also { created = r.key }
                 CreateResult.EmptyName -> d
             }

@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
+
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -153,6 +157,7 @@ fun OverviewTab(
     inner: Boolean,
     actions: RecordActions,
     recorderLink: String? = null,
+    appearance: @Composable () -> Unit = {},
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -185,6 +190,8 @@ fun OverviewTab(
                 }
             }
         }
+        // CST-08 1a, CST-71: appearance bars and `마지막 등장` directly under the field table, before the `항목` list.
+        appearance()
         for (row in full.overview.items) {
             key(row.defKey) { FoldReveal(showEmpty || row.defKey in shownItems) { FieldRowItem(doc, row, actions) } }
         }
@@ -194,7 +201,8 @@ fun OverviewTab(
         Row(Modifier.fillMaxWidth().topHairline(colors.line), verticalAlignment = Alignment.CenterVertically) {
             TextAction(state.emptyLabel, actions.onToggleEmpty, color = if (showEmpty) colors.acc else colors.ink3, style = type.small, modifier = Modifier.padding(start = 0.dp))
             Spacer(Modifier.weight(1f))
-            if (actions.editable) TextAction(state.overview.addLabel, actions.onAddField, color = colors.ink2, style = type.label)
+            // Icon list `＋ 항목` (class b): icon `plus` + `항목`, read as `항목 넣기`.
+            if (actions.editable) CivilightIconButton(IconButtonSpec.ADD_FIELD, actions.onAddField)
         }
         GallerySectionView(gallery, inner, actions)
         // CST-49: `레코더 · 정리 안 됨 1 ›` right of the first section header (or on its own line without one).
@@ -438,10 +446,19 @@ private fun TagLabel(text: String, onClick: (() -> Unit)? = null) {
  * the relations at the lens; tapping a chip edits that relation's 호칭 slot.
  */
 @Composable
-fun SpeechTab(body: String, chips: List<AddressChip>, hiddenRow: String?, actions: RecordActions) {
+fun SpeechTab(
+    body: String,
+    chips: List<AddressChip>,
+    hiddenRow: String?,
+    actions: RecordActions,
+    summary: String? = null,
+    onSummary: (() -> Unit)? = null,
+) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(Modifier.fillMaxWidth().padding(top = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // CST-72: the one-line summary first, then the prose and the 호칭 chips.
+        SpeechSummaryRow(summary, onSummary)
         SectionLabel(CastUiCopy.SPEECH)
         val edit = if (actions.editable) Modifier.pressable(onClick = actions.onEditSpeech, scaleOnPress = false, onClickLabel = CastUiCopy.SPEECH) else Modifier
         if (body.isNotBlank()) {
@@ -497,10 +514,12 @@ fun GameTextTab(
  * reads a tappable `비어 있음`, as on `말투`.
  */
 @Composable
-fun SecretTab(doc: ProjectDoc, rows: List<FieldRow>, body: String, actions: RecordActions) {
+fun SecretTab(doc: ProjectDoc, rows: List<FieldRow>, body: String, actions: RecordActions, head: @Composable () -> Unit = {}) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
+        // CST-73: `이 탭 잠그기` at the tab head.
+        head()
         for (row in rows) FieldRowItem(doc, row, actions)
         SectionLabel(CastUiCopy.TABS[4], Modifier.padding(top = 22.dp, bottom = 10.dp))
         val edit = if (actions.editable) Modifier.pressable(onClick = actions.onEditSecret, scaleOnPress = false, onClickLabel = CastUiCopy.TABS[4]) else Modifier

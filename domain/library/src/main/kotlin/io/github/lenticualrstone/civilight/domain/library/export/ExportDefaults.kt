@@ -6,6 +6,8 @@ import io.github.lenticualrstone.civilight.model.app.ExportFormat
 import io.github.lenticualrstone.civilight.model.app.ExportOptions
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.project.Rating
+import io.github.lenticualrstone.civilight.model.project.Project
+import io.github.lenticualrstone.civilight.model.game.GameTools
 import java.time.ZoneId
 
 /** `넣기` · `빼기` for hidden scenes in range (LIB-41, LIB-42). */
@@ -27,12 +29,26 @@ enum class ExportLayer(val id: String, val label: String) {
 object ExportDefaults {
     val FORMATS: List<ExportFormat> = listOf(ExportFormat.PDF, ExportFormat.CSV, ExportFormat.ENGINE_JSON, ExportFormat.PROJECT_FILE)
 
+    /**
+     * (0.2.0, LIB-91, G-7) The formats the sheet offers for [project]: all four with `게임 제작 도구` on,
+     * else `대본 PDF` and `프로젝트 파일 .civilight` only. [FORMATS] keeps every format.
+     */
+    fun exportFormats(project: Project): List<ExportFormat> =
+        if (GameTools.on(project)) FORMATS else FORMATS.filter { it == ExportFormat.PDF || it == ExportFormat.PROJECT_FILE }
+
+    fun exportFormats(doc: ProjectDoc): List<ExportFormat> = exportFormats(doc.project)
+
+    /** [format] when [doc] offers it, else the first offered format (LIB-91 `ED`: a hidden choice falls back). */
+    fun visibleFormat(doc: ProjectDoc, format: ExportFormat): ExportFormat =
+        exportFormats(doc).let { if (format in it) format else it.first() }
+
     /** Format radio cards: title · sub. */
     fun formatCard(format: ExportFormat): Pair<String, String> = when (format) {
-        ExportFormat.PDF -> "대본 PDF" to "읽기용 · 표지에 등급"
+        // (0.2.0, LIB-92) The rating fragments are dropped, nothing added.
+        ExportFormat.PDF -> "대본 PDF" to "읽기용"
         ExportFormat.CSV -> "대사 표 CSV" to "화자 · 대사 · 보이스 ID · 블록 ID · 상태"
         ExportFormat.ENGINE_JSON -> "게임 엔진 JSON" to "씬 · 블록 · 화자 · 연출 · 선택지"
-        ExportFormat.PROJECT_FILE -> "프로젝트 파일 .civilight" to "옮기기 · 보관 · 숨김 · R-18 · 숨긴 항목 있으면 암호"
+        ExportFormat.PROJECT_FILE -> "프로젝트 파일 .civilight" to "옮기기 · 보관 · 숨김 · 숨긴 항목 있으면 암호"
     }
 
     /** PDF `빼기`; CSV and JSON `넣기`; `.civilight` never asks (everything goes in). */

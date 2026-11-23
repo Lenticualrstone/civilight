@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library
 
+import io.github.lenticualrstone.civilight.feature.library.projectsettings.ProjectSettingsCopy
 import io.github.lenticualrstone.civilight.domain.library.rating.Protection
 import io.github.lenticualrstone.civilight.domain.library.rating.RatedProject
 import io.github.lenticualrstone.civilight.domain.library.rating.RatingDefaultsTable
@@ -203,16 +204,19 @@ class ProtectionTest {
     }
 
     @Test
-    fun `R19-14 and R19-15 프로젝트 설정 marks values that differ from the rating's default`() {
+    fun `R-02 프로젝트 설정 shows the four switches without any rating (R19-14, R19-15 no longer apply)`() {
         val r15 = LibFx.ashen().let { it.copy(project = it.project.copy(protections = Protections(captureBlock = true))) }
         val rows = ProjectSettingsState.build(r15, readOnly = false, RatingDefaults()).protection.rows
-        assertEquals("R-15 기본과 다름", rows.single { it.protection == Protection.CAPTURE_BLOCK }.differsMarker)
-        assertTrue(rows.filter { it.protection != Protection.CAPTURE_BLOCK }.all { it.differsMarker == null })
+        assertTrue(rows.all { it.differsMarker == null })
+        assertTrue(rows.single { it.protection == Protection.CAPTURE_BLOCK }.on)
+        assertEquals("숨기기", ProjectSettingsCopy.SECTION_PROTECTION)
 
         val r18 = LibFx.ashen().let { it.copy(project = it.project.copy(rating = Rating.R18.open(), protections = all)) }
         val settings = ProjectSettingsState.build(r18, readOnly = true, RatingDefaults())
-        assertTrue(settings.protection.rows.all { it.differsMarker == null })
-        assertEquals("R-18 ›", settings.protection.ratingRowValue)
+        assertTrue(settings.protection.rows.all { it.on && it.differsMarker == null })
+        assertTrue(settings.protection.rows.none { it.fullSub.contains("R-18") })
+        // The stored rating is kept (D34), never drawn.
+        assertEquals(Rating.R18, settings.protection.rating)
         assertTrue(settings.readOnly)
     }
 

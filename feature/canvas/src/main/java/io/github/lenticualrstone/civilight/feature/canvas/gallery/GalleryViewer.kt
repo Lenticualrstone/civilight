@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.canvas.gallery
 
+import io.github.lenticualrstone.civilight.designsystem.component.IconLabelButton
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -37,19 +39,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
-import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
-import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
@@ -91,7 +86,7 @@ fun GalleryViewer(
     Column(Modifier.fillMaxSize().background(colors.bg).statusBarsPadding().navigationBarsPadding()) {
         // Top: 닫기 · `<owner> · 갤러리` over `<i>/<N>` · ⋯
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            CivilightIconButton(IconId.X, GalleryUiCopy.BTN_CLOSE, onClose)
+            CivilightIconButton(IconButtonSpec.CLOSE, onClose)
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 CivilightText(GalleryUiCopy.ownerGallery(ownerName), type.number, color = colors.ink3, maxLines = 1)
                 CivilightText(nav.position, type.number, color = colors.ink2, maxLines = 1)
@@ -194,22 +189,24 @@ private fun ZoomableImage(item: GalleryItem, sharedImage: @Composable (Key) -> M
 /** `이전` · `설명` · `다음` (secondary, primary when on, secondary). */
 @Composable
 private fun ViewerButtons(nav: ViewerNav, textOn: Boolean, onMove: (Key) -> Unit, onText: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        EndButton(GalleryUiCopy.BTN_PREV, nav.hasPrev, Modifier.weight(1f)) { onMove(nav.prev()) }
-        CivilightButton(
-            GalleryUiCopy.BTN_TEXT,
-            { onText(!textOn) },
-            Modifier.weight(1f).semantics { role = Role.Switch; toggleableState = ToggleableState(textOn) },
-            variant = if (textOn) ButtonVariant.PRIMARY else ButtonVariant.GHOST,
-        )
-        EndButton(GalleryUiCopy.BTN_NEXT, nav.hasNext, Modifier.weight(1f)) { onMove(nav.next()) }
+    // ICON A8 · B13: `이전` · `다음` icon only (off at an end, board `GalViewOff`), `설명` icon + text with its state.
+    val colors = CivilightTheme.colors
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        CivilightIconButton(IconButtonSpec.VIEWER_PREV, { onMove(nav.prev()) }, enabled = nav.hasPrev)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            val caption = IconButtonSpec.CAPTION_TOGGLE
+            IconLabelButton(
+                icon = caption.icon ?: IconId.Edit,
+                label = caption.text ?: GalleryUiCopy.BTN_TEXT,
+                onClick = { onText(!textOn) },
+                contentDescription = caption.accessibilityName,
+                tint = if (textOn) colors.acc else colors.ink2,
+                labelColor = if (textOn) colors.acc else colors.ink,
+                on = textOn,
+            )
+        }
+        CivilightIconButton(IconButtonSpec.VIEWER_NEXT, { onMove(nav.next()) }, enabled = nav.hasNext)
     }
-}
-
-/** At an end the button is drawn at 38 % (the DS disabled alpha, animated) and does nothing (board `GalViewOff`). */
-@Composable
-private fun EndButton(text: String, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    CivilightButton(text, onClick, modifier, variant = ButtonVariant.GHOST, enabled = enabled)
 }
 
 @Composable
@@ -219,7 +216,7 @@ private fun ViewerText(shown: ViewerItem, handlers: GalleryHandlers, onEdit: ((K
     val p = shown.panel
     Row(verticalAlignment = Alignment.CenterVertically) {
         CivilightText(p.title, type.title, Modifier.weight(1f), color = if (p.untitled) colors.ink3 else colors.ink)
-        if (onEdit != null) TextAction(GalleryUiCopy.BTN_EDIT, { onEdit(p.key) }, color = colors.acc)
+        if (onEdit != null) CivilightIconButton(IconButtonSpec.CAPTION_EDIT, { onEdit(p.key) }, tint = colors.acc)
     }
     PanelMeta(p, away = false, handlers = handlers)
     val caption = p.caption

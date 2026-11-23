@@ -1,6 +1,5 @@
 package io.github.lenticualrstone.civilight.feature.story
 
-import io.github.lenticualrstone.civilight.designsystem.component.LensChipState
 import io.github.lenticualrstone.civilight.feature.story.Fx.node
 import io.github.lenticualrstone.civilight.feature.story.common.StoryActions
 import io.github.lenticualrstone.civilight.feature.story.Fx.withUnit
@@ -8,7 +7,6 @@ import io.github.lenticualrstone.civilight.feature.story.home.HomeModel
 import io.github.lenticualrstone.civilight.feature.story.home.HomeShortcut
 import io.github.lenticualrstone.civilight.model.app.LensState
 import io.github.lenticualrstone.civilight.model.position.LensPoint
-import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.navigation.CanvasBoard
 import io.github.lenticualrstone.civilight.navigation.CastList
 import io.github.lenticualrstone.civilight.navigation.CheckCenter
@@ -33,24 +31,21 @@ class HomeModelTest {
     private fun home(d: io.github.lenticualrstone.civilight.model.doc.ProjectDoc = doc, locked: Boolean = true, readOnly: Boolean = true) =
         HomeModel.build(d, readOnly, locked, Fx.today, Fx.zone)
 
+    /** U-06: the head names the project; S-1 / S-4: home has no lens chip and no rating badge to build. */
     @Test
-    fun headStatsAndLensChipOfTheExample() {
+    fun headAndStatsOfTheExample() {
         val ui = home()
         assertEquals("잿빛 새벽의 등불", ui.name)
-        assertEquals(Rating.R15, ui.rating)
-        assertEquals("최신 · 1-7", ui.lens.text)
-        assertEquals(LensChipState.LATEST, ui.lens.state)
         assertEquals(listOf("7/10" to "1장 에피소드", "0" to "오늘 쓴 글자", "11" to "인물"), ui.stats.map { it.value to it.label })
         assertEquals("명령 또는 검색 · 인물 · 용어 · 대사", ui.commandHint)
         assertTrue(ui.readOnly)
     }
 
+    /** S-1: a stored past lens changes nothing on home (no chip; the store opens a project at 최신, D9). */
     @Test
-    fun lensChipAtAPastPoint_LENS13() {
+    fun aStoredPastLensLeavesHomeAsIs() {
         val d = doc.copy(app = doc.app.copy(view = doc.app.view.copy(lens = LensState(point = LensPoint.UnitEnd(K.EPISODE_1_5)))))
-        val ui = home(d)
-        assertEquals("시점 · 1-5", ui.lens.text)
-        assertEquals(LensChipState.PAST, ui.lens.state)
+        assertEquals(home(), home(d))
     }
 
     @Test
@@ -92,12 +87,12 @@ class HomeModelTest {
     @Test
     fun shortcutsInBoardOrderAndTheirRoutes() {
         val ui = home()
-        assertEquals(listOf("스토리", "인물", "세계", "연표", "캔버스", "갤러리", "페이지", "점검 센터", "설정"), ui.shortcuts.map { it.label })
+        assertEquals(listOf("스토리", "할 일 · 복선", "인물", "세계", "연표", "캔버스", "갤러리", "페이지", "점검 센터", "설정"), ui.shortcuts.map { it.label })
         assertTrue(HomeShortcut.SETTINGS.dim)
         val p = K.PROJECT
         assertEquals(
             listOf(
-                StoryStructure(p), CastList(p), World(p), Timeline(p), CanvasBoard(p),
+                StoryStructure(p), null, CastList(p), World(p), Timeline(p), CanvasBoard(p),
                 Gallery.ofProject(p), PageList(p), CheckCenter(p), ProjectSettings(p),
             ),
             HomeShortcut.entries.map { it.route(p) },
@@ -107,12 +102,12 @@ class HomeModelTest {
     @Test
     fun settingsKeepsItsOwnLastRow_GAL03() {
         val rows = HomeModel.shortcutRows(HomeModel.shortcuts(doc))
-        assertEquals(listOf(3, 3, 2, 1), rows.map { it.size })
+        assertEquals(listOf(3, 3, 3, 1), rows.map { it.size })
         assertEquals(listOf(HomeShortcut.SETTINGS), rows.last())
         assertTrue(rows.dropLast(1).all { HomeShortcut.SETTINGS !in it })
         val none = doc.copy(project = doc.project.copy(worldTime = doc.project.worldTime.copy(mode = WorldTimeMode.NONE.open())))
         val noTime = HomeModel.shortcutRows(HomeModel.shortcuts(none))
-        assertEquals(listOf(3, 3, 1, 1), noTime.map { it.size })
+        assertEquals(listOf(3, 3, 2, 1), noTime.map { it.size })
         assertEquals(listOf(HomeShortcut.SETTINGS), noTime.last())
     }
 

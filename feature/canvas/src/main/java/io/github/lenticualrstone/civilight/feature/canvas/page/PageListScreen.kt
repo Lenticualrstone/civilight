@@ -14,6 +14,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,11 +23,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -38,7 +42,10 @@ import io.github.lenticualrstone.civilight.designsystem.card.CardKind
 import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
 import io.github.lenticualrstone.civilight.designsystem.card.CardViewMotion
 import io.github.lenticualrstone.civilight.designsystem.card.SnapCardRow
-import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardState
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.designsystem.component.ListCreateRow
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
@@ -46,19 +53,20 @@ import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.LockRow
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.ViewToggle
-import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
-import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.designsystem.theme.Unhide
 import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
 import io.github.lenticualrstone.civilight.designsystem.theme.rememberUnhide
 import io.github.lenticualrstone.civilight.designsystem.theme.unhide
+import io.github.lenticualrstone.civilight.feature.canvas.board.NameCreateCard
 import io.github.lenticualrstone.civilight.feature.canvas.card.RecentFileCard
 import io.github.lenticualrstone.civilight.feature.canvas.card.ViewChoice
+import io.github.lenticualrstone.civilight.feature.canvas.common.CreatedScroll
 import io.github.lenticualrstone.civilight.feature.canvas.common.canvasEditContext
+import io.github.lenticualrstone.civilight.feature.canvas.common.createdFlash
 import io.github.lenticualrstone.civilight.feature.canvas.image.SlotImage
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.ViewMode
@@ -74,6 +82,7 @@ import io.github.lenticualrstone.civilight.ui.project.ProjectLoad
 import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
 import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** What the body of the page list shows (one crossfade between them, CNV-14). */
@@ -82,7 +91,8 @@ private enum class ListBody { LOADING, EMPTY, LIST }
 /**
  * 페이지 목록 (CNV-14; no board, Q-PG-05): the project's pages in their order, `목록 | 카드` in the
  * header (CNV-21, remembered per screen), hidden pages folded into one locked row while locked (rule 19
- * §6), a `+` that makes a page and opens it for editing. The card view is one snapping row of page cards
+ * §6). U-15: the top row `＋ 새 페이지` opens the shared create card (`이름`); `만들기` stays on the list,
+ * scrolls the new row or card into view and flashes it ([createdFlash]); `만들고 열기` opens the page into editing. The row is left out in read-only projects (U-15.10). The card view is one snapping row of page cards
  * (the 최근 연 파일 card, CNV-22 … CNV-24).
  *
  * Motion (audit §4 canvas 3, 4): rows and cards enter, leave and move with `civilightItem()`; loading,
@@ -103,6 +113,29 @@ fun PageListScreen(route: PageList, deps: FeatureDeps) {
     val cards = ViewChoice.showCards(settings.viewByScreen, ViewChoice.PAGES)
     val open = { key: Key -> deps.navigator.push(PageDoc(route.projectKey, key)) }
     val unhide = rememberUnhide(gate.open)
+    var creating by remember { mutableStateOf<CreateCardState?>(null) }
+    var highlighted by remember { mutableStateOf<Key?>(null) }
+    LaunchedEffect(highlighted) {
+        if (highlighted == null) return@LaunchedEffect
+        delay(CivilightMotion.createdRowHighlightMs.toLong())
+        highlighted = null
+    }
+    val onCreate = { if (creating == null) creating = CreateCardState.open(CreateKind.PAGE, CreateCardMode.LIST) }
+    val create = { name: String, openAfter: Boolean ->
+        creating = null
+        vm.create(name) { r, key ->
+            if (r == EditResult.READ_ONLY) deps.toasts.show(PageCopy.READ_ONLY, actionLabel = null)
+            if (r == EditResult.APPLIED && key != null) {
+                if (openAfter) {
+                    // `만들고 열기` opens the new page straight into editing, as the head `+` did (CNV-14).
+                    JustCreatedPages.mark(key)
+                    open(key)
+                } else {
+                    highlighted = key
+                }
+            }
+        }
+    }
 
     CivilightScreen(
         title = PageCopy.SMALL_LINE,
@@ -114,14 +147,6 @@ fun PageListScreen(route: PageList, deps: FeatureDeps) {
                     showCards = cards,
                     onChange = { show -> scope.launch { deps.stores.settings.setViewMode(ViewChoice.PAGES, if (show) ViewMode.CARD else ViewMode.LIST) } },
                 )
-                FoldReveal(view != null && !view.readOnly, horizontal = true) {
-                    CivilightIconButton(IconId.Plus, PageCopy.NEW_PAGE, {
-                        vm.create { r, key ->
-                            if (r == EditResult.READ_ONLY) deps.toasts.show(PageCopy.READ_ONLY, actionLabel = null)
-                            key?.takeIf { r == EditResult.APPLIED }?.let(open)
-                        }
-                    })
-                }
             }
         },
     ) { padding ->
@@ -135,13 +160,26 @@ fun PageListScreen(route: PageList, deps: FeatureDeps) {
             ContentSwap(body, Modifier.fillMaxSize(), label = "pageListBody") { b ->
                 when (b) {
                     ListBody.LOADING -> Box(Modifier.fillMaxSize())
-                    ListBody.EMPTY -> Box(Modifier.fillMaxSize().padding(padding).padding(24.dp), contentAlignment = Alignment.Center) {
-                        EmptyBlock(title = PageCopy.PAGE_LIST_EMPTY)
+                    ListBody.EMPTY -> Column(Modifier.fillMaxSize().padding(padding).padding(top = 12.dp)) {
+                        // U-15.1: the create row is there with 0 pages too.
+                        if (shown?.canCreate == true) ListCreateRow(CreateKind.PAGE, onCreate, Modifier.padding(horizontal = if (inner) 16.dp else 4.dp))
+                        Box(Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            EmptyBlock(title = PageCopy.PAGE_LIST_EMPTY)
+                        }
                     }
-                    ListBody.LIST -> shown?.let { PageListBody(it, cards, inner, padding, gate, unhide, open) }
+                    ListBody.LIST -> shown?.let { PageListBody(it, cards, inner, padding, gate, unhide, open, onCreate, highlighted) }
                 }
             }
         }
+    }
+    creating?.let { state ->
+        NameCreateCard(
+            state = state,
+            onChange = { creating = it },
+            onCancel = { creating = null },
+            onCreate = { create(state.name, false) },
+            onCreateAndOpen = { create(state.name, true) },
+        )
     }
 }
 
@@ -158,11 +196,32 @@ private fun PageListBody(
     gate: HiddenGate,
     unhide: Unhide,
     open: (Key) -> Unit,
+    onCreate: () -> Unit,
+    highlighted: Key?,
 ) {
     val motion = CivilightTheme.motion
     val side = if (inner) 32.dp else 20.dp
     val cardRadius = CardMetrics.radius(CardKind.RECENT)
     val secondKey = view.rows.getOrNull(1)?.key
+    val listState = rememberLazyListState()
+    val cardState = rememberLazyListState()
+    // U-15.6: the page made with `만들기` is added at the end; scroll it into view once its row is there.
+    val rowKeys = view.rows.map { it.key }
+    val listLeading = (if (view.canCreate) 1 else 0) + 1
+    val scrollTarget = if (cards) CreatedScroll.index(rowKeys, highlighted, leading = 0) else CreatedScroll.index(rowKeys, highlighted, listLeading)
+    LaunchedEffect(scrollTarget, cards) {
+        val index = scrollTarget ?: return@LaunchedEffect
+        if (cards) {
+            // The card row sits right after the create row: bring it into view, then the card along the row.
+            val cardsItem = if (view.canCreate) 1 else 0
+            if (listState.layoutInfo.visibleItemsInfo.none { it.index == cardsItem }) listState.scrollToItem(cardsItem)
+            if (cardState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+                if (motion.reduced) cardState.scrollToItem(index) else cardState.animateScrollToItem(index)
+            }
+        } else if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+            if (motion.reduced) listState.scrollToItem(index) else listState.animateScrollToItem(index)
+        }
+    }
     SharedTransitionLayout {
         AnimatedContent(cards, transitionSpec = { CardViewMotion.transform(motion) }, label = "pageListView") { showCards ->
             val visibility = this
@@ -177,8 +236,12 @@ private fun PageListBody(
                 )
             LazyColumn(
                 Modifier.fillMaxSize(),
+                state = listState,
                 contentPadding = PaddingValues(top = padding.calculateTopPadding() + 12.dp, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
+                if (view.canCreate) {
+                    item(key = "create") { ListCreateRow(CreateKind.PAGE, onCreate, civilightItem().padding(horizontal = side - 16.dp)) }
+                }
                 if (showCards) {
                     item(key = "cards") {
                         SnapCardRow(
@@ -188,6 +251,7 @@ private fun PageListBody(
                             inner = inner,
                             title = view.section,
                             modifier = civilightItem(),
+                            state = cardState,
                         ) { row, imageModifier ->
                             val nudge = if (row.key == secondKey) visibility.rememberNudge() else null
                             RecentFileCard(
@@ -198,6 +262,7 @@ private fun PageListBody(
                                 onClick = { open(row.key) },
                                 modifier = Modifier
                                     .graphicsLayer { translationX = (nudge?.value ?: 0f) * density }
+                                    .createdFlash(row.key == highlighted, radius = cardRadius.dp, over = true)
                                     .then(if (row.hiddenTag) Modifier.unhide(unhide) else Modifier),
                                 imageModifier = Modifier.sharedImage("img-${row.key}"),
                                 imageRadius = visibility.imageRadius(own = cardRadius, other = CardViewMotion.THUMB_RADIUS_DP).dp,
@@ -227,6 +292,7 @@ private fun PageListBody(
                             trailing = if (row.hiddenTag) ({ HiddenMark() }) else null,
                             modifier = civilightItem()
                                 .padding(horizontal = side)
+                                .createdFlash(row.key == highlighted, outset = 10.dp)
                                 .then(if (row.hiddenTag) Modifier.unhide(unhide) else Modifier),
                         )
                     }

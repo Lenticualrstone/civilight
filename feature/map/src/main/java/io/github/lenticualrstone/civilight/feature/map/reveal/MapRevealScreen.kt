@@ -83,18 +83,20 @@ fun MapRevealScreen(route: MapReveal, deps: FeatureDeps) {
     val readOnly by vm.readOnly.collectAsState()
     val hiddenOpen by vm.hiddenOpen.collectAsState()
     val sheets = rememberSheetHost()
-    val lens = deps.lens(currentProjectStore)
     val inner = LocalWindowLayout.current.isInner
     var viewportArray by rememberSaveable(route.mapKey) { mutableStateOf(Viewport.UNSET.toArray()) }
+    // (0.2.0, WLD-71) The scrubber is this view's own point, not the project lens: it starts at 최신 and
+    // never moves the lens of the world heads.
+    var pointUnit by rememberSaveable(route.mapKey) { mutableStateOf<String?>(null) }
     val d = doc
-    val ui = remember(d, hiddenOpen) { d?.let { RevealState.build(it, route.mapKey, MapScreenViewModel.lensOf(it), hiddenOpen) } }
+    val ui = remember(d, hiddenOpen, pointUnit) {
+        d?.let { RevealState.build(it, route.mapKey, pointUnit?.let { u -> LensPoint.UnitEnd(u) } ?: MapScreenViewModel.lensOf(it), hiddenOpen) }
+    }
 
     CivilightScreen(
         title = MapCopy.REVEAL_TITLE,
         smallLine = ui?.small,
         back = mapBack(deps),
-        lens = d?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
         sheets = sheets,
     ) { padding ->
         val state = ui ?: return@CivilightScreen
@@ -121,7 +123,7 @@ fun MapRevealScreen(route: MapReveal, deps: FeatureDeps) {
                             CivilightText(MapCopy.REVEAL_DIM, CivilightTheme.type.small, Modifier.padding(end = 8.dp), color = CivilightTheme.colors.ink3)
                             CivilightSwitch(state.dim, if (readOnly) null else ({ vm.setDim(it) }), enabled = !readOnly)
                         }
-                        Scrubber(state.stops) { key -> lens.set(LensPoint.UnitEnd(key)) }
+                        Scrubber(state.stops) { key -> pointUnit = key }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         // The counts change with the lens: the value swap (CNV-42), the pending chip folds in and out.

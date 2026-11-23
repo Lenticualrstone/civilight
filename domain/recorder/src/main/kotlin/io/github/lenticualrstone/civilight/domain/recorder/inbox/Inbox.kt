@@ -169,7 +169,7 @@ object Inbox {
         val project = env.project(key) ?: return null
         return when {
             env.isLockedHidden(project) -> RecorderCopy.HIDDEN_PROJECT
-            project.linkMask -> LinkViews.ratingBadge(project.rating)
+            project.linkMask -> LinkViews.maskedLabel()
             else -> project.name
         }
     }
@@ -178,7 +178,7 @@ object Inbox {
         val project = env.project(target.projectKey)
         return when {
             project != null && env.isLockedHidden(project) -> RecorderCopy.HIDDEN_PROJECT
-            project != null && project.linkMask -> LinkViews.ratingBadge(project.rating)
+            project != null && project.linkMask -> LinkViews.maskedLabel()
             else -> Targets.resolve(env, target).let { r ->
                 if (!target.isProject && r.hidden && !env.itemsOpen(target.projectKey)) RecorderCopy.HIDDEN_ITEM else r.label.orEmpty()
             }

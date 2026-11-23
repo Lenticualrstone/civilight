@@ -137,12 +137,16 @@ object MergePlanner {
         MergeSlot.Secret -> "비밀"
     }
 
-    /** A cell's value as comparable data (null = empty). */
-    fun value(c: Character, slot: MergeSlot): Any? = when (slot) {
+    /**
+     * A cell's value as comparable data (null = empty). With [doc], `태그` compares the live tags only, the
+     * same ones [text] prints, so a side holding only trashed tags is empty (no choice row with an empty value).
+     */
+    fun value(c: Character, slot: MergeSlot, doc: ProjectDoc? = null): Any? = when (slot) {
         is MergeSlot.Field -> FieldValueEdits.normalized(c.fields[slot.defKey])?.copy(ext = null)
         MergeSlot.OneLiner -> c.oneLiner?.takeIf { it.isNotBlank() }
         MergeSlot.DisplayName -> c.displayNameBase?.takeIf { it.isNotBlank() }
-        MergeSlot.Tags -> c.tagKeys.takeIf { it.isNotEmpty() }
+        MergeSlot.Tags -> (if (doc == null) c.tagKeys else c.tagKeys.filter { io.github.lenticualrstone.civilight.domain.cast.CharacterEdits.liveTag(doc, it) != null })
+            .takeIf { it.isNotEmpty() }
         MergeSlot.Speech -> c.speechBody.takeIf { it.docText.isNotBlank() }
         MergeSlot.Secret -> c.secretBody.takeIf { it.docText.isNotBlank() }
     }
@@ -164,7 +168,7 @@ object MergePlanner {
      * `◆` records (리엔's 소속) is never "empty".
      */
     fun data(doc: ProjectDoc, c: Character, slot: MergeSlot): Any? {
-        val base = value(c, slot)
+        val base = value(c, slot, doc)
         val history = history(doc, c.key, slot).map { doc.manuscript.rankOf(it.anchor) to it.value }
         return if (base == null && history.isEmpty()) null else base to history
     }
@@ -181,7 +185,7 @@ object MergePlanner {
             val record = doc.recordAt(ownerTarget(slot, c.key)!!, LensPoint.Latest)
             (if (record != null) record.valueAs(String.serializer()) else c.displayNameBase) ?: c.name
         }
-        MergeSlot.Tags -> CastCopy.joinAll(c.tagKeys.map { doc.index.tag(it)?.name })
+        MergeSlot.Tags -> CastCopy.joinAll(c.tagKeys.map { io.github.lenticualrstone.civilight.domain.cast.CharacterEdits.liveTag(doc, it)?.name })
         MergeSlot.Speech -> c.speechBody.docText
         MergeSlot.Secret -> c.secretBody.docText
     }

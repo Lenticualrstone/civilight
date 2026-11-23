@@ -74,7 +74,8 @@ data class TimelineMapUi(
  */
 object TimelineMapState {
     fun build(doc: ProjectDoc, selectedEvent: Key?, chosenMap: Key?, compareMode: CompareMode, hiddenOpen: Boolean): TimelineMapUi {
-        val lens = LensRules.effective(doc, doc.app.view.lens.point)
+        // (0.2.0, S-1, WLD-71) No lens chip here: the 연표 reads at `최신`.
+        val lens: LensPoint = LensPoint.Latest
         val maps = TimelineMaps(doc, StoryEngine(doc))
         val rows = maps.rows().map { row ->
             val event = doc.index.event(row.eventKey)

@@ -37,7 +37,7 @@ internal fun scriptPanelActions(
         deps.navigator.push(to)
     }
     return PanelActions(
-        changeKind = { block -> if (!vm.readOnly) open(KindSheetKey(p, block)) },
+        changeKind = { block -> if (!vm.readOnly) open(io.github.lenticualrstone.civilight.feature.script.input.KindMenuSheetKey(p, blockKey = block)) },
         changeSpeaker = { block -> if (!vm.readOnly) vm.speakerTargetOf(block)?.let { open(SpeakerSheetKey.of(p, it)) } },
         restoreSpeaker = { character -> vm.restoreSpeaker(character, authenticated) },
         keepSpeaker = vm::keepSpeaker,
@@ -66,6 +66,11 @@ internal fun scriptPanelActions(
         openRecord = { record -> push(RecorderRecordDetail(record)) },
         restoreSubject = { kind, item -> vm.restoreLinkTarget(kind, item, authenticated) },
         keepSubject = vm::keepSubject,
+        setBlockDisplayName = vm::setBlockDisplayName,
+        plant = { block -> if (!vm.readOnly) open(io.github.lenticualrstone.civilight.feature.script.input.PlantSheetKey(p, block)) },
+        mentionOrPayoff = { block -> if (!vm.readOnly) open(io.github.lenticualrstone.civilight.feature.script.input.MarkPickSheetKey(p, block)) },
+        setTodo = vm::setBlockTodo,
+        setTodoDone = vm::setBlockTodoDone,
         selectMode = { block ->
             leave()
             vm.selectBlock(block)

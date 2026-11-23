@@ -7,6 +7,7 @@ import io.github.lenticualrstone.civilight.domain.story.time.SceneTimes
 import io.github.lenticualrstone.civilight.domain.story.time.TimeLabels
 import io.github.lenticualrstone.civilight.domain.story.units.UnitCodes
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.change.Anchor
 import io.github.lenticualrstone.civilight.model.change.ChangeTarget
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.doc.isLinkBeforeReveal
@@ -128,7 +129,15 @@ data class SearchContext(
  * results and hidden scenes are not searched while locked, but text in visible scenes is still found.
  * Results are derived and never stored.
  */
-class ProjectSearch(val doc: ProjectDoc, val context: SearchContext = SearchContext()) {
+/**
+ * [autoReveal] (0.2.0, WLD-72, D12): a term's automatic first reveal when it has no stored one. `domain:world`
+ * owns it (`TermReveals.autoAnchor`) and depends on this module, so callers pass it in; the default finds none.
+ */
+class ProjectSearch(
+    val doc: ProjectDoc,
+    val context: SearchContext = SearchContext(),
+    private val autoReveal: (Key) -> Anchor? = { null },
+) {
     private val codes = UnitCodes(doc)
     private val labels = TimeLabels(SceneTimes(doc), codes)
     private val lens = LensView(doc, codes)
@@ -219,12 +228,26 @@ class ProjectSearch(val doc: ProjectDoc, val context: SearchContext = SearchCont
 
     /** `첫 공개 1-7 #044` (or `첫 공개 1-7` without the block), `공개 예정 2-5`, `첫 공개 없음`. */
     private fun revealPart(termKey: Key, withBlock: Boolean): String {
-        val reveal = doc.history(ChangeTarget.TermReveal(termKey)).firstOrNull() ?: return "첫 공개 없음"
+        val reveal = doc.history(ChangeTarget.TermReveal(termKey)).firstOrNull()
+            ?: return autoReveal(termKey)?.let { autoRevealPart(it, withBlock) } ?: "첫 공개 없음"
         return when {
             doc.isPlanned(reveal) -> "공개 예정 ${lens.anchorPoint(reveal.anchor)}"
             withBlock -> "첫 공개 ${lens.anchorLabel(reveal.anchor)}"
             else -> "첫 공개 ${lens.anchorPoint(reveal.anchor)}"
         }
+    }
+
+    /** The automatic reveal: never planned; inside a hidden scene while locked only its point (no block) is named. */
+    private fun autoRevealPart(anchor: Anchor, withBlock: Boolean): String {
+        val sceneKey = when (anchor) {
+            is Anchor.AtBlock -> doc.index.block(anchor.blockKey)?.sceneKey
+            is Anchor.UnitStart -> anchor.unitKey
+            is Anchor.UnitEnd -> anchor.unitKey
+            else -> null
+        }
+        val unit = sceneKey?.let { doc.index.unit(it) }
+        val hidden = unit != null && (unit.hidden || doc.index.ancestors(unit).any { it.hidden })
+        return if (withBlock && !hiddenLocked(hidden)) "첫 공개 ${lens.anchorLabel(anchor)}" else "첫 공개 ${lens.anchorPoint(anchor)}"
     }
 
     private fun scenes(q: TextQuery): List<SearchItem> = searchableScenes.mapNotNull { s ->
@@ -233,9 +256,9 @@ class ProjectSearch(val doc: ProjectDoc, val context: SearchContext = SearchCont
     }
 
     /** Game-output blocks, latest story position first; `#043` lists that block of the current episode (`ED`). */
-    private fun lines(q: TextQuery): List<SearchItem> {
+    private fun lines(q: TextQuery, keep: (Block) -> Boolean = { true }): List<SearchItem> {
         val scenes = searchableScenes.map { it.key }.toSet()
-        val blocks = doc.manuscript.liveBlocks.filter { it.sceneKey in scenes }
+        val blocks = doc.manuscript.liveBlocks.filter { it.sceneKey in scenes && keep(it) }
         val out = mutableListOf<SearchItem>()
         numberHit(q, blocks)?.let(out::add)
         for (block in blocks.asReversed()) {
@@ -340,4 +363,80 @@ class ProjectSearch(val doc: ProjectDoc, val context: SearchContext = SearchCont
         }
         return out
     }
+
+    // --- (0.2.0, N-13) `그 밖 ▾` and `화자 ▾` -----------------------------------------------------------
+
+    /**
+     * `대사` limited to one character's lines (N-13 `화자 ▾`): dialogue blocks whose speaker is [speakerKey],
+     * the `#043` number hit included only when it is that speaker's. An empty query finds nothing, as under `대사`.
+     */
+    fun searchLines(raw: String, speakerKey: Key): SearchResult {
+        val q = TextQuery(raw)
+        if (q.isEmpty) return SearchResult(q.text, SearchFilter.LINE, emptyList(), hiddenExcluded, null)
+        val items = lines(q) { it.kind.known == BlockKind.DIALOGUE && it.speakerKey == speakerKey }
+        val sections = if (items.isEmpty()) emptyList() else listOf(SearchSection(SearchSectionKind.LINE, items))
+        val empty = if (items.isEmpty()) EmptySearch(q.text, hiddenExcluded, similar(q)) else null
+        return SearchResult(q.text, SearchFilter.LINE, sections, hiddenExcluded, empty)
+    }
+
+    /**
+     * The `화자 ▾` choices: live characters (not hidden while locked) who speak at least one live dialogue
+     * block of a searchable scene, in cast order.
+     */
+    fun lineSpeakers(): List<LineSpeaker> {
+        val scenes = searchableScenes.map { it.key }.toSet()
+        val speaking = doc.manuscript.liveBlocks
+            .filter { it.sceneKey in scenes && it.kind.known == BlockKind.DIALOGUE }
+            .mapNotNull { it.speakerKey }
+            .toSet()
+        return doc.cast.characters
+            .filter { it.deletedAt == null && !hiddenLocked(it.hidden) && it.key in speaking }
+            .sortedWith(compareBy({ it.order }, { it.key }))
+            .map { LineSpeaker(it.key, it.name) }
+    }
+
+    /** Names of one `그 밖 ▾` kind (`장소 · 세력 · 사건 · 페이지`) matching [raw]; recorder records are never searched. */
+    fun searchMore(raw: String, more: SearchMore): MoreResult {
+        val q = TextQuery(raw)
+        val hidden = context.locked && when (more) {
+            SearchMore.PLACE -> doc.world.places.any { it.hidden && it.deletedAt == null }
+            SearchMore.FACTION -> doc.world.factions.any { it.hidden && it.deletedAt == null }
+            SearchMore.EVENT -> false
+            SearchMore.PAGE -> doc.pages.values.any { it.hidden && it.deletedAt == null }
+        }
+        if (q.isEmpty) return MoreResult(q.text, more, emptyList(), hidden, null)
+        val items = when (more) {
+            SearchMore.PLACE -> places(q).map { MoreItem(more, it.key!!, (it as SearchItem.NamedItem).name) }
+            SearchMore.FACTION -> factions(q).map { MoreItem(more, it.key!!, (it as SearchItem.NamedItem).name) }
+            SearchMore.EVENT -> events(q).map { MoreItem(more, it.key!!, (it as SearchItem.NamedItem).name) }
+            SearchMore.PAGE -> doc.pages.values
+                .filter { it.deletedAt == null && !hiddenLocked(it.hidden) }
+                .sortedWith(compareBy({ it.order }, { it.key }))
+                .mapNotNull { p -> q.highlight(p.name)?.let { MoreItem(more, p.key, it) } }
+        }
+        val empty = if (items.isEmpty()) EmptySearch(q.text, hidden, emptyList()) else null
+        return MoreResult(q.text, more, items, hidden, empty)
+    }
+}
+
+/** (0.2.0, N-13) What `그 밖 ▾` picks; recorder records and gallery images are not among them. */
+enum class SearchMore(val word: String) { PLACE("장소"), FACTION("세력"), EVENT("사건"), PAGE("페이지") }
+
+/** One `화자 ▾` choice. */
+data class LineSpeaker(val key: Key, val name: String)
+
+/** A name hit of a `그 밖 ▾` kind: place → card, faction → card, event → detail, page → page. */
+data class MoreItem(val kind: SearchMore, val key: Key, val name: Highlight)
+
+/** The result of one `그 밖 ▾` kind; [empty] is `결과 없음` (no `비슷한 이름`). */
+data class MoreResult(
+    val query: String,
+    val kind: SearchMore,
+    val items: List<MoreItem>,
+    val hiddenExcluded: Boolean,
+    val empty: EmptySearch?,
+) {
+    /** `장소`, `페이지 · 3` (count when more than one, as the other sections). */
+    val header: String get() = if (items.size > 1) "${kind.word} · ${items.size}" else kind.word
+    val footer: String? get() = if (hiddenExcluded && empty == null) "숨긴 항목 제외" else null
 }

@@ -70,7 +70,10 @@ data class MergeSheetUi(
  */
 object MergePlan {
     fun deleteSheet(impact: DeleteImpact, hiddenLocked: Boolean = false): DeleteSheetUi {
-        val sheet = Messages.impactSheet(impact, hiddenLocked)
+        // (0.2.0, WLD-75) Routes are hidden: route ends are left out of the sheet (its `경로 끝 N` row and
+        // the `참조 N` total), display only; the delete itself still turns them dotted.
+        val shown = if (SHOWS_ROUTES) impact else impact.copy(references = impact.references.filterNot { it.kind == RefKind.ROUTE_END })
+        val sheet = Messages.impactSheet(shown, hiddenLocked)
         return DeleteSheetUi(
             title = sheet.title,
             sub = sheet.sub,
@@ -122,14 +125,16 @@ object MergePlan {
         return MergeSheetUi(
             title = title,
             sub = sub,
-            refsLine = WorldCopy.countLine(WorldCopy.MERGE_REFS, preview.referenceCount),
+            // (0.2.0, WLD-75) Route ends are not counted while routes are hidden, as in [refParts].
+            refsLine = WorldCopy.countLine(WorldCopy.MERGE_REFS, shownReferenceCount(preview.referenceCount, preview.references.count { it.kind == RefKind.ROUTE_END })),
             refsParts = refParts(preview.references.groupingBy { it.kind }.eachCount()),
             conflictsLine = if (differing > 0) WorldCopy.countLine(WorldCopy.MERGE_CONFLICTS, differing) else null,
             mergedHead = WorldCopy.withWord(preview.mergedName, WorldCopy.MERGE_MERGED),
             targetHead = WorldCopy.withWord(preview.targetName, WorldCopy.MERGE_KEPT),
             conflicts = conflicts,
             reveal = reveal,
-            routeEnds = if (kind == WorldKind.PLACE) MergeRows.routeEndRow(doc, mergedKey, targetKey) else null,
+            // (0.2.0, WLD-75) Routes are hidden: no `경로 끝 N · … 핀으로` row (the ends still move to the target's pin).
+            routeEnds = if (kind == WorldKind.PLACE && SHOWS_ROUTES) MergeRows.routeEndRow(doc, mergedKey, targetKey) else null,
             filledLine = if (preview.filled.isNotEmpty()) Messages.filledLine(preview) else null,
             footer = WorldCopy.mergedToTrash(preview.mergedName, preview.targetName),
             cancel = WorldCopy.BTN_CANCEL,
@@ -147,8 +152,16 @@ object MergePlan {
 
     /** `대사 3 · @ 1 · 씬 등장 1`: the moved references by kind, in the trash rows' order. */
     fun refParts(counts: Map<RefKind, Int>): String = REF_ORDER.mapNotNull { (kind, word) ->
+        // (0.2.0, WLD-75) Route ends are not counted while routes are hidden.
+        if (kind == RefKind.ROUTE_END && !SHOWS_ROUTES) return@mapNotNull null
         counts[kind]?.takeIf { it > 0 }?.let { if (word == "@") "@ $it" else "$word $it" }
     }.joinToString(WorldCopy.SEP)
+
+    /** `옮길 참조 · N` without the route ends while routes are hidden. */
+    fun shownReferenceCount(total: Int, routeEnds: Int): Int = if (SHOWS_ROUTES) total else (total - routeEnds).coerceAtLeast(0)
+
+    /** (0.2.0, WLD-75) Routes have no surface in 0.2.0 (their data is kept). */
+    const val SHOWS_ROUTES: Boolean = false
 
     /** Pseudo field key of the `첫 공개` comparison row. */
     const val REVEAL_ROW = "reveal"

@@ -18,10 +18,12 @@ object ScriptTourSteps {
     const val HEAD: Int = 2
 
     /**
-     * Steps this script has no element for: the read-only example draws `예시 홈으로 · 온보딩 끝내기`
-     * where the command field would be, so `명령 칸` is left out of its tour (emulator QA round 2).
+     * Steps this script has no element for. (0.2.0, LIB-96, S-9) `명령 칸` · `… 마이크` is left out always: U-14
+     * replaced the command bar with the input bar and the mic is gone; new input-bar steps wait for
+     * `TODO_COPY_SCR_TOUR_*`. (The read-only example never had it: `예시 홈으로 · 온보딩 끝내기` sit there.)
      */
-    fun absent(readOnly: Boolean): Set<Int> = if (readOnly) setOf(COMMAND) else emptySet()
+    @Suppress("UNUSED_PARAMETER")
+    fun absent(readOnly: Boolean): Set<Int> = setOf(COMMAND)
 
     /** How many steps the script tour has (`명령 칸`, `블록을 왼쪽으로`, `씬 머리`). */
     const val COUNT: Int = 3

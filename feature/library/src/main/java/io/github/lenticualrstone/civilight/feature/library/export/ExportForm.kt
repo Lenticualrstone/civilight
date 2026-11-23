@@ -37,7 +37,7 @@ object ExportFormRules {
 
     /** The sheet as first opened: `대본 PDF` selected (board `Export`; §3 `ExportOptions` default). */
     fun initial(doc: ProjectDoc, now: Timestamp, zone: ZoneId, format: ExportFormat = ExportFormat.PDF): ExportForm =
-        ExportForm(ExportDefaults.initial(doc, format, now, zone))
+        ExportForm(ExportDefaults.initial(doc, ExportDefaults.visibleFormat(doc, format), now, zone))
 
     /** Another format card: its own defaults; a typed file name stays, passwords are dropped. */
     fun selectFormat(form: ExportForm, doc: ProjectDoc, format: ExportFormat, now: Timestamp, zone: ZoneId): ExportForm {
@@ -80,6 +80,18 @@ object ExportFormRules {
     fun setRecorderAudio(form: ExportForm, on: Boolean) = form.copy(options = form.options.copy(includeRecorderAudio = on))
 
     fun setIncludeTrash(form: ExportForm, on: Boolean) = form.copy(options = form.options.copy(includeTrash = on))
+
+    /** (0.2.0, LIB-97) `지난 판도 포함`. */
+    fun setIncludeVersions(form: ExportForm, on: Boolean) = form.copy(options = form.options.copy(includeVersions = on))
+
+    /**
+     * (0.2.0, LIB-91) [form] when its format is offered for [doc], else switched to the first offered format
+     * (a remembered CSV or JSON draft while `게임 제작 도구` is off). Nothing is written to the project.
+     */
+    fun visible(form: ExportForm, doc: ProjectDoc, now: Timestamp, zone: ZoneId): ExportForm {
+        val format = ExportDefaults.visibleFormat(doc, form.format)
+        return if (format == form.format) form else selectFormat(form, doc, format, now, zone)
+    }
 
     /** The rows `domain:library` draws for the current choices. */
     fun sheet(doc: ProjectDoc, form: ExportForm, recorder: RecorderLibrary): ExportSheet = ExportSheets.build(doc, form.options, recorder)

@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.library.export
 
+import io.github.lenticualrstone.civilight.feature.library.common.actionContext
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import io.github.lenticualrstone.civilight.designsystem.component.DelayedProgress
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import androidx.compose.runtime.SideEffect
@@ -34,7 +37,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightTextField
 import io.github.lenticualrstone.civilight.feature.library.backup.PasswordInput
 import io.github.lenticualrstone.civilight.designsystem.component.OutlinedSegmented
-import io.github.lenticualrstone.civilight.designsystem.component.RatingBadge
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.SegmentItem
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
@@ -99,7 +102,10 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
         if (draftFlow.value == null) draftFlow.value = ExportFormRules.initial(d, deps.clock.now(), deps.clock.zone)
     }
     if (current == null || blocked || lockedAway) return
-    val form = draft ?: return
+    val stored = draft ?: return
+    // (0.2.0, LIB-91) A remembered CSV or JSON draft falls back to the first offered format while the switch is off.
+    val form = ExportFormRules.visible(stored, current, deps.clock.now(), deps.clock.zone)
+    LaunchedEffect(form.format, stored.format) { if (form.format != stored.format) draftFlow.value = form }
     ProtectWindow(WindowProtection.forProject(current.project.protections))
 
     fun update(change: (ExportForm) -> ExportForm) {
@@ -129,7 +135,8 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
                     writtenBy = SaveDialog.writtenBy(context),
                     now = deps.clock.now(),
                     pdf = AndroidPdfWriter(context),
-                    coverRating = deps.settings.value.ratingDefaults.exportCoverRating,
+                    // (0.2.0, LIB-92) No rating on the PDF cover; the stored setting is kept and not read.
+                    coverRating = false,
                     preview = AndroidCoverPreview(deps.stores.blobs),
                     authenticate = { deps.biometric.authenticate(AuthRequest(AuthCopy.HIDDEN_PROJECTS)) == AuthResult.SUCCESS },
                 )
@@ -147,9 +154,11 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
                         deps.toasts.show(ExportCopy.SAVE_FAILED, actionLabel = null)
                         return@launch
                     }
-                    ready.plan?.let { plan ->
-                        val at = deps.clock.now()
-                        services.writer.edit(key, model.header) { doc, _ -> ExportRunner.fixVoiceIds(doc, plan, at) }
+                    // Voice IDs (CSV, JSON) and the automatic `내보낸 판` (PDF, CSV, JSON; N-29) only after the save.
+                    if (ready.plan != null || ready.versionPlan != null) {
+                        val ctx = deps.stores.actionContext()
+                        // No undo step (0.2.0): undo would otherwise drop the record of what was exported.
+                        services.writer.editWithoutUndo(key, carry = ExportRunner::carryAfterSave) { doc, _ -> ExportRunner.afterSave(doc, ready, ctx) ?: doc }
                     }
                     services.exports.clear(key)
                     deps.toasts.show(ExportCopy.DONE, actionLabel = null)
@@ -162,7 +171,8 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
     SheetScrollBody(Modifier.padding(top = 4.dp)) {
         SectionLabel(ExportCopy.SECTION_FORMAT, Modifier.padding(top = 10.dp))
         Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ExportDefaults.FORMATS.forEach { format ->
+            // (0.2.0, LIB-91, G-7) With `게임 제작 도구` off only `대본 PDF` and `프로젝트 파일 .civilight`.
+            ExportDefaults.exportFormats(current).forEach { format ->
                 val (title, sub) = ExportDefaults.formatCard(format)
                 ChoiceCard(
                     title = title,
@@ -203,19 +213,19 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
     }
 }
 
-/** `내보내기` + `닫기`, then `<name> · <badge>` (board `Export`). */
+/**
+ * `내보내기` + `닫기`, then the project name (board `Export`). (0.2.0) No rating badge (LIB-92); `닫기` is the
+ * class-a `close` icon with its name (DS-70 A6, `icon-buttons.md` 시트 머리).
+ */
 @Composable
 private fun ExportHeader(title: String, close: String, doc: ProjectDoc, onClose: () -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         CivilightText(title, type.title, Modifier.weight(1f), color = colors.ink, maxLines = 1)
-        TextAction(close, onClose)
+        CivilightIconButton(IconButtonSpec.CLOSE, onClose)
     }
-    Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        CivilightText(doc.project.name + ExportCopy.SEP.trimEnd(), type.small, color = colors.ink3, maxLines = 1)
-        RatingBadge(ThemeBridge.rating(doc.project.rating))
-    }
+    CivilightText(doc.project.name, type.small, Modifier.padding(top = 2.dp), color = colors.ink3, maxLines = 1)
 }
 
 /** A board `.row`: label left in `ink3`, the value or control right; 44 min; `line` above. */
@@ -327,6 +337,10 @@ private fun OptionRow(row: ExportRow, form: ExportForm, doc: ProjectDoc, update:
         }
         is ExportRow.IncludeTrash -> RowFrame(row.label) {
             CivilightSwitch(row.on, { on -> update { ExportFormRules.setIncludeTrash(it, on) } })
+        }
+        // (0.2.0, LIB-97, N-29) `.civilight` with at least one version: `지난 판도 포함`, on by default.
+        is ExportRow.IncludeVersions -> RowFrame(row.label) {
+            CivilightSwitch(row.on, { on -> update { ExportFormRules.setIncludeVersions(it, on) } })
         }
     }
 }

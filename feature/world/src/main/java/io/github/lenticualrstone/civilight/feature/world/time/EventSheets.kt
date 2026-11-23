@@ -43,7 +43,7 @@ import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
 import io.github.lenticualrstone.civilight.ui.picker.HiddenGate
 import io.github.lenticualrstone.civilight.ui.picker.PickerCopy
-import io.github.lenticualrstone.civilight.ui.picker.PlacePickerSheet
+import io.github.lenticualrstone.civilight.feature.world.common.WorldPlacePicker
 import io.github.lenticualrstone.civilight.ui.picker.UnitPickerSheet
 import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.project.currentProjectStore
@@ -102,10 +102,12 @@ private fun SheetScope.EventFormContent(projectKey: Key, eventKey: Key?, saveId:
                 selectedKey = draft.sceneKey,
                 levels = io.github.lenticualrstone.civilight.feature.world.term.RevealOptions.sceneLevels(doc),
             )
-            EventPick.PLACE -> PlacePickerSheet(
-                doc = doc, gate = gate, title = WorldCopy.PICK_PLACE,
+            // (0.2.0, U-15.3, WLD-70) The event place picker has the `＋ 새 장소` row on top.
+            EventPick.PLACE -> WorldPlacePicker(
+                doc = doc, gate = gate, title = WorldCopy.PICK_PLACE, readOnly = readOnly,
                 onPick = { draft = draft.withPlace(it); pick = EventPick.NONE },
                 onClose = { pick = EventPick.NONE },
+                onCreate = { item -> editor.createPlace(item) },
                 selected = draft.place,
             )
             EventPick.REVEAL -> UnitPickerSheet(

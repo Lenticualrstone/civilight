@@ -56,6 +56,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
@@ -286,7 +287,8 @@ fun ColumnScope.MicOffPane(onClose: () -> Unit, onOpenSettings: () -> Unit, onTo
         CivilightText(RecorderUiCopy.MIC_OFF_SUB, CivilightTheme.type.small.copy(fontSize = 13.sp), Modifier.padding(top = 6.dp), color = colors.ink2)
         Column(Modifier.padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             CivilightButton(RecorderUiCopy.OPEN_SYSTEM_SETTINGS, onOpenSettings, Modifier.fillMaxWidth(), variant = ButtonVariant.PRIMARY_LARGE)
-            CivilightButton(RecorderCopy.TO_TEXT, onToText, Modifier.fillMaxWidth(), variant = ButtonVariant.GHOST)
+            // Icon list B24: icon + `글로 쓰기`, the same shape as the recorder rows.
+            CivilightButton(IconButtonSpec.INBOX_RECORD_TEXT.text ?: RecorderCopy.TO_TEXT, onToText, Modifier.fillMaxWidth(), variant = ButtonVariant.GHOST, icon = IconButtonSpec.INBOX_RECORD_TEXT.icon)
         }
     }
 }

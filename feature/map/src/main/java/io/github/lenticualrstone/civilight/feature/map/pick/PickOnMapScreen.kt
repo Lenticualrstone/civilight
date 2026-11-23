@@ -117,6 +117,7 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
                             CivilightButton(MapCopy.BTN_CREATE, {
                                 sheet.close()
                                 val target = activeMap ?: return@CivilightButton
+                                if (d?.let { PickState.canDropPin(it, target) } != true) return@CivilightButton
                                 vm.createPlaceWithPin(target, name, Point(key.x, key.y)) { placeKey ->
                                     emptySpot = null
                                     pickedKind = PlaceRefKind.PLACE.name
@@ -145,7 +146,8 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
                         val ref = PickState.pick(doc0, state.mapKey, p, hit, state.regions, MapScreenViewModel.lensOf(doc0), hiddenOpen)
                         pickedKind = ref?.kind?.known?.name
                         pickedKey = ref?.key
-                        emptySpot = if (ref == null && !state.regions) floatArrayOf(p.x, p.y) else null
+                        // (0.2.0, WLD-41) `새 장소` only on an editable (image) map; view-only maps get no new pin.
+                        emptySpot = if (ref == null && !state.regions && PickState.canDropPin(doc0, state.mapKey)) floatArrayOf(p.x, p.y) else null
                     },
                 )
             }
@@ -165,6 +167,7 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
                         state?.maps?.forEach { chip ->
                             FilterChip(chip.name, chip.selected, {
                                 mapKey = chip.key
+                                emptySpot = null
                                 mover.moveTo(Viewport())
                             })
                         }
@@ -179,7 +182,7 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
             val spot = emptySpot
             val slot = when {
                 bar != null && ref != null -> MapBarSlot(MapBars.PICK, PickBarUi.Pick(bar, ref))
-                ref == null && spot != null && state != null -> MapBarSlot(MapBars.PLACE, PickBarUi.NewPlace(spot[0], spot[1]))
+                ref == null && spot != null && state != null && d != null && PickState.canDropPin(d, state.mapKey) -> MapBarSlot(MapBars.PLACE, PickBarUi.NewPlace(spot[0], spot[1]))
                 else -> null
             }
             MapBar(slot, Modifier.align(Alignment.BottomCenter).fillMaxWidth()) { _, b ->

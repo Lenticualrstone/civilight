@@ -9,7 +9,6 @@ import io.github.lenticualrstone.civilight.model.recorder.EntrySurface
 import io.github.lenticualrstone.civilight.model.recorder.RecorderTargetKind
 import io.github.lenticualrstone.civilight.model.serialName
 import io.github.lenticualrstone.civilight.navigation.ProjectSearch
-import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.navigation.popTo
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
@@ -32,7 +31,8 @@ fun worldBack(route: Route, deps: FeatureDeps): IconAction? = when (LocalPaneRol
 
 /**
  * The bottom command bar: tapping opens project search (`장소 · 용어 · 세력 찾기`, `명령 또는 검색`);
- * the mic starts the recorder with this screen as `보던 곳` (rule 23: a card links that card).
+ * no mic (0.2.0 S-8: the recorder starts only from 프로젝트 홈 and the 기록함). The recorder parameters
+ * are kept for callers and unused.
  */
 @Composable
 fun WorldCommandBar(
@@ -46,16 +46,6 @@ fun WorldCommandBar(
     CommandBar(
         hint = hint,
         onClick = { deps.navigator.push(ProjectSearch(projectKey)) },
-        onMic = {
-            deps.navigator.push(
-                Recording(
-                    surface = surface.serialName,
-                    projectKey = projectKey,
-                    targetKind = targetKind?.serialName,
-                    targetKey = targetKey,
-                ),
-            )
-        },
     )
 }
 

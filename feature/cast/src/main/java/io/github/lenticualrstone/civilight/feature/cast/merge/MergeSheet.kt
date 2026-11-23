@@ -44,6 +44,10 @@ import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
+import io.github.lenticualrstone.civilight.feature.cast.common.CastAuth
+import io.github.lenticualrstone.civilight.feature.cast.field.rememberStopCount
+import io.github.lenticualrstone.civilight.navigation.ProfileTab
+import io.github.lenticualrstone.civilight.ui.security.AuthRequest
 import io.github.lenticualrstone.civilight.feature.cast.field.rememberCastEditor
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
@@ -51,7 +55,7 @@ import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.navigation.MergeItemsSheet
 import io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
-import io.github.lenticualrstone.civilight.ui.picker.CharacterPickerSheet
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCharacterPicker
 import io.github.lenticualrstone.civilight.ui.picker.FactionPickerSheet
 import io.github.lenticualrstone.civilight.ui.picker.HiddenGate
 import io.github.lenticualrstone.civilight.ui.picker.PlacePickerSheet
@@ -95,11 +99,27 @@ fun SheetScope.MergeItemsContent(sheet: MergeItemsSheet) {
         }
         return
     }
+    // CST-73: a character whose 비밀 tab is locked is compared only after the device lock; a cancel closes.
+    // Plain `remember`, cleared by the background: a restored or returned-to sheet asks again.
+    val stops = rememberStopCount()
+    var authed by remember(sheet, chosen, stops) { mutableStateOf(false) }
+    val gated = chosen != null && !authed && MergeModel.needsSecretAuth(doc, sheet.kind, merged, chosen)
+    if (gated) {
+        LaunchedEffect(sheet, chosen, stops) {
+            if (CastAuth.confirm(deps, AuthRequest(CastUiCopy.TABS[ProfileTab.SECRET.ordinal]))) {
+                authed = true
+            } else {
+                done = true
+                host.close()
+            }
+        }
+        return
+    }
     // The target picker and the comparison swap in place (P3).
     ContentSwap(chosen == null, label = "mergeStep") { picking ->
         Column(Modifier.fillMaxWidth()) {
             if (picking) {
-                host.TargetPicker(doc, sheet.kind, merged, gate, onPick = { target = it }, onClose = host::close)
+                host.TargetPicker(sheet.projectKey, doc, sheet.kind, merged, gate, onPick = { target = it }, onClose = host::close)
             } else if (chosen != null && view != null) {
                 host.MergeBody(
                     view = view,
@@ -124,11 +144,12 @@ fun SheetScope.MergeItemsContent(sheet: MergeItemsSheet) {
 
 /** Step 1: the item that stays, from the picker of [kind]; the merged item itself is ignored. */
 @Composable
-private fun SheetScope.TargetPicker(doc: ProjectDoc, kind: EntityKind, merged: Key, gate: HiddenGate, onPick: (Key) -> Unit, onClose: () -> Unit) {
+private fun SheetScope.TargetPicker(projectKey: Key, doc: ProjectDoc, kind: EntityKind, merged: Key, gate: HiddenGate, onPick: (Key) -> Unit, onClose: () -> Unit) {
     val title = MergeModel.title(kind)
     val pick: (Key) -> Unit = { key -> if (key != merged && MergeModel.canMerge(doc, kind, merged, key)) onPick(key) }
     when (kind) {
-        EntityKind.CHARACTER -> CharacterPickerSheet(doc, gate, onPick = pick, onClose = onClose, title = title)
+        // CST-45: the merge target needs an existing character, so no create row; live tag chips only (N-44).
+        EntityKind.CHARACTER -> CastCharacterPicker(projectKey, doc, gate, title, onPick = pick, onClose = onClose, creatable = false)
         EntityKind.PLACE -> PlacePickerSheet(doc, gate, title, onPick = { pick(it.key) }, onClose = onClose, includeRegions = false)
         EntityKind.TERM -> TermPickerSheet(doc, gate, title, onPick = { key, _ -> pick(key) }, onClose = onClose)
         EntityKind.FACTION -> FactionPickerSheet(doc, gate, title, onPick = pick, onClose = onClose)

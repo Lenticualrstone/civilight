@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.map.edit
 
+import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
 import io.github.lenticualrstone.civilight.domain.world.common.StoryCodes
 import io.github.lenticualrstone.civilight.domain.world.map.MapEdits
 import io.github.lenticualrstone.civilight.domain.world.map.DetailEdits
@@ -199,7 +200,7 @@ object EditState {
             small = if (map.parent != null) crumbs else MapCopy.viewSmall(MapViewState.styleName(map)),
             base = MapBases.of(map),
             scene = scene,
-            scale = MapScales.barLabel(doc, map),
+            scale = if (MapOffers.showsScale(map)) MapScales.barLabel(doc, map) else null,
             props = props(doc, map, scene, lens, s),
             layers = layerRows(doc, map),
             items = items(scene, s.selected),

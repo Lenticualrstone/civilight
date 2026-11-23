@@ -1,10 +1,18 @@
 package io.github.lenticualrstone.civilight.feature.cast.relation
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardCopy
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardState
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreate
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreateCard
+import io.github.lenticualrstone.civilight.feature.cast.create.CreateCardCodec
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.ui.project.EditResult
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,7 +52,7 @@ import io.github.lenticualrstone.civilight.navigation.SheetKey
 import kotlinx.serialization.Serializable
 import io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
-import io.github.lenticualrstone.civilight.ui.picker.CharacterPickerSheet
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCharacterPicker
 import io.github.lenticualrstone.civilight.ui.picker.UnitPickerSheet
 import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.project.currentProjectStore
@@ -115,7 +123,7 @@ private fun SheetScope.RelationEditBody(projectKey: Key, viewerKey: Key?, partne
     var partnerFirst by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial?.partnerHoldsFirst) }
     var description by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial?.description.orEmpty()) }
     var address by rememberSaveable(sheet, chosen, slot) { mutableStateOf(initial?.address.orEmpty()) }
-    var newKind by rememberSaveable(sheet, chosen, slot) { mutableStateOf<String?>(null) }
+    var kindCard by rememberSaveable(saveKey, chosen, slot, stateSaver = KindCardSaver) { mutableStateOf<CreateCardState?>(null) }
     val draft = SlotDraft(kindKey, partnerFirst, description, address)
     val editable = !store.readOnly
     val stage = when {
@@ -128,7 +136,8 @@ private fun SheetScope.RelationEditBody(projectKey: Key, viewerKey: Key?, partne
         Column(Modifier.fillMaxWidth()) {
             when (shown) {
                 RelationStage.PICK_PARTNER ->
-                    CharacterPickerSheet(doc, gate, onPick = { picked -> if (picked != viewer) partner = picked }, onClose = host::close, title = CastUiCopy.PICK_PARTNER)
+                    // U-15.3 (CST-66, §8.3 Q45): the partner picker has the `＋ 새 인물` row; a created character is picked.
+                    CastCharacterPicker(projectKey, doc, gate, CastUiCopy.PICK_PARTNER, onPick = { picked -> if (picked != viewer) partner = picked }, onClose = host::close)
                 RelationStage.PICK_START ->
                     UnitPickerSheet(doc, gate, RelationDrafts.START, onPick = { start = it; pickingStart = false }, onClose = { pickingStart = false }, selectedKey = start)
                 RelationStage.FORM -> if (chosen != null && view != null) {
@@ -168,28 +177,39 @@ private fun SheetScope.RelationEditBody(projectKey: Key, viewerKey: Key?, partne
                                                 }
                                             })
                                         }
-                                        if (newKind == null) AddChip(RelationKinds.ADD, { newKind = "" })
+                                        // CST-76: `+ 새 종류` opens the relation-kind create card (picker mode); the category is the slot's.
+                                        AddChip(RelationKinds.ADD, { kindCard = CreateCardState.open(CreateKind.RELATION_KIND, CreateCardMode.PICKER) })
                                     }
-                                    FoldRevealValue(newKind) { typed ->
-                                        Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                                            CivilightTextField(typed, { newKind = it }, Modifier.weight(1f), label = CastUiCopy.NAME)
-                                            TextAction(CastUiCopy.BTN_INSERT, {
-                                                val name = typed
-                                                var made: Pair<Key, Boolean?>? = null
-                                                editor.act(CastUiCopy.BTN_INSERT, then = {
-                                                    made?.let { (k, first) ->
-                                                        kindKey = k
-                                                        partnerFirst = first
+                                    kindCard?.let { card ->
+                                        var kindBusy by remember { mutableStateOf(false) }
+                                        CastCreateCard(
+                                            state = card,
+                                            onChange = { kindCard = it },
+                                            onCancel = { kindCard = null },
+                                            onCreate = {
+                                                val made = card
+                                                kindBusy = true
+                                                var picked: Pair<Key, Boolean?>? = null
+                                                // The card closes only once the write applied; otherwise the typed values stay.
+                                                editor.act(CreateCardCopy.CREATE, then = { result ->
+                                                    kindBusy = false
+                                                    if (result == EditResult.APPLIED) {
+                                                        kindCard = null
+                                                        picked?.let { (k, first) ->
+                                                            kindKey = k
+                                                            partnerFirst = first
+                                                        }
                                                     }
-                                                    newKind = null
                                                 }) { d, ctx ->
-                                                    RelationDrafts.addKind(d, slot, name, ctx)?.let { (next, chip) ->
-                                                        made = chip.kindKey to chip.partnerHoldsFirst
+                                                    RelationDrafts.addKindFromCard(d, slot, made.name, CastCreate.pairName(made), ctx)?.let { (next, chip) ->
+                                                        picked = chip.kindKey to chip.partnerHoldsFirst
                                                         next
                                                     } ?: d
                                                 }
-                                            }, Modifier.padding(start = 8.dp, top = 18.dp))
-                                        }
+                                            },
+                                            canCreate = !kindBusy && CastCreate.canCreate(card),
+                                            fields = CastCreate.kindFields(between = slot == SheetSlot.BETWEEN),
+                                        )
                                     }
                                     CivilightTextField(description, { description = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = CastUiCopy.DESCRIPTION_OPTIONAL)
                                 }
@@ -229,3 +249,8 @@ private fun SheetScope.RelationEditBody(projectKey: Key, viewerKey: Key?, partne
         }
     }
 }
+
+private val KindCardSaver: androidx.compose.runtime.saveable.Saver<CreateCardState?, String> = androidx.compose.runtime.saveable.Saver(
+    save = { it?.let(CreateCardCodec::encode) ?: "" },
+    restore = { CreateCardCodec.decode(it) },
+)

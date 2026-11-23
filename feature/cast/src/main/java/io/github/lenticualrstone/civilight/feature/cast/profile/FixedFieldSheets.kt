@@ -1,5 +1,16 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCard
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardCopy
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardState
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.designsystem.component.CreateRow
+import io.github.lenticualrstone.civilight.feature.cast.common.toAction
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreate
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreateCard
+import io.github.lenticualrstone.civilight.feature.cast.create.CreateCardCodec
+import io.github.lenticualrstone.civilight.ui.project.EditResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -118,10 +129,12 @@ fun SheetScope.TagsSheetContent(sheet: TagsEditSheet) {
     }
     val initial = remember(sheet) { FixedFieldEdits.picks(doc, sheet.characterKey) }
     var picks by rememberSaveable(stateSaver = PicksSaver) { mutableStateOf(initial) }
-    var name by rememberSaveable { mutableStateOf("") }
+    var creating by rememberSaveable(stateSaver = TagFieldCardSaver) { mutableStateOf<CreateCardState?>(null) }
     val editable = !store.readOnly
     SheetHeader(CastUiCopy.TAGS, onClose = ::close, closeLabel = CastUiCopy.BTN_CLOSE)
     SheetScrollBody(Modifier.padding(top = 14.dp)) {
+        // U-15.4 (CST-75): `＋ 새 태그` on top opens the create card in picker mode.
+        if (editable) CreateRow(CreateCard.rowLabel(CreateKind.TAG), { creating = CreateCardState.open(CreateKind.TAG, CreateCardMode.PICKER) }, Modifier.padding(bottom = 8.dp))
         ChipFlow {
             for (tag in CharacterEdits.tags(doc)) {
                 FilterChip(tag.name, picks.any { it.key == tag.key }, { picks = FixedFieldEdits.toggle(picks, tag.key, tag.name) }, enabled = editable)
@@ -130,15 +143,29 @@ fun SheetScope.TagsSheetContent(sheet: TagsEditSheet) {
                 FilterChip(pick.name, true, { picks = picks - pick }, enabled = editable)
             }
         }
-        if (editable) {
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                CivilightTextField(name, { name = it }, Modifier.weight(1f), label = CastUiCopy.NAME)
-                CivilightButton(CastUiCopy.BTN_INSERT, {
-                    picks = FixedFieldEdits.addName(doc, picks, name)
-                    name = ""
-                }, variant = ButtonVariant.GHOST, enabled = name.isNotBlank())
-            }
-        }
+    }
+    var tagBusy by remember { mutableStateOf(false) }
+    creating?.let { card ->
+        CastCreateCard(
+            state = card,
+            onChange = { creating = it },
+            onCancel = { creating = null },
+            onCreate = {
+                val made = card
+                tagBusy = true
+                var created: Key? = null
+                // CST-75: the new tag is created and checked on the character in one write (one undo step).
+                // The card closes only once the write applied; otherwise the typed name stays.
+                editor.act(CreateCardCopy.CREATE, then = { result ->
+                    tagBusy = false
+                    if (result == EditResult.APPLIED) {
+                        creating = null
+                        created?.let { k -> picks = picks + TagPick(k, made.name.trim()) }
+                    }
+                }) { d, ctx -> CastCreate.createTagOn(d, sheet.characterKey, made, ctx.toAction())?.let { (next, k) -> created = k; next } ?: d }
+            },
+            canCreate = !tagBusy && CastCreate.canCreateTag(doc, card),
+        )
     }
     if (editable) {
         SheetActions {
@@ -150,3 +177,8 @@ fun SheetScope.TagsSheetContent(sheet: TagsEditSheet) {
         }
     }
 }
+
+private val TagFieldCardSaver: Saver<CreateCardState?, String> = Saver(
+    save = { it?.let(CreateCardCodec::encode) ?: "" },
+    restore = { CreateCardCodec.decode(it) },
+)

@@ -57,13 +57,10 @@ import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.model.asset.Ratio
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.text.RichDoc
-import io.github.lenticualrstone.civilight.model.recorder.EntrySurface
-import io.github.lenticualrstone.civilight.model.recorder.RecorderTargetKind
 import io.github.lenticualrstone.civilight.model.serialName
 import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
 import io.github.lenticualrstone.civilight.navigation.PageDoc
 import io.github.lenticualrstone.civilight.navigation.RecorderRecordDetail
-import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.Trash
 import io.github.lenticualrstone.civilight.navigation.TrashFilter
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
@@ -119,9 +116,10 @@ fun PageDocScreen(route: PageDoc, deps: FeatureDeps) {
     }
     val readOnlyToast = { deps.toasts.show(PageCopy.READ_ONLY, actionLabel = null) }
 
-    // A page just made from the list opens straight into editing.
+    // A page just made opens straight into editing: a blank page, or one made with `만들고 열기` (U-15) whose
+    // name is already set. The mark is read once the page has loaded, so it is not lost while loading.
     LaunchedEffect(view?.key, view?.isBlank) {
-        if (view != null && view.isBlank && !view.readOnly && view.access == PageAccess.OPEN) beginEditing(true)
+        if (view != null && PageAutoEdit.shouldStart(view, JustCreatedPages.take(view.key))) beginEditing(true)
     }
     val stopEditing = { editing = false }
     // A page that opened straight into editing leaves on the first back (nothing visible changes when such a
@@ -164,16 +162,6 @@ fun PageDocScreen(route: PageDoc, deps: FeatureDeps) {
                     } else {
                         startEditing()
                     }
-                },
-                onMic = {
-                    deps.navigator.push(
-                        Recording(
-                            surface = EntrySurface.PAGE.serialName,
-                            projectKey = route.projectKey,
-                            targetKind = RecorderTargetKind.PAGE.serialName,
-                            targetKey = route.pageKey,
-                        ),
-                    )
                 },
                 micLabel = PageCopy.MIC,
             )

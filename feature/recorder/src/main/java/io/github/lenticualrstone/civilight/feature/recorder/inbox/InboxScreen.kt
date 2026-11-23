@@ -41,7 +41,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
-import io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock
+import io.github.lenticualrstone.civilight.designsystem.component.FittingButtonRow
 import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.LockRow
@@ -169,7 +169,7 @@ fun InboxScreen(route: RecorderInbox, deps: FeatureDeps) {
                 CivilightButton(label, { reveal?.relock?.invoke() }, variant = ButtonVariant.COMPACT_GHOST, icon = IconId.Lock)
             }
             FoldReveal(populated != null, horizontal = true) {
-                CivilightIconButton(IconId.Filter, RecorderUiCopy.SEARCH_ICON, onClick = {
+                CivilightIconButton(IconId.Search, RecorderUiCopy.SEARCH_ICON, onClick = {
                     searching = !searching
                     if (!searching) {
                         query = TextFieldValue("")
@@ -356,20 +356,33 @@ class InboxActions(
     }
 }
 
-/** `EmptyLr` (LRC-30): `전체 0`, the outlined block `기록 없음` with `말로 기록` · `글로`. */
+/**
+ * `EmptyLr` (LRC-30): `전체 0`, the outlined block `기록 없음` with `말로 기록` · `글로 쓰기` ([EmptyInboxView]).
+ * Drawn here rather than with the shared `EmptyBlock`, which has no button icons in 0.2.0 (see the status
+ * file's Requests); same box, type and button row.
+ */
 @Composable
 private fun EmptyInbox(view: InboxView, actions: InboxActions, modifier: Modifier = Modifier) {
     val empty = view.screen.empty ?: return
+    val shown = EmptyInboxView.of(empty)
+    val colors = CivilightTheme.colors
+    val shape = RoundedCornerShape(20.dp)
     Column(modifier) {
-        FilterChip(empty.chip, selected = true, onClick = {})
-        EmptyBlock(
-            title = empty.title,
-            subtitle = empty.sub,
-            primaryLabel = empty.buttons[0],
-            onPrimary = { actions.capture(view, typed = false) },
-            secondaryLabel = empty.buttons[1],
-            onSecondary = { actions.capture(view, typed = true) },
-        )
+        FilterChip(shown.chip, selected = true, onClick = {})
+        Column(
+            Modifier
+                .padding(top = 18.dp)
+                .fillMaxWidth()
+                .insetOutline(colors.edge, 1.dp, shape)
+                .padding(horizontal = 20.dp, vertical = 26.dp),
+        ) {
+            CivilightText(shown.title, CivilightTheme.type.emptyTitle, color = colors.ink)
+            shown.sub?.let { CivilightText(it, CivilightTheme.type.small, Modifier.padding(top = 4.dp), color = colors.ink3) }
+            FittingButtonRow(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                CivilightButton(shown.voice.text.orEmpty(), { actions.capture(view, typed = false) }, icon = shown.voice.icon)
+                CivilightButton(shown.text.text.orEmpty(), { actions.capture(view, typed = true) }, variant = ButtonVariant.GHOST, icon = shown.text.icon)
+            }
+        }
     }
 }
 

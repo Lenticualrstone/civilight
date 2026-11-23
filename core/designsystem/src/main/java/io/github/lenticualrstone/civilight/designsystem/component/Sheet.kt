@@ -297,6 +297,19 @@ fun SheetHeader(
             CivilightText(title, type.title, color = colors.ink, maxLines = 1)
             if (subtitle != null) CivilightText(subtitle, type.small, color = colors.ink3)
         }
+        SheetClose(closeLabel, onClose)
+    }
+}
+
+/**
+ * (0.2.0, DS-70 A6) The head's close: the default `닫기` is the icon-only `close` (class a, name `닫기`); any
+ * other word a caller passes (`완료`, `취소`) stays a text action.
+ */
+@Composable
+private fun SheetClose(closeLabel: String, onClose: () -> Unit) {
+    if (closeLabel == io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.CLOSE) {
+        CivilightIconButton(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.CLOSE, onClose)
+    } else {
         TextAction(closeLabel, onClose)
     }
 }
@@ -314,7 +327,7 @@ fun SheetTabsHeader(
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         CivilightTabs(tabs, selectedIndex, onSelect, Modifier.weight(1f), gap = gap)
-        TextAction(closeLabel, onClose)
+        SheetClose(closeLabel, onClose)
     }
 }
 

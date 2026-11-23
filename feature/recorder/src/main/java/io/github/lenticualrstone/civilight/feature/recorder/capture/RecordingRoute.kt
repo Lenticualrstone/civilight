@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -60,6 +61,11 @@ tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
 fun micGranted(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
+/** Whether the app may post notifications (always true below API 33). */
+fun notificationsGranted(context: Context): Boolean =
+    Build.VERSION.SDK_INT < NotificationAsk.FIRST_SDK ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
 /**
  * The `Recording` overlay route (LRC-01 … LRC-20): `녹음 중`, `정리 중`, `마이크 꺼짐`, the reason
  * line, the text memo (`startTyped`) and the link picker, over the screen the user was on (the
@@ -84,6 +90,10 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hub.launch { permissionResult(granted) }
     }
+
+    // U-13 · D32: the ongoing recording notification needs POST_NOTIFICATIONS on API 33+ (NotificationAsk).
+    // The answer is not used: a refused request still records, only the notification stays hidden.
+    val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     // Platform parts that need a context: audio focus (LRC-09) and the background keep-alive service.
     LaunchedEffect(hub) {
@@ -139,6 +149,19 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
     // While its card is shown the take pauses, so reading the cards is not recorded; it resumes when the
     // card closes (or this screen leaves). Keyed on the stage: a take started from the memo's mic pauses too.
     val touring = tourRunning()
+    LaunchedEffect(state.stage, touring) {
+        val ask = NotificationAsk.shouldAsk(
+            sdkInt = Build.VERSION.SDK_INT,
+            granted = notificationsGranted(context),
+            stage = state.stage,
+            askedThisRun = NotificationAsk.askedThisRun,
+            touring = touring,
+        )
+        if (ask && Build.VERSION.SDK_INT >= NotificationAsk.FIRST_SDK) {
+            NotificationAsk.askedThisRun = true
+            runCatching { notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS) }
+        }
+    }
     DisposableEffect(touring, state.stage) {
         if (touring) hub.holdForTour()
         onDispose { if (touring) hub.releaseTour() }
@@ -147,12 +170,18 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
     // U-13: the route left while a take records or is paused (popped, another screen on top, the app closed).
     // Declared after the tour hold so it is disposed first: the take is saved before a tour release could resume it.
     // Not on a configuration change, and not when the system tears the screen down in the background (LRC-09).
+    // The activity's own lifecycle, not the entry's: an entry may already be stopped when it is popped.
     val activity = remember(context) { context.findActivity() }
     DisposableEffect(hub) {
         onDispose {
-            val inApp = activity?.isChangingConfigurations != true &&
-                (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) || activity?.isFinishing == true)
-            if (inApp && deps.navigator.backStack.none { it is Recording }) leaveNow()
+            val activityLifecycle = (activity as? androidx.lifecycle.LifecycleOwner)?.lifecycle ?: lifecycle
+            val leave = LeaveRules.leaveOnDispose(
+                changingConfigurations = activity?.isChangingConfigurations == true,
+                finishing = activity?.isFinishing == true,
+                activityStarted = activityLifecycle.currentState.isAtLeast(Lifecycle.State.STARTED),
+                backStack = deps.navigator.backStack,
+            )
+            if (leave) leaveNow()
         }
     }
 

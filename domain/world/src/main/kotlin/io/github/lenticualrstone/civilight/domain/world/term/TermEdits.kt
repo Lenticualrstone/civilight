@@ -150,6 +150,8 @@ object TermEdits {
         access: TermAccess = TermAccess(),
         spots: Set<ScriptSpot>? = null,
     ): ProjectDoc {
+        // (0.2.0, WLD-73) While `용어 후보` is off, stored `아님` records are kept as they are.
+        if (!doc.project.termCandidates) return doc
         var changed = false
         val terms = doc.world.terms.map { term ->
             if (!access.canSearch(term) || term.rejections.isEmpty()) return@map term

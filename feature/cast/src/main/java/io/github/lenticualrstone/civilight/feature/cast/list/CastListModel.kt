@@ -57,7 +57,7 @@ object CastListModel {
         val query = if (ui.searching) ui.query.nfc() else ""
         val lens = doc.castLens
         val filters = CastFilterModel.clean(doc, ui.filters)
-        val view = CastFilterModel.apply(doc, CastList.build(doc, lens, tag, query, hiddenUnlocked), filters, lens)
+        val view = CastFilterModel.apply(doc, CastList.build(doc, lens, tag, query, hiddenUnlocked), filters, lens, hiddenUnlocked)
         // Both views are built whatever `ui.cards` says: the `목록 ↔ 카드` switch animates between them (CNV-45).
         val cards = if (view.empty == null) CastFilterModel.cards(doc, CastList.cards(doc, lens, hiddenUnlocked), view, filters, lens) else emptyList()
         return CastListState(
@@ -107,6 +107,51 @@ object CastListModel {
 
     /** Lazy key of one card row (one per group; the sort order's single group has no tag). */
     fun cardsKey(tagKey: Key?): String = "cards-$tagKey"
+
+    /**
+     * The lazy item keys of the list body in drawing order (the screen draws them in exactly this order):
+     * `목록 | 관계도`, chips, active filters, the `＋ 새 인물` row (CST-66: under the chips, above the lock row
+     * and the first section), empty state, `결과 없음`, lock row, field hits, `숨긴 항목 제외`, then each
+     * section and its rows. Used to scroll a new row into view after `만들기`.
+     */
+    fun itemKeys(state: CastListState, showCreate: Boolean): List<String> = buildList {
+        val view = state.view
+        if (view.empty == null) add(MODE_KEY)
+        add(CHIPS_KEY)
+        if (state.activeFilters.isNotEmpty()) add(ACTIVE_KEY)
+        if (showCreate) add(CREATE_KEY)
+        if (view.empty != null) add(EMPTY_KEY)
+        if (state.noResults) add(NONE_KEY)
+        if (view.lockRow != null) add(LOCK_KEY)
+        if (state.fieldHits.isNotEmpty()) {
+            add(HITS_HEAD_KEY)
+            addAll(hitKeys(state.fieldHits))
+        }
+        if (state.hiddenExcluded) add(HIDDEN_EXCLUDED_KEY)
+        for (group in view.groups) {
+            add(sectionKey(group.tagKey))
+            for (row in group.rows) add(rowKey(group.tagKey, row.key))
+        }
+    }
+
+    /** Index of the first row of [characterKey] in [itemKeys], or -1. */
+    fun firstRowIndex(keys: List<String>, state: CastListState, characterKey: Key): Int {
+        val rows = state.view.groups.filter { g -> g.rows.any { it.key == characterKey } }.map { rowKey(it.tagKey, characterKey) }.toSet()
+        return keys.indexOfFirst { it in rows }
+    }
+
+    /** The `＋ 새 인물` row is drawn in editable projects only (U-15.10). */
+    fun showsCreate(state: CastListState): Boolean = !state.readOnly
+
+    const val MODE_KEY = "mode"
+    const val CHIPS_KEY = "chips"
+    const val ACTIVE_KEY = "active"
+    const val CREATE_KEY = "create"
+    const val EMPTY_KEY = "empty"
+    const val NONE_KEY = "none"
+    const val LOCK_KEY = "lock"
+    const val HITS_HEAD_KEY = "hits-head"
+    const val HIDDEN_EXCLUDED_KEY = "hidden-excluded"
 
     /** Tapping a chip: the tag, or `전체` (null); one chip at a time (CST-02). */
     fun selectTag(ui: CastListUi, tagKey: Key?): CastListUi = ui.copy(selectedTag = tagKey)

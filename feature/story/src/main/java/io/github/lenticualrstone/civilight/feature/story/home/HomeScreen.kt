@@ -28,14 +28,13 @@ import androidx.compose.ui.text.style.TextDecoration
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.CommandBar
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
-import io.github.lenticualrstone.civilight.designsystem.component.LensChip
 import io.github.lenticualrstone.civilight.designsystem.component.ListRow
-import io.github.lenticualrstone.civilight.designsystem.component.RatingBadge
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.foundation.bottomHairline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
@@ -50,7 +49,6 @@ import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
 import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.navigation.Library
-import io.github.lenticualrstone.civilight.navigation.LensSheet
 import io.github.lenticualrstone.civilight.navigation.ProjectHome
 import io.github.lenticualrstone.civilight.navigation.ProjectSearch
 import io.github.lenticualrstone.civilight.navigation.Recording
@@ -66,7 +64,6 @@ import io.github.lenticualrstone.civilight.ui.nav.PaneRole
 import io.github.lenticualrstone.civilight.ui.nav.openDetail
 import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
-import io.github.lenticualrstone.civilight.ui.theme.ThemeBridge
 import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 
 /** 프로젝트 홈 (STO-01; cover `Home`, inner `TwoHome` list pane, `ColHome` column). */
@@ -81,27 +78,23 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
         CivilightScreen(
             // The head always names the project (QA U-06), also right after the wizard; empty only while loading.
             title = ui?.name.orEmpty(),
-            smallLine = HomeCopy.LIBRARY,
-            back = if (inDetailPane) null else IconAction(HomeCopy.LIBRARY) { if (!navigator.popTo(Library)) navigator.resetTo(Library) },
-            actions = {
-                // `NewReady` draws neither: the rating sits in the summary line under the name. The group
-                // folds in and out when the state changes (motion audit, feature:story 8).
-                FoldRevealValue(ui?.takeIf { !it.newReady }, horizontal = true) { u ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RatingBadge(ThemeBridge.rating(u.rating))
-                        Spacer(Modifier.width(4.dp))
-                        LensChip(u.lens.text, u.lens.state, { sheets.open(LensSheet(route.projectKey)) })
-                    }
-                }
-            },
+            // DS-70 A13: icon only, read `서재로`. No rating badge (S-4) and no lens chip (S-1): home is always 최신.
+            back = if (inDetailPane) null else IconAction(IconButtonCopy.TO_LIBRARY) { if (!navigator.popTo(Library)) navigator.resetTo(Library) },
             commandBar = {
                 CommandBar(
                     hint = ui?.commandHint.orEmpty(),
                     onClick = { navigator.push(ProjectSearch(route.projectKey)) },
+                    // S-8: inside the app the recorder opens only from here.
                     onMic = { navigator.push(Recording(projectKey = route.projectKey)) },
                 )
             },
             sheets = sheets,
+            localSheets = { key ->
+                when (key) {
+                    is HomeMarksSheet -> { { HomeMarksContent(key, deps) } }
+                    else -> null
+                }
+            },
         ) { padding ->
             // Loading -> content swaps on the kind (loaded or not), never on the data, so an edit does
             // not cross-fade the whole screen (motion audit, feature:story 7).
@@ -116,8 +109,11 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
                         onResume = { navigator.push(Script(u.projectKey, blockKey = it.blockKey, caretAtEnd = true)) },
                         onEpisode = { navigator.openDetail(StoryStructure(u.projectKey, focusUnitKey = it.key)) },
                         onShortcut = { shortcut ->
-                            val target = shortcut.route(u.projectKey)
-                            if (target is StoryStructure) navigator.openDetail(target) else navigator.push(target)
+                            when (val target = shortcut.route(u.projectKey)) {
+                                null -> sheets.open(HomeMarksSheet(u.projectKey))
+                                is StoryStructure -> navigator.openDetail(target)
+                                else -> navigator.push(target)
+                            }
                         },
                         onStartRoute = { navigator.push(it) },
                         onDismissStart = { vm.dismissStart() },
@@ -275,13 +271,10 @@ private fun ShortcutList(shortcuts: List<HomeShortcut>, onShortcut: (HomeShortcu
     }
 }
 
-/** `[R-15] 연재 장편 · 장 › 에피소드 › 씬 · 1200년` under the name (board `NewReady`). */
+/** `연재 장편 · 장 › 에피소드 › 씬 · 1200년` under the name (board `NewReady`); no rating badge (S-4). */
 @Composable
 private fun StartSummary(ui: HomeUi, start: HomeStart) {
-    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        RatingBadge(ThemeBridge.rating(ui.rating))
-        CivilightText(start.summary, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
-    }
+    CivilightText(start.summary, CivilightTheme.type.small, Modifier.padding(top = 8.dp), color = CivilightTheme.colors.ink3)
 }
 
 /**

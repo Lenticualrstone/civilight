@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.cast.map
 
+import io.github.lenticualrstone.civilight.feature.cast.common.CastViewModeRow
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
@@ -36,7 +38,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
-import io.github.lenticualrstone.civilight.designsystem.component.SegmentedControl
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
@@ -200,7 +201,7 @@ fun RelationMapScreen(route: RelationMap, deps: FeatureDeps) {
             if (editable) {
                 CivilightIconButton(IconId.Line, CastUiCopy.LINE_TOOL, { setUi(RelationMapModel.toggleLineTool(ui)) }, tint = toolTint)
             }
-            CivilightIconButton(IconId.Filter, CastUiCopy.PLACE_FILTER, { sheets.open(MapFilterSheet(p)) }, tint = filterTint)
+            CivilightIconButton(IconId.Filter, CastUiCopy.FILTER_BUTTON, { sheets.open(MapFilterSheet(p)) }, tint = filterTint)
         },
         sheets = sheets,
         localSheets = { key ->
@@ -245,8 +246,8 @@ fun RelationMapScreen(route: RelationMap, deps: FeatureDeps) {
             )
             if (!inner) {
                 // `목록 | 관계도` under the head (cover); `목록` returns to the list.
-                SegmentedControl(
-                    CastUiCopy.VIEW_MODES, 1, { if (it == 0) deps.navigator.push(CastList(p)) },
+                CastViewModeRow(
+                    1, { if (it == 0) deps.navigator.push(CastList(p)) },
                     Modifier.padding(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding()),
                 )
             }

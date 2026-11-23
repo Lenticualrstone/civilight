@@ -35,12 +35,13 @@ class SpeakerDataTest {
     }
 
     @Test
-    fun `the 말투 line is the first sentence of the prose, the display name shows only while it stands in`() {
+    fun `TC-N43-01 the 말투 line is the one-line summary, never the prose, the display name shows only while it stands in`() {
         val rien = SpeakerData.panel(doc, K.RIEN, K.BLOCK_042)!!
-        val prose = Fx.character(doc, K.RIEN).speechBody
-        val text = prose.docText.trim()
-        assertEquals(if (text.isEmpty()) null else CharacterEdits.firstSentence(text), rien.speech)
+        assertNull(Fx.character(doc, K.RIEN).speechSummary)
+        assertNull("no summary: the line is left out, not the prose", rien.speech)
         assertNull(rien.displayName)
+        val withSummary = doc.copy(cast = doc.cast.copy(characters = doc.cast.characters.map { if (it.key == K.RIEN) it.copy(speechSummary = "반말 · 짧게 끊음") else it }))
+        assertEquals("반말 · 짧게 끊음", SpeakerData.panel(withSummary, K.RIEN, K.BLOCK_042)!!.speech)
     }
 
     @Test

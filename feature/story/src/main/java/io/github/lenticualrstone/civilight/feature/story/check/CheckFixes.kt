@@ -11,7 +11,7 @@ import io.github.lenticualrstone.civilight.domain.checks.CheckInputs
 import io.github.lenticualrstone.civilight.domain.checks.CheckResult
 import io.github.lenticualrstone.civilight.domain.checks.FixAction
 import io.github.lenticualrstone.civilight.domain.checks.FixKind
-import io.github.lenticualrstone.civilight.domain.checks.ProjectChecks
+import io.github.lenticualrstone.civilight.domain.checks.WritingChecks
 import io.github.lenticualrstone.civilight.domain.script.Anchors
 import io.github.lenticualrstone.civilight.domain.script.BlockOps
 import io.github.lenticualrstone.civilight.domain.script.VoiceIds
@@ -31,7 +31,6 @@ import io.github.lenticualrstone.civilight.model.checks.CheckType
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.script.BlockKind
 import io.github.lenticualrstone.civilight.navigation.CharacterProfile
-import io.github.lenticualrstone.civilight.navigation.MapScale
 import io.github.lenticualrstone.civilight.navigation.ProfileTab
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.navigation.SceneWhereSheet
@@ -113,7 +112,10 @@ object CheckFixes {
                 if (warning == null || mode == null) FixEffect.Unavailable else FixEffect.Edit(action.label) { d, ctx -> WhereModel.applyModeChip(d, warning, mode, ctx) }
             }
             FixKind.OPEN_BULK -> FixEffect.OpenBulk(result.subjectKeys.filter { WhereModel.isLiveScene(doc, it) })
-            FixKind.FIX_SCALE -> target?.let { FixEffect.Navigate(MapScale(projectKey, it), detail = false) } ?: FixEffect.Unavailable
+            // S-3 hides the map's distance tools ("hidden means hidden everywhere"), so `축척 고치기` is not
+            // drawn; restore `Navigate(MapScale(projectKey, it), detail = false)` only if the map lane keeps
+            // MapScale reachable under S-3 (Requests).
+            FixKind.FIX_SCALE -> FixEffect.Unavailable
             FixKind.TO_AUTO -> target?.let { scene -> FixEffect.Edit(action.label) { d, ctx -> if (WhereModel.isLiveScene(d, scene)) Transitions.toAuto(d, scene, ctx.edit) else d } } ?: FixEffect.Unavailable
             FixKind.EDIT_TRANSITION, FixKind.WRITE_DIRECT -> target?.let { FixEffect.OpenSheet(SceneWhereSheet(projectKey, it)) } ?: FixEffect.Unavailable
             FixKind.HIDE_SCENE -> target?.let { scene -> FixEffect.Edit(action.label) { d, ctx -> UnitSettingsEdit.setHidden(d, scene, true, ctx.edit) } } ?: FixEffect.Unavailable
@@ -179,9 +181,9 @@ object CheckFixes {
         return CheckAcks.acknowledge(doc, now, ctx.edit)
     }
 
-    /** The same item (type and subjects) in [doc], or null once it no longer fires. */
+    /** The same item (type and subjects) in [doc], or null once it no longer fires (or its kind is gated, S-2). */
     fun current(doc: ProjectDoc, inputs: CheckInputs, result: CheckResult): CheckResult? =
-        ProjectChecks.check(doc, inputs, result.checkType).firstOrNull { it.subjectKeys == result.subjectKeys }
+        WritingChecks.check(doc, inputs, result.checkType).firstOrNull { it.subjectKeys == result.subjectKeys }
 
     /** The `◇ 공개 전 후보` candidate a row stands for: same term, spot and fingerprint. */
     fun candidate(doc: ProjectDoc, result: CheckResult): TermCandidate? {

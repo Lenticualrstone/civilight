@@ -70,7 +70,7 @@ class RevealSpecTest {
     }
 
     @Test
-    fun `WLD-T35 no first reveal`() {
+    fun `WLD-T35 no first reveal (superseded in 0_2_0 by the automatic reveal)`() {
         val t8 = key(350)
         var doc = WorldFixture.addTerm(stateA(), t8, "검은 등잔")
         doc = appendRun(doc, b12, link(key(351), t8, "검은 등잔"))
@@ -78,18 +78,20 @@ class RevealSpecTest {
         doc = appendRun(doc, K.BLOCK_B61, link(key(353), t8, "검은 등잔"))
         val q = queries(doc)
         assertTrue(q.usage(t8).none(q::isBeforeReveal))
+        // WLD-72: the effective reveal is BLOCK(b12), automatic; no `첫 공개 없음`, no chip, no check row.
+        assertEquals(b12, q.reveal(t8)!!.blockKey)
+        assertTrue(q.isAutoReveal(t8))
         val card = q.card(t8)!!
-        assertTrue(card.notices.contains("첫 공개 없음 · 쓰인 곳 3"))
-        val chip = card.chips.filterIsInstance<TermChip.SuggestReveal>().single()
-        assertEquals("1-2 씬 1을 첫 공개로", chip.label)
-        val row = q.checks().rows.filterIsInstance<TermCheckRow.NoReveal>().single { it.termKey == t8 }
-        assertEquals("◇ 첫 공개 없음 · 검은 등잔 · 쓰인 곳 3", row.text)
-        assertEquals(chip, row.chip)
+        assertTrue(card.notices.none { it.startsWith("첫 공개 없음") })
+        assertTrue(card.chips.none { it is TermChip.SuggestReveal })
+        assertTrue(q.checks().rows.none { it is TermCheckRow.NoReveal })
 
-        val applied = TermEdits.setReveal(doc, t8, chip.suggestion.target, ctx()) as RevealEdit.Applied
+        // Setting it by hand still writes a stored record (WLD-18).
+        val applied = TermEdits.setReveal(doc, t8, RevealTarget.Block(b12), ctx()) as RevealEdit.Applied
         assertEquals(Anchor.AtBlock(b12), applied.record.anchor)
         val after = queries(applied.doc)
         assertEquals(b12, after.reveal(t8)!!.blockKey)
+        assertFalse(after.isAutoReveal(t8))
         assertTrue(after.activeWarnings(t8).isEmpty())
     }
 
@@ -235,9 +237,8 @@ class RevealSpecTest {
         // Through the card: a term whose first link sits in 1-6 씬 4.
         val t = key(420)
         val doc = appendRun(WorldFixture.addTerm(stateA(), t, "장부 도장"), K.BLOCK_1_6_025, link(key(421), t, "장부 도장"))
-        val chip = queries(doc).card(t)!!.chips.filterIsInstance<TermChip.SuggestReveal>().single()
-        assertEquals("1-6 씬 4를 첫 공개로", chip.label)
-        assertNotNull(chip.suggestion)
-        assertNull(queries(doc).reveal(t))
+        // (0.2.0, WLD-72) Superseded: the term now has the automatic reveal at that block and no chip.
+        assertTrue(queries(doc).card(t)!!.chips.none { it is TermChip.SuggestReveal })
+        assertEquals(K.BLOCK_1_6_025, queries(doc).reveal(t)!!.blockKey)
     }
 }

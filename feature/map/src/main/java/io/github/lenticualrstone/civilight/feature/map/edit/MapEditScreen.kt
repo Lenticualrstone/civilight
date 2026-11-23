@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.map.edit
 
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
+import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
+import io.github.lenticualrstone.civilight.feature.map.common.HiddenRoute
+import io.github.lenticualrstone.civilight.ui.tour.TourStepAbsent
 import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -119,6 +124,12 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
     val route = EditorRoute(projectKey, mapKey)
     val vm = entryViewModel { MapEditViewModel(route.projectKey, route.mapKey, MapEnv.of(deps)) }
     val doc by vm.doc.collectAsState()
+    // (0.2.0, WLD-75, D11) Only image maps are edited; any other map opens view-only in 지도 보기 instead.
+    val editable = doc?.maps?.get(route.mapKey)?.let(MapOffers::editable)
+    if (editable == false) {
+        HiddenRoute(deps, io.github.lenticualrstone.civilight.navigation.MapView(route.projectKey, route.mapKey))
+        return
+    }
     val readOnly by vm.readOnly.collectAsState()
     val hiddenOpen by vm.hiddenOpen.collectAsState()
     val sheets = rememberSheetHost()
@@ -203,16 +214,16 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
         }
     }
 
+    // (0.2.0, S-9) Map tour steps this editor has no target for (the removed `경로` tool) are skipped.
+    MapTourSteps.absent().forEach { step -> key(step) { TourStepAbsent(step) } }
     CivilightScreen(
         title = if (detail) MapCopy.DETAIL_TITLE else ui?.title.orEmpty(),
         smallLine = if (detail) map?.name else ui?.small,
         back = mapBack(deps),
-        lens = d?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
         actions = {
             // LIB-19 map tour: `⋯` (its `시점별 공개` row) is the `보이는 시점` hole (MapTourSteps).
             CivilightIconButton(IconId.More, MapCopy.MORE, { sheets.open(MapMoreSheet) }, Modifier.tourTarget(MapTourSteps.REVEAL))
-            CivilightIconButton(IconId.Undo, MapCopy.BTN_UNDO, { vm.undoLast() }, enabled = !readOnly)
+            CivilightIconButton(IconButtonSpec.MAP_UNDO, { vm.undoLast() }, enabled = !readOnly)
             TextAction(MapCopy.BTN_DONE, { deps.navigator.pop() })
         },
         banner = if (readOnly) ({ ReadOnlyBanner(MapCopy.READ_ONLY) }) else null,
@@ -226,7 +237,7 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
                         MapMoreContent(
                             rows = MapMenu.rows(map0, MapMenuScreen.EDIT),
                             onRow = { action -> close(); menu.onRow(action, doc0) },
-                            canScale = !MapScales.isNodeMap(map0),
+                            canScale = MapOffers.showsScale(map0),
                             defaultSize = settings.largeMapExport,
                             exporting = false,
                             onScale = { close(); deps.navigator.push(MapScaleRoute(route.projectKey, route.mapKey)) },
@@ -477,19 +488,19 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
             val toolCells = remember(detail) { tools.map { MapTool(it.label, it.icon) } }
             val motion = CivilightTheme.motion
             val toolbar: @Composable (Modifier) -> Unit = { mod ->
-                // LIB-19 map tour: the tool bar and its `경로` cell are the holes of `도구 줄` and `경로` (MapTourSteps).
+                // LIB-19 map tour: the tool bar is the hole of `도구 줄` (MapTourSteps; no `경로` cell in 0.2.0).
                 MapToolbar(
                     tools.indexOf(editor.tool).coerceAtLeast(0),
                     { set(Editor.chooseTool(editor, tools[it], detail)) },
                     mod.tourTarget(MapTourSteps.TOOLBAR).animateContentSize(motion.move(CivilightMotion.standard)),
                     tools = toolCells,
                     label = MapCopy.TOOLBAR,
-                ) { i -> MapTourSteps.stepOfTool(tools[i])?.let { Modifier.tourTarget(it) } ?: Modifier }
+                )
             }
             val shapeEdit = editor.shapeEdit
             val shapeChoice = shapeEdit?.let { pending -> d?.let { ShapeEdits.choice(it, route.mapKey, pending.regionKey, lens) } as? EditChoice.TwoButtons }
             val moving = state.moving
-            val scaleLabel = map?.let { m -> d?.let { ScaleBars.label(it, m, contentWidth, barPx) } } ?: state.scale
+            val scaleLabel = map?.takeIf(MapOffers::showsScale)?.let { m -> d?.let { ScaleBars.label(it, m, contentWidth, barPx) } }
             // The bar above the tool bar (move, shape choice, and on the cover the layer, property and stamp cards).
             val barContent: @Composable (EditBar, String, Boolean) -> Unit = { b, kind, isInner ->
                 val st = b.state

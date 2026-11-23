@@ -50,7 +50,8 @@ internal object TermSource {
         }
         // `맞음`-marked links: listed under `맞다고 표시한 것` (their fingerprint matches the stored one).
         report.intended.forEach { out += beforeReveal(scope, queries, it, group = null) }
-        return Output(out, scanning = !index.complete)
+        // (0.2.0 WLD-73) While `용어 후보` is off no scan runs, so the check center never waits for one.
+        return Output(out, scanning = doc.project.termCandidates && !index.complete)
     }
 
     private fun beforeReveal(scope: CheckScope, q: TermQueries, row: TermCheckRow.BeforeReveal, group: CheckGroup?): CheckResult {

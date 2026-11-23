@@ -40,7 +40,7 @@ data class HelpReplayUi(val walkthrough: ReplayRow, val modules: List<ReplayRow>
 object HelpReplayState {
     fun build(state: OnboardingState, tipsOn: Boolean): HelpReplayUi = HelpReplayUi(
         walkthrough = ReplayRow(HelpCopy.WALKTHROUGH, HelpCopy.stepsLine(OnboardingFlow.WALK_PAGES, state.walkthroughSeen), null),
-        modules = TourModule.entries.map { m ->
+        modules = ModuleTours.offered.map { m ->
             ReplayRow(m.rowTitle, HelpCopy.seenLine(ModuleTours.seen(state, m)), m)
         },
         tipsOn = tipsOn,

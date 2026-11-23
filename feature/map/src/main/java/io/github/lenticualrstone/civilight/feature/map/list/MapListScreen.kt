@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.map.list
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,9 +55,6 @@ fun MapListScreen(route: MapList, deps: FeatureDeps) {
         title = MapCopy.LIST_TITLE,
         smallLine = ui?.small,
         back = mapBack(deps),
-        actions = {
-            CivilightIconButton(IconId.Plus, MapCopy.NEW_MAP, { newMap.open() }, enabled = !readOnly)
-        },
         sheets = sheets,
         localSheets = { key ->
             when (key) {
@@ -67,6 +65,9 @@ fun MapListScreen(route: MapList, deps: FeatureDeps) {
     ) { padding ->
         val inner = LocalWindowLayout.current.isInner
         Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())) {
+            // (0.2.0, WLD-75, U-15.1) The list's first row `＋ 새 지도` (class b) replaces the head `+`; it opens the
+            // image picker at once. Not drawn in a read-only project (U-15.10).
+            if (!readOnly) CreateRow(MapCopy.NEW_MAP, { newMap.open() }, Modifier.padding(horizontal = 8.dp))
             // Loading, empty and filled swap with a crossfade; only a change of kind animates, so adding a map does not.
             ContentSwap(ui, contentKey = { list -> if (list == null) "loading" else if (list.cards.isEmpty()) "empty" else "cards" }) { list ->
                 when {
@@ -75,8 +76,6 @@ fun MapListScreen(route: MapList, deps: FeatureDeps) {
                         // The block shows the heading (`지도 · 0`) once; a second section label above it repeated it (QA 8).
                         title = list.section,
                         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 48.dp),
-                        primaryLabel = if (readOnly) null else MapCopy.NEW_MAP,
-                        onPrimary = if (readOnly) null else { { newMap.open() } },
                     )
                     else -> SnapCardRow(
                         items = list.cards,

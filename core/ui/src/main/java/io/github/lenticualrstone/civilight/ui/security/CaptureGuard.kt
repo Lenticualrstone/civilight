@@ -16,7 +16,8 @@ enum class TaskLabel(val text: String) {
     APP_NAME("Civilight"),
 
     /** Content of a name-masked project on screen. */
-    MASKED_PROJECT("R-18 프로젝트"),
+    // (0.2.0 S-4, R-03) No rating word: the same interim copy as `RatingLabels.MASKED_PROJECT` (TODO_COPY_LIB_MASKED_NAME).
+    MASKED_PROJECT("이름 가림"),
 }
 
 /**
@@ -32,7 +33,7 @@ data class WindowProtection(
 ) {
     val isNone: Boolean get() = !secure && !hideRecentsPreview && taskLabel == null
 
-    /** The strongest of both (a hidden project's `Civilight` label wins over `R-18 프로젝트`). */
+    /** The strongest of both (a hidden project's `Civilight` label wins over `이름 가림`). */
     operator fun plus(other: WindowProtection) = WindowProtection(
         secure = secure || other.secure,
         hideRecentsPreview = hideRecentsPreview || other.hideRecentsPreview || secure || other.secure,
@@ -44,7 +45,7 @@ data class WindowProtection(
 
         /**
          * Protection while content of a project is on screen: capture block → `FLAG_SECURE`;
-         * hidden → recents preview masked and the card named `Civilight`; name mask → `R-18 프로젝트`.
+         * hidden → recents preview masked and the card named `Civilight`; name mask → `이름 가림`.
          */
         fun forProject(p: Protections): WindowProtection = WindowProtection(
             secure = p.captureBlock,

@@ -17,6 +17,12 @@ import io.github.lenticualrstone.civilight.model.cast.EntityKind
 object CastUiCopy {
     // --- Shared ---
     const val BACK = "뒤로"
+
+    /** Accessibility name of the head ⋯ (icon list, names from 2026-11-24). */
+    const val MENU = "메뉴"
+
+    /** Accessibility name of the head filter icon (icon list `거르기`). */
+    const val FILTER_BUTTON = "거르기"
     const val BTN_CLOSE = "닫기"
     const val BTN_INSERT = "넣기"
     const val MIC = "라이프 레코더"
@@ -282,4 +288,42 @@ object CastUiCopy {
 
     /** `빛돌 · ‘합침 → 오리지늄 등불’로 휴지통`. */
     fun mergedFootnote(merged: String, target: String): String = "$merged · ‘합침 → $target’로 휴지통"
+
+    // --- 0.2.0 (spec 30 §8.1) ---
+
+    /**
+     * `카드 보기` values in `AppSettings.castCardStyle` order (00 §13.4, LIB-94): the head toggle cells'
+     * accessibility names (CST-67).
+     */
+    val CARD_STYLES = listOf("부채꼴 덱", "회전 목마", "겹친 더미", "타로 펼침", "기울어진 벽", "롤로덱스", "목록")
+
+    /** `오래 안 나옴` (CST-69 sort chip and active-sort chip). */
+    const val SORT_ABSENT = "오래 안 나옴"
+
+    /** `한 줄 요약` (CST-72): the 말투 row and its sheet title. */
+    const val SPEECH_SUMMARY = "한 줄 요약"
+
+    /** `이 탭 잠그기` (CST-73): the 비밀 tab head switch. */
+    const val SECRET_LOCK = "이 탭 잠그기"
+
+    /** `마지막 등장` (CST-71). */
+    const val LAST_SEEN = "마지막 등장"
+
+    /** `휴지통으로` (tag delete confirm, CST-75). */
+    const val BTN_TO_TRASH = "휴지통으로"
+
+    /** `휴지통 · 30일 · 되살리면 다시 이어짐` (tag delete confirm footnote, CST-75). */
+    const val TAG_TRASH_FOOT = "휴지통 · 30일 · 되살리면 다시 이어짐"
+
+    /** `‘주연’ 지우기` (tag delete confirm title). */
+    fun tagDeleteTitle(name: String): String = "‘$name’ 지우기"
+
+    /** `쓰는 인물 3`. */
+    fun tagUsers(count: Int): String = "쓰는 인물 $count"
+
+    /** `이미지 1` (only when gallery images hold the tag). */
+    fun tagImages(count: Int): String = "이미지 $count"
+
+    /** `태그 주연 지움` (toast, with `되돌리기`). */
+    fun tagDeleted(name: String): String = "태그 $name 지움"
 }

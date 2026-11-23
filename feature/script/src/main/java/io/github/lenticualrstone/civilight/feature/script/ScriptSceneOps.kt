@@ -37,8 +37,8 @@ internal fun ScriptViewModel.followNewScene(unitKey: Key) {
     newSceneJob?.cancel()
     newSceneJob = viewModelScope.launch {
         val scene = content.filterNotNull().mapNotNull { c -> NewSceneFollow.created(c.doc, unitKey, known) }.first()
-        if (!readOnly) enterVirtual(scene)
-        requestScroll(ScriptRowKeys.head(scene))
+        // (0.2.0, SCR-49) The new scene's head sits directly above the input bar, so it is the target scene.
+        aboveInput.tryEmit(ScriptRowKeys.head(scene))
     }
 }
 

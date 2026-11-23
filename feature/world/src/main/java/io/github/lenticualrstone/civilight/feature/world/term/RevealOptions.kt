@@ -48,7 +48,8 @@ object RevealOptions {
     /** (a): one row per manuscript link of the term, in manuscript order. */
     fun links(doc: ProjectDoc, termKey: Key, hiddenOpen: Boolean): List<RevealOptionUi> {
         val queries = TermQueries(doc, CandidateIndex.pending(), TermAccess(hiddenOpen))
-        val current = queries.reveal(termKey)
+        // (0.2.0, WLD-72) Only a stored (hand-set) reveal is marked current: the automatic one stays pickable.
+        val current = queries.storedReveal(termKey)
         return queries.usage(termKey).map { link ->
             val spot = link.spot as ScriptSpot
             val target = when (spot) {
@@ -70,7 +71,7 @@ object RevealOptions {
 
     /** (b), second step: the scene's game-output blocks (`#044 · 리엔 · “…”`). */
     fun blocks(doc: ProjectDoc, termKey: Key, sceneKey: Key): List<RevealOptionUi> {
-        val current = TermQueries(doc, CandidateIndex.pending()).reveal(termKey)
+        val current = TermQueries(doc, CandidateIndex.pending()).storedReveal(termKey)
         return doc.manuscript.liveBlocksOf(sceneKey)
             .filter { it.kind.known in BLOCK_KINDS }
             .map { block ->

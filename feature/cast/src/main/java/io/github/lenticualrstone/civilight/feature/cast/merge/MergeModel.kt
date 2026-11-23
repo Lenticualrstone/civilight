@@ -21,6 +21,7 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.change.RelationSlotName
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.game.GameTools
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.domain.trash.MergeChoices as ItemChoices
 
@@ -72,6 +73,14 @@ data class MergeView(
  * (saved with the sheet): `f:<field>`, `c:<cell>`, `r:<partner>:<slot>`, [REVEAL].
  */
 object MergeModel {
+    /**
+     * (0.2.0, CST-73) The comparison shows secret values, so it opens only after the device lock when
+     * either character's `이 탭 잠그기` is on. Other kinds have no 비밀 tab.
+     */
+    fun needsSecretAuth(doc: ProjectDoc, kind: EntityKind, mergedKey: Key, targetKey: Key): Boolean =
+        kind == EntityKind.CHARACTER &&
+            listOf(mergedKey, targetKey).any { doc.index.character(it)?.secretTabLocked == true }
+
     const val REVEAL = "reveal"
     private const val FIELD = "f:"
     private const val CELL = "c:"
@@ -164,7 +173,8 @@ object MergeModel {
             sameLabels = sameLabels,
             infoRows = listOfNotNull(
                 p.filledRow.takeIf { p.filled.isNotEmpty() },
-                p.voiceRow,
+                // CST-74: the voice-ID row belongs to the game tools; the IDs are kept and moved either way.
+                p.voiceRow.takeIf { GameTools.on(doc) },
                 p.mutualRow?.let(::splitRow),
             ),
             footnote = p.footnote,

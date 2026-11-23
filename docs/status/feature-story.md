@@ -253,6 +253,28 @@ UI features are built and wired to the store, but have not been seen on a device
 - **`NewReady` text extract vs HTML:** `docs/boards/boards_text.txt` lists row 2 as `가져온 기록 2개 정리하기 | 프로젝트 메모`, while the HTML board and LIB-13 say `연결된 기록 2개 정리하기 | 기록함`. The HTML and spec are followed (via `domain:library` `StartBlock`).
 - **`시작해 볼 것 · n/4`** keeps `/4` when the `연결된 기록` row is hidden (k = 0, LIB-13 `ED`), so a fresh project reads `0/4` with three rows. This is `domain:library`'s header; it is flagged here for the library lane.
 
+## 0.2.0 wave 2 (lane story, 2026-11-24)
+
+`tools/gw :feature:story:compileDebugKotlin :feature:story:testDebugUnitTest` exits 0: 177 tests, 0 failed. `:domain:story:test` 199 (4 ignored as before), 0 failed. `:domain:checks:test` 53, 1 failed: `TermChecksTest.termWithoutRevealRaisesNoRevealRow`, caused by the uncommitted world-lane change to `domain:world` term reveals (S-5 automatic first reveal); this lane's code does not touch it. Nothing was run on an emulator, so every row stays partial.
+
+- **U-06 / U-07 / S-4 / S-1 home head.** The head is the project name only. The back button is icon only (DS-70 A13, read `서재로`), and the `서재` small line is gone. The rating badge is gone from the head and the `NewReady` summary. The lens chip is gone, and `HomeUi` no longer carries `rating` or `lens`. The store already opens a project at 최신 (D9, `LensOnOpen`). The `작업` items stay DS list rows with a pressed state.
+- **S-8.** The mic is only on home's command bar. Removed from 스토리 구조 and 점검 센터.
+- **N-41.** A new `작업` row `할 일 · 복선`, after `스토리`, opens the home-local `HomeMarksSheet`. It has the filters `열림 · 거둠 · 끝냄` with counts, one choice at a time. Rows are a foreshadowing (`복선`, name, `1-7 씬 3 · 거둘 곳 · 2-5`) or a memo to-do (`할 일`, first line). A row opens its block in the script. A moved plant is drawn dotted. A plant with no live block after it is drawn without a press state. Items in a hidden scene leave the list and the counts while locked. Model: `home/HomeMarks.kt`, tests in `HomeMarksTest`.
+- **N-13.**
+  - The chips wrap (`ChipFlow`), so cover width has no horizontal scroll. They are the six chips, then `그 밖 ▾`, which opens a local sheet with `장소 · 세력 · 사건 · 페이지`. The picked kind reads `장소 ▾`.
+  - Under `대사` there is also `화자 ▾`: a local sheet with `전체` and the characters who speak.
+  - Domain (additive) in `ProjectSearch`: `searchLines(raw, speakerKey)`, `lineSpeakers()`, `searchMore(raw, SearchMore)`, plus the types `SearchMore`, `MoreItem`, `MoreResult` and `LineSpeaker`. `전체` still has no page section.
+  - S-1: the search lists neither `시점 바꾸기` nor `렌즈를 이 씬으로 맞추기` (`SearchModel.withoutLensCommands`).
+- **S-2 / D33 / G-2.** The new `domain:checks` `WritingChecks` (`run`, `check`, `header`, `shownFilter`, `hiddenFilters`) has three gates. The voice kinds and the `보이스` chip follow `GameTools.on`. The five travel kinds (`◇ 장소 없음` included) and the `이동` chip follow `이동 점검`. `◇ 공개 전 후보` follows `project.termCandidates`. The 점검 센터 and the search's `확인할 항목 N` use it. Acknowledgements of gated kinds are kept and show again when the gate opens (`WritingChecksTest`).
+- **Icons.** The search field's `닫기` is now an icon (A5 `찾기 닫기`) beside the DS field, in both searches. `새 씬` is plus + text (B9). `Story020Test.iconButtonLint` runs `IconButtonLint` over `src/main`.
+- **U-15 for 사건:** not in this lane (the 연표 lives in `feature:world`).
+
+### Requests (0.2.0)
+
+- `core:navigation`: a route for the `할 일 · 복선` list (today it is the home-local sheet `HomeMarksSheet`).
+- `core:designsystem` `SearchField`: draw `onClose` as the A5 icon (`찾기 닫기`). Both searches work around it with a separate icon button.
+- Other lanes that count checks (for example a script `▲` badge) should use `domain:checks` `WritingChecks.run` instead of `ProjectChecks.run`, so their counts match the 점검 센터.
+
 ## Requests
 
 - **feature:world (QA 2026-11-23, 용어 tab hint):** `WorldCopy.TERM_HINT` (`공개 시점 전 사용 → 점검 센터`) must be a real button: a `TextAction` that pushes `CheckCenter(projectKey, CheckFilter.TERM.name)` (`domain:story` `CheckFilter`; the route filter is the enum name, and `점검 센터` opens on the `용어 공개` chip, as already done for the 용어 tab elsewhere). This lane cannot edit the world module.
@@ -296,3 +318,7 @@ UI features are built and wired to the store, but have not been seen on a device
 - **feature:world (batch 3, WLD-29):** home's `연표` shortcut is left out in `시간 없이` (`WorldTimeMode.NONE`; `SheetRowsTest.theTimelineShortcutIsLeftOutWithoutTime_WLD29`).
 - **feature:world (WLD-32):** a 회상 whose base event is in the trash shows the event dotted with `◇` and keeps the stored 때.
 - **Core pass follow-ups:** `RecorderInbox(projectKey = p)` for `연결된 기록 …`, `World(p, TERMS, createTerm = true)` for `세계 용어 하나 적기`, `새 씬` in 1-level projects (`SceneActions.create(parentKey = null)`).
+
+## 0.2.0 integration (wave 2, orchestrator)
+
+Applied: `SearchField` draws the A5 icon close; both searches pass `onClose` again (local icon buttons removed). `SheetHeader` draws `닫기` as the A6 icon. `ProjectSearch` takes `autoReveal`. Not applied: core:navigation route for `할 일 · 복선` (home-local sheet kept).

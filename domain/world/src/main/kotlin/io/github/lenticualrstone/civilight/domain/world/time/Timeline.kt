@@ -95,7 +95,7 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
         if (!available) return Timeline(false, "연표", "세계 시간과 이야기 시간", infoLine, chips, emptyList())
 
         val lensRank = doc.manuscript.rankOf(lens)
-        data class Item(val absolute: Long, val tier: Int, val order: String, val row: TimelineRow)
+        data class Item(val absolute: Long, val tier: Int, val order: String, val row: TimelineRow, val dateless: Boolean = false)
         val items = ArrayList<Item>()
         val events = doc.world.events.filter { it.deletedAt == null }
         var lastStoryAbsolute = Long.MIN_VALUE
@@ -146,7 +146,8 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
             val time = timeLabel(view, TimeSubject.Event(event.key), anchor, moment)
             items += Item(
                 moment?.absolute ?: Long.MAX_VALUE, if (isStory) 2 else 0, event.order,
-                if (!unlocked && EventMasks.sceneHidden(doc, event)) {
+                dateless = moment == null && !isStory,
+                row = if (!unlocked && EventMasks.sceneHidden(doc, event)) {
                     // A story event on a hidden scene: `숨긴 씬`, its episode code only.
                     TimelineRow.EventRow(event, time, EventMasks.HIDDEN_SCENE, event.sceneKey?.let { codes.episodeCode(it) }.orEmpty(), dimmed)
                 } else {
@@ -155,7 +156,11 @@ class TimelineBuilder(private val doc: ProjectDoc, times: SceneTimeSource) {
             )
         }
 
-        val sorted = items.sortedWith(compareBy<Item>({ it.absolute }, { it.tier }, { it.order }))
+        // (0.2.0, WLD-74) A world event with no date (made in place with an empty `때`) is listed after the
+        // dated world events before the story, right above `이야기 시작`.
+        val storyStart = items.filter { it.tier >= 1 }.minOfOrNull { it.absolute }
+        val placed = if (storyStart == null) items else items.map { if (it.dateless) it.copy(absolute = storyStart) else it }
+        val sorted = placed.sortedWith(compareBy<Item>({ it.absolute }, { it.tier }, { it.dateless }, { it.order }))
         val rows = ArrayList<TimelineRow>()
         var dividerPlaced = false
         val firstChapter = chapters.firstOrNull()

@@ -50,10 +50,12 @@ fun SheetScope.CastFilterContent(view: FilterSheetView, state: FieldFilterState,
                 CivilightTextField(input.max, { onChange(state.range(range.defKey, input.copy(max = it))) }, Modifier.weight(1f), unit = range.unit, keyboardOptions = number)
             }
         }
-        if (view.sorts.isNotEmpty()) {
+        if (view.sorts.isNotEmpty() || view.absentSort) {
             SectionLabel(CastFilterModel.SORT_TITLE, Modifier.padding(top = 14.dp, bottom = 6.dp))
             ChipFlow {
                 for (s in view.sorts) FilterChip(s.label, state.sortDefKey == s.defKey, { onChange(state.sort(s.defKey)) })
+                // CST-69: `오래 안 나옴` (tap again for the list order).
+                if (view.absentSort) FilterChip(CastUiCopy.SORT_ABSENT, state.absent, { onChange(state.sortAbsent()) })
             }
         }
     }

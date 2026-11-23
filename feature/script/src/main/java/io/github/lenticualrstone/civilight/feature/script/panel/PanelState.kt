@@ -86,4 +86,11 @@ class PanelActions(
     val restoreSubject: (kind: io.github.lenticualrstone.civilight.model.text.LinkTargetKind?, itemKey: Key) -> Unit = { _, _ -> },
     /** `이대로 두기` on a `대상 지워짐` record (SCR-57). */
     val keepSubject: (itemKey: Key, recordKey: Key) -> Unit = { _, _ -> },
+    /** (0.2.0, N-43) `이 블록만 · 표시 이름` saved. */
+    val setBlockDisplayName: (blockKey: Key, value: String) -> Unit = { _, _ -> },
+    /** (0.2.0, N-41) `복선 심기`, `다시 언급 · 거두기`, `할 일`. */
+    val plant: (blockKey: Key) -> Unit = {},
+    val mentionOrPayoff: (blockKey: Key) -> Unit = {},
+    val setTodo: (blockKey: Key, on: Boolean) -> Unit = { _, _ -> },
+    val setTodoDone: (blockKey: Key, done: Boolean) -> Unit = { _, _ -> },
 )

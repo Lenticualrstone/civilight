@@ -1,5 +1,15 @@
 package io.github.lenticualrstone.civilight.feature.world.list
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import io.github.lenticualrstone.civilight.designsystem.component.ListCreateRow
+import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
+import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateCard
+import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateCards
+import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateDraft
+import io.github.lenticualrstone.civilight.feature.world.common.createdHighlight
+import io.github.lenticualrstone.civilight.model.story.PlaceRef
+import io.github.lenticualrstone.civilight.model.story.PlaceRefKind
+import io.github.lenticualrstone.civilight.ui.picker.PlacePickerSheet
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.updateTransition
@@ -99,13 +109,27 @@ fun WorldScreen(route: World, deps: FeatureDeps) {
     val cardRows = remember(doc, ui) { val d = doc; val u = ui; if (d != null && u != null) WorldCardRows.build(d, u.items) else emptyList() }
     // LIB-19 world tour: it waits for the list, so its holes are known before a card shows (WorldTourSteps).
     if (ui == null) TourHold()
-    // LIB-13 `세계 용어 하나 적기`: open the new-term form once on arrival (shell.md core pass, item 3).
+    // (0.2.0, U-15, WLD-70) The create card over the list: its draft (null = closed) and the row just made.
+    var createText by rememberSaveable { mutableStateOf<String?>(null) }
+    val draft = WorldCreateDraft.decode(createText)
+    var highlightKey by remember { mutableStateOf<String?>(null) }
+    val hiddenOpen = gate.open
+    // LIB-13 `세계 용어 하나 적기`: open the new-term card once on arrival (shell.md core pass, item 3).
     var createHandled by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(route.createTerm) {
-        if (route.createTerm && !createHandled) {
+    LaunchedEffect(route.createTerm, readOnly) {
+        if (route.createTerm && !createHandled && !readOnly) {
             createHandled = true
             vm.selectTab(io.github.lenticualrstone.civilight.navigation.WorldTab.TERMS)
-            sheets.open(CreateItemSheet(io.github.lenticualrstone.civilight.navigation.WorldTab.TERMS))
+            createText = WorldCreateDraft.of(WorldKind.TERM).encode()
+        }
+    }
+    fun create(open: Boolean) {
+        val d = draft ?: return
+        val k = d.worldKind ?: return
+        scope.launch {
+            val newKey = vm.createInPlace(k, WorldCreateCards.item(d)) ?: return@launch
+            createText = null
+            if (open) deps.navigator.openDetail(WorldTargets.card(route.projectKey, k, newKey)) else highlightKey = newKey
         }
     }
 
@@ -115,18 +139,26 @@ fun WorldScreen(route: World, deps: FeatureDeps) {
         back = worldBack(route, deps),
         lens = doc?.let(::lensChipLabel),
         onLens = { sheets.open(LensSheet(route.projectKey)) },
-        actions = {
-            CivilightIconButton(
-                icon = IconId.Plus,
-                contentDescription = WorldCopy.createLabel(kind),
-                onClick = { sheets.open(CreateItemSheet(tab)) },
-                enabled = !readOnly,
-            )
-        },
         commandBar = { WorldCommandBar(deps, route.projectKey, WorldCopy.SEARCH_WORLD) },
         sheets = sheets,
         localSheets = { key ->
             when (key) {
+                is CreateParentPickSheet -> doc?.let { d ->
+                    {
+                        PlacePickerSheet(
+                            doc = d,
+                            gate = gate,
+                            title = WorldCopy.PICK_PLACE,
+                            onPick = { ref ->
+                                WorldCreateDraft.decode(createText)?.let { createText = it.copy(parentKey = ref.key).encode() }
+                                close()
+                            },
+                            onClose = ::close,
+                            selected = draft?.parentKey?.let { PlaceRef(PlaceRefKind.PLACE, it) },
+                            includeRegions = false,
+                        )
+                    }
+                }
                 is CreateItemSheet -> {
                     {
                         val sheetKind = WorldTabs.kindOf(key.tab)
@@ -162,11 +194,35 @@ fun WorldScreen(route: World, deps: FeatureDeps) {
                 onHint = { deps.navigator.push(CheckCenter(route.projectKey, CheckFilter.TERM.name)) },
                 onRow = { row -> deps.navigator.openDetail(WorldTargets.card(route.projectKey, row.kind, row.key)) },
                 onUnlock = gate.unlock,
-                onCreate = { sheets.open(CreateItemSheet(tab)) },
+                onCreate = { createText = WorldCreateDraft.of(kind).encode() },
+                onCandidate = { row ->
+                    // (0.2.0, WLD-73) The card opens scrolled to its `후보` group.
+                    io.github.lenticualrstone.civilight.feature.world.term.TermCardScroll.request(route.projectKey, row.key)
+                    deps.navigator.openDetail(WorldTargets.card(route.projectKey, WorldKind.TERM, row.key))
+                },
+                highlightKey = highlightKey,
+                onHighlightDone = { highlightKey = null },
+            )
+        }
+        // The card is hidden while its own `상위 지역` picker is on top, and comes back when it closes.
+        if (draft != null && !readOnly && sheets.top !is CreateParentPickSheet) {
+            WorldCreateCard(
+                draft = draft,
+                doc = doc,
+                hiddenOpen = hiddenOpen,
+                onChange = { createText = it.encode() },
+                onCancel = { createText = null },
+                onCreate = { create(open = false) },
+                onCreateAndOpen = { create(open = true) },
+                onPickParent = { sheets.open(CreateParentPickSheet) },
             )
         }
     }
 }
+
+/** (0.2.0, WLD-70) The `상위 지역` picker of the place create card (feature-local; its own picker has no create row). */
+@kotlinx.serialization.Serializable
+data object CreateParentPickSheet : io.github.lenticualrstone.civilight.navigation.SheetKey
 
 /** One body of the list: the data of a [WorldView], kept per view so a leaving body keeps drawing its own tab. */
 private data class WorldBody(val view: WorldView, val items: List<WorldListItem>, val cardRows: List<WorldCardRowUi>, val pending: Boolean)
@@ -187,6 +243,9 @@ private fun WorldList(
     onRow: (WorldListItem.Row) -> Unit,
     onUnlock: () -> Unit,
     onCreate: () -> Unit,
+    onCandidate: (WorldListItem.CandidateRow) -> Unit,
+    highlightKey: String?,
+    onHighlightDone: () -> Unit,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -196,7 +255,7 @@ private fun WorldList(
     // Card view: the list's own lock and empty lines stay, the rows become horizontal card rows.
     val body = remember(ui, cardRows, view) {
         val all = ui?.items.orEmpty()
-        WorldBody(view, if (showCards) all.filter { it is WorldListItem.Lock || it is WorldListItem.Empty } else all, cardRows, ui?.candidatesPending == true)
+        WorldBody(view, if (showCards) WorldCardRows.cardViewLines(all) else all, cardRows, ui?.candidatesPending == true)
     }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding())) {
@@ -246,34 +305,63 @@ private fun WorldList(
                 }
             }
             val bottom = padding.calculateBottomPadding() + 24.dp
+            val lines = ListLines(selectedKey, readOnly, onUnlock, onCreate, onCandidate, highlightKey, onHighlightDone, shown.view.tab)
             if (shown.view.cards) {
-                CardRowsBody(shown, grows, bottom, selectedKey, inner, readOnly, onCard, onUnlock, onCreate)
+                CardRowsBody(shown, grows, bottom, inner, onCard, lines)
             } else {
-                RowsBody(shown, bottom, selectedKey, readOnly, onRow, onUnlock, onCreate)
+                RowsBody(shown, bottom, onRow, lines)
             }
         }
     }
+}
+
+/** What every list line needs besides its item (U-15 create row, highlight, the candidate rows). */
+private data class ListLines(
+    val selectedKey: String?,
+    val readOnly: Boolean,
+    val onUnlock: () -> Unit,
+    val onCreate: () -> Unit,
+    val onCandidate: (WorldListItem.CandidateRow) -> Unit,
+    val highlightKey: String?,
+    val onHighlightDone: () -> Unit,
+    val tab: io.github.lenticualrstone.civilight.navigation.WorldTab,
+)
+
+/**
+ * (0.2.0, U-15.1, WLD-70) The list's first row `＋ 새 장소 · ＋ 새 용어 · ＋ 새 세력` (class b, icon `plus`),
+ * under the tabs and the hint line and above the sections; not drawn in a read-only project (U-15.10).
+ */
+@Composable
+private fun CreateLine(lines: ListLines, modifier: Modifier = Modifier) {
+    ListCreateRow(WorldCreateCards.createKind(WorldTabs.kindOf(lines.tab)), lines.onCreate, modifier)
 }
 
 @Composable
 private fun RowsBody(
     body: WorldBody,
     bottom: androidx.compose.ui.unit.Dp,
-    selectedKey: String?,
-    readOnly: Boolean,
     onRow: (WorldListItem.Row) -> Unit,
-    onUnlock: () -> Unit,
-    onCreate: () -> Unit,
+    lines: ListLines,
 ) {
     val keys = remember(body.items) { WorldViewSwitch.uniqueKeys(body.items.map { it.id }) }
     val linkKey = remember(body.items) { WorldTourSteps.linkRowKey(body.items) }
+    val listState = rememberLazyListState()
+    val offset = if (lines.readOnly) 0 else 1
+    LaunchedEffect(lines.highlightKey, body.items) {
+        val i = body.items.indexOfFirst { (it as? WorldListItem.Row)?.key == lines.highlightKey }
+        if (lines.highlightKey != null && i >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == i + offset }) {
+            listState.animateScrollToItem(i + offset)
+        }
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = bottom),
     ) {
+        if (!lines.readOnly) item(key = "create") { Box(civilightItem()) { CreateLine(lines, Modifier.padding(top = 4.dp)) } }
         itemsIndexed(body.items, key = { i, _ -> keys[i] }) { _, item ->
             Box(civilightItem()) {
-                ListItemView(item, selectedKey, readOnly, body.pending, onRow, onUnlock, onCreate, tourLink = linkKey != null && (item as? WorldListItem.Row)?.key == linkKey)
+                ListItemView(item, lines, body.pending, onRow, tourLink = linkKey != null && (item as? WorldListItem.Row)?.key == linkKey)
             }
         }
     }
@@ -284,18 +372,22 @@ private fun CardRowsBody(
     body: WorldBody,
     grows: Boolean,
     bottom: androidx.compose.ui.unit.Dp,
-    selectedKey: String?,
     inner: Boolean,
-    readOnly: Boolean,
     onCard: (WorldCardUi) -> Unit,
-    onUnlock: () -> Unit,
-    onCreate: () -> Unit,
+    lines: ListLines,
 ) {
+    val selectedKey = lines.selectedKey
     val keys = remember(body.items) { WorldViewSwitch.uniqueKeys(body.items.map { it.id }) }
+    // (U-15.6) Card rows draw no `만들기` highlight: drop the key here so it does not flash later in list view.
+    LaunchedEffect(lines.highlightKey, body.items) {
+        if (lines.highlightKey != null && body.items.none { (it as? WorldListItem.Row)?.key == lines.highlightKey }) lines.onHighlightDone()
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = bottom),
     ) {
+        // (0.2.0, WLD-05) In card view the `＋ 새 <kind>` row stays above the card rows.
+        if (!lines.readOnly) item(key = "create") { Box(civilightItem().padding(horizontal = 24.dp)) { CreateLine(lines, Modifier.padding(top = 4.dp)) } }
         // Card rows keep the content inset of the shared row; the other lines get the list's 24 dp.
         items(body.cardRows, key = { it.id }) { row ->
             Box(civilightItem()) {
@@ -304,7 +396,7 @@ private fun CardRowsBody(
         }
         itemsIndexed(body.items, key = { i, _ -> keys[i] }) { _, item ->
             Box(civilightItem().padding(horizontal = 24.dp)) {
-                ListItemView(item, selectedKey, readOnly, body.pending, onRow = {}, onUnlock, onCreate)
+                ListItemView(item, lines, body.pending, onRow = {})
             }
         }
     }
@@ -313,14 +405,13 @@ private fun CardRowsBody(
 @Composable
 private fun ListItemView(
     item: WorldListItem,
-    selectedKey: String?,
-    readOnly: Boolean,
+    lines: ListLines,
     pending: Boolean,
     onRow: (WorldListItem.Row) -> Unit,
-    onUnlock: () -> Unit,
-    onCreate: () -> Unit,
     tourLink: Boolean = false,
 ) {
+    val selectedKey = lines.selectedKey
+    val onUnlock = lines.onUnlock
     when (item) {
         is WorldListItem.Section -> SectionLabel(item.title, Modifier.padding(top = 18.dp, bottom = 6.dp))
         is WorldListItem.Lock -> LockRow(
@@ -329,17 +420,25 @@ private fun ListItemView(
             onAction = onUnlock,
             modifier = Modifier.padding(top = 12.dp),
         )
+        // (0.2.0, WLD-02) The empty line stays under the create row; its `<kind> 만들기` button is superseded.
         is WorldListItem.Empty -> EmptyBlock(
             title = item.line,
             modifier = Modifier.padding(top = 48.dp),
-            primaryLabel = if (readOnly) null else item.button,
-            onPrimary = if (readOnly) null else onCreate,
+        )
+        is WorldListItem.CandidateRow -> ListRow(
+            title = item.title,
+            subtitle = item.fragment,
+            onClick = { lines.onCandidate(item) },
+            trailing = item.right?.let { right ->
+                { CivilightText(right, CivilightTheme.type.small, color = CivilightTheme.colors.ink3, textAlign = TextAlign.End) }
+            },
         )
         is WorldListItem.Row -> ListRow(
             title = item.title,
             subtitle = item.fragment.ifBlank { null },
             onClick = { onRow(item) },
             selected = item.key == selectedKey,
+            modifier = Modifier.createdHighlight(item.key == lines.highlightKey, lines.onHighlightDone),
             // LIB-19 world tour: the first `◇ 후보` column is the `용어 잇기` hole.
             trailing = { RightColumn(item, pending = pending, modifier = if (tourLink) Modifier.tourTarget(WorldTourSteps.LINK) else Modifier) },
         )

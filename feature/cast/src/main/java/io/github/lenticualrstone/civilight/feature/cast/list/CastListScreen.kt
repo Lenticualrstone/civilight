@@ -2,6 +2,23 @@
 
 package io.github.lenticualrstone.civilight.feature.cast.list
 
+import io.github.lenticualrstone.civilight.feature.cast.common.castLens
+import io.github.lenticualrstone.civilight.feature.cast.common.CastViewModeRow
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.saveable.Saver
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardState
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.designsystem.component.IconOnlyButton
+import io.github.lenticualrstone.civilight.designsystem.component.ListCreateRow
+import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
+import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreate
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreateCard
+import io.github.lenticualrstone.civilight.feature.cast.create.CreateCardCodec
+import io.github.lenticualrstone.civilight.model.app.CardStyle
+import kotlinx.coroutines.delay
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
@@ -40,7 +57,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.NoResults
 import io.github.lenticualrstone.civilight.designsystem.component.SearchField
 import io.github.lenticualrstone.civilight.designsystem.component.SearchHit
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
-import io.github.lenticualrstone.civilight.designsystem.component.SegmentedControl
 import io.github.lenticualrstone.civilight.designsystem.component.RemovableChip
 import io.github.lenticualrstone.civilight.designsystem.component.ViewToggle
 import io.github.lenticualrstone.civilight.feature.cast.image.CharacterImages
@@ -86,8 +102,11 @@ import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
 import io.github.lenticualrstone.civilight.model.app.ViewMode
 import kotlinx.coroutines.launch
 
-/** The `viewByScreen` id of the cast list's `목록 | 카드` choice. */
-private const val CARD_SCREEN = "cast"
+/** Saves an open create card with the screen (kind, mode and typed values). */
+private val CreateCardSaver: Saver<CreateCardState?, String> = Saver(
+    save = { state -> state?.let { CreateCardCodec.encode(it) } ?: "" },
+    restore = { text -> CreateCardCodec.decode(text) },
+)
 
 /** 인물 목록 (CST-01, CST-02; boards `Cast`, `EmptyCast`, `TwoCast`, `ColCast`). */
 @Composable
@@ -100,11 +119,17 @@ fun CastListScreen(route: CastList, deps: FeatureDeps) {
     var selectedTag by rememberSaveable { mutableStateOf<String?>(null) }
     var searching by rememberSaveable { mutableStateOf(false) }
     var typed by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
-    // CST-04: `목록 | 카드` is remembered per screen as a local preference (`AppSettings.viewByScreen`).
+    // U-16 (CST-67): the view follows `카드 보기` and the head toggle; a style without a renderer shows the list.
+    // The 0.1.0 `목록 | 카드` toggle (CST-04) is superseded and `viewByScreen["cast"]` is no longer read.
     val settings by deps.settings.collectAsState()
-    val cards = settings.viewByScreen[CARD_SCREEN] == ViewMode.CARD
-    val setCards: (Boolean) -> Unit = { on -> deps.appScope.launch { deps.stores.settings.setViewMode(CARD_SCREEN, if (on) ViewMode.CARD else ViewMode.LIST) } }
+    val style = CastCardViews.shown(settings)
+    val cards = false
     var filtersJson by rememberSaveable { mutableStateOf("") }
+    // U-15 (CST-66): the create card over the list; the new row is highlighted for a moment after `만들기`.
+    var creating by rememberSaveable(stateSaver = CreateCardSaver) { mutableStateOf<CreateCardState?>(null) }
+    var highlighted by remember { mutableStateOf<Key?>(null) }
+    var creatingBusy by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
     val filters = remember(filtersJson) { FilterStateCodec.decode(filtersJson) }
     val ui = CastListUi(selectedTag, typed.text, searching, cards, filters)
     val state = remember(doc, ui, gate.open, ready.readOnly) { CastListModel.build(doc, ui, gate.open, ready.readOnly) }
@@ -123,13 +148,13 @@ fun CastListScreen(route: CastList, deps: FeatureDeps) {
             lens = lensChipLabel(doc),
             onLens = { sheets.open(LensSheet(route.projectKey)) },
             actions = {
-                ViewToggle(cards, setCards)
+                if (CastCardViews.showsToggle(settings)) {
+                    CastViewToggle(settings.castCardStyle, style) { mode -> deps.appScope.launch { deps.stores.settings.setCastToggle(mode) } }
+                }
                 if (state.canFilter) {
-                    CivilightIconButton(IconId.Filter, CastFilterModel.TITLE, { sheets.open(CastFilterSheet(route.projectKey)) }, tint = if (state.filters.active) CivilightTheme.colors.acc else CivilightTheme.colors.ink2)
+                    CivilightIconButton(IconId.Filter, CastUiCopy.FILTER_BUTTON, { sheets.open(CastFilterSheet(route.projectKey)) }, tint = if (state.filters.active) CivilightTheme.colors.acc else CivilightTheme.colors.ink2)
                 }
-                if (!state.readOnly) {
-                    CivilightIconButton(IconId.Plus, CastUiCopy.NEW_CHARACTER, { sheets.open(NewCharacterSheet(route.projectKey)) }, tint = CivilightTheme.colors.ink)
-                }
+                // CST-66: the head `+` is gone; creating is the `＋ 새 인물` row (or the 3D view's head button).
             },
             commandBar = {
                 // The search field and the command bar swap in place (P3).
@@ -140,21 +165,14 @@ fun CastListScreen(route: CastList, deps: FeatureDeps) {
                             typed = TextFieldValue("")
                         }
                     } else {
-                        CommandBar(
-                            hint = view.searchHint,
-                            onClick = { searching = true },
-                            onMic = { deps.navigator.push(Recording(projectKey = route.projectKey)) },
-                            micLabel = CastUiCopy.MIC,
-                        )
+                        // S-8: no mic here; the recorder opens only from home.
+                        CommandBar(hint = view.searchHint, onClick = { searching = true })
                     }
                 }
             },
             sheets = sheets,
             localSheets = { key ->
                 when (key) {
-                    is NewCharacterSheet -> {
-                        { NewCharacterSheetContent { name -> vm.create(name) { created -> close(); open(created) } } }
-                    }
                     is CastFilterSheet -> {
                         { CastFilterContent(CastFilterModel.sheet(doc), state.filters) { filtersJson = FilterStateCodec.encode(it) } }
                     }
@@ -165,6 +183,15 @@ fun CastListScreen(route: CastList, deps: FeatureDeps) {
             val inner = LocalWindowLayout.current.isInner
             val galleryCounts = remember(doc, gate.open) { CastGallery.counts(doc, doc.cast.characters.filter { it.deletedAt == null }.map { it.key }, gate.open) }
             val hiddenKeys = remember(doc, gate.open) { if (gate.open) doc.cast.characters.filter { it.hidden }.mapTo(HashSet()) { it.key } else emptySet() }
+            CastCardViews.renderers[style]?.takeIf { !style.isList }?.let { renderer ->
+                // U-16 extension point (wave 3): a registered 3D renderer draws the narrowed characters once each.
+                val shownCards = remember(doc, state) { state.view.rows.distinctBy { it.key }.mapNotNull { r -> doc.index.character(r.key)?.let { io.github.lenticualrstone.civilight.domain.cast.list.CastList.card(doc, it, doc.castLens) } } }
+                renderer.Draw(
+                    CastCardViewInput(shownCards, state.view.lockRow?.count, state.readOnly, padding),
+                    CastCardViewActions(open = open, unlock = gate.unlock, create = if (state.readOnly) null else ({ creating = CastCreate.openCharacter(CreateCardMode.LIST) })),
+                )
+                return@CivilightScreen
+            }
             CastListBody(
                 state = state,
                 cards = cards,
@@ -178,7 +205,10 @@ fun CastListScreen(route: CastList, deps: FeatureDeps) {
                 onTag = { selectedTag = it },
                 onRow = open,
                 onUnlock = gate.unlock,
-                onAdd = { sheets.open(NewCharacterSheet(route.projectKey)) },
+                onAdd = { creating = CastCreate.openCharacter(CreateCardMode.LIST) },
+                showCreate = CastListModel.showsCreate(state),
+                highlighted = highlighted,
+                listState = listState,
                 onRecorder = { deps.navigator.push(RecorderInbox(projectKey = route.projectKey)) },
                 onMap = { deps.navigator.push(RelationMap(route.projectKey)) },
                 onFilters = { filtersJson = FilterStateCodec.encode(it) },
@@ -189,7 +219,62 @@ fun CastListScreen(route: CastList, deps: FeatureDeps) {
                 }),
             )
         }
+        creating?.takeIf { !state.readOnly }?.let { card ->
+            val liveTags = remember(doc) { CharacterEdits.tags(doc) }
+            val finish: (Boolean) -> Unit = { openAfter ->
+                val made = card
+                // The card closes only once the write applied; otherwise the typed values stay.
+                creatingBusy = true
+                vm.createFromCard(made, onDone = { creatingBusy = false }) { key ->
+                    creating = null
+                    if (openAfter) {
+                        open(key)
+                    } else {
+                        // Return the chip filter to `전체` when it would hide the new row (§8.3 Q46).
+                        val next = CastCreate.afterCreate(ui, CastCreate.tagKeys(made))
+                        selectedTag = next.selectedTag
+                        highlighted = key
+                    }
+                }
+            }
+            CastCreateCard(
+                state = card,
+                onChange = { creating = it },
+                onCancel = { creating = null },
+                onCreate = { finish(false) },
+                onCreateAndOpen = { finish(true) },
+                canCreate = !creatingBusy && CastCreate.canCreate(card),
+                tags = liveTags,
+            )
+        }
     }
+    // After `만들기`: scroll just enough to show the new row when it is out of view, then highlight it (DS-72).
+    LaunchedEffect(highlighted, state) {
+        val key = highlighted ?: return@LaunchedEffect
+        val keys = CastListModel.itemKeys(state, CastListModel.showsCreate(state))
+        val index = CastListModel.firstRowIndex(keys, state, key)
+        if (index < 0) {
+            // CST-66: a search or field filter that hides the new row is cleared, then this runs again.
+            val next = CastCreate.revealCreated(doc, ui, key, gate.open, ready.readOnly)
+            if (next == ui) return@LaunchedEffect
+            selectedTag = next.selectedTag
+            if (next.query != ui.query) typed = TextFieldValue(next.query)
+            searching = next.searching
+            if (next.filters != ui.filters) filtersJson = FilterStateCodec.encode(next.filters)
+            return@LaunchedEffect
+        }
+        if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) listState.animateScrollToItem(index)
+        delay(CivilightMotion.createdRowHighlightMs.toLong())
+        highlighted = null
+    }
+}
+
+/** The head toggle (DS-39, CST-67): `목록` and the chosen 3D view; drawn only when that view has a renderer. */
+@Composable
+private fun CastViewToggle(chosen: CardStyle, shown: CardStyle, onSelect: (ViewMode) -> Unit) {
+    val colors = CivilightTheme.colors
+    IconOnlyButton(IconId.List, CastUiCopy.CARD_STYLES.last(), { onSelect(ViewMode.LIST) }, tint = if (shown.isList) colors.ink else colors.ink3)
+    IconOnlyButton(IconId.Grid, CastUiCopy.CARD_STYLES[chosen.ordinal], { onSelect(ViewMode.CARD) }, tint = if (shown.isList) colors.ink3 else colors.ink)
 }
 
 @Composable
@@ -225,6 +310,9 @@ private fun CastListBody(
     imageOf: (String) -> SlotImage?,
     cardImageOf: (String) -> SlotImage?,
     onPickImage: ((String) -> Unit)?,
+    showCreate: Boolean,
+    highlighted: Key?,
+    listState: LazyListState,
 ) {
     val motion = CivilightTheme.motion
     val unhide = rememberUnhide(revealed)
@@ -232,7 +320,10 @@ private fun CastListBody(
         val layout = this
         AnimatedContent(cards, transitionSpec = { CardViewMotion.transform(motion) }, label = "castView") { showCards ->
             val shared = CastShared.of(layout, this, motion)
-            CastLazyBody(state, showCards, inner, shared, galleryCounts, hiddenKeys, unhide, onGallery, padding, selectedKey, onTag, onRow, onUnlock, onAdd, onRecorder, onMap, onFilters, imageOf, cardImageOf, onPickImage)
+            CastLazyBody(
+                state, showCards, inner, shared, galleryCounts, hiddenKeys, unhide, onGallery, padding, selectedKey, onTag, onRow, onUnlock, onAdd,
+                onRecorder, onMap, onFilters, imageOf, cardImageOf, onPickImage, showCreate, highlighted, listState,
+            )
         }
     }
 }
@@ -259,35 +350,44 @@ private fun CastLazyBody(
     imageOf: (String) -> SlotImage?,
     cardImageOf: (String) -> SlotImage?,
     onPickImage: ((String) -> Unit)?,
+    showCreate: Boolean,
+    highlighted: Key?,
+    listState: LazyListState,
 ) {
     val view = state.view
     val revealedLook: (Key) -> Modifier = { key -> if (key in hiddenKeys) Modifier.unhide(unhide) else Modifier }
     // No horizontal content padding: the card rows run to the screen edge (QA 7), everything else keeps 24 dp.
     val side = Modifier.padding(horizontal = CAST_SIDE)
+    // Item order and keys follow `CastListModel.itemKeys` (used to scroll a new row into view).
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp),
     ) {
         if (view.empty == null) {
-            item(key = "mode") {
+            item(key = CastListModel.MODE_KEY) {
                 // `목록 | 관계도` (CST-01; not on `EmptyCast`): `관계도` is the map (CST-33), a separate route for now.
-                SegmentedControl(CastUiCopy.VIEW_MODES, 0, { if (it == 1) onMap() }, civilightItem().then(side).padding(bottom = 12.dp))
+                CastViewModeRow(0, { if (it == 1) onMap() }, civilightItem().then(side).padding(bottom = 12.dp))
             }
         }
-        item(key = "chips") {
+        item(key = CastListModel.CHIPS_KEY) {
             ChipFlow(civilightItem().then(side)) {
                 for (chip in view.chips) FilterChip(chip.label, chip.selected, { onTag(chip.tagKey) })
             }
         }
         if (state.activeFilters.isNotEmpty()) {
-            item(key = "active") {
+            item(key = CastListModel.ACTIVE_KEY) {
                 ChipFlow(civilightItem().then(side).padding(top = 8.dp)) {
                     for (f in state.activeFilters) RemovableChip(f.label, { onFilters(f.without) }, CastUiCopy.BTN_REMOVE)
                 }
             }
         }
+        // U-15.1 (CST-66): `＋ 새 인물` under the chips, with 0 or many characters and while a query is typed.
+        if (showCreate) {
+            item(key = CastListModel.CREATE_KEY) { ListCreateRow(CreateKind.CHARACTER, onAdd, civilightItem().then(side).padding(top = 8.dp)) }
+        }
         view.empty?.let { empty ->
-            item(key = "empty") {
+            item(key = CastListModel.EMPTY_KEY) {
                 EmptyBlock(
                     title = empty.title,
                     subtitle = empty.sub,
@@ -299,14 +399,14 @@ private fun CastLazyBody(
                 )
             }
         }
-        if (state.noResults) item(key = "none") { NoResults(CastUiCopy.NO_RESULTS, civilightItem().then(side)) }
+        if (state.noResults) item(key = CastListModel.NONE_KEY) { NoResults(CastUiCopy.NO_RESULTS, civilightItem().then(side)) }
         view.lockRow?.let { lock ->
-            item(key = "lock") {
+            item(key = CastListModel.LOCK_KEY) {
                 Box(civilightItem().then(side).padding(top = 16.dp)) { LockRow(lock.title, lock.action, onUnlock, subtitle = lock.sub) }
             }
         }
         if (state.fieldHits.isNotEmpty()) {
-            item(key = "hits-head") { SectionLabel(CastUiCopy.ADD_FIELD_ROW, civilightItem().then(side).padding(top = 20.dp, bottom = 6.dp)) }
+            item(key = CastListModel.HITS_HEAD_KEY) { SectionLabel(CastUiCopy.ADD_FIELD_ROW, civilightItem().then(side).padding(top = 20.dp, bottom = 6.dp)) }
             val hitKeys = CastListModel.hitKeys(state.fieldHits)
             items(state.fieldHits.size, key = { hitKeys[it] }) { i ->
                 val hit = state.fieldHits[i]
@@ -314,7 +414,7 @@ private fun CastLazyBody(
             }
         }
         if (state.hiddenExcluded) {
-            item(key = "hidden-excluded") { CivilightText(CastUiCopy.HIDDEN_EXCLUDED, CivilightTheme.type.small, civilightItem().then(side).padding(top = 12.dp), color = CivilightTheme.colors.ink3) }
+            item(key = CastListModel.HIDDEN_EXCLUDED_KEY) { CivilightText(CastUiCopy.HIDDEN_EXCLUDED, CivilightTheme.type.small, civilightItem().then(side).padding(top = 12.dp), color = CivilightTheme.colors.ink3) }
         }
         if (showCards) {
             state.cardGroups.forEachIndexed { i, group ->
@@ -329,7 +429,8 @@ private fun CastLazyBody(
                     CastRowView(
                         row,
                         imageOf(row.key),
-                        selected = row.key == selectedKey,
+                        // The selected row, and for a moment the row just made (every copy of it, CST-68).
+                        selected = row.key == selectedKey || row.key == highlighted,
                         onClick = { onRow(row.key) },
                         portraitShare = shared.portrait(group.tagKey, row.key, radiusDp = 20f),
                         modifier = civilightItem().then(side).then(revealedLook(row.key)),

@@ -117,7 +117,7 @@ internal fun SheetScope.MultiExportContent(docs: List<ProjectDoc>, services: Lib
                     label = row.title,
                     checked = row.checked,
                     onCheckedChange = { picked = MultiExport.toggle(pickedSet, row.key).toList() },
-                    subtitle = if (row.locked) "${row.badge} · ${ExportCopy.PASSWORD}" else row.badge,
+                    subtitle = row.subtitle,
                 )
             }
         }

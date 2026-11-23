@@ -160,7 +160,8 @@ object TermCardState {
             ),
             fields = FieldRows.build(doc, EntityKind.TERM, termKey, term.fields, lens),
             notices = card.notices.filterNot { it.startsWith(WorldCopy.NOTICE_SEARCH_OFF) },
-            searchOff = !term.textSearch,
+            // (0.2.0, WLD-25, WLD-73) `글자 찾기 꺼짐 · 켜기` belongs to the candidate check.
+            searchOff = !term.textSearch && doc.project.termCandidates,
             chips = card.chips,
             header = card.header,
             candidatesPending = card.candidatesPending,

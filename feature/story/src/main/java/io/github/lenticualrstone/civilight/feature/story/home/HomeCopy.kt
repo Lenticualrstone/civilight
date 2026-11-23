@@ -2,8 +2,7 @@ package io.github.lenticualrstone.civilight.feature.story.home
 
 /** Copy of 프로젝트 홈 (STO-01, board `Home`). */
 object HomeCopy {
-    /** Head line `‹ 서재`: back label and small line, then the project's name as the title (QA U-06). */
-    const val LIBRARY = "서재"
+    /** The head names the project only (QA U-06); the back button is icon only (DS-70 A13, `서재로`). */
 
     const val STAT_TODAY = "오늘 쓴 글자"
     const val STAT_CAST = "인물"
@@ -12,6 +11,7 @@ object HomeCopy {
     const val WORK = "작업"
 
     const val SHORTCUT_STORY = "스토리"
+    const val SHORTCUT_MARKS = "할 일 · 복선"
     const val SHORTCUT_CAST = "인물"
     const val SHORTCUT_WORLD = "세계"
     const val SHORTCUT_TIMELINE = "연표"
@@ -32,4 +32,13 @@ object HomeCopy {
 
     /** Untitled episode in compact rows (STO-03). */
     const val NO_TITLE = "—"
+
+    /** (0.2.0, N-41) The `할 일 · 복선` sheet: title, the three filters, the row kinds, `거둘 곳 · 2-5`. */
+    const val MARKS_TITLE = "할 일 · 복선"
+    const val MARK_OPEN = "열림"
+    const val MARK_PAID_OFF = "거둠"
+    const val MARK_DONE = "끝냄"
+    const val MARK_PLANT = "복선"
+    const val MARK_TODO = "할 일"
+    const val MARK_PAYOFF_AT = "거둘 곳"
 }

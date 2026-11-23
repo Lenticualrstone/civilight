@@ -30,12 +30,13 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.ui.theme.ThemeBridge
 
-/** Rating badge followed by a small meta line (`R-15 1장 7/10 · 인물 12 · 오늘 08:12`). */
+/**
+ * The small meta line (`1장 7/10 · 인물 12 · 오늘 08:12`). (0.2.0, LIB-92, S-4) No rating badge: [rating] is the
+ * stored value (D34), kept in the row model and never drawn.
+ */
 @Composable
-internal fun BadgeLine(rating: Rating, text: String, modifier: Modifier = Modifier) {
+internal fun BadgeLine(@Suppress("UNUSED_PARAMETER") rating: Rating, text: String, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        RatingBadge(ThemeBridge.rating(rating))
-        Spacer(Modifier.width(6.dp))
         CivilightText(text, CivilightTheme.type.small, color = CivilightTheme.colors.ink3, maxLines = 1)
     }
 }

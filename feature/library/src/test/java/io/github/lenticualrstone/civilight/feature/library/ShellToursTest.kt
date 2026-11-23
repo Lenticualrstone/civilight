@@ -39,13 +39,14 @@ class ShellToursTest {
             CharacterTrack(p),
         )
         assertEquals(
-            listOf(TourModule.SCRIPT, TourModule.CAST, TourModule.WORLD_TIMELINE, TourModule.RECORDER, TourModule.MAP, TourModule.ROUTE_PLACE_TIME),
+            // (0.2.0 S-3, LIB-96) 지도 만들기 and 인물 동선 tours are not offered: their routes host none.
+            listOf(TourModule.SCRIPT, TourModule.CAST, TourModule.WORLD_TIMELINE, TourModule.RECORDER, null, null),
             routes.map(ShellTours::moduleOf),
         )
         // List or detail neighbours never run a second copy of the same tour.
         listOf(CastList(p), TermCard(p, "term"), RecorderInbox(), Library, null).forEach { assertNull("$it", ShellTours.moduleOf(it)) }
         // Every module is hosted somewhere: six by the shell, 서재 · 숨기기 by LibraryScreen.
-        assertEquals(TourModule.entries.toSet() - TourModule.LIBRARY_HIDING, routes.mapNotNull(ShellTours::moduleOf).toSet())
+        assertEquals(ModuleTours.offered.toSet() - TourModule.LIBRARY_HIDING, routes.mapNotNull(ShellTours::moduleOf).toSet())
     }
 
     @Test

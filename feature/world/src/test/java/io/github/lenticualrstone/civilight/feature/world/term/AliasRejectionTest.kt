@@ -90,4 +90,13 @@ class AliasRejectionTest {
         val b42 = card.groups.first().rows.first { it.markers.any(MarkerUi::warn) }
         assertTrue(b42.markers.toString(), b42.markers.any { it.dotted && it.text == MarkerUi.ORPHANED })
     }
+
+    @Test
+    fun `WLD-73 no 새로 찾음 count while 용어 후보 is off`() {
+        val on = WorldTestFixture.stateA()
+        val off = on.copy(project = on.project.copy(termCandidates = false))
+        val saved = AliasEditor.add(off, T1, "빛돌", io.github.lenticualrstone.civilight.feature.world.common.TermIndexes.OFF_INDEX, access, ctx) as AliasChange.Saved
+        assertNull(saved.newlyFound)
+        assertEquals(listOf("오리지늄", "빛돌"), saved.doc.index.term(T1)!!.aliases)
+    }
 }

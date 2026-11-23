@@ -7,6 +7,7 @@ import io.github.lenticualrstone.civilight.domain.checks.CheckListRow
 import io.github.lenticualrstone.civilight.domain.checks.CheckReport
 import io.github.lenticualrstone.civilight.domain.checks.CheckResult
 import io.github.lenticualrstone.civilight.domain.checks.FixKind
+import io.github.lenticualrstone.civilight.domain.checks.WritingChecks
 import io.github.lenticualrstone.civilight.domain.story.checks.CheckFilter
 import io.github.lenticualrstone.civilight.domain.story.checks.EmptyCheck
 import io.github.lenticualrstone.civilight.domain.story.search.CommandBar
@@ -42,7 +43,8 @@ object CheckModel {
      */
     fun build(report: CheckReport, filter: CheckFilter, stale: Boolean): CheckUi {
         val scanning = stale || report.scanning
-        val header = CheckCenterView.header(report).let { h ->
+        val filter = WritingChecks.shownFilter(report.doc, report.inputs, filter)
+        val header = WritingChecks.header(report).let { h ->
             if (!scanning) h else h.copy(chips = h.chips.map { it.copy(dimmed = true) }, scanningLabel = h.scanningLabel ?: CheckCopy.SCANNING)
         }
         val rows = CheckCenterView.rows(report, filter)

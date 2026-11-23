@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.world.place
 
+import io.github.lenticualrstone.civilight.model.game.GameTools
 import io.github.lenticualrstone.civilight.domain.world.item.WorldCards
 import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
 import io.github.lenticualrstone.civilight.domain.world.map.MapViews
@@ -107,7 +108,8 @@ object PlaceCardState {
                 if (parentHidden) WorldCopy.HIDDEN_ITEM else card.parentName ?: WorldCopy.EMPTY_VALUE,
                 editable = !readOnly,
             ),
-            assets = FixedRowUi(WorldCopy.ROW_ASSETS, card.backgroundAssets.toString(), editable = false),
+            // (0.2.0, WLD-76) `배경 에셋` only with `게임 제작 도구` on.
+            assets = if (GameTools.on(doc)) FixedRowUi(WorldCopy.ROW_ASSETS, card.backgroundAssets.toString(), editable = false) else null,
             fields = FieldRows.build(doc, EntityKind.PLACE, placeKey, place.fields, lens),
             timeRows = timeRows(doc, projectKey, placeKey, hiddenOpen),
             maps = card.pins.map { mapRow(doc, projectKey, it) },

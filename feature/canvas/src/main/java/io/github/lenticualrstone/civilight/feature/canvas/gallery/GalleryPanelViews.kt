@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.gallery
 
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -36,7 +37,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import io.github.lenticualrstone.civilight.designsystem.component.ButtonRow
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
@@ -270,21 +270,30 @@ fun PanelButtons(panel: PanelModel, handlers: GalleryHandlers, vertical: Boolean
             PanelButton.VIEW -> true
         }
     }
-    val content: @Composable (PanelButton, Modifier) -> Unit = { b, m ->
-        when (b) {
-            PanelButton.VIEW -> CivilightButton(b.label, { handlers.view(key) }, m, variant = ButtonVariant.GHOST)
-            PanelButton.EDIT -> CivilightButton(b.label, { handlers.edit?.invoke(key, false) }, m, variant = ButtonVariant.GHOST)
-            PanelButton.WRITE -> CivilightButton(b.label, { handlers.edit?.invoke(key, true) }, m, variant = ButtonVariant.PRIMARY)
-            PanelButton.MENU -> CivilightIconButton(IconId.More, b.label, { handlers.menu?.invoke(key) }, m)
+    // ICON A10: `보기` · `고치기` are icons next to `⋯`; `설명 쓰기` stays a text button (c), the main action.
+    val write = PanelButton.WRITE in buttons
+    val icons: @Composable () -> Unit = {
+        buttons.forEach { b ->
+            when (b) {
+                PanelButton.VIEW -> CivilightIconButton(IconButtonSpec.CARD_VIEW, { handlers.view(key) })
+                PanelButton.EDIT -> CivilightIconButton(IconButtonSpec.CARD_CAPTION_EDIT, { handlers.edit?.invoke(key, false) })
+                PanelButton.MENU -> CivilightIconButton(IconId.More, b.label, { handlers.menu?.invoke(key) })
+                PanelButton.WRITE -> Unit
+            }
         }
+    }
+    val writeButton: @Composable (Modifier) -> Unit = { m ->
+        CivilightButton(PanelButton.WRITE.label, { handlers.edit?.invoke(key, true) }, m, variant = ButtonVariant.PRIMARY)
     }
     if (vertical) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            buttons.forEach { b -> content(b, if (b == PanelButton.MENU) Modifier else Modifier.fillMaxWidth()) }
+            if (write) writeButton(Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) { icons() }
         }
     } else {
-        ButtonRow(Modifier.fillMaxWidth()) {
-            buttons.forEach { b -> content(b, if (b == PanelButton.MENU) Modifier else Modifier.weight(1f)) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
+            if (write) writeButton(Modifier.weight(1f))
+            icons()
         }
     }
 }

@@ -8,6 +8,7 @@ import io.github.lenticualrstone.civilight.model.change.ChangeRecord
 import io.github.lenticualrstone.civilight.model.checks.AckKind
 import io.github.lenticualrstone.civilight.model.checks.CheckType
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.game.GameTools
 import io.github.lenticualrstone.civilight.model.position.LensPoint
 import io.github.lenticualrstone.civilight.model.position.Rank
 import io.github.lenticualrstone.civilight.model.text.docText
@@ -28,7 +29,8 @@ class TermQueries(
     val describer = SpotDescriber(doc, codes)
 
     private val scriptTexts: List<SpotText> by lazy { TextSpots.script(doc) }
-    private val outsideTexts: List<SpotText> by lazy { TextSpots.outside(doc) }
+    /** (0.2.0 CST-73) Secret text of a character whose `이 탭 잠그기` is on is never listed or counted here. */
+    private val outsideTexts: List<SpotText> by lazy { TextSpots.outside(doc).filterNot { secretLocked(doc, it.spot) } }
     private val spotOrder: Map<TextSpot, Int> by lazy {
         (scriptTexts + outsideTexts).withIndex().associate { (i, s) -> s.spot to i }
     }
@@ -42,8 +44,32 @@ class TermQueries(
 
     fun term(termKey: Key): Term? = doc.index.term(termKey)
 
-    /** The term's live reveal, or null. */
-    fun reveal(termKey: Key): RevealInfo? = reveals.getOrPut(termKey) { TermReveals.of(doc, termKey, codes) }
+    /**
+     * (0.2.0, WLD-72) The term's **effective** reveal, or null: the stored (hand-set) record when there is
+     * one, else the automatic reveal at its first usage link in manuscript order ([RevealInfo.isAuto]).
+     * Every reader (list, card, `▲`, candidates, check rows, the script) goes through this.
+     */
+    fun reveal(termKey: Key): RevealInfo? = reveals.getOrPut(termKey) {
+        TermReveals.of(doc, termKey, codes)
+            ?: usage(termKey).firstOrNull()?.takeIf { term(termKey)?.deletedAt == null }?.let { link ->
+                (link.spot as? ScriptSpot)?.let { TermReveals.autoInfo(doc, termKey, TermReveals.anchorOf(it), codes) }
+            }
+    }
+
+    /** (0.2.0) The stored (hand-set) reveal only, or null. */
+    fun storedReveal(termKey: Key): RevealInfo? = reveal(termKey)?.takeUnless { it.isAuto }
+
+    /** (0.2.0, WLD-72) True when the effective reveal is the automatic one. */
+    fun isAutoReveal(termKey: Key): Boolean = reveal(termKey)?.isAuto == true
+
+    /** (0.2.0, WLD-73) The project setting `용어 후보`: one switch for every candidate surface. */
+    val candidatesOn: Boolean get() = doc.project.termCandidates
+
+    /**
+     * (0.2.0, WLD-26, WLD-73) True while candidate numbers wait for the scan. Never while `용어 후보` is off: the
+     * index is not built then, so nothing waits for it.
+     */
+    val scanPending: Boolean get() = candidatesOn && !index.complete
 
     /** All live links to a term. */
     fun links(termKey: Key): List<TermLink> = linksByTerm[termKey].orEmpty()
@@ -51,8 +77,12 @@ class TermQueries(
     /** `쓰인 곳`: links in game-output manuscript text, in manuscript order. */
     fun usage(termKey: Key): List<TermLink> = links(termKey).filter { it.isUsage }
 
-    /** `원고 밖 · 메모`. */
+    /**
+     * `원고 밖 · 메모`. (0.2.0, WLD-19, WLD-76) Links in character game text (voice lines, archive documents)
+     * are listed and counted only with `게임 제작 도구` on; the links themselves are kept.
+     */
     fun outside(termKey: Key): List<TermLink> = links(termKey).filterNot { it.isUsage }
+        .filter { GameTools.on(doc) || (it.spot !is OutsideSpot.VoiceLineText && it.spot !is OutsideSpot.ArchiveText) }
 
     /** `▲ 공개 전 사용` (WLD-20): a usage link before the reveal; block granularity, story time never consulted. */
     fun isBeforeReveal(link: TermLink): Boolean {
@@ -72,7 +102,7 @@ class TermQueries(
     fun activeWarnings(termKey: Key): List<TermLink> = usage(termKey).filter { isBeforeReveal(it) && !isIntended(it) }
 
     /** True when candidates of this term are searched and shown now. */
-    fun showsCandidates(term: Term): Boolean = access.canSearch(term)
+    fun showsCandidates(term: Term): Boolean = candidatesOn && access.canSearch(term)
 
     /** Current candidates of a term after `아님`, in manuscript order (empty when not searchable). */
     fun candidates(termKey: Key): List<TermCandidate> {
@@ -165,16 +195,18 @@ class TermQueries(
             if (shows && candidates.isNotEmpty()) append("${Copy.SEP}후보 ${candidates.size}")
         }
         val notices = ArrayList<String>()
-        if (TermPattern.isSingleSyllable(term)) notices += "1음절${Copy.SEP}글자 찾기 안 함"
-        if (!term.textSearch) notices += "글자 찾기 꺼짐${Copy.SEP}켜기"
-        if (reveal == null) notices += "첫 공개 없음${Copy.SEP}쓰인 곳 ${usage.size}"
+        // (0.2.0, WLD-73, WLD-25) The `글자 찾기` states belong to the candidate check: hidden while it is off.
+        if (candidatesOn && TermPattern.isSingleSyllable(term)) notices += "1음절${Copy.SEP}글자 찾기 안 함"
+        if (candidatesOn && !term.textSearch) notices += "글자 찾기 꺼짐${Copy.SEP}켜기"
+        // (0.2.0, WLD-08) With the automatic reveal a term with usage always has a reveal; the state is gone.
+        if (reveal == null && usage.isNotEmpty()) notices += "첫 공개 없음${Copy.SEP}쓰인 곳 ${usage.size}"
         val chips = ArrayList<TermChip>()
-        if (term.textSearch && term.rejections.size > REJECTION_CHIP_THRESHOLD) chips += TermChip.TurnOffSearch("글자 찾기 끄기")
+        if (candidatesOn && term.textSearch && term.rejections.size > REJECTION_CHIP_THRESHOLD) chips += TermChip.TurnOffSearch("글자 찾기 끄기")
         revealSuggestion(termKey)?.let { chips += it }
         return TermCard(
             termKey = termKey,
             name = term.name,
-            revealValue = reveal?.cardValue ?: "첫 공개 없음",
+            revealValue = reveal?.let { revealCardValue(it) } ?: "첫 공개 없음",
             aliasValue = term.aliases.joinToString(Copy.SEP),
             relatedValue = term.related.mapNotNull { ref ->
                 when (ref.kind.known) {
@@ -197,7 +229,7 @@ class TermQueries(
             notices = notices,
             chips = chips,
             rejections = term.rejections,
-            candidatesPending = !index.complete,
+            candidatesPending = scanPending,
         )
     }
 
@@ -232,6 +264,74 @@ class TermQueries(
             dimmed = link.rank != null && link.rank > lensRank,
         )
     }
+
+    /**
+     * (0.2.0, WLD-72) The card's `첫 공개` value. While the hidden lock is closed and the reveal's block is in a
+     * hidden scene, it reads `<episode> · 숨긴 씬` (the scene and block are not named).
+     */
+    fun revealCardValue(reveal: RevealInfo): String {
+        if (access.hiddenUnlocked) return reveal.cardValue
+        val block = reveal.blockKey?.let { doc.index.block(it) } ?: return reveal.cardValue
+        val scene = doc.index.unit(block.sceneKey) ?: return reveal.cardValue
+        val hidden = scene.hidden || doc.index.ancestors(scene).any { it.hidden }
+        return if (hidden) "${reveal.episodeLabel.orEmpty()}${Copy.SEP}숨긴 씬" else reveal.cardValue
+    }
+
+    /**
+     * (0.2.0, WLD-73) The last section of the 용어 tab while `용어 후보` is on: `용어 후보 · N`, one row per term
+     * with at least one candidate (after `아님`), in the term list's order at [lens]; null when there is none (or the
+     * setting is off). Locked hidden terms are left out (they are not searched).
+     */
+    fun candidateSection(lens: LensPoint = LensPoint.Latest): CandidateSection? {
+        if (!candidatesOn) return null
+        val listed = list(lens).let { l -> l.revealed + l.pending }.map { it.termKey }
+        val rows = listed.mapNotNull(::term)
+            .filter { showsCandidates(it) }
+            .mapNotNull { term ->
+                val all = candidates(term.key)
+                if (all.isEmpty()) return@mapNotNull null
+                val pre = all.count(::isBeforeReveal)
+                CandidateTermRow(
+                    termKey = term.key,
+                    name = term.name,
+                    fragment = "후보 ${all.size}",
+                    right = if (pre > 0) "◇ 공개 전 후보 $pre" else null,
+                )
+            }
+        if (rows.isEmpty()) return null
+        return CandidateSection("용어 후보${Copy.SEP}${rows.size}", rows, pending = scanPending)
+    }
+
+    /**
+     * (0.2.0, WLD-27, WLD-73) The candidate spans of one manuscript block for the script, in text order
+     * (option lines by option order): the faint dotted underline and the `참고` rows
+     * `용어 후보 · <matchedText> · 잇기 · 아님`. Empty while `용어 후보` is off.
+     */
+    fun candidateSpans(blockKey: Key): List<CandidateSpan> {
+        if (!candidatesOn) return emptyList()
+        val block = doc.index.block(blockKey) ?: return emptyList()
+        val spots = TextSpots.scriptSpotsOf(doc, block).mapNotNull { it.spot as? ScriptSpot }
+        return spots.withIndex().flatMap { (optionIndex, spot) ->
+            index.at(spot).map { it.termKey }.distinct()
+                .flatMap { key -> candidates(key).filter { it.spot == spot } }
+                .sortedBy { it.start }
+                .map { c ->
+                    CandidateSpan(
+                        candidate = c,
+                        termKey = c.termKey,
+                        termName = term(c.termKey)?.name.orEmpty(),
+                        matchedText = c.matchedText,
+                        kind = c.kind,
+                        start = c.start,
+                        end = c.end,
+                        optionIndex = if (spot is ScriptSpot.OptionText) optionIndex else null,
+                    )
+                }
+        }
+    }
+
+    /** (0.2.0, WLD-73) The `참고` row text of a candidate: `용어 후보 · 등불`. */
+    fun referenceLine(span: CandidateSpan): String = "용어 후보${Copy.SEP}${span.matchedText}"
 
     // --- List -----------------------------------------------------------------------------------
 
@@ -326,7 +426,7 @@ class TermQueries(
                         "${Copy.SEP}‘${term.name}’$tag${Copy.SEP}${reveal.listLabel}"
                     candidateRows += (spotOrder[c.spot] ?: Int.MAX_VALUE) to TermCheckRow.CandidateBeforeReveal(
                         candidate = c, text = text, snippet = snippet, buttons = listOf("원고로 가기", "잇기", "아님"),
-                        pending = !index.complete,
+                        pending = scanPending,
                     )
                 }
             } else if (usage(term.key).isNotEmpty()) {
@@ -348,7 +448,7 @@ class TermQueries(
             rows = rows,
             intended = intended,
             deleted = deletedTermRows(),
-            scanning = !index.complete,
+            scanning = scanPending,
             badgeCount = badge,
             totalCount = total,
         )
@@ -398,4 +498,39 @@ class TermQueries(
         /** More than this many `아님` shows the chip `글자 찾기 끄기` (WLD-25). */
         const val REJECTION_CHIP_THRESHOLD = 10
     }
+}
+
+/** (0.2.0, WLD-73) A row of the `용어 후보 · N` section: name, `후보 3`, and `◇ 공개 전 후보 1` when some come before the reveal. */
+data class CandidateTermRow(val termKey: Key, val name: String, val fragment: String, val right: String?)
+
+/** (0.2.0, WLD-73) The `용어 후보 · N` section of the 용어 tab; [pending] while the scan is not done. */
+data class CandidateSection(val title: String, val rows: List<CandidateTermRow>, val pending: Boolean)
+
+/**
+ * (0.2.0, WLD-27) What the script draws for one candidate: `{termKey, termName, matchedText, kind, start,
+ * end, optionIndex?}` ([optionIndex] = index of the option line inside a choice block), plus the candidate
+ * itself for `잇기` ([TermEdits.link]) and `아님` ([TermEdits.reject]).
+ */
+data class CandidateSpan(
+    val candidate: TermCandidate,
+    val termKey: Key,
+    val termName: String,
+    val matchedText: String,
+    val kind: CandidateKind,
+    val start: Int,
+    val end: Int,
+    val optionIndex: Int?,
+)
+
+/**
+ * (0.2.0, CST-73) True for a spot that shows the 비밀 tab of a character whose `이 탭 잠그기` is on: the secret
+ * body and the values of secret fields. Readers outside the record (world lists, `원고 밖 · 메모`, link counts)
+ * leave such spots out; the record asks for the device lock itself. The text is kept (scope §8).
+ */
+fun secretLocked(doc: ProjectDoc, spot: TextSpot): Boolean = when (spot) {
+    is OutsideSpot.CharacterBody -> spot.secret && doc.index.character(spot.characterKey)?.secretTabLocked == true
+    is OutsideSpot.FieldText -> spot.entityKind == io.github.lenticualrstone.civilight.model.cast.EntityKind.CHARACTER &&
+        doc.index.character(spot.entityKey)?.secretTabLocked == true &&
+        doc.index.fieldDef(spot.fieldDefKey)?.isSecret == true
+    else -> false
 }

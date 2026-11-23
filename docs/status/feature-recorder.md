@@ -8,6 +8,15 @@ All four batches done (batch 4 was the last of this lane).
 
 **Build and tests.** `tools/gw :feature:recorder:compileDebugKotlin :feature:recorder:testDebugUnitTest --no-configuration-cache` exits 0: 134 JVM tests, all passing (`CaptureHubTest` 17, `InboxTest` 16, `RecordScreenTest` 15, `AudioAndEngineTest` 13, `PutTest` 13, `MemoHubTest` 10, `OutsideAndRecoveryTest` 8, `PutMemoAndCharacterTest` 8, `FilesAndHooksTest` 8, `HidingAndAfterTest` 8, `LinksAndRoutesTest` 6, `MemoEditingTest` 4, `SettingsTest` 4, `RecorderCopyLintTest` 3, `SheetKeysTest` 1). `domain:recorder` got one additive file in batch 3 (`hooks/TargetLines.kt`, LRC-24) and nothing in batch 4; `tools/gw :domain:recorder:test --no-configuration-cache` exited 0 in batch 3 (98 tests, 90 run green, 8 `@Ignore`d as before, 0 failures). Use `--no-configuration-cache`: without it, `tools/gw` reused a configuration-cache entry of another lane's task graph twice in batch 3 (it ran `:feature:canvas` / `:feature:script` tasks and printed their result for a recorder command; see Requests). Nothing was run on a device or emulator, and no APK was built. The widget, tile and foreground service classes compile and this module's resources build, but the app's manifest merge was never run (it needs an app build, which is on hold).
 
+## 0.2.0 lane recorder (2026-11-24)
+
+Scope rows U-13 (LRC-49, D8, D32), S-8 (LRC-48, D4), LRC-50, icon list B24. Status `partial` until seen on the emulator.
+- **U-13 / LRC-49:** the branch work (pause closes the take's recorder, focus and engine input; segments joined; in-app leave saves `정리 안 됨` with the toast `기록함에 둠`) is kept and its tests pass. New: the route's dispose decision is `capture/LeaveRules.leaveOnDispose` (activity lifecycle, not the entry's; another screen pushed over the recorder now saves too; config change and background teardown do not), and removing the task from recents saves and releases (`RecordingService.onTaskRemoved` → `LeaveRules.onTaskRemoved`; `KeepAlive` joins `CaptureHub.leaving` before it stops the service, so the record is written first). The background keeps recording with its notification (D32).
+- **LRC-48:** the tile service and widget receiver are no longer declared in this module's manifest (classes and resources kept). `설정 · 라이프 레코더` hides `잠금 화면에서 녹음` (`RecorderSettingsRows.HIDDEN`; value kept, `녹음` heads the next row). `capture/RecorderEntryPoints` states the rule (mic only on 프로젝트 홈; 기록함 buttons; no outside surface). `EmptyLr` draws no sub (`TODO_COPY_LRC_EMPTY_SUB`).
+- **LRC-50:** a masked link reads `이름 가림` (`RecorderCopy.MASKED_NAME`, interim for `TODO_COPY_LIB_MASKED_NAME`), never `R-18` (domain:recorder `LinkViews.maskedLabel`, used by link views, inbox tags and menu, picker, placement labels).
+- **Icons:** `EmptyLr` and `마이크 꺼짐` use icon + `말로 기록` · `글로 쓰기` (B24; `글로` → `글로 쓰기`). The inbox header button draws the filter glyph (LRC-25) but is named and acts as `검색` (§6 Q11); left as is.
+- **Tests:** `Recorder020Test` (8). feature:recorder 170 (was 162), all pass; domain:recorder 99 (91 run, 8 `@Ignore`d as before).
+
 ## Architecture
 
 Package `io.github.lenticualrstone.civilight.feature.recorder`.
@@ -254,7 +263,7 @@ Every UI feature below is built and wired to the store, but nobody has seen it o
 - **LRC-02 / 04 widget** (`RecorderWidgetProvider`, static, no names): a tap opens the app's `Recording` overlay with no link. **Stub:** the isolated "앱을 열지 않고" activity; the cover-screen host of vendor-only cover widgets. `requestPinAppWidget` from onboarding is LIB-15's.
 - **LRC-03 tile** (`RecorderTileService`): label `라이프 레코더` (TODO_COPY_LRC_01 `ED`), one tap opens the recording. On API 34+ it uses the `PendingIntent` overload.
 - **LRC-05 lock screen:** the hub rules are done (see Done). **Stub:** the show-when-locked recording surface; the tile on the lock screen asks for the device unlock first (`unlockAndRun`).
-- **LRC-09:** recovery at start-up (`recorder.resume` hook) done; audio focus loss pauses (`AndroidAudioFocus`, installed by the route); the microphone foreground service with the ongoing notification runs while a take records or is paused (`KeepAlive`, started with `startService` from the visible route; any platform refusal stops it quietly). Not run on a device. `POST_NOTIFICATIONS` is not asked for, so on API 33+ the notification may be hidden while the service still runs.
+- **LRC-09:** recovery at start-up (`recorder.resume` hook) done; audio focus loss pauses (`AndroidAudioFocus`, installed by the route); the microphone foreground service with the ongoing notification runs while a take records or is paused (`KeepAlive`, started with `startService` from the visible route; any platform refusal stops it quietly). Not run on a device. (0.2.0) `POST_NOTIFICATIONS` is declared and asked once per app run on API 33+ when a take first reaches `녹음 중` (`capture/NotificationAsk`, launched from `RecordingRoute`; not over a tour card). If it is refused the take still records and the service still runs, but the notification stays hidden (no way back from the drawer); not run on a device.
 - **LRC-10:** modes (recording · still · sweep · none) are tested; left are DS-owned details (see Requests): processing heights `[90, 140, 120, 160, 110, 80, 60]` at opacity 0.8, and the level formula without the oscillation. Since batch 3 the level comes from the microphone amplitude (`AudioTakes.sample`, every 200 ms); an engine's `onLevel` also feeds it.
 - **Built ahead of their batch** (keep them; finish the rest there):
   - LRC-40 … 43 were finished in batch 4 (see below).
@@ -328,7 +337,7 @@ Every UI feature below is built and wired to the store, but nobody has seen it o
 - **Inbox filter state** lives in the inbox entry's view model, set once from the route preset. Opening the inbox from 서재 is a new entry, so it starts unfiltered.
 - **Header icon** (§6 Q11 `ED`): opens a search field over the visible records (`RecordSearch`: hidden records only while open). Icon label and placeholder are `TODO_COPY_LRC_SEARCH_ICON` / `TODO_COPY_LRC_SEARCH_FIELD`.
 - **`원고에 넣기` is disabled** on a record with blank text (every voice record until a speech engine lands) and when no project can take it (only the read-only example in the 서재).
-- **Initial destination:** the record's only linked project; a protected one runs the prompt as the sheet opens; cancel → the project menu. A locked hidden destination opens the hidden group with the prompt (`unlockHiddenGroup`), so its rows can be read. The R-18 prompt title is `TODO_COPY_LRC_R18_PROMPT`.
+- **Initial destination:** the record's only linked project; a protected one runs the prompt as the sheet opens; cancel → the project menu. A locked hidden destination opens the hidden group with the prompt (`unlockHiddenGroup`), so its rows can be read. The protected-destination prompt title is `TODO_COPY_LRC_R18_PROMPT` (interim `이름 가림`).
 - **`씬 고르기 ›`** lists the scenes only (one level of core:ui `UnitPickerSheet`), titled `씬 고르기`.
 - **`이미 넣음` row** opens the script at that block and closes the sheets.
 - **Disabled menu rows and row tags** (a 넣기 without text or destination) are drawn at 38 % and do nothing; nothing is hidden.
@@ -371,6 +380,11 @@ Every UI feature below is built and wired to the store, but nobody has seen it o
 
 ## Requests
 
+- **(0.2.0) Command-bar mics (S-8, LRC-48, U-14.14):** remove `onMic` on every screen except 프로젝트 홈 (`feature/story/.../home/HomeScreen.kt` stays). Sites: cast `profile/ProfileScreen.kt`, `list/CastListScreen.kt`; world `common/ScreenParts.kt`; library `shelf/LibraryScreen.kt`; script `ScriptScreen.kt`, `ui/ScriptBars.kt`, `assets/AssetsScreen.kt`; canvas `page/PageDocScreen.kt`, `gallery/GalleryScreen.kt`; map `node/NodeMapScreen.kt`; story `structure/StructureScreen.kt`, `check/CheckCenterScreen.kt`.
+- **(0.2.0) feature:library:** `onboarding/DeviceChoices.kt` pins `RecorderWidgetProvider`, which is no longer declared; hide the `OnbVoice` `홈 화면 위젯 추가` choice (LIB-95) so it is not a dead control.
+- **(0.2.0) core:designsystem:** `EmptyBlock` button icons (B24 is drawn feature-locally in `InboxScreen`); `LockRow` action with the `fingerprint` icon (B21 `지문으로 보기`, inbox and record screen).
+- **(0.2.0) Copy:** `TODO_COPY_LRC_EMPTY_SUB` (none drawn); `TODO_COPY_LIB_MASKED_NAME` (interim `이름 가림`); `RecorderUiCopy.PROTECTED_PROMPT` (was `R18_PROMPT`) is `TODO_COPY_LRC_R18_PROMPT` with the interim `이름 가림` (S-4: no rating label); the D34 R-18 keying is unchanged.
+
 - **Spec owner (motion row 11):** should `정리 중` show the finalising wait only after 1 s (then the label `받아쓰는 중 · 문장 나누기` moves into `DelayedProgress`, with a reserved line so the text does not jump) when the glow is off or reduced, or keep it at once as LRC-13 draws it? Not built until decided.
 - **Copy:** confirm the `ED` picks in the Motion wave table (the shell asked the same for its two). Once the spec owner decides, change `ShownCopy` (one file); the ids stay.
 
@@ -408,3 +422,9 @@ Every UI feature below is built and wired to the store, but nobody has seen it o
 - **Library lane (LRC-45, optional):** when hidden records are included (hidden project, encrypted file) the export row could show the hidden part as `TODO_COPY_LRC_20`; it shows nothing then.
 - **Library lane (LRC-43):** the trash `레코더` row of a hidden record restores only after the `숨긴 기록 보기` prompt (`RecorderActions.restore(…, authenticated)`).
 - **Cast lane (LRC-47, still open):** the profile line `레코더 · 정리 안 됨 n ›` (CST-49) is not drawn yet; see the LRC-24 request above.
+
+- **(0.2.0) Review fixes (2026-11-24):** `POST_NOTIFICATIONS` declared + asked (above). 기록함 header search uses `IconId.Search` (was the filter glyph). `RecorderEntryPoints` is documented as the reference rule only: no command bar reads it, so `LRC_0_2_01_theMicIsOnlyOnHome` does not cover the UI; S-8 needs each owning lane to drop `onMic` (cast, world, library, script, canvas, map). Cross-lane: removing the widget declaration needs library LIB-95 (hide the OnbVoice `홈 화면 위젯 추가` card and its polling) to land in the same release.
+
+## 0.2.0 integration (wave 2, orchestrator)
+
+Applied: every command-bar mic except 프로젝트 홈 removed (world, library, canvas page and gallery, node map); `Recorder020Test.LRC_0_2_01_onlyHomePassesOnMic` scans the sources. Library `OnbVoice` widget choice removed. `LockRow` draws `fingerprint` for `지문으로 보기`. Not applied: `EmptyBlock` icon option (local empty block kept).

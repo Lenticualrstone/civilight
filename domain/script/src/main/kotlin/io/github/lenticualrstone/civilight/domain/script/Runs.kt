@@ -1,6 +1,8 @@
 package io.github.lenticualrstone.civilight.domain.script
 
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.script.Block
 import io.github.lenticualrstone.civilight.model.text.LinkTarget
 import io.github.lenticualrstone.civilight.model.text.LinkTargetKind
 import io.github.lenticualrstone.civilight.model.text.TextRun
@@ -184,6 +186,36 @@ object Runs {
 
     /** Display text with parens drawn `(text)` (manuscript and excerpts with the layer on). */
     fun displayText(runs: List<TextRun>): String = exportText(runs, includeParens = true)
+
+    /**
+     * (0.2.0, SCR-55) [runs] as drawn on screen: the text of a link whose target is hidden and locked
+     * ([unlocked] false) reads `숨긴 인물` / `숨긴 항목` (`Links.state`); every other run is unchanged.
+     * Exports keep using [exportText] on the real runs (export decides hidden content on its own).
+     */
+    fun masked(doc: ProjectDoc, runs: List<TextRun>, unlocked: Boolean): List<TextRun> =
+        if (runs.none { it is TextRun.Link }) runs
+        else runs.map { run ->
+            if (run !is TextRun.Link) run
+            else when (val state = Links.state(doc, run, unlocked)) {
+                is Links.State.Hidden -> run.copy(text = state.text)
+                else -> run
+            }
+        }
+
+    /** [displayText] of the [masked] runs: every on-screen string built from block text uses this. */
+    fun displayText(doc: ProjectDoc, runs: List<TextRun>, unlocked: Boolean): String = displayText(masked(doc, runs, unlocked))
+
+    /** [exportText] of the [masked] runs (the `괄호 지문` layer off on screen). */
+    fun shownText(doc: ProjectDoc, runs: List<TextRun>, unlocked: Boolean, includeParens: Boolean): String =
+        exportText(masked(doc, runs, unlocked), includeParens)
+
+    /** A link in [runs] points at a hidden item while the gate is locked ([unlocked] false). */
+    fun hidesLink(doc: ProjectDoc, runs: List<TextRun>, unlocked: Boolean): Boolean =
+        !unlocked && runs.any { it is TextRun.Link && Links.state(doc, it, unlocked) is Links.State.Hidden }
+
+    /** [hidesLink] over a block's runs and its choice options. */
+    fun blockHidesLink(doc: ProjectDoc, block: Block, unlocked: Boolean): Boolean =
+        hidesLink(doc, block.runs, unlocked) || block.options.any { hidesLink(doc, it.runs, unlocked) }
 
     /** Count of grapheme clusters (STO-06 `ED`: spaces included). */
     fun graphemes(text: String): Int {

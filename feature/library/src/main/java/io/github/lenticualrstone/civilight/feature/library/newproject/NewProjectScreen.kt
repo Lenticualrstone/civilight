@@ -99,20 +99,18 @@ internal fun NewProjectScreen(route: NewProject, services: LibraryServices) {
         }
     }
 
-    // Step 1's R-18 block says whether a 복구 암호 exists (batch 5: the backup book, loaded here).
-    val backupBook by services.backups.book.state.collectAsState()
     LaunchedEffect(Unit) { services.backups.book.ensureLoaded() }
     val enabled = NewProjectRules.canProceed(form, step) && !creating
     val leftLabel = if (step == NewProjectStep.NAME) NewProjectCopy.CANCEL else NewProjectCopy.PREVIOUS
     val rightLabel = if (step == NewProjectStep.START) NewProjectCopy.CREATE else NewProjectCopy.NEXT
     val body: @Composable ColumnScope.() -> Unit = {
         when (step) {
-            NewProjectStep.NAME -> NameStep(form, settings.ratingDefaults, backupBook.recovery != null, ::update)
+            NewProjectStep.NAME -> NameStep(form, ::update)
             NewProjectStep.STRUCTURE -> StructureStep(form, wide = inner, showPreview = !inner, update = ::update)
             NewProjectStep.TIME -> TimeStep(form, ::update)
             NewProjectStep.START -> StartStep(
                 form = form,
-                hideSwitch = NewProjectRules.hideSwitch(form, settings.ratingDefaults),
+                hideSwitch = NewProjectRules.hideSwitch(form),
                 inputs = inputs,
                 update = ::update,
                 onPickBundle = { sheets.open(BundlePickerSheet) },

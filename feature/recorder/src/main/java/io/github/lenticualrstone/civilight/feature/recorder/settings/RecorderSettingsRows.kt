@@ -13,7 +13,7 @@ enum class RecorderSettingId {
     /** `받아쓰기 · 클라우드` (LRC-12): read by `EngineChoice` when a take starts. */
     CLOUD,
 
-    /** `잠금 화면에서 녹음` (LRC-05). */
+    /** `잠금 화면에서 녹음` (LRC-05). (0.2.0) Not drawn (LRC-48); the stored value is kept and not read. */
     LOCK_SCREEN,
 
     /** `원본 음성 보관` (LRC-14): read at `멈추고 저장`; off never deletes audio already kept. */
@@ -38,7 +38,32 @@ data class RecorderSettingRowView(val id: RecorderSettingId, val row: SettingsRo
 object RecorderSettingsRows {
     private val ORDER = RecorderSettingId.entries
 
+    /**
+     * (0.2.0) Rows of entry points that 0.2.0 does not offer (LRC-48, S-8): `잠금 화면에서 녹음`. There is no
+     * widget or tile row. The value stays in [AppSettings] and in backups (scope §8).
+     */
+    val HIDDEN: Set<RecorderSettingId> = setOf(RecorderSettingId.LOCK_SCREEN)
+
+    /**
+     * The rows drawn, in order, without the [HIDDEN] ones. A hidden row that opened a section hands its section
+     * label to the next drawn row, so `녹음` still heads the switches.
+     */
     fun of(settings: AppSettings): List<RecorderSettingRowView> {
+        val out = mutableListOf<RecorderSettingRowView>()
+        var carried: String? = null
+        for (view in all(settings)) {
+            if (view.id in HIDDEN) {
+                carried = view.row.section ?: carried
+                continue
+            }
+            out += if (carried != null && view.row.section == null) view.copy(row = view.row.copy(section = carried)) else view
+            carried = null
+        }
+        return out
+    }
+
+    /** Every row the domain defines, hidden ones included (0.1.0 order). */
+    fun all(settings: AppSettings): List<RecorderSettingRowView> {
         val rows = RecorderSettingsScreen.rows(settings.recorder, settings.recorderGlow)
         check(rows.size == ORDER.size) { "RecorderSettingsScreen.rows changed: ${rows.size} rows" }
         return rows.zip(ORDER) { row, id -> RecorderSettingRowView(id, row) }

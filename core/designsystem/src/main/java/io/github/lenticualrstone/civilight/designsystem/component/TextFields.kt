@@ -206,7 +206,8 @@ fun PasswordField(
 /**
  * DS-35 search field: the command-bar shape (52 tall, radius 14, `tint`, 1 dp `edge`) with `Search` 18 at
  * the left, typed text in `ink` with the `acc` caret, and a right-aligned `small` 11 sp [rightHint]
- * (`초성 검색`), or a [closeLabel] text button (`닫기`) when [onClose] is set.
+ * (`초성 검색`), or the close when [onClose] is set: (0.2.0, DS-70 A5) the icon-only `close` read `찾기 닫기` for
+ * the default [closeLabel], a text button for any other word.
  */
 @Composable
 fun SearchField(
@@ -251,6 +252,8 @@ fun SearchField(
                     inner()
                 }
                 when {
+                    onClose != null && closeLabel == io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.CLOSE ->
+                        CivilightIconButton(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.SEARCH_CLOSE, onClose)
                     onClose != null -> TextAction(closeLabel, onClose)
                     rightHint != null -> CivilightText(rightHint, type.small.merge(TextStyle(fontSize = 11.sp)), color = colors.ink3, maxLines = 1)
                 }

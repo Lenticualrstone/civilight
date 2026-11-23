@@ -12,6 +12,7 @@ import android.os.IBinder
 import androidx.core.app.ServiceCompat
 import io.github.lenticualrstone.civilight.designsystem.R as DsR
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureHub
+import io.github.lenticualrstone.civilight.feature.recorder.capture.LeaveRules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -23,7 +24,8 @@ import kotlinx.coroutines.launch
  * own; the process-wide [CaptureHub] is the recording. It is started with `startService` while the
  * recording screen is visible and promotes itself; if the platform refuses (no permission, API
  * limits), it stops quietly and the recording goes on while the app is open (never a crash of the
- * capture). Tapping the notification reopens `녹음 중`.
+ * capture). Tapping the notification reopens `녹음 중`. Removing the task from recents saves the take as
+ * `정리 안 됨` and releases the microphone ([onTaskRemoved], LRC-49); the service stops when the hub goes idle.
  *
  * Not run on a device yet (APK builds are on hold).
  */
@@ -46,6 +48,16 @@ class RecordingService : Service() {
             stopSelf()
         }
         return START_NOT_STICKY
+    }
+
+    /**
+     * The task was swiped away from recents (LRC-49, D32): the take is saved and the microphone released
+     * ([LeaveRules.onTaskRemoved]). The service is not stopped here: [KeepAlive] stops it once the hub's
+     * [CaptureHub.leaving] save has finished, so the process lives until the record is written.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        KeepAlive.hub?.let(LeaveRules::onTaskRemoved)
+        super.onTaskRemoved(rootIntent)
     }
 
     private fun notification(title: String, text: String, channelName: String, route: String?): Notification {
@@ -102,10 +114,16 @@ class RecordingService : Service() {
 object KeepAlive {
     private var attached = false
 
+    /** The hub the service follows (set on attach); the service saves through it when the task is removed. */
+    @Volatile
+    var hub: CaptureHub? = null
+        private set
+
     fun attach(context: Context, hub: CaptureHub, scope: CoroutineScope) {
         synchronized(this) {
             if (attached) return
             attached = true
+            this.hub = hub
         }
         val app = context.applicationContext
         scope.launch {
@@ -113,6 +131,8 @@ object KeepAlive {
                 .distinctUntilChanged { a, b -> (a == null) == (b == null) }
                 .collect { pair ->
                     if (pair == null) {
+                        // A leave (in-app, the activity finishing or the task removed) is written before the service goes.
+                        hub.leaving?.join()
                         RecordingService.stop(app)
                     } else {
                         val route = io.github.lenticualrstone.civilight.navigation.RouteCodec.encode(OutsideEntries.resume(pair.second))

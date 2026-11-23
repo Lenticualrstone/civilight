@@ -30,7 +30,8 @@ class ProjectSettingsTest {
     fun `LIB-69 구조 rows read as the ProjSettings board`() {
         assertEquals("잿빛 새벽의 등불", ui.projectName)
         assertEquals(
-            listOf(ProjectSettingsTarget.LEVELS, ProjectSettingsTarget.WORLD_TIME, ProjectSettingsTarget.NOTATION, ProjectSettingsTarget.TRAVEL, ProjectSettingsTarget.DAY_BANDS),
+            // (0.2.0 S-3, WLD-47) no `이동 수단` row.
+            listOf(ProjectSettingsTarget.LEVELS, ProjectSettingsTarget.WORLD_TIME, ProjectSettingsTarget.NOTATION, ProjectSettingsTarget.DAY_BANDS),
             ui.structure.map { it.target },
         )
         row(ProjectSettingsTarget.LEVELS).let {
@@ -48,7 +49,7 @@ class ProjectSettingsTest {
             assertTrue(it.sub, it.sub!!.endsWith(" · 연표는 기준 사건도"))
             assertEquals("에피소드 기준", it.value)
         }
-        assertEquals("이동 수단", row(ProjectSettingsTarget.TRAVEL).title)
+        assertTrue(ui.structure.none { it.target == ProjectSettingsTarget.TRAVEL })
         assertEquals("하루는 새벽 4시부터 · 저녁 17–20", row(ProjectSettingsTarget.DAY_BANDS).sub)
     }
 
@@ -56,8 +57,9 @@ class ProjectSettingsTest {
     fun `LIB-69 인물 and 스크립트 추가 칸 rows`() {
         assertEquals(listOf("인물 항목", "관계 종류", "태그"), ui.cast.map { it.title })
         assertEquals("고치기", row(ProjectSettingsTarget.FIELDS).value)
-        assertEquals(listOf("무대 위치", "보이스 ID"), ui.script.switches.map { it.title })
-        assertEquals(listOf("왼쪽 · 가운데 · 오른쪽", "대사마다 녹음용 ID"), ui.script.switches.map { it.sub })
+        // (0.2.0, LIB-91) `게임 제작 도구` first; the example holds game data, so it opens on (G-3) and the voice rows show.
+        assertEquals(listOf("게임 제작 도구", "무대 위치", "보이스 ID"), ui.script.switches.map { it.title })
+        assertEquals(listOf(io.github.lenticualrstone.civilight.feature.library.projectsettings.ProjectSettingsCopy.GAME_TOOLS_SUB, "왼쪽 · 가운데 · 오른쪽", "대사마다 녹음용 ID"), ui.script.switches.map { it.sub })
         assertEquals(listOf("ID 형식", "전환 문구"), ui.script.links.map { it.title })
         assertTrue(row(ProjectSettingsTarget.VOICE_FORMAT).sub!!.endsWith("인물 · 에피소드 · 블록 · 내보내면 고정"))
         assertEquals("새 씬 기본 없음 · 틀 장소 · 시각", row(ProjectSettingsTarget.TRANSITION).sub)
@@ -66,7 +68,6 @@ class ProjectSettingsTest {
     @Test
     fun `LIB-69 the rows other areas specify carry the ProjSettings board values`() {
         assertEquals("1-7 · 2일째 · 새벽 · 연표는 기준 사건도", row(ProjectSettingsTarget.NOTATION).sub)
-        assertEquals("도보 15 km · 8시간 · 말 40 km · 8시간 · 배 30 km · 24시간", row(ProjectSettingsTarget.TRAVEL).sub)
         // The board draws `프로젝트 7`; the example defines 11 project fields (fixture.md #12), and the row counts them.
         assertEquals("게임 프로필 · 고정 7 · 프로젝트 11 · 장소 · 용어 · 세력도", row(ProjectSettingsTarget.FIELDS).sub)
         // The board draws `사이 12`; the example seeds rule 13's 사이 11 (fixture.md #14).

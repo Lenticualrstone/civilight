@@ -1195,6 +1195,7 @@ VersionBlock = {
 - The model already stores canvases as a map (`canvas/<key>.json`, `ProjectDoc.canvases`), each with `order` and `name`; 0.2.0 adds no project data.
 - New class A field `ProjectActivity.lastCanvasKey: Key?` (`_app/activity.json`): written when a canvas is opened. Home `캔버스` opens it when live, else the first live canvas by `order`, else creates one (`ED`, same as 0.1.0's first open).
 - Create, rename, reorder, delete and restore a canvas: trash kind `canvas` (C-20) through `domain:trash`; a canvas's nodes and edges go and come back with it (§5.1). Node and edge rules are unchanged (D25).
+- Reorder is deferred (not in 0.2.0): the N-58 scope row does not require it, `CanvasActions` has no reorder and no control is drawn. Canvases keep their `order` as made.
 
 ### 13.7 Recorder settings that are hidden (S-8)
 

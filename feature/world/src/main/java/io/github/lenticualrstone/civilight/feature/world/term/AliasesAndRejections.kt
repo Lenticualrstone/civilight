@@ -48,7 +48,8 @@ object AliasEditor {
         when (val edit = TermEdits.setAliases(doc, termKey, aliases, ctx)) {
             is AliasEdit.Invalid -> AliasChange.Refused(message(edit.problem))
             is AliasEdit.Applied -> {
-                val found = if (index.complete) {
+                // (0.2.0, WLD-73) No `새로 찾음` count while `용어 후보` is off.
+                val found = if (index.complete && edit.doc.project.termCandidates) {
                     val (after, _) = index.rescanTerm(edit.doc, termKey, access)
                     TermEdits.newlyFound(index, after, termKey)
                 } else {

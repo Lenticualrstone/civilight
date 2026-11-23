@@ -10,8 +10,13 @@ object ProjectSettingsCopy {
     const val COVER_SUB = "서재 카드 · 목록 썸네일 · 프로젝트 홈"
     const val SECTION_STRUCTURE = "구조"
     const val SECTION_CAST = "인물"
-    const val SECTION_PROTECTION = "등급 · 숨기기"
+    /** (0.2.0, LIB-92) Was `등급 · 숨기기`. */
+    const val SECTION_PROTECTION = "숨기기"
     const val SECTION_SCRIPT = "스크립트 추가 칸"
+
+    /** (0.2.0, WLD-73) The world group of 프로젝트 설정, holding `용어 후보`. */
+    const val SECTION_WORLD = "세계"
+    const val TERM_CANDIDATES = "용어 후보"
 
     const val CHANGE = "바꾸기"
 
@@ -38,6 +43,15 @@ object ProjectSettingsCopy {
     const val TAGS = "태그"
 
     // 스크립트 추가 칸
+    /** (0.2.0, LIB-91) First row of `스크립트 추가 칸`. */
+    const val GAME_TOOLS = "게임 제작 도구"
+
+    /**
+     * LIB-91 row sub: copy id `TODO_COPY_LIB_GAME_TOOLS_SUB` (to confirm), interim from the words of the user's
+     * decision row `게임 제작 기능` (spec 60 §8.9).
+     */
+    const val GAME_TOOLS_SUB = "보이스 ID · 에셋 · 연출 큐 · 녹음 대본 CSV · 엔진 JSON"
+
     const val STAGE = "무대 위치"
     const val STAGE_SUB = "왼쪽 · 가운데 · 오른쪽"
     const val VOICE_ID = "보이스 ID"

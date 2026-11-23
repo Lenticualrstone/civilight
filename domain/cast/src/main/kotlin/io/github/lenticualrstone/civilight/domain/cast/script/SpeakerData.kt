@@ -26,7 +26,7 @@ data class PickerFieldChip(val defKey: Key, val optionKey: Key, val label: Strin
 data class SpeakerPanel(
     /** `화자 · 리엔 · 17세 · 등불 결사` (the first two `머리` values before the block, TC-F-26). */
     val headLine: String,
-    /** `말투` in one line: the first sentence of the 말투 prose, or null when it is empty (§6 Q9). */
+    /** `말투` in one line: (0.2.0, CST-72, CST-38) the character's `한 줄 요약`, or null when it is empty (never the prose). */
     val speech: String?,
     /** `??? (1-9 공개)` while a display name stands in for the name; null otherwise. */
     val displayName: String?,
@@ -68,7 +68,7 @@ object SpeakerData {
         val hidden = RelationViews.hiddenPartnerCount(doc, speakerKey, hiddenUnlocked)
         return SpeakerPanel(
             headLine = Profile.panelLine(doc, speakerKey, blockKey),
-            speech = c.speechBody.docText.trim().takeIf { it.isNotEmpty() }?.let(CharacterEdits::firstSentence),
+            speech = c.speechSummary?.trim()?.takeIf { it.isNotEmpty() },
             displayName = if (name.override != null) DisplayNames.referenceValue(doc, speakerKey, point) else null,
             addresses = RelationPanel.addressRows(doc, speakerKey, blockKey, hiddenUnlocked),
             relations = RelationPanel.rows(doc, speakerKey, blockKey, hiddenUnlocked),

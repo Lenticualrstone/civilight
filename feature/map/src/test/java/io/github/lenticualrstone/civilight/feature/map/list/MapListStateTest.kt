@@ -49,7 +49,9 @@ class MapListStateTest {
         assertEquals(MapBaseKind.IMAGE, map.baseKind.known)
         assertEquals(blob.hash, map.baseImageHash)
         assertEquals(MapSize(8000, 6000), map.baseSize)
-        assertEquals("지도 4", map.name)
+        // (0.2.0, WLD-75) `지도 N`: the smallest N no live map is named with.
+        assertEquals(io.github.lenticualrstone.civilight.domain.world.map.MapNames.nextDefault(doc), map.name)
+        assertEquals("지도 1", map.name)
         assertTrue(made.doc.assets.blobs.any { it.hash == blob.hash })
         val again = MapCreation.imageMap(made.doc, blob, MapFx.ctx(9))!!
         assertEquals(1, again.doc.assets.blobs.count { it.hash == blob.hash })

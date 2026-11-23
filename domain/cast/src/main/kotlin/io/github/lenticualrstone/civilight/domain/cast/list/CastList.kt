@@ -139,7 +139,7 @@ object CastList {
         val q = query.trim().nfc()
         if (q.isEmpty()) return true
         if (Hangul.matches(character.name, q)) return true
-        return character.tagKeys.mapNotNull { doc.index.tag(it)?.name }.any { Hangul.matches(it, q) }
+        return CharacterEdits.liveTagNames(doc, character).any { Hangul.matches(it, q) }
     }
 
     fun row(doc: ProjectDoc, c: Character, lens: LensPoint, dates: StoryDateSource = StoryDates.Default): CastRow = CastRow(
@@ -151,8 +151,17 @@ object CastList {
         hiddenTag = c.hidden,
     )
 
-    /** The section a character is listed under: its first tag (CST Q13 default), else [UNTAGGED]. */
-    fun groupTag(doc: ProjectDoc, c: Character): Tag? = c.tagKeys.firstNotNullOfOrNull { doc.index.tag(it) }
+    /** The first live tag of a character (the card rows of CST-04), else null ([UNTAGGED]). */
+    fun groupTag(doc: ProjectDoc, c: Character): Tag? = c.tagKeys.firstNotNullOfOrNull { CharacterEdits.liveTag(doc, it) }
+
+    /**
+     * (0.2.0, CST-68, N-44) Every section a character is listed under: each of its live tags, in tag
+     * order. Empty means the untagged section ([UNTAGGED]), also when every tag it holds is trashed.
+     */
+    fun groupTags(doc: ProjectDoc, c: Character): List<Tag> {
+        val held = c.tagKeys.toSet()
+        return CharacterEdits.tags(doc).filter { it.key in held }
+    }
 
     fun build(
         doc: ProjectDoc,
@@ -171,9 +180,11 @@ object CastList {
             val tag = doc.index.tag(selectedTag)
             listOf(CastGroup(selectedTag, tag?.name.orEmpty(), filtered.map { row(doc, it, lens, dates) }))
         } else {
-            val byTag = filtered.groupBy { groupTag(doc, it)?.key }
-            tags.mapNotNull { t -> byTag[t.key]?.let { CastGroup(t.key, t.name, it.map { c -> row(doc, c, lens, dates) }) } } +
-                listOfNotNull(byTag[null]?.let { CastGroup(null, UNTAGGED, it.map { c -> row(doc, c, lens, dates) }) })
+            // CST-68: a character sits in the section of each of its live tags; `전체 N` still counts it once.
+            val rows = filtered.associate { it.key to row(doc, it, lens, dates) }
+            val sections = filtered.associate { it.key to groupTags(doc, it).map { t -> t.key } }
+            tags.map { t -> CastGroup(t.key, t.name, filtered.filter { t.key in sections.getValue(it.key) }.map { rows.getValue(it.key) }) } +
+                listOf(CastGroup(null, UNTAGGED, filtered.filter { sections.getValue(it.key).isEmpty() }.map { rows.getValue(it.key) }))
         }.filter { it.rows.isNotEmpty() }
         return CastListView(
             projectName = doc.project.name,

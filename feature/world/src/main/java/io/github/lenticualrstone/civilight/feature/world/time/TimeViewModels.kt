@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.stateIn
 
 /** The 연표 (WLD-31): rows at the lens for the chosen view. */
 @OptIn(ExperimentalCoroutinesApi::class)
-class TimelineViewModel(projectKey: Key, env: WorldEnv) : WorldViewModel(projectKey, env) {
+class TimelineViewModel(projectKey: Key, env: WorldEnv) : EventEditorViewModel(projectKey, env) {
     private data class ViewInput(val view: TimelineView, val anchorKey: Key?)
 
     private val viewInput = MutableStateFlow(ViewInput(TimelineView.EPISODE, null))
@@ -64,6 +64,20 @@ open class EventEditorViewModel(projectKey: Key, env: WorldEnv) : WorldViewModel
             }
         }
         return if (result == EditResult.APPLIED) saved else null
+    }
+
+    /**
+     * (0.2.0, U-15.3, WLD-70) `만들기` of the place picker's create card: one edit, one undo step; the new
+     * place is returned as the pick (null when nothing was made).
+     */
+    suspend fun createPlace(item: io.github.lenticualrstone.civilight.domain.world.item.NewWorldItem): io.github.lenticualrstone.civilight.model.story.PlaceRef? {
+        var made: io.github.lenticualrstone.civilight.model.story.PlaceRef? = null
+        val ctx = editContext()
+        val label = io.github.lenticualrstone.civilight.designsystem.component.CreateCard.title(io.github.lenticualrstone.civilight.designsystem.component.CreateKind.PLACE)
+        val result = apply(label) { d ->
+            io.github.lenticualrstone.civilight.domain.world.item.WorldCreate.createPlaceAndPick(d, item, ctx)?.let { (doc, ref) -> made = ref; doc } ?: d
+        }
+        return if (result == EditResult.APPLIED) made else null
     }
 
     /** `⋯ › 지우기`: the event goes to the trash; returns the toast (null when nothing happened). */

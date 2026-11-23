@@ -167,11 +167,12 @@ class ShelfCardsTest {
     }
 
     @Test
-    fun `S-02 S-12 a name-masked project reads R-18 프로젝트 without the title and does not block capture`() {
+    fun `S-02 S-12 a name-masked project reads 이름 가림 without the title and does not block capture`() {
         val masked = ashen.copy(project = ashen.project.copy(protections = ashen.project.protections.copy(nameMask = true, captureBlock = true)))
         val ui = build(list = listOf(shelf(masked, at("2026-11-22T08:12"))), recents = listOf(recent(masked, RecentKind.SCENE, K.SCENE_1_7_3, "2026-11-22T08:12")))
         val card = ui.recents.single()
-        assertEquals("씬 · R-18 프로젝트", card.kindLine)
+        // (0.2.0, LIB-92) The masked label no longer names a rating: `TODO_COPY_LIB_MASKED_NAME`, interim `이름 가림`.
+        assertEquals("씬 · 이름 가림", card.kindLine)
         assertNull(card.title)
         assertTrue(card.masked)
         assertNull("no picture of masked content", card.imageHash)

@@ -27,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardState
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
@@ -34,6 +37,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
+import io.github.lenticualrstone.civilight.feature.canvas.common.CanvasWrites
 import io.github.lenticualrstone.civilight.feature.canvas.CanvasCopy
 import io.github.lenticualrstone.civilight.feature.canvas.common.canvasEditContext
 import io.github.lenticualrstone.civilight.feature.canvas.edit.CanvasEdits
@@ -96,7 +100,9 @@ fun CanvasBoardScreen(route: CanvasBoard, deps: FeatureDeps) {
     val sheets = rememberSheetHost()
     val back = IconAction(CanvasCopy.BACK) { deps.navigator.pop() }
     val ready = load as? ProjectLoad.Ready
-    val canvas = ready?.let { CanvasEdits.resolveForRoute(it.doc, route.canvasKey) }
+    // N-58: switching canvases stays on this screen (one view model), so a delete toast's `되돌리기` keeps working.
+    var selected by rememberSaveable(route) { mutableStateOf(route.canvasKey) }
+    val canvas = ready?.let { CanvasEdits.resolveForRoute(it.doc, selected) }
     val state = when {
         ready == null -> BoardState.LOADING
         canvas == null -> BoardState.NO_CANVAS
@@ -110,7 +116,7 @@ fun CanvasBoardScreen(route: CanvasBoard, deps: FeatureDeps) {
             BoardState.LOADING -> CivilightScreen(title = "", smallLine = CanvasCopy.SMALL_LINE, back = back) { }
             BoardState.NO_CANVAS -> NoCanvas(shownReady?.readOnly ?: true, back, vm)
             BoardState.BOARD -> if (shownReady != null && shownCanvas != null) {
-                CanvasBoard(route, deps, vm, shownReady.doc, shownReady.readOnly, shownCanvas, sheets, back)
+                CanvasBoard(route, deps, vm, shownReady.doc, shownReady.readOnly, shownCanvas, sheets, back, onSwitch = { selected = it })
             }
         }
     }
@@ -141,6 +147,7 @@ private fun CanvasBoard(
     canvas: Canvas,
     sheets: SheetHost,
     back: IconAction,
+    onSwitch: (Key) -> Unit,
 ) {
     val projectKey = route.projectKey
     val cover = !LocalWindowLayout.current.isInner
@@ -174,15 +181,78 @@ private fun CanvasBoard(
         popover = false
     }
 
+    // N-58: several canvases. The create card and the rename card sit over the list sheet; after `만들기`
+    // the new row is highlighted for a moment (U-15.6).
+    var creating by remember { mutableStateOf<CreateCardState?>(null) }
+    var renaming by remember { mutableStateOf<Key?>(null) }
+    var highlighted by remember { mutableStateOf<Key?>(null) }
+    LaunchedEffect(highlighted) {
+        if (highlighted == null) return@LaunchedEffect
+        delay(CivilightMotion.createdRowHighlightMs.toLong())
+        highlighted = null
+    }
+    val openCanvas = { key: Key ->
+        if (key != canvas.key) {
+            sheets.closeAll()
+            clearSelection()
+            onSwitch(key)
+        }
+    }
+    val lensChip = lensChipLabel(doc)
+    val wide = LocalWindowLayout.current.isInner
+
     CivilightScreen(
         title = canvas.name,
         smallLine = CanvasCopy.SMALL_LINE,
         back = back,
-        lens = lensChipLabel(doc),
-        onLens = { sheets.open(LensSheet(projectKey)) },
+        topBar = {
+            CanvasTopBar(
+                name = canvas.name,
+                back = back,
+                wide = wide,
+                lens = lensChip,
+                onLens = { sheets.open(LensSheet(projectKey)) },
+                onName = { sheets.open(CanvasListSheet(projectKey, canvas.key)) },
+            )
+        },
         sheets = sheets,
         localSheets = { key ->
             when (key) {
+                is CanvasListSheet -> {
+                    {
+                        val view = remember(doc, canvas.key, readOnly, highlighted) { CanvasListModel.build(doc, canvas.key, readOnly, highlighted) }
+                        CanvasListContent(
+                            view = view,
+                            onCreate = { if (creating == null) creating = CreateCardState.open(CreateKind.CANVAS, CreateCardMode.LIST) },
+                            onOpen = { k -> close(); openCanvas(k) },
+                            onMenu = { k -> open(CanvasRowMenuSheet(projectKey, k, canvas.key)) },
+                        )
+                    }
+                }
+                is CanvasRowMenuSheet -> {
+                    {
+                        val row = remember(doc, key, readOnly) { CanvasListModel.build(doc, key.currentKey, readOnly).rows.firstOrNull { it.key == key.canvasKey } }
+                        CanvasRowMenuContent(
+                            row = row,
+                            onRename = { close(); renaming = key.canvasKey },
+                            onDelete = {
+                                close()
+                                vm.deleteCanvas(key.canvasKey) { r, deleted ->
+                                    if (r == EditResult.READ_ONLY) readOnlyToast()
+                                    if (r == EditResult.APPLIED && deleted != null) {
+                                        // `되돌리기` may come after the user left this screen (toasts outlive it): restore on the app
+                                        // scope, not the view model's.
+                                        deps.toasts.showFor(projectKey, deleted.toast.message, actionLabel = deleted.toast.action) {
+                                            CanvasWrites.launch(deps, projectKey, CanvasCopy.BTN_RESTORE) { d, ctx -> CanvasListEdits.restore(d, deleted.entryKey, ctx) ?: d }
+                                        }
+                                        // The open canvas was deleted: show the one home `캔버스` would open now.
+                                        if (key.canvasKey == canvas.key) CanvasListModel.afterDelete(deleted.doc)?.let(openCanvas)
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
                 is NodeEditSheet -> {
                     {
                         val view = remember(doc, key, gate.open, readOnly) { NodeEditModel.build(doc, key.canvasKey, key.nodeKey, gate.open, readOnly) }
@@ -354,6 +424,45 @@ private fun CanvasBoard(
             if (!cover && popover && sheets.top == null) {
                 InnerPopover(projectKey, canvas, doc, readOnly, gate, scene, sizes, vp, ui.selection, deps, vm, sheets, readOnlyToast, clearSelection)
             }
+        }
+    }
+    creating?.let { state ->
+        NameCreateCard(
+            state = state,
+            onChange = { creating = it },
+            onCancel = { creating = null },
+            onCreate = {
+                creating = null
+                vm.createCanvas(state.name) { r, made ->
+                    if (r == EditResult.READ_ONLY) readOnlyToast()
+                    if (r == EditResult.APPLIED) highlighted = made
+                }
+            },
+            onCreateAndOpen = {
+                creating = null
+                vm.createCanvas(state.name) { r, made ->
+                    if (r == EditResult.READ_ONLY) readOnlyToast()
+                    if (r == EditResult.APPLIED && made != null) {
+                        sheets.closeAll()
+                        openCanvas(made)
+                    }
+                }
+            },
+        )
+    }
+    renaming?.let { target ->
+        val current = CanvasEdits.canvas(doc, target)?.name
+        if (current == null) {
+            renaming = null
+        } else {
+            CanvasRenameCard(
+                current = current,
+                onCancel = { renaming = null },
+                onRename = { name ->
+                    renaming = null
+                    vm.renameCanvas(target, name) { r -> if (r == EditResult.READ_ONLY) readOnlyToast() }
+                },
+            )
         }
     }
 }

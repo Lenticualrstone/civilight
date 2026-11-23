@@ -50,7 +50,6 @@ import io.github.lenticualrstone.civilight.feature.story.bulk.BulkModel
 import io.github.lenticualrstone.civilight.navigation.BulkPlaceTime
 import io.github.lenticualrstone.civilight.navigation.CheckCenter
 import io.github.lenticualrstone.civilight.navigation.ProjectSearch
-import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 import io.github.lenticualrstone.civilight.ui.nav.LocalPaneRole
@@ -108,7 +107,6 @@ fun CheckCenterScreen(route: CheckCenter, deps: FeatureDeps) {
                 CommandBar(
                     hint = ui?.commandHint.orEmpty(),
                     onClick = { navigator.push(ProjectSearch(p)) },
-                    onMic = { navigator.push(Recording(projectKey = p)) },
                 )
             },
             sheets = sheets,

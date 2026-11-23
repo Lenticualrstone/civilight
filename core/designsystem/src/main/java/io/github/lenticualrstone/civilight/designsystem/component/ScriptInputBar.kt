@@ -104,6 +104,8 @@ class ScriptInputActions(
  * sends. [mergeOffReason] (`화자 다름` · `종류 다름` · scene start) dims `합치기`; null leaves it on.
  * [cues] draws the 연출 cue chips above the text (the caller passes it only with `게임 제작 도구` on).
  * [glass] false leaves out the bar's own glass and insets (a host that draws its own bar).
+ * [nextSceneEnabled] false dims `다음 씬` (`ink3`, not tappable, name `다음 씬 만들기 · 꺼짐`): the caller's rule
+ * (an empty scene would only be followed by another empty one).
  */
 @Composable
 fun ScriptInputBar(
@@ -117,6 +119,7 @@ fun ScriptInputBar(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     cues: (@Composable () -> Unit)? = null,
     glass: Boolean = true,
+    nextSceneEnabled: Boolean = true,
 ) {
     val ime = keyboardUp()
     val currentEvent by rememberUpdatedState(actions.onEvent)
@@ -131,7 +134,7 @@ fun ScriptInputBar(
             verticalArrangement = Arrangement.spacedBy(gap),
         ) {
             if (ScriptInputRules.showsToolRow(state, context.readOnly)) InputToolRow(state, context, actions)
-            InputChipRow(state, actions, context.readOnly, mergeOffReason, speakerMenuOpen, kindMenuOpen)
+            InputChipRow(state, actions, context.readOnly, mergeOffReason, speakerMenuOpen, kindMenuOpen, nextSceneEnabled)
             InputFieldRow(state, actions, context, visualTransformation, cues)
         }
     }
@@ -191,6 +194,7 @@ private fun InputChipRow(
     mergeOffReason: String?,
     speakerMenuOpen: Boolean,
     kindMenuOpen: Boolean,
+    nextSceneEnabled: Boolean,
 ) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 36.dp),
@@ -211,7 +215,7 @@ private fun InputChipRow(
             open = kindMenuOpen,
             onClick = actions.onKindChip,
         )
-        PlaceArea(state, actions, readOnly, mergeOffReason)
+        PlaceArea(state, actions, readOnly, mergeOffReason, nextSceneEnabled)
     }
 }
 
@@ -259,7 +263,7 @@ private fun ValueChip(name: String, value: String, dimmed: Boolean, open: Boolea
 
 /** The place area: one of `씬 3 끝에 · 다음 씬`, `씬 없음 · 다음 씬`, `#044 뒤에 · ✕`, `#044 고치기 · 나누기 · 합치기 · ✕`. */
 @Composable
-private fun RowScope.PlaceArea(state: ScriptInputState, actions: ScriptInputActions, readOnly: Boolean, mergeOffReason: String?) {
+private fun RowScope.PlaceArea(state: ScriptInputState, actions: ScriptInputActions, readOnly: Boolean, mergeOffReason: String?, nextSceneEnabled: Boolean) {
     val colors = CivilightTheme.colors
     val place = ScriptInputRules.place(state)
     Row(
@@ -270,11 +274,11 @@ private fun RowScope.PlaceArea(state: ScriptInputState, actions: ScriptInputActi
         when (place) {
             is InputPlace.SceneEnd -> {
                 SceneEndLabel(place.number, state.sceneFlash)
-                if (ScriptInputRules.showsNextScene(state, readOnly)) NextSceneButton(actions.onNextScene)
+                if (ScriptInputRules.showsNextScene(state, readOnly)) NextSceneButton(nextSceneEnabled, actions.onNextScene)
             }
             InputPlace.NoScene -> {
                 CivilightText(ScriptInputCopy.NO_SCENE, PLACE_TEXT, color = colors.ink3, maxLines = 1)
-                if (ScriptInputRules.showsNextScene(state, readOnly)) NextSceneButton(actions.onNextScene)
+                if (ScriptInputRules.showsNextScene(state, readOnly)) NextSceneButton(nextSceneEnabled, actions.onNextScene)
             }
             is InputPlace.After -> {
                 CivilightText(ScriptInputCopy.after(place.number), PLACE_BOLD, Modifier.weight(1f, fill = false), color = colors.ink, maxLines = 1)
@@ -346,19 +350,24 @@ private fun SceneEndLabel(number: Int, flash: Int) {
     }
 }
 
-/** `다음 씬` (class b): icon `next_scene` 16 + text, `acc` 600, accessibility name `다음 씬 만들기`. */
+/**
+ * `다음 씬` (class b): icon `next_scene` 16 + text, `acc` 600, accessibility name `다음 씬 만들기`. Off: `ink3` 500,
+ * not tappable, name `다음 씬 만들기 · 꺼짐`.
+ */
 @Composable
-private fun NextSceneButton(onClick: () -> Unit) {
+private fun NextSceneButton(enabled: Boolean, onClick: () -> Unit) {
     val colors = CivilightTheme.colors
+    val content = if (enabled) colors.acc else colors.ink3
     IconLabelButton(
         icon = IconId.NextScene,
         label = IconButtonCopy.NEXT_SCENE,
         onClick = onClick,
-        contentDescription = IconButtonCopy.NEXT_SCENE_NAME,
-        tint = colors.acc,
-        labelColor = colors.acc,
-        labelStyle = PLACE_BOLD,
+        contentDescription = if (enabled) IconButtonCopy.NEXT_SCENE_NAME else IconButtons.offName(IconButtonCopy.NEXT_SCENE_NAME),
+        tint = content,
+        labelColor = content,
+        labelStyle = if (enabled) PLACE_BOLD else PLACE_TEXT,
         iconSize = 16.dp,
+        enabled = enabled,
     )
 }
 

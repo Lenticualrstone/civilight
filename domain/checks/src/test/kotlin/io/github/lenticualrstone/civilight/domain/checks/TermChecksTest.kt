@@ -6,6 +6,9 @@ import io.github.lenticualrstone.civilight.domain.story.checks.CheckFilter
 import io.github.lenticualrstone.civilight.domain.world.term.CandidateIndex
 import io.github.lenticualrstone.civilight.domain.world.term.TermFingerprints
 import io.github.lenticualrstone.civilight.domain.world.term.TermQueries
+import io.github.lenticualrstone.civilight.domain.world.term.ScriptSpot
+import io.github.lenticualrstone.civilight.domain.world.term.TermReveals
+import io.github.lenticualrstone.civilight.domain.world.term.isAuto
 import io.github.lenticualrstone.civilight.model.change.Anchor
 import io.github.lenticualrstone.civilight.model.checks.AckKind
 import io.github.lenticualrstone.civilight.model.checks.CheckType
@@ -73,22 +76,25 @@ class TermChecksTest {
         assertEquals(CheckFilter.TERM, candidates.single().filter)
     }
 
+    /**
+     * (0.2.0, S-5, D12) Without a hand-set reveal, a term used with `@` is revealed automatically at its first
+     * usage link, so `◇ 첫 공개 없음` no longer fires for it (usage links are manuscript links only, and any
+     * one of them is an automatic reveal) and nothing is `▲ 공개 전 사용`.
+     */
     @Test
-    fun termWithoutRevealRaisesNoRevealRow() {
+    fun termWithoutStoredRevealIsRevealedAtItsFirstUse() {
         val noReveal = doc.copy(changes = doc.changes.copy(records = doc.changes.records.map {
             if (it.key == K.R9) it.copy(deletedAt = 1L, trashEntryKey = "01JZ000000TRSH999999999999") else it
         }))
+        val queries = TermQueries(noReveal, CandidateIndex.build(noReveal))
+        val usage = queries.usage(K.TERM_ORIGINIUM_LANTERN)
+        assertEquals(2, usage.size)
+        val reveal = queries.reveal(K.TERM_ORIGINIUM_LANTERN)!!
+        assertTrue(reveal.isAuto)
+        assertEquals(TermReveals.anchorOf(usage.first().spot as ScriptSpot), reveal.record.anchor)
         val report = Fx.run(noReveal)
-        val row = report.ofType(CheckType.TERM_NO_REVEAL).single()
-        assertEquals("◇ 첫 공개 없음", row.title)
-        assertEquals("용어 · 오리지늄 등불", row.location)
-        assertEquals("오리지늄 등불 · 쓰인 곳 2", row.body)
-        val chip = row.actions.first()
-        assertEquals(FixKind.SET_REVEAL, chip.kind)
-        assertTrue(chip.label, chip.label.startsWith("1-4 씬 2") && chip.label.endsWith("첫 공개로"))
-        assertEquals("원고로 가기", row.actions.last().label)
+        assertTrue(report.ofType(CheckType.TERM_NO_REVEAL).isEmpty())
         assertTrue(report.ofType(CheckType.TERM_BEFORE_REVEAL).isEmpty())
-        assertTrue(report.ofType(CheckType.TERM_CANDIDATE_BEFORE_REVEAL).isEmpty())
     }
 
     /** A term revealed beyond the 집필 선: its pre-reveal links fold into `잿불의 서약 · ▲ n`. */

@@ -26,6 +26,7 @@ import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.model.sample.ExampleKeys
 import io.github.lenticualrstone.civilight.model.sample.ExampleProject
+import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -83,7 +84,7 @@ class RatingSheetTest {
         assertFalse(access.groupOpen)
         assertTrue(access.isProjectOpen(doc.key))
         val profile = ProjectProfile.of(doc)
-        assertEquals("R-18", ProjectSurfaces.recorderLinkLabel(profile, access))
+        assertEquals(RatingLabels.MASKED_PROJECT, ProjectSurfaces.recorderLinkLabel(profile, access))
         assertTrue(oneLinkedRecord().records.single().runs.joinToString("") { it.shownText }.startsWith("하르트가 등불을 싫어하는 이유"))
 
         val recent = RecentItem(Fixtures.keys()(), doc.key, RecentKind.SCENE, ExampleKeys.SCENE_1_7_3, Fixtures.NOW)

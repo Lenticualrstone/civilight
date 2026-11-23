@@ -51,6 +51,10 @@ class CastCopyLintTest {
         add(CastUiCopy.linkChange(3, "노아", "오웬"))
         add(CastUiCopy.gallerySection(8))
         add(CastUiCopy.galleryChip(8))
+        add(CastUiCopy.tagDeleteTitle("주연"))
+        add(CastUiCopy.tagUsers(3))
+        add(CastUiCopy.tagImages(1))
+        add(CastUiCopy.tagDeleted("주연"))
     }
 
     @Test

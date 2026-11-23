@@ -121,8 +121,6 @@ fun PolygonRegionsScreen(route: PolygonRegionsRoute, deps: FeatureDeps) {
         title = ui?.title ?: MapCopy.POLY_TITLE,
         smallLine = ui?.small,
         back = mapBack(deps),
-        lens = d?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
         banner = if (readOnly) ({ ReadOnlyBanner(MapCopy.READ_ONLY) }) else null,
         sheets = sheets,
         localSheets = { key ->

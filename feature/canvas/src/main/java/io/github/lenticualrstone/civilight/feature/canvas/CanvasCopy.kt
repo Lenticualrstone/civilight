@@ -24,6 +24,28 @@ object CanvasCopy {
      */
     const val NEW_CANVAS_NAME = "캔버스"
 
+    // --- Several canvases (N-58; words from the vocabulary and the 서재 ⋯ menu, see Requests) ---
+    /** Accessibility name of the canvas name `▾` in the head (opens the list sheet). */
+    const val LIST_OPEN = "캔버스 목록"
+
+    /** Title of the list sheet. */
+    const val LIST_TITLE = SMALL_LINE
+
+    /** `노드 6`: the sub-line of a list row. */
+    fun nodeCount(n: Int): String = "$TOOL_NODE_WORD $n"
+    private const val TOOL_NODE_WORD = "노드"
+
+    /** A row's `⋯` (icon list: ⋯ name `메뉴`). */
+    const val ROW_MENU = "메뉴"
+    const val BTN_RENAME = "이름 바꾸기"
+    const val BTN_DELETE = "지우기"
+
+    /** The rename card: title, field label, confirm (c-class `바꾸기`). */
+    const val RENAME_TITLE = BTN_RENAME
+    const val FIELD_NAME = "이름"
+    const val BTN_CHANGE = "바꾸기"
+    const val BTN_CANCEL = "취소"
+
     // --- Tool bar (CNV-03) ---
     const val TOOL_NODE = "노드"
     const val TOOL_CHARACTER_INNER = "인물 카드"
@@ -129,4 +151,6 @@ object CanvasCopy {
     const val UNDO_LINE = TOOL_LINE
     const val UNDO_NEW_CANVAS = SMALL_LINE
     const val UNDO_REMOVE = TOOL_NODE
+    const val UNDO_RENAME = BTN_RENAME
+    const val UNDO_DELETE = BTN_DELETE
 }

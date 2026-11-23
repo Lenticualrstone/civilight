@@ -17,6 +17,8 @@ import io.github.lenticualrstone.civilight.feature.script.editor.LinkLook
 import io.github.lenticualrstone.civilight.feature.script.editor.SpanKind
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.game.GameTools
+import io.github.lenticualrstone.civilight.domain.script.ReadAloud
 import io.github.lenticualrstone.civilight.model.script.Block
 import io.github.lenticualrstone.civilight.model.script.BlockKind
 import io.github.lenticualrstone.civilight.model.script.ScriptLayers
@@ -131,6 +133,8 @@ data class BlockRow(
     val preReveal: Boolean = false,
     /** The memo was put in by the Life Recorder: its source record (SCR-59). */
     val recorderRecordKey: Key? = null,
+    /** (0.2.0) `고치기` is not offered: it would show hidden text in the field ([ScriptRows.editLocked]). */
+    val editLocked: Boolean = false,
 ) : ScriptRow {
     override val key: String get() = ScriptRowKeys.block(blockKey)
 
@@ -160,10 +164,7 @@ object ScriptRows {
             when (row) {
                 is Manuscript.Row.Head -> {
                     out += HeadRow(row.sceneKey, HeadTitles.of(doc, row.sceneKey, row.text), row.transitionLine, row.hiddenTag, Labels.sceneOrdinal(doc, row.sceneKey) ?: 0)
-                    val empty = doc.manuscript.liveBlocksOf(row.sceneKey).isEmpty()
-                    if (empty && !readOnly && preview == ScriptPreview.WRITE) {
-                        out += EmptySceneRow(row.sceneKey, inheritedSpeaker(doc, row.sceneKey))
-                    }
+                    // (0.2.0, SCR-01) An empty scene draws only its head; a send writes its first block.
                 }
                 is Manuscript.Row.HiddenScene -> out += HiddenSceneRow(row.sceneKey, row.text)
                 is Manuscript.Row.BlockRow -> out += blockRow(doc, row, layers, unlocked, zone, terms)
@@ -212,7 +213,8 @@ object ScriptRows {
             BlockOps.orderedOptions(block).mapIndexed { i, o ->
                 OptionLine(
                     index = "${i + 1}",
-                    text = if (layers.paren) Runs.displayText(o.runs) else Runs.exportText(o.runs, includeParens = false),
+                    // SCR-55: a link to a locked hidden item reads `숨긴 인물` / `숨긴 항목`.
+                    text = Runs.shownText(doc, o.runs, unlocked, includeParens = layers.paren),
                     number = Labels.optionNumber(block.number, i + 1),
                     optionKey = o.key,
                 )
@@ -227,7 +229,8 @@ object ScriptRows {
             runs = block.runs,
             linkLooks = linkLooks(doc, block, unlocked),
             // SCR-08: cues read with Korean effect names (`화면 효과 페이드`).
-            text = if (kind == BlockKind.DIRECTION) DirectionCues.blockLine(doc, block.cues) else row.text,
+            // (0.2.0, SCR-08) The 연출 text line; the cue summary with `게임 제작 도구` on, or alone on a cue-only block.
+            text = if (kind == BlockKind.DIRECTION) "▸ " + ReadAloud.directionText(doc, block, GameTools.on(doc), unlocked) else row.text,
             memoPrefix = if (kind == BlockKind.MEMO) Manuscript.memoPrefix(block, zone) else null,
             options = options,
             speakerMarks = speakerMarks,
@@ -237,14 +240,29 @@ object ScriptRows {
             termCandidates = termMarks.candidates,
             preReveal = termMarks.preReveal,
             recorderRecordKey = block.recorderSource?.recordKey.takeIf { kind == BlockKind.MEMO },
+            editLocked = editLocked(doc, block, unlocked),
         )
+    }
+
+    /**
+     * `고치기` would put hidden text into the field: the block links a hidden item, or its speaker is hidden,
+     * while the gate is locked (SCR-55, rule 19). The swipe drops its `고치기` button then.
+     */
+    fun editLocked(doc: ProjectDoc, block: Block, unlocked: Boolean): Boolean {
+        if (unlocked) return false
+        if (block.speakerKey?.let { doc.index.character(it) }?.hidden == true) return true
+        return Runs.blockHidesLink(doc, block, unlocked)
     }
 
     /** Domain label → model; an empty dialogue block without a speaker reads `화자 없음` neutrally. */
     fun speakerOf(label: Manuscript.SpeakerLabel?, block: Block): SpeakerModel = when (label) {
-        is Manuscript.SpeakerLabel.Named ->
-            SpeakerModel(label.displayName ?: label.name, label.name.takeIf { label.displayName != null }, SpeakerLook.NAMED, block.speakerKey)
-        Manuscript.SpeakerLabel.Missing -> SpeakerModel(Manuscript.SpeakerLabel.Missing.TEXT, null, SpeakerLook.MISSING, null)
+        // (0.2.0, N-43, SCR-20) A per-block display name wins: `경비병 (하르트)`.
+        is Manuscript.SpeakerLabel.Named -> block.displayNameOverride?.takeIf { it.isNotBlank() }?.let { own ->
+            SpeakerModel(own, "(${label.name})", SpeakerLook.NAMED, block.speakerKey)
+        } ?: SpeakerModel(label.displayName ?: label.name, label.name.takeIf { label.displayName != null }, SpeakerLook.NAMED, block.speakerKey)
+        Manuscript.SpeakerLabel.Missing -> block.displayNameOverride?.takeIf { it.isNotBlank() }?.let { own ->
+            SpeakerModel(own, "(${Manuscript.SpeakerLabel.Missing.TEXT})", SpeakerLook.MISSING, null)
+        } ?: SpeakerModel(Manuscript.SpeakerLabel.Missing.TEXT, null, SpeakerLook.MISSING, null)
         Manuscript.SpeakerLabel.Hidden -> SpeakerModel(Manuscript.SpeakerLabel.Hidden.TEXT, null, SpeakerLook.HIDDEN, block.speakerKey)
         is Manuscript.SpeakerLabel.Deleted -> SpeakerModel(label.text, null, SpeakerLook.DELETED, block.speakerKey)
         null -> SpeakerModel(Manuscript.SpeakerLabel.Missing.TEXT, null, SpeakerLook.UNSET, null)

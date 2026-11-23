@@ -8,7 +8,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.RadioRow
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
-import io.github.lenticualrstone.civilight.navigation.SettingsRating
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 
 /**
@@ -43,6 +42,6 @@ internal fun HidingSettingsScreen(services: LibraryServices) {
             trailing = ui.biometricStatus?.let { status -> { CivilightText(status, type.small, color = colors.ink2, maxLines = 1) } },
         )
         SwitchSettingRow(ui.backupHidden, vm::setBackupHidden)
-        LinkRow(ui.ratingRules) { navigator.push(SettingsRating) }
+        // (0.2.0, LIB-92) `수위 등급별 동작` left: the 설정 · 수위 등급 screen has no entry point.
     }
 }

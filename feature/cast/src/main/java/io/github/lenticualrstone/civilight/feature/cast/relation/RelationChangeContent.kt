@@ -46,7 +46,7 @@ import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.feature.cast.field.rememberCastEditor
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
-import io.github.lenticualrstone.civilight.ui.picker.CharacterPickerSheet
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCharacterPicker
 import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.project.currentProjectStore
 
@@ -89,12 +89,12 @@ fun SheetScope.RelationChangeContent(projectKey: Key, blockKey: Key, viewerKey: 
     ContentSwap(picking, label = "changeStep") { which ->
         Column(Modifier.fillMaxWidth()) {
             if (which != null) {
-                CharacterPickerSheet(doc, gate, onPick = { picked ->
+                CastCharacterPicker(projectKey, doc, gate, CastUiCopy.PICK_PARTNER, onPick = { picked ->
                     if (which == PARTNER && picked != viewer) partner = picked
                     if (which == VIEWER && picked != partner) viewer = picked
                     chosen.clear()
                     picking = null
-                }, onClose = { picking = null }, title = CastUiCopy.PICK_PARTNER)
+                }, onClose = { picking = null })
             } else if (other != null && view != null && everySection != null) {
                 SheetHeader(view.title, onClose = host::close, subtitle = view.sub, closeLabel = view.cancelLabel)
                 SheetScrollBody {

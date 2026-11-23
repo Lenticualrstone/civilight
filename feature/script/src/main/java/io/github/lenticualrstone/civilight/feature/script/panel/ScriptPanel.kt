@@ -192,6 +192,46 @@ fun PropsTab(model: PropsModel, actions: PanelActions, wide: Boolean) {
             val tap = record?.let { Modifier.pressable(PressAction.Click({ actions.openRecord(it) }), role = Role.Button, scaleOnPress = false) } ?: Modifier
             Box(tap) { PropFieldView(field) {} }
         }
+        // (0.2.0, N-43, SCR-78) `이 블록만 · 표시 이름`: saved when the field loses focus or its IME action runs.
+        model.blockDisplayName?.let { value ->
+            if (model.readOnly) {
+                if (value.isNotEmpty()) PropFieldView(PropField(io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.BLOCK_DISPLAY_NAME, value)) {}
+            } else {
+                BlockNameField(block, value, actions.setBlockDisplayName)
+            }
+        }
+        // (0.2.0, N-41, SCR-77) Foreshadowing and the memo to-do.
+        model.todo?.let { on ->
+            io.github.lenticualrstone.civilight.designsystem.component.SwitchRow(
+                title = io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.TODO,
+                checked = on,
+                onCheckedChange = { actions.setTodo(block, it) },
+                enabled = !model.readOnly,
+                divider = false,
+            )
+            if (on) {
+                io.github.lenticualrstone.civilight.designsystem.component.CheckboxRow(
+                    label = io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.DONE,
+                    checked = model.todoDone,
+                    onCheckedChange = { actions.setTodoDone(block, it) },
+                    enabled = !model.readOnly,
+                    divider = false,
+                )
+            }
+        }
+        model.marks.forEach { line ->
+            CivilightText(
+                line, type.small,
+                if (model.readOnly) Modifier else Modifier.pressable(PressAction.Click({ actions.mentionOrPayoff(block) }), role = Role.Button, hitTarget = HitTarget.SMALL, scaleOnPress = false),
+                color = colors.ink2,
+            )
+        }
+        if (!model.readOnly) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (model.canPlant) TextAction(io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.PLANT, { actions.plant(block) }, color = colors.ink)
+                TextAction(io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.MENTION_OR_PAYOFF, { actions.mentionOrPayoff(block) }, color = colors.ink)
+            }
+        }
         // SCR-36: the visible way into `블록 고르기` (the spec draws no entry, Q-17).
         if (!model.readOnly) actions.selectMode?.let { enter ->
             TextAction(io.github.lenticualrstone.civilight.feature.script.select.MoveCopy.TITLE, { enter(block) }, color = colors.ink)
@@ -244,5 +284,42 @@ private fun ManualVoiceField(blockKey: Key, stored: String, onCommit: (String) -
         keyboardActions = KeyboardActions(onDone = { if (text != stored) onCommit(text) }),
         textStyle = CivilightTheme.type.number.merge(TextStyle(fontSize = 13.sp)),
         modifier = Modifier.onFocusChanged { if (!it.hasFocus && text != stored) onCommit(text) },
+    )
+}
+
+/** `이 블록만 · 표시 이름` (SCR-78): a one-line field saved on focus loss or Done. */
+@Composable
+private fun BlockNameField(
+    blockKey: io.github.lenticualrstone.civilight.model.Key,
+    stored: String,
+    onSave: (blockKey: io.github.lenticualrstone.civilight.model.Key, value: String) -> Unit,
+) {
+    // One text state per block (not per stored value), so leaving the block can still read what was typed.
+    val textState = androidx.compose.runtime.saveable.rememberSaveable(blockKey) { androidx.compose.runtime.mutableStateOf(stored) }
+    var text by textState
+    var focused by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    // The stored value of this block, read when the field leaves (closing the sheet, another block selected).
+    val storedOfBlock = androidx.compose.runtime.remember(blockKey) { arrayOf(stored) }
+    androidx.compose.runtime.SideEffect { storedOfBlock[0] = stored }
+    val save by androidx.compose.runtime.rememberUpdatedState(onSave)
+    // Undo or another screen changed the name: the field follows while it is not being typed in.
+    androidx.compose.runtime.LaunchedEffect(blockKey, stored) { if (!focused) text = stored }
+    androidx.compose.runtime.DisposableEffect(blockKey) {
+        // Captured per block: a save on leaving goes to this block, never to the next one.
+        val key = blockKey
+        val state = textState
+        val storedRef = storedOfBlock
+        onDispose { if (state.value.trim() != storedRef[0]) save(key, state.value) }
+    }
+    io.github.lenticualrstone.civilight.designsystem.component.CivilightTextField(
+        value = text,
+        onValueChange = { text = it },
+        modifier = Modifier.onFocusChanged { f ->
+            if (focused && !f.isFocused && text.trim() != stored) onSave(blockKey, text)
+            focused = f.isFocused
+        },
+        label = io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.BLOCK_DISPLAY_NAME,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (text.trim() != stored) onSave(blockKey, text) }),
     )
 }

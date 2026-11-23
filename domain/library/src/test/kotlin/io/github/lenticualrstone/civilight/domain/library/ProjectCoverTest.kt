@@ -52,7 +52,7 @@ class ProjectCoverTest {
         val menu = ProjectMenus.of(glass)
         assertEquals(
             listOf(
-                ProjectMenuAction.OPEN, ProjectMenuAction.RENAME, ProjectMenuAction.COVER, ProjectMenuAction.RATING,
+                ProjectMenuAction.OPEN, ProjectMenuAction.RENAME, ProjectMenuAction.COVER,
                 ProjectMenuAction.HIDE, ProjectMenuAction.BACKUP_EXPORT, ProjectMenuAction.DELETE,
             ),
             menu.rows.map { it.action },

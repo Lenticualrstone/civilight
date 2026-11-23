@@ -1,5 +1,14 @@
 package io.github.lenticualrstone.civilight.feature.cast.kinds
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardCopy
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardState
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreate
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreateCard
+import io.github.lenticualrstone.civilight.feature.cast.create.CreateCardCodec
+import io.github.lenticualrstone.civilight.ui.project.EditResult
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -92,6 +101,13 @@ fun RelationKindSettingsScreen(route: RelationKindSettings, deps: FeatureDeps) {
     val sheets = rememberSheetHost()
     val editable = !ready.readOnly
     val p = route.projectKey
+    // CST-76: `+ 새 종류` opens the create card; the section gives the category.
+    var kindCard by rememberSaveable(stateSaver = KindCardSaver) { mutableStateOf<CreateCardState?>(null) }
+    var kindCategory by rememberSaveable { mutableStateOf(RelationCategory.BETWEEN.name) }
+    val openCard: (RelationCategory) -> Unit = { category ->
+        kindCategory = category.name
+        kindCard = CreateCardState.open(CreateKind.RELATION_KIND, CreateCardMode.LIST)
+    }
     CenterColumn {
         CivilightScreen(
             title = CastUiCopy.KIND_TITLE,
@@ -132,14 +148,44 @@ fun RelationKindSettingsScreen(route: RelationKindSettings, deps: FeatureDeps) {
                         onClick = { sheets.open(KindEditSheet(p, row.key)) },
                     )
                 }
-                if (editable) AddChip(CastUiCopy.KIND_NEW, { sheets.open(NewKindSheet(p, RelationCategory.BETWEEN)) }, Modifier.padding(top = 10.dp))
+                if (editable) AddChip(CastUiCopy.KIND_NEW, { openCard(RelationCategory.BETWEEN) }, Modifier.padding(top = 10.dp))
                 SectionLabel(settings.mindTitle, Modifier.padding(top = 26.dp), trailing = settings.mindNote, trailingAccent = false)
                 KindChips(settings.minds) { sheets.open(KindEditSheet(p, it)) }
-                if (editable) AddChip(CastUiCopy.KIND_NEW, { sheets.open(NewKindSheet(p, RelationCategory.MIND)) }, Modifier.padding(top = 6.dp))
+                if (editable) AddChip(CastUiCopy.KIND_NEW, { openCard(RelationCategory.MIND) }, Modifier.padding(top = 6.dp))
             }
+        }
+        var kindBusy by remember { mutableStateOf(false) }
+        kindCard?.takeIf { editable }?.let { card ->
+            val category = RelationCategory.valueOf(kindCategory)
+            val finish: (Boolean) -> Unit = { openAfter ->
+                val made = card
+                kindBusy = true
+                var created: Key? = null
+                // The card closes only once the write applied; otherwise the typed values stay.
+                vm.act(CreateCardCopy.CREATE, then = { result ->
+                    kindBusy = false
+                    if (result == EditResult.APPLIED && created != null) kindCard = null
+                    if (openAfter && result == EditResult.APPLIED) created?.let { sheets.open(KindEditSheet(p, it)) }
+                }) { d, ctx -> CastCreate.createKind(d, category, made, ctx)?.let { (next, k) -> created = k; next } ?: d }
+            }
+            CastCreateCard(
+                state = card,
+                onChange = { kindCard = it },
+                onCancel = { kindCard = null },
+                onCreate = { finish(false) },
+                onCreateAndOpen = { finish(true) },
+                // CST-76: a name the section already has is refused (the row is listed above).
+                canCreate = !kindBusy && CastCreate.canCreateKind(ready.doc, category, card),
+                fields = CastCreate.kindFields(between = category == RelationCategory.BETWEEN),
+            )
         }
     }
 }
+
+private val KindCardSaver: Saver<CreateCardState?, String> = Saver(
+    save = { it?.let(CreateCardCodec::encode) ?: "" },
+    restore = { CreateCardCodec.decode(it) },
+)
 
 @Composable
 private fun KindChips(rows: List<KindRow>, onOpen: (Key) -> Unit) {

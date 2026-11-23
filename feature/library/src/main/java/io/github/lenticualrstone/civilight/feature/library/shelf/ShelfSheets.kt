@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.library.shelf
 
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -57,7 +59,7 @@ internal fun iconOf(action: ProjectMenuAction): ImageVector = when (action) {
 }
 
 /**
- * The ⋯ sheet: project name (`title`) + `닫기`, badge + `<format> · 씬 <s>개 · 인물 <c> · 페이지 <p>`,
+ * The ⋯ sheet: project name (`title`) + `닫기`, `<format> · 씬 <s>개 · 인물 <c> · 페이지 <p>`,
  * then the rows of [ProjectMenus] (the example shows only `열기`). Content of a protected project, so
  * the window is protected while it is open (LIB-26).
  */
@@ -75,8 +77,10 @@ internal fun SheetScope.ProjectMenuContent(
     ProtectWindow(WindowProtection.forProject(doc.project.protections))
     Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         CivilightText(menu.title, type.title, Modifier.weight(1f), color = colors.ink, maxLines = 1)
-        TextAction(menu.close, scope::close)
+        // DS-70 A6: the sheet head `닫기` is the `close` icon with its name.
+        CivilightIconButton(IconButtonSpec.CLOSE, scope::close)
     }
+    // (0.2.0, LIB-92) The sub line without a rating badge.
     BadgeLine(RatingLabels.effective(doc.project.rating), menu.sub, Modifier.padding(top = 2.dp))
     SheetScrollBody(Modifier.padding(top = 10.dp)) {
         menu.rows.forEach { row ->

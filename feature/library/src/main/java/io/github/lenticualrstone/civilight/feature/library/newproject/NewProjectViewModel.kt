@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.library.newproject
 
+import io.github.lenticualrstone.civilight.model.project.Rating
+import io.github.lenticualrstone.civilight.model.app.RatingDefaults
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.domain.library.masking.ProjectProfile
@@ -85,8 +87,10 @@ internal class NewProjectViewModel(private val services: LibraryServices) : View
             try {
                 val result = ProjectCreator.create(
                     ports = StoreCreatorPorts(services),
-                    form = form,
-                    defaults = deps.settings.value.ratingDefaults,
+                    // (0.2.0, LIB-92, G-01) A new project is `all` with every protection off: no rating can come in
+                    // from a restored draft, and the stored defaults are not read.
+                    form = form.copy(rating = Rating.ALL),
+                    defaults = RatingDefaults(),
                     ctx = stores.actionContext(),
                     bundleSource = sourceDoc(form),
                     notation = deps.settings.value.defaultSceneNotation,

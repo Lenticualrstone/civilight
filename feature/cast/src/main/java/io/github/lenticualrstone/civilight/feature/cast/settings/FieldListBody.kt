@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.cast.settings
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -251,11 +254,13 @@ internal fun AddFieldRow(modifier: Modifier, onClick: () -> Unit) {
             .topHairline(colors.line)
             .pressable(onClick = onClick, scaleOnPress = false, onClickLabel = CastUiCopy.ADD_FIELD_TITLE)
             .heightIn(min = 44.dp)
-            .padding(vertical = 4.dp),
+            .padding(vertical = 4.dp)
+            // Icon list `＋ 항목` (class b, B12): the short label is read as the full name `항목 넣기`.
+            .semantics { contentDescription = IconButtonSpec.ADD_FIELD.accessibilityName },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CivilightIcon(IconId.Plus, contentDescription = null, tint = colors.ink2)
-        CivilightText(CastUiCopy.ADD_FIELD_ROW, CivilightTheme.type.label, Modifier.weight(1f), color = colors.ink)
+        CivilightText(CastUiCopy.ADD_FIELD_ROW, CivilightTheme.type.label, Modifier.weight(1f).clearAndSetSemantics { }, color = colors.ink)
     }
 }

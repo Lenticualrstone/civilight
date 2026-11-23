@@ -89,8 +89,6 @@ import io.github.lenticualrstone.civilight.ui.tour.TourStepAbsent
 import io.github.lenticualrstone.civilight.domain.library.onboarding.TourModule
 import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
 import io.github.lenticualrstone.civilight.feature.library.newproject.startNewProject
-import io.github.lenticualrstone.civilight.feature.library.rating.RatingPickContent
-import io.github.lenticualrstone.civilight.feature.library.rating.RatingPickSheet
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.navigation.ExportSheet
@@ -99,7 +97,6 @@ import io.github.lenticualrstone.civilight.navigation.ProjectHome
 import io.github.lenticualrstone.civilight.navigation.ProjectRoute
 import io.github.lenticualrstone.civilight.navigation.Settings
 import io.github.lenticualrstone.civilight.navigation.RecorderInbox
-import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.RestoreBackup
 import io.github.lenticualrstone.civilight.navigation.Script
 import io.github.lenticualrstone.civilight.navigation.SheetKey
@@ -126,6 +123,7 @@ internal fun LibraryScreen(services: LibraryServices) {
     LaunchedEffect(Unit) { services.backups.load() }
     val vm = entryViewModel { LibraryViewModel(services) }
     val ui by vm.state.collectAsState()
+    val view by vm.view.collectAsState()
     val docs by vm.documents.collectAsState()
     val sheets = rememberSheetHost()
     val sheetRegistry = LocalSheetRegistry.current
@@ -215,10 +213,8 @@ internal fun LibraryScreen(services: LibraryServices) {
                 close()
                 openSheet(RenameSheet(key))
             }
-            ProjectMenuAction.RATING -> {
-                close()
-                openSheet(RatingPickSheet(key))
-            }
+            // (0.2.0, LIB-92) The ⋯ sheet no longer offers `수위 등급`; nothing to open.
+            ProjectMenuAction.RATING -> close()
             ProjectMenuAction.HIDE -> {
                 close()
                 vm.hide(key)
@@ -257,8 +253,11 @@ internal fun LibraryScreen(services: LibraryServices) {
             title = ShelfCopy.TITLE,
             smallLine = ShelfCopy.SMALL,
             actions = {
-                // LIB-04: `목록 | 카드` left of `+`, in both views (board `LibCards`).
-                ViewToggle(showCards = ui.showCards, onChange = vm::showCards)
+                // (0.2.0, LIB-93) `목록` · <chosen 3D view> left of `+`; not drawn while the style is `목록` or has no
+                // renderer yet (ShelfViews), so the toggle never switches between two identical lists.
+                view.toggle?.let { toggle ->
+                    ViewToggle(showCards = toggle.styleOn, onChange = vm::showStyle, listLabel = toggle.listLabel, cardLabel = toggle.styleLabel)
+                }
                 // `ED`: no board draws the way into 설정 (LIB-63); a labelled icon button.
                 CivilightIconButton(
                     IconId.Props,
@@ -283,8 +282,6 @@ internal fun LibraryScreen(services: LibraryServices) {
                 CommandBar(
                     hint = ShelfCopy.SEARCH_HINT,
                     onClick = { navigator.push(LibrarySearch()) },
-                    onMic = { navigator.push(Recording(surface = "commandBar")) },
-                    micLabel = ShelfCopy.RECORDER,
                 )
             },
             sheets = sheets,
@@ -317,9 +314,6 @@ internal fun LibraryScreen(services: LibraryServices) {
                             }
                         }
                     }
-                    is RatingPickSheet -> sheetBody {
-                        docs[key.projectKey]?.takeIf { ui.shows(key.projectKey) }?.let { doc -> RatingPickContent(key.projectKey, RatingLabels.effective(doc.project.rating)) }
-                    }
                     else -> null
                 }
             },
@@ -327,7 +321,9 @@ internal fun LibraryScreen(services: LibraryServices) {
           BoxWithConstraints(Modifier.fillMaxSize()) {
             val wide = ShelfCards.isWide(maxWidth.value.toInt())
             val inset = CardMetrics.inset(wide).dp
-            val cardsOn = ui.showCards && ui.empty == null
+            // (0.2.0, LIB-93) The chosen 3D view when it has a renderer and there are projects; else the list.
+            val renderer = view.rendered?.let(ShelfViewRenderers::of)
+            val cardsOn = renderer != null && ShelfViews.drawsView(view, ui)
             // Loading → content (audit row 7): nothing is drawn until the stores answered, then it fades in.
             ContentSwap(ui.loaded, Modifier.fillMaxSize(), label = "shelfLoaded") { loaded ->
               if (loaded) {
@@ -348,15 +344,16 @@ internal fun LibraryScreen(services: LibraryServices) {
                         ) {
                             if (showCards) {
                                 item(key = "cards") {
-                                    ProjectCardsBlock(
-                                        ui = ui,
-                                        wide = wide,
-                                        covers = covers,
-                                        unhide = unhide,
-                                        onOpen = ::openProject,
-                                        onMenu = { sheets.open(ShelfMenuSheet(it)) },
-                                        onUnlock = vm::unlockHiddenGroup,
-                                        onNewProject = { services.startNewProject() },
+                                    // The extension point (ShelfViewRenderers): wave 3 draws each 3D view from the masked ShelfUi.
+                                    renderer?.invoke(
+                                        ShelfViewInput(
+                                            ui = ui,
+                                            wide = wide,
+                                            onOpen = ::openProject,
+                                            onMenu = { sheets.open(ShelfMenuSheet(it)) },
+                                            onUnlock = vm::unlockHiddenGroup,
+                                            onNewProject = { services.startNewProject() },
+                                        ),
                                     )
                                 }
                                 item(key = "recents") {
@@ -406,12 +403,14 @@ internal fun LibraryScreen(services: LibraryServices) {
                                         ContentSwap(groupKind, Modifier.padding(horizontal = SIDE), label = "hiddenGroup") { kind ->
                                             when (kind) {
                                                 GroupKind.LOCKED -> lastLock?.let { group ->
+                                                    // DS-70 B21: `지문으로 보기` is icon `fingerprint` + text.
                                                     LockRow(
                                                         title = group.title,
                                                         subtitle = group.sub,
                                                         actionLabel = group.button,
                                                         onAction = vm::unlockHiddenGroup,
                                                         modifier = Modifier.padding(top = 12.dp).tourTarget(LibraryTourSteps.HIDDEN_GROUP),
+                                                        actionIcon = IconId.Fingerprint,
                                                     )
                                                 }
                                                 GroupKind.OPEN -> (ui.openGroup ?: groupSnapshot)?.let { group ->

@@ -3,7 +3,7 @@ package io.github.lenticualrstone.civilight.feature.story.check
 import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.domain.checks.CheckInputs
 import io.github.lenticualrstone.civilight.domain.checks.CheckReport
-import io.github.lenticualrstone.civilight.domain.checks.ProjectChecks
+import io.github.lenticualrstone.civilight.domain.checks.WritingChecks
 import io.github.lenticualrstone.civilight.feature.story.common.StoryServices
 import io.github.lenticualrstone.civilight.feature.story.common.StoryViewModel
 import io.github.lenticualrstone.civilight.model.Key
@@ -55,7 +55,8 @@ class CheckCenterViewModel(
             .filterNotNull()
             .mapLatest { (doc, inputs) ->
                 this.inputs = inputs
-                ProjectChecks.run(doc, inputs)
+                // S-2 / D33: writing items only; voice, travel and candidate rows follow their gates.
+                WritingChecks.run(doc, inputs)
             }
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, null)

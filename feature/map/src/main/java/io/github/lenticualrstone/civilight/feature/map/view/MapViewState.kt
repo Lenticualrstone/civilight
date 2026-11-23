@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.map.view
 
+import io.github.lenticualrstone.civilight.model.game.GameTools
+import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
 import io.github.lenticualrstone.civilight.domain.world.item.WorldCards
 import io.github.lenticualrstone.civilight.domain.world.map.Crumb
 import io.github.lenticualrstone.civilight.domain.world.map.MapEdits
@@ -61,6 +63,12 @@ data class MapViewUi(
     val moving: MovingPinUi?,
     /** `그림 · 색면` chip of a generated detailed-terrain or polygon map (WLD-57), the style's name. */
     val styleChip: String? = null,
+    /** (0.2.0, WLD-75) `편집`: image maps only; every other map is view-only. */
+    val canEdit: Boolean = true,
+    /** (0.2.0, WLD-75) `핀 옮기기`: image maps only. */
+    val canMovePin: Boolean = true,
+    /** (0.2.0, WLD-76) The `배경 에셋` row: only with `게임 제작 도구` on. */
+    val showsAssets: Boolean = true,
 )
 
 data class MovingPinUi(val pinKey: Key, val title: String, val to: Point?)
@@ -93,13 +101,16 @@ object MapViewState {
             crumbs = if (crumbs.size > 1) crumbs else emptyList(),
             base = MapBases.of(map),
             scene = scene,
-            scale = MapScales.barLabel(doc, map),
+            scale = if (MapOffers.showsScale(map)) MapScales.barLabel(doc, map) else null,
             chips = listOf(LayerChipUi(null, MapCopy.ALL_PINS, filter == null)) +
                 MapEdits.layers(map).map { LayerChipUi(it.key, it.name, it.key == filter) },
-            canReplaceBase = map.baseKind.known == MapBaseKind.IMAGE || map.baseKind.known == MapBaseKind.SKETCH,
+            canReplaceBase = MapOffers.canReplaceBase(map),
             place = selectedPin?.let { placePanel(doc, map, scene, it, lens, hiddenOpen) },
             moving = movingPin,
-            styleChip = styleChip(map),
+            styleChip = if (MapOffers.showsStyleChip(map)) styleChip(map) else null,
+            canEdit = MapOffers.canEdit(map),
+            canMovePin = MapOffers.canMovePin(map),
+            showsAssets = GameTools.on(doc),
         )
     }
 

@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.cast.field
 
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -106,7 +108,12 @@ private fun SheetScope.TimedHistoryContent(projectKey: Key, subject: TimedSubjec
             }
             if (editable) {
                 SheetActions {
-                    CivilightButton(view.addLabel, { step = HistoryStep.PICK_POINT }, Modifier.weight(1f), ButtonVariant.GHOST)
+                    // Icon list row `소속 기록 시트 · 시점 추가` (class b): icon `plus` + `시점`, read as `시점 추가`.
+                    if (view.addLabel == CastUiCopy.BTN_ADD_POINT) {
+                        CivilightIconButton(IconButtonSpec.ADD_POINT, { step = HistoryStep.PICK_POINT }, Modifier.weight(1f))
+                    } else {
+                        CivilightButton(view.addLabel, { step = HistoryStep.PICK_POINT }, Modifier.weight(1f), ButtonVariant.GHOST)
+                    }
                     CivilightButton(view.editLabel, { host.open(editSheet) }, Modifier.weight(1f))
                 }
             }

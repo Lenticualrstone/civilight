@@ -102,6 +102,10 @@ object FieldSettingsModel {
     }
 
     /** Whether the record header shows [which] (CST-14; on by default). */
+    /** (0.2.0, CST-74) The header switches shown: `보이스` only while `게임 제작 도구` is on (its setting kept). */
+    fun headerSwitches(doc: ProjectDoc): List<HeaderFixed> =
+        HeaderFixed.entries.filter { it != HeaderFixed.VOICE || io.github.lenticualrstone.civilight.model.game.GameTools.on(doc) }
+
     fun showsInHeader(doc: ProjectDoc, which: HeaderFixed): Boolean = when (which) {
         HeaderFixed.FIRST_APPEARANCE -> doc.project.cast.showFirstAppearanceInHeader
         HeaderFixed.VOICE -> doc.project.cast.showVoiceProgressInHeader

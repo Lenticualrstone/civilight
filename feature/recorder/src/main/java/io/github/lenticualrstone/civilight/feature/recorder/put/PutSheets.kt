@@ -111,7 +111,7 @@ internal fun rememberProjectStep(sheet: PutSheet, kind: PutKind, library: Record
     LaunchedEffect(current) {
         val awaiting = current as? DestinationStep.AwaitingAuth ?: return@LaunchedEffect
         val hiddenLocked = env.project(awaiting.projectKey)?.let(env::isLockedHidden) == true
-        val title = if (hiddenLocked) AuthCopy.HIDDEN_PROJECTS else RecorderUiCopy.R18_PROMPT
+        val title = if (hiddenLocked) AuthCopy.HIDDEN_PROJECTS else RecorderUiCopy.PROTECTED_PROMPT
         val ok = deps.biometric.authenticate(AuthRequest(title)) == AuthResult.SUCCESS
         // The destination's rows read its structure, so the hidden group opens with the prompt (Defaults used).
         if (ok && hiddenLocked) deps.unlock.unlockHiddenGroup()

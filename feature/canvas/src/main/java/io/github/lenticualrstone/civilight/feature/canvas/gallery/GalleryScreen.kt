@@ -2,6 +2,7 @@
 
 package io.github.lenticualrstone.civilight.feature.canvas.gallery
 
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -111,7 +112,6 @@ import io.github.lenticualrstone.civilight.navigation.GalleryAddSheet
 import io.github.lenticualrstone.civilight.navigation.GalleryInfoSheet
 import io.github.lenticualrstone.civilight.navigation.GalleryMenuSheet
 import io.github.lenticualrstone.civilight.navigation.ProjectSearch
-import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.Script
 import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
@@ -507,7 +507,6 @@ private fun GalleryFrame(
                         CommandBar(
                             hint = if (route.ownerKind == GalleryOwnerKind.PROJECT) GalleryUiCopy.FIND_ALL else GalleryUiCopy.FIND,
                             onClick = { deps.navigator.push(ProjectSearch(route.projectKey)) },
-                            onMic = { deps.navigator.push(Recording(projectKey = route.projectKey)) },
                         )
                     }
                 }
@@ -759,7 +758,7 @@ private fun OrderLine(
         }
         // `여러 장 고르기` (GAL-18), in every view; shown only where the menu actions exist.
         FoldReveal(onMulti != null, horizontal = true, label = "multiEntry") {
-            TextAction(GalleryUiCopy.BTN_SELECT_MANY, { onMulti?.invoke() }, Modifier.padding(start = 12.dp))
+            CivilightIconButton(IconButtonSpec.MULTI_SELECT, { onMulti?.invoke() }, Modifier.padding(start = 8.dp))
         }
         Box(Modifier.weight(1f))
         when (val slot = GalleryPlacement.orderSlot(s.view, s.viewKind, s.hint)) {
@@ -781,7 +780,7 @@ private fun UnlockedBar(text: String, side: androidx.compose.ui.unit.Dp, onReloc
     ) {
         CivilightIcon(IconId.Unlock, null, size = 16.dp, tint = colors.ink2)
         CivilightText(text, CivilightTheme.type.small, Modifier.weight(1f).padding(start = 8.dp), color = colors.ink2, maxLines = 2)
-        TextAction(GalleryUiCopy.BTN_RELOCK, onRelock, color = colors.acc)
+        CivilightIconButton(IconButtonSpec.RELOCK, onRelock, tint = colors.acc)
     }
 }
 

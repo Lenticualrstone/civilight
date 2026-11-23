@@ -86,6 +86,15 @@ object TermIndexes {
             var previous: ScanInput? = null
             input.filterNotNull().collect { next ->
                 latest = next
+                // (0.2.0, WLD-26, WLD-73) While `용어 후보` is off the index is neither built nor updated; turning
+                // it on again runs the "project opened" full scan (previous = null → full, pending first).
+                // The index then reads empty and complete, so no reader waits on a scan that never runs
+                // (`점검 중` in the check center, domain:checks `TermSource.scanning`).
+                if (!next.doc.project.termCandidates) {
+                    previous = null
+                    index.value = OFF_INDEX
+                    return@collect
+                }
                 when (val plan = RescanPlans.of(previous, next)) {
                     RescanPlan.Full -> {
                         scheduler.fullScan()
@@ -106,6 +115,9 @@ object TermIndexes {
             work.cancel()
         }
     }
+
+    /** (0.2.0, WLD-73) The index while `용어 후보` is off: no candidates, nothing pending. */
+    val OFF_INDEX: CandidateIndex = CandidateIndex.pending().withComplete(true)
 
     private val holders = HashMap<Key, Holder>()
 

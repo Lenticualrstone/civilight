@@ -53,6 +53,8 @@ fun LockRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     showIcon: Boolean = true,
+    /** (0.2.0, DS-70 B21) The button's icon; `지문으로 보기` gets `fingerprint` unless the caller says otherwise. */
+    actionIcon: IconId? = if (actionLabel == io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.SHOW_WITH_FINGERPRINT) IconId.Fingerprint else null,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -72,7 +74,7 @@ fun LockRow(
             CivilightText(title, type.itemTitle, color = colors.ink, maxLines = 1)
             if (subtitle != null) CivilightText(subtitle, type.small, color = colors.ink3)
         }
-        CivilightButton(actionLabel, onAction, variant = ButtonVariant.COMPACT_PRIMARY)
+        CivilightButton(actionLabel, onAction, variant = ButtonVariant.COMPACT_PRIMARY, icon = actionIcon)
     }
 }
 

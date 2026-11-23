@@ -1,10 +1,19 @@
 package io.github.lenticualrstone.civilight.feature.cast.map
 
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardCopy
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode
+import io.github.lenticualrstone.civilight.designsystem.component.CreateCardState
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreate
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCreateCard
+import io.github.lenticualrstone.civilight.feature.cast.create.CreateCardCodec
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import io.github.lenticualrstone.civilight.ui.project.EditResult
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -93,6 +102,7 @@ fun SheetScope.MapLineContent(sheet: MapLineSheet) {
     val slot = LineSlot.valueOf(slotName)
     var kindKey by rememberSaveable(sheet, slot) { mutableStateOf<Key?>(null) }
     var partnerFirst by rememberSaveable(sheet, slot) { mutableStateOf<Boolean?>(null) }
+    var kindCard by rememberSaveable(sheet, slot, stateSaver = LineKindCardSaver) { mutableStateOf<CreateCardState?>(null) }
     var start by rememberSaveable(sheet) { mutableStateOf(view.startUnitKey ?: CanvasRelations.startUnit(doc, lens)) }
     var pickingStart by rememberSaveable(sheet) { mutableStateOf(false) }
     if (pickingStart) {
@@ -119,7 +129,39 @@ fun SheetScope.MapLineContent(sheet: MapLineSheet) {
                     partnerFirst = if (picked) null else chip.partnerHoldsFirst
                 })
             }
-            AddChip(RelationKinds.ADD.removePrefix("+ "), { deps.navigator.push(RelationKindSettings(sheet.projectKey)) })
+            // CST-76: `+ 새 종류` opens the relation-kind create card; the slot gives the category, the new kind is picked.
+            AddChip(RelationKinds.ADD.removePrefix("+ "), { kindCard = CreateCardState.open(CreateKind.RELATION_KIND, CreateCardMode.PICKER) })
+        }
+        var kindBusy by remember { mutableStateOf(false) }
+        kindCard?.let { card ->
+            CastCreateCard(
+                state = card,
+                onChange = { kindCard = it },
+                onCancel = { kindCard = null },
+                onCreate = {
+                    val made = card
+                    kindBusy = true
+                    var picked: Pair<Key, Boolean?>? = null
+                    // The card closes only once the write applied; otherwise the typed values stay.
+                    editor.act(CreateCardCopy.CREATE, then = { result ->
+                        kindBusy = false
+                        if (result == EditResult.APPLIED) {
+                            kindCard = null
+                            picked?.let { (k, first) ->
+                                kindKey = k
+                                partnerFirst = first
+                            }
+                        }
+                    }) { d, ctx ->
+                        RelationDrafts.addKindFromCard(d, PairLines.sheetSlot(slot), made.name, CastCreate.pairName(made), ctx)?.let { (next, chip) ->
+                            picked = chip.kindKey to chip.partnerHoldsFirst
+                            next
+                        } ?: d
+                    }
+                },
+                canCreate = !kindBusy && CastCreate.canCreate(card),
+                fields = CastCreate.kindFields(between = slot == LineSlot.BETWEEN),
+            )
         }
         ListRow(
             RelationDrafts.START,
@@ -141,3 +183,8 @@ fun SheetScope.MapLineContent(sheet: MapLineSheet) {
         }
     }
 }
+
+private val LineKindCardSaver: androidx.compose.runtime.saveable.Saver<CreateCardState?, String> = androidx.compose.runtime.saveable.Saver(
+    save = { it?.let(CreateCardCodec::encode) ?: "" },
+    restore = { CreateCardCodec.decode(it) },
+)

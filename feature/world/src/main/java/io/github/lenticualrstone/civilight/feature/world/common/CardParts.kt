@@ -156,7 +156,8 @@ fun FieldSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Box { FoldRevealValue(emptyLine.takeIf { showLine }, horizontal = true) { line -> TextAction(line, onShowEmpty, color = colors.ink3, style = type.small) } }
-                if (!readOnly) TextAction(WorldCopy.ADD_FIELD, onAdd, color = colors.acc, style = type.small)
+                // (0.2.0, ICON B12) `＋ 항목`: icon `plus` + `항목`, accessibility name `항목 넣기` (as on the cast profile).
+                if (!readOnly) io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.ADD_FIELD, onAdd)
             }
         }
     }

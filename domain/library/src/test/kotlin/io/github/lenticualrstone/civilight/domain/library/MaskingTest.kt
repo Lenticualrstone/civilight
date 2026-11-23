@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.library
 
+import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
 import io.github.lenticualrstone.civilight.domain.library.masking.CrossSearchScope
 import io.github.lenticualrstone.civilight.domain.library.masking.HiddenAccess
 import io.github.lenticualrstone.civilight.domain.library.masking.LibraryListing
@@ -57,7 +58,7 @@ class MaskingTest {
     fun `S-02 recents and widget lists`() {
         for (surface in listOf(Surface.RECENTS_LIST, Surface.WIDGET_LIST)) {
             assertEquals(Presentation.Omitted, at(surface, h))
-            assertEquals(Presentation.Label("R-18 프로젝트"), at(surface, m))
+            assertEquals(Presentation.Label(RatingLabels.MASKED_PROJECT), at(surface, m))
             assertEquals("유리 정원", (at(surface, n) as Presentation.Shown).name)
         }
     }
@@ -77,7 +78,7 @@ class MaskingTest {
     fun `S-04 notifications`() {
         assertEquals(Presentation.CountedHidden, at(Surface.NOTIFICATION, h))
         assertTrue(Notifications.backupDone(listOf(h)).endsWith("숨긴 프로젝트 1"))
-        assertEquals(Presentation.Label("R-18 프로젝트"), at(Surface.NOTIFICATION, m))
+        assertEquals(Presentation.Label(RatingLabels.MASKED_PROJECT), at(Surface.NOTIFICATION, m))
         assertEquals("유리 정원", (at(Surface.NOTIFICATION, n) as Presentation.Shown).name)
     }
 
@@ -94,10 +95,10 @@ class MaskingTest {
     @Test
     fun `S-06 system recents label`() {
         assertEquals(Presentation.Label("Civilight"), at(Surface.SYSTEM_RECENTS_LABEL, h))
-        assertEquals(Presentation.Label("R-18 프로젝트"), at(Surface.SYSTEM_RECENTS_LABEL, m))
+        assertEquals(Presentation.Label(RatingLabels.MASKED_PROJECT), at(Surface.SYSTEM_RECENTS_LABEL, m))
         assertEquals(Presentation.Label("Civilight"), at(Surface.SYSTEM_RECENTS_LABEL, n))
         assertEquals("Civilight", WindowGuards.of(listOf(VisibleContent(h))).taskLabel)
-        assertEquals("R-18 프로젝트", WindowGuards.of(listOf(VisibleContent(m))).taskLabel)
+        assertEquals(RatingLabels.MASKED_PROJECT, WindowGuards.of(listOf(VisibleContent(m))).taskLabel)
         assertNull(WindowGuards.of(listOf(VisibleContent(n))).taskLabel)
     }
 
@@ -152,17 +153,19 @@ class MaskingTest {
     fun `N-02 a run without hidden projects names them with masking`() {
         val ash = ProjectProfile.of(Fixtures.example())
         val oath = h.copy(protections = Protections(nameMask = true))
-        assertEquals("백업 끝 · 잿빛 새벽의 등불 · 유리 정원 · R-18 프로젝트", Notifications.backupDone(listOf(ash, n, oath)))
+        assertEquals("백업 끝 · 잿빛 새벽의 등불 · 유리 정원 · 이름 가림", Notifications.backupDone(listOf(ash, n, oath)))
     }
 
     @Test
     fun `recorder link label`() {
         assertEquals("숨긴 프로젝트", ProjectSurfaces.recorderLinkLabel(h))
-        assertEquals("R-18", ProjectSurfaces.recorderLinkLabel(h, HiddenAccess.LOCKED.openGroup(Fixtures.NOW)))
-        assertEquals("R-18", ProjectSurfaces.recorderLinkLabel(m))
+        // (0.2.0, LIB-92, S-4) The recorder mask shows the masked label, never a rating word.
+        assertEquals("이름 가림", ProjectSurfaces.recorderLinkLabel(h, HiddenAccess.LOCKED.openGroup(Fixtures.NOW)))
+        assertEquals("이름 가림", ProjectSurfaces.recorderLinkLabel(m))
         assertNull(ProjectSurfaces.recorderLinkLabel(n))
-        // Lowered with the mask kept on: the rating shown is the current one (§6 Q8 keeps only the name label literal).
-        assertEquals("R-15", ProjectSurfaces.recorderLinkLabel(m.copy(rating = Rating.R15)))
+        Rating.entries.forEach { rating ->
+            assertEquals(RatingLabels.MASKED_PROJECT, ProjectSurfaces.recorderLinkLabel(m.copy(rating = rating)))
+        }
     }
 
     @Test

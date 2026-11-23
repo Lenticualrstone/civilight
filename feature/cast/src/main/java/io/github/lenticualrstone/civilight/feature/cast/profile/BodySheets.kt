@@ -15,6 +15,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
+import io.github.lenticualrstone.civilight.feature.cast.field.SecretSheetGate
 import io.github.lenticualrstone.civilight.feature.cast.field.rememberCastEditor
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.navigation.SheetKey
@@ -43,26 +44,31 @@ fun SheetScope.BodyEditContent(sheet: BodyEditSheet) {
         return
     }
     val initial = remember(sheet) { if (sheet.part == BodyPart.SPEECH) c.speechBody else c.secretBody }
+    // Held above the gate: a relock hides the editor, and the typed text is back once the tab is confirmed again.
     val state = rememberRichTextEditorState(initial, key = sheet)
-    val title = if (sheet.part == BodyPart.SPEECH) CastUiCopy.SPEECH else CastUiCopy.TABS[4]
-    SheetHeader(title, onClose = ::close, subtitle = c.name, closeLabel = CastUiCopy.BTN_CLOSE)
-    SheetScrollBody {
-        RichTextEditor(
-            state = state,
-            projectKey = sheet.projectKey,
-            linkPickerTitle = CastUiCopy.LINK_PICKER_TITLE,
-            openSheet = host::open,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            minHeight = 180.dp,
-        )
-    }
-    Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-        CivilightButton(CastUiCopy.BTN_SAVE, {
-            val body = state.result
-            editor.act(CastUiCopy.BTN_SAVE) { d, ctx ->
-                if (sheet.part == BodyPart.SPEECH) CharacterEdits.setSpeech(d, sheet.characterKey, body, ctx) else CharacterEdits.setSecret(d, sheet.characterKey, body, ctx)
-            }
-            host.close()
-        }, Modifier.weight(1f), enabled = state.changed)
+    // CST-73: the 비밀 body of a locked tab is behind the same gate as the tab (it waits while the tab asks again
+    // and closes when the tab is left or the prompt cancelled).
+    SecretSheetGate(sheet.characterKey, needsLock = sheet.part == BodyPart.SECRET && c.secretTabLocked) {
+        val title = if (sheet.part == BodyPart.SPEECH) CastUiCopy.SPEECH else CastUiCopy.TABS[4]
+        SheetHeader(title, onClose = ::close, subtitle = c.name, closeLabel = CastUiCopy.BTN_CLOSE)
+        SheetScrollBody {
+            RichTextEditor(
+                state = state,
+                projectKey = sheet.projectKey,
+                linkPickerTitle = CastUiCopy.LINK_PICKER_TITLE,
+                openSheet = host::open,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                minHeight = 180.dp,
+            )
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+            CivilightButton(CastUiCopy.BTN_SAVE, {
+                val body = state.result
+                editor.act(CastUiCopy.BTN_SAVE) { d, ctx ->
+                    if (sheet.part == BodyPart.SPEECH) CharacterEdits.setSpeech(d, sheet.characterKey, body, ctx) else CharacterEdits.setSecret(d, sheet.characterKey, body, ctx)
+                }
+                host.close()
+            }, Modifier.weight(1f), enabled = state.changed)
+        }
     }
 }

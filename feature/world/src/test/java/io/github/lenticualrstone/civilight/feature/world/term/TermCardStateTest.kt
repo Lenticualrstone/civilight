@@ -96,17 +96,17 @@ class TermCardStateTest {
     }
 
     @Test
-    fun `WLD-T35 no first reveal - notice and suggestion chip`() {
+    fun `WLD-T35 superseded - a term with links reads its automatic reveal, no notice and no chip`() {
         val ctx = WorldTestFixture.ctx()
         val created = WorldItems.createTerm(WorldTestFixture.stateA(), "검은 등잔", ctx) as CreateResult.Created
         val t8 = created.key
         var doc = WorldTestFixture.appendRun(created.doc, K.BLOCK_B12, WorldTestFixture.link(ctx.newKey(), t8, "검은 등잔"))
         doc = WorldTestFixture.appendRun(doc, K.BLOCK_B42, WorldTestFixture.link(ctx.newKey(), t8, "검은 등잔"))
         val ui = card(doc, t8)
-        assertEquals("첫 공개 없음", ui.reveal!!.value)
-        assertTrue(ui.notices.contains("첫 공개 없음 · 쓰인 곳 2"))
-        val chip = ui.chips.filterIsInstance<TermChip.SuggestReveal>().single()
-        assertEquals("1-2 씬 1을 첫 공개로", chip.label)
+        // (0.2.0, WLD-72) The first link (1-2 씬 1) is the automatic reveal.
+        assertTrue(ui.reveal!!.value.startsWith("1-2 씬 1 · #"))
+        assertTrue(ui.notices.none { it.startsWith("첫 공개 없음") })
+        assertTrue(ui.chips.none { it is TermChip.SuggestReveal })
         assertTrue(ui.groups[0].rows.all { row -> row.markers.none { it.warn } })
     }
 

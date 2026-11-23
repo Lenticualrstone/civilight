@@ -56,7 +56,10 @@ data class PageView(
 ) {
     val shownName: String get() = name.ifBlank { PageCopy.UNNAMED }
 
-    /** A page just made (no name, no text) opens straight into editing. */
+    /**
+     * No name and no text: such a page opens straight into editing. A page made with `만들고 열기` has a name,
+     * so it is opened into editing through [JustCreatedPages] ([PageAutoEdit]).
+     */
     val isBlank: Boolean get() = name.isBlank() && paragraphs.all { it.text.isBlank() }
 
     val links: List<PageLink> get() = paragraphs.flatMap { p -> p.links.map { it.link } }

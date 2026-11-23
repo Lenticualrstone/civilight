@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.map.view
 
+import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
 import io.github.lenticualrstone.civilight.domain.world.gen.TerrainGenerator
 import io.github.lenticualrstone.civilight.domain.world.map.MapScales
 import io.github.lenticualrstone.civilight.feature.map.MapCopy
@@ -49,14 +50,15 @@ object MapMenu {
     fun rows(map: WorldMap, screen: MapMenuScreen): List<MapMenuRow> {
         val out = ArrayList<MapMenuRow>()
         out += MapMenuRow(MapMenuAction.RENAME, MapCopy.MAP_NAME, map.name)
-        if (screen != MapMenuScreen.NODE) {
+        // (0.2.0, WLD-75) Format editors, re-roll and 인물 동선 are hidden; their data stays.
+        if (MapOffers.OFFERS_GENERATION && screen != MapMenuScreen.NODE) {
             formatEditTitle(map)?.let { out += MapMenuRow(MapMenuAction.FORMAT_EDIT, it) }
             if (map.baseKind.known == MapBaseKind.GENERATED && map.generation != null) {
                 val ok = canReroll(map)
                 out += MapMenuRow(MapMenuAction.REROLL, MapCopy.REROLL_TITLE, if (ok) null else MapCopy.REROLL_OTHER_VERSION, ok)
             }
         }
-        if (screen == MapMenuScreen.VIEW && !MapScales.isNodeMap(map)) out += MapMenuRow(MapMenuAction.TRACK, MapCopy.TRACK_TITLE)
+        if (MapOffers.OFFERS_TRACK && screen == MapMenuScreen.VIEW && !MapScales.isNodeMap(map)) out += MapMenuRow(MapMenuAction.TRACK, MapCopy.TRACK_TITLE)
         if (screen != MapMenuScreen.EDIT) out += MapMenuRow(MapMenuAction.DELETE, MapCopy.BTN_REMOVE)
         return out
     }

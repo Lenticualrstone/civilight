@@ -271,7 +271,8 @@ abstract class MapScreenViewModel(projectKey: Key, protected val env: MapEnv) : 
     }
 
     companion object {
-        /** The lens point the map draws at (a stale point reads as 최신). */
-        fun lensOf(doc: ProjectDoc): LensPoint = LensRules.effective(doc, doc.app.view.lens.point)
+        /** (0.2.0, S-1, WLD-71) Map screens have no lens chip and always read at `최신`. */
+        @Suppress("UNUSED_PARAMETER")
+        fun lensOf(doc: ProjectDoc): LensPoint = LensPoint.Latest
     }
 }

@@ -82,6 +82,15 @@ class LibraryCopyLintTest {
         add(StartBlock.PROTAGONIST_SUB)
         add(LibraryNotices.RESTORE_DONE)
         add(LibraryNotices.EXPORT_DONE)
+        // 0.2.0 copy that lives in domain:library (LIB-92 masked name and name-mask sub, LIB-97 versions row, format subs).
+        add(io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels.TODO_COPY_LIB_MASKED_NAME)
+        add(io.github.lenticualrstone.civilight.domain.library.rating.ProjectProtectionSettings.TODO_COPY_LIB_NAME_MASK_SUB)
+        add(io.github.lenticualrstone.civilight.domain.library.rating.ProjectProtectionSettings.SECTION_020)
+        add(ExportRow.TODO_COPY_LIB_EXPORT_VERSIONS)
+        io.github.lenticualrstone.civilight.domain.library.export.ExportDefaults.FORMATS.forEach {
+            val (title, sub) = io.github.lenticualrstone.civilight.domain.library.export.ExportDefaults.formatCard(it)
+            add(title); add(sub)
+        }
         // Batch 5: 복구 암호 strength line and the 되살리는 중 lines.
         add(io.github.lenticualrstone.civilight.feature.library.backup.RecoveryPasswordState.strength("등불지기의새벽1잿빛하층구역".toCharArray())!!.line)
         add("${RestoreCopy.DRIVE} · 11월 20일 ${RestoreCopy.BACKUP}")
@@ -139,6 +148,13 @@ class LibraryCopyLintTest {
         assertEquals("이미 있는 R-18 프로젝트 2", RatingSettingsState.applyTitle(Rating.R18, 2))
         assertEquals("처음 설정 · 2/4", OnboardingCopy.setupLine(2))
         assertEquals("3단계 · 아직 안 봄", HelpCopy.stepsLine(3, seen = false))
+    }
+
+    /** DS-70: every icon-only button of this module carries a non-blank accessibility name. */
+    @Test
+    fun `icon button lint`() {
+        val issues = io.github.lenticualrstone.civilight.designsystem.icon.IconButtonLint.lintDir(File("src/main"))
+        assertEquals(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonLint.report(issues), 0, issues.size)
     }
 
     /** Motion audit §4: no literal durations or curves, no default `animateItem()` or snap fling in this module. */

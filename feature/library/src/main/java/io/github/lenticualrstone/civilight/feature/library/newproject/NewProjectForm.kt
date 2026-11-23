@@ -125,9 +125,15 @@ object NewProjectRules {
         linkedRecordKeys = if (recordKey in form.linkedRecordKeys) form.linkedRecordKeys - recordKey else form.linkedRecordKeys + recordKey,
     )
 
-    /** The step-4 switch: the author's choice, else the rating's hide default (R19-11 … 13). */
-    fun hideSwitch(form: NewProjectForm, defaults: RatingDefaults): Boolean =
-        form.step4Hide ?: NewProjectProtections.of(form.rating, defaults, null).step4ToggleInitial
+    /**
+     * The step-4 switch: the author's choice, else off (0.2.0, LIB-92 R-06: no rating to derive it from).
+     * The stored `RatingDefaults` are never read for a new project.
+     */
+    fun hideSwitch(form: NewProjectForm): Boolean =
+        form.step4Hide ?: NewProjectProtections.of(Rating.ALL, RatingDefaults(), null).step4ToggleInitial
+
+    @Deprecated("0.2.0: new projects have no rating", ReplaceWith("hideSwitch(form)"))
+    fun hideSwitch(form: NewProjectForm, @Suppress("UNUSED_PARAMETER") defaults: RatingDefaults): Boolean = hideSwitch(form)
 
     /** The tinted block under the R-18 cell (LIB-09), only while R-18 is picked. */
     fun r18Block(form: NewProjectForm, defaults: RatingDefaults, recoverySet: Boolean): R18DefaultsBlock? =
@@ -166,6 +172,7 @@ object NewProjectRules {
         name = form.name,
         oneLiner = form.oneLiner.ifBlank { null },
         format = form.format,
+        // (0.2.0, LIB-92) The step-1 picker is gone, so the form keeps its default `all`.
         rating = form.rating,
         structurePreset = form.structurePreset,
         customLevels = form.customLevels,

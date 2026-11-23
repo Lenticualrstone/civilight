@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.gallery
 
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -713,7 +714,7 @@ private fun OrderRow(order: OrderRowModel, enabled: Boolean, onMove: (GalleryMov
             CivilightText(GalleryUiCopy.ORDER, CivilightTheme.type.itemTitle, color = colors.ink, maxLines = 1)
             CivilightText(order.text, CivilightTheme.type.small, color = colors.ink3, maxLines = 1)
         }
-        CivilightButton(GalleryUiCopy.BTN_FIRST, { onMove(GalleryMove.FIRST) }, variant = ButtonVariant.COMPACT_GHOST, enabled = enabled && order.canFirst)
+        CivilightButton(GalleryUiCopy.BTN_FIRST, { onMove(GalleryMove.FIRST) }, variant = ButtonVariant.COMPACT_GHOST, icon = IconButtonSpec.TO_TOP.icon, enabled = enabled && order.canFirst)
         CivilightButton(GalleryUiCopy.BTN_FORWARD, { onMove(GalleryMove.FORWARD) }, variant = ButtonVariant.COMPACT_GHOST, enabled = enabled && order.canForward)
         CivilightButton(GalleryUiCopy.BTN_BACKWARD, { onMove(GalleryMove.BACKWARD) }, variant = ButtonVariant.COMPACT_GHOST, enabled = enabled && order.canBackward)
     }

@@ -3,7 +3,6 @@ package io.github.lenticualrstone.civilight.feature.library.export
 import io.github.lenticualrstone.civilight.domain.library.export.ExportDefaults
 import io.github.lenticualrstone.civilight.domain.library.export.ProjectFileExport
 import io.github.lenticualrstone.civilight.domain.library.format.BlobReader
-import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.app.ExportFormat
@@ -11,8 +10,13 @@ import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import java.time.ZoneId
 
-/** One project of the 여러 프로젝트 checklist (LIB-72). */
-data class MultiExportRow(val key: Key, val title: String, val badge: String, val checked: Boolean, val locked: Boolean)
+/**
+ * One project of the 여러 프로젝트 checklist (LIB-72). (0.2.0, LIB-92, S-4) No rating badge: [subtitle] is
+ * `암호` when the file is locked by default (still keyed on the stored R-18, D34), else null.
+ */
+data class MultiExportRow(val key: Key, val title: String, val checked: Boolean, val locked: Boolean) {
+    val subtitle: String? get() = if (locked) ExportCopy.PASSWORD else null
+}
 
 /** One file to write: its name (unique in the batch) and whether it is locked with an `암호`. */
 data class MultiExportFile(val key: Key, val fileName: String, val encrypt: Boolean)
@@ -25,7 +29,7 @@ data class MultiExportFile(val key: Key, val fileName: String, val encrypt: Bool
  */
 object MultiExport {
     fun rows(docs: List<ProjectDoc>, picked: Set<Key>): List<MultiExportRow> = docs.map { doc ->
-        MultiExportRow(doc.key, doc.project.name, RatingLabels.badge(doc.project.rating), doc.key in picked, ExportDefaults.encryptDefault(doc))
+        MultiExportRow(doc.key, doc.project.name, doc.key in picked, ExportDefaults.encryptDefault(doc))
     }
 
     fun toggle(picked: Set<Key>, key: Key): Set<Key> = if (key in picked) picked - key else picked + key

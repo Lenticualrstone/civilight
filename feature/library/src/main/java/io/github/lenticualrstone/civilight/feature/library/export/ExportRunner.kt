@@ -1,6 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.library.export
 
+import io.github.lenticualrstone.civilight.domain.actions.ActionContext
 import io.github.lenticualrstone.civilight.domain.actions.ExportActions
+import io.github.lenticualrstone.civilight.domain.actions.VersionActions
 import io.github.lenticualrstone.civilight.domain.library.export.ExportDefaults
 import io.github.lenticualrstone.civilight.domain.library.export.ExportGate
 import io.github.lenticualrstone.civilight.domain.library.export.ExportPlan
@@ -31,6 +33,11 @@ class ExportReady(
     val bytes: ByteArray,
     /** CSV and engine JSON: the lines written, fixed after the save (LIB-46). Null for `.civilight`. */
     val plan: ExportPlan?,
+    /**
+     * (0.2.0, N-29, D21) PDF, CSV and engine JSON: what was written, so each exported numbering unit gets one
+     * automatic `내보낸 판` once the file is saved. Null for `.civilight` (it adds none, LIB-97).
+     */
+    val versionPlan: ExportPlan? = null,
 )
 
 /** What `<형식> 만들기` came to before the save dialog. */
@@ -77,8 +84,8 @@ object ExportRunner {
                         val plain = writer.write(ScriptPdf.build(doc, plan, options.rangeKeys, coverRating))
                         if (password != null) PdfEncryption.encrypt(plain, password) else plain
                     }
-                    // A PDF never fixes voice IDs (LIB-46): no plan goes with it.
-                    ExportBuild.Ready(ExportReady(ExportRun.fileName(options.fileName, ExportFormat.PDF), mimeOf(ExportFormat.PDF), bytes, null))
+                    // A PDF never fixes voice IDs (LIB-46): no fixation plan goes with it; the version plan does (D21).
+                    ExportBuild.Ready(ExportReady(ExportRun.fileName(options.fileName, ExportFormat.PDF), mimeOf(ExportFormat.PDF), bytes, null, versionPlan = plan))
                 } catch (_: PdfEncryptionException) {
                     // Never write the file unlocked when `PDF 암호` is on.
                     ExportBuild.Unavailable
@@ -93,7 +100,7 @@ object ExportRunner {
                 }
                 when (val run = withContext(Dispatchers.Default) { ExportActions.run(doc, options, authenticated, now) }) {
                     ExportRunOutcome.Cancelled -> ExportBuild.Cancelled
-                    is ExportRunOutcome.Done -> ExportBuild.Ready(ExportReady(run.file.fileName, run.file.mimeType, run.file.bytes, run.plan))
+                    is ExportRunOutcome.Done -> ExportBuild.Ready(ExportReady(run.file.fileName, run.file.mimeType, run.file.bytes, run.plan, versionPlan = run.plan))
                 }
             }
             ExportFormat.PROJECT_FILE -> {
@@ -119,6 +126,51 @@ object ExportRunner {
             ExportGate.Open -> false
             ExportGate.NeedsAuth -> if (authenticate()) true else null
         }
+
+    /**
+     * What a saved file writes back to the project as it is now, as one step: the voice IDs of exactly the
+     * lines written (CSV, JSON; LIB-46), then one automatic `내보낸 판` per exported numbering unit (PDF, CSV,
+     * JSON; N-29, D21) through `domain:actions` `VersionActions.captureForExport`. Null when nothing changes.
+     */
+    fun afterSave(current: ProjectDoc, ready: ExportReady, ctx: ActionContext): ProjectDoc? {
+        if (ready.plan == null && ready.versionPlan == null) return null
+        val fixed = ready.plan?.let { fixVoiceIds(current, it, ctx.now) } ?: current
+        return ready.versionPlan?.let { VersionActions.captureForExport(fixed, it, ctx) } ?: fixed
+    }
+
+    /**
+     * (0.2.0) What [afterSave] changed, carried onto a kept undo step [step] (the write is no undo step, so undo
+     * never takes it back): the `내보낸 판` rows it added (they hold the text as exported, never the step's) and
+     * the voice states it fixed, by block and option key. Blocks the step does not have are left alone.
+     */
+    fun carryAfterSave(step: ProjectDoc, before: ProjectDoc, after: ProjectDoc): ProjectDoc {
+        var out = step
+        for ((unit, file) in after.versions) {
+            val had = before.versions[unit]?.versions?.map { it.key }?.toSet().orEmpty()
+            val added = file.versions.filter { it.key !in had }
+            if (added.isEmpty()) continue
+            val target = out.versions[unit] ?: file.copy(versions = emptyList())
+            val known = target.versions.map { it.key }.toSet()
+            out = out.copy(versions = out.versions + (unit to target.copy(versions = target.versions + added.filter { it.key !in known })))
+        }
+        val beforeBlocks = before.episodes.values.flatMap { it.blocks }.associateBy { it.key }
+        val changed = after.episodes.values.flatMap { it.blocks }.filter { b ->
+            val old = beforeBlocks[b.key]
+            old == null || old.voice != b.voice || old.options.map { it.voice } != b.options.map { it.voice }
+        }.associateBy { it.key }
+        if (changed.isEmpty()) return out
+        return out.copy(
+            episodes = out.episodes.mapValues { (_, file) ->
+                file.copy(
+                    blocks = file.blocks.map { b ->
+                        val a = changed[b.key] ?: return@map b
+                        val optionVoice = a.options.associate { it.key to it.voice }
+                        b.copy(voice = a.voice, options = b.options.map { o -> if (o.key in optionVoice) o.copy(voice = optionVoice.getValue(o.key)) else o })
+                    },
+                )
+            },
+        )
+    }
 
     /** The voice IDs of exactly the lines written (LIB-46), applied to the project as it is now. */
     fun fixVoiceIds(current: ProjectDoc, plan: ExportPlan, at: Timestamp): ProjectDoc =

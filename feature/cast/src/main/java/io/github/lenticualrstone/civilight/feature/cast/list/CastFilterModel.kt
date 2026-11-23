@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.cast.list
 
+import io.github.lenticualrstone.civilight.domain.cast.Appearances
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldDefinitions
@@ -32,8 +33,10 @@ data class FieldFilterState(
     val selected: Map<Key, Set<Key>> = emptyMap(),
     val ranges: Map<Key, RangeInput> = emptyMap(),
     val sortDefKey: Key? = null,
+    /** (0.2.0, CST-69) `오래 안 나옴`: the longest absent first, inside each section. Exclusive with [sortDefKey]. */
+    val absent: Boolean = false,
 ) {
-    val active: Boolean get() = selected.values.any { it.isNotEmpty() } || ranges.values.any { !it.isOpen } || sortDefKey != null
+    val active: Boolean get() = selected.values.any { it.isNotEmpty() } || ranges.values.any { !it.isOpen } || sortDefKey != null || absent
 
     fun toggle(defKey: Key, option: Key): FieldFilterState {
         val now = selected[defKey].orEmpty()
@@ -45,7 +48,10 @@ data class FieldFilterState(
         copy(ranges = if (input.min.isBlank() && input.max.isBlank()) ranges - defKey else ranges + (defKey to input))
 
     /** Tapping the chosen order again goes back to the list order. */
-    fun sort(defKey: Key): FieldFilterState = copy(sortDefKey = if (sortDefKey == defKey) null else defKey)
+    fun sort(defKey: Key): FieldFilterState = copy(sortDefKey = if (sortDefKey == defKey) null else defKey, absent = false)
+
+    /** `오래 안 나옴` on or off (CST-69); the field orders turn off. */
+    fun sortAbsent(): FieldFilterState = copy(absent = !absent, sortDefKey = null)
 }
 
 /** A range control of the sheet: a `숫자` field. */
@@ -57,8 +63,10 @@ data class FilterSheetView(
     val chips: List<FieldFilterChip>,
     val ranges: List<RangeField>,
     val sorts: List<SortOrder>,
+    /** (0.2.0, CST-69) `오래 안 나옴` is offered in every project, so the sheet always has a sort. */
+    val absentSort: Boolean = true,
 ) {
-    val isEmpty: Boolean get() = chips.isEmpty() && ranges.isEmpty() && sorts.isEmpty()
+    val isEmpty: Boolean get() = chips.isEmpty() && ranges.isEmpty() && sorts.isEmpty() && !absentSort
 }
 
 /** An active filter shown under the tag chips, with the state after removing it. */
@@ -90,6 +98,7 @@ object CastFilterModel {
             selected = state.selected.mapNotNull { (k, v) -> chips[k]?.let { opts -> (v intersect opts).takeIf { it.isNotEmpty() }?.let { k to it } } }.toMap(),
             ranges = state.ranges.filterKeys { it in ranges },
             sortDefKey = state.sortDefKey?.takeIf { it in sorts },
+            absent = state.absent && state.sortDefKey == null,
         )
     }
 
@@ -111,11 +120,18 @@ object CastFilterModel {
      * The list with the field filters applied. A sort order turns the groups into one section named
      * after it (`나이순`), sorted with `??` and empty last [PROPOSED layout].
      */
-    fun apply(doc: ProjectDoc, view: CastListView, state: FieldFilterState, lens: LensPoint): CastListView {
+    fun apply(doc: ProjectDoc, view: CastListView, state: FieldFilterState, lens: LensPoint, hiddenUnlocked: Boolean = false): CastListView {
         if (!state.active) return view
         val groups = view.groups.map { g -> g.copy(rows = g.rows.filter { passes(doc, it.key, state, lens) }) }.filter { it.rows.isNotEmpty() }
         val sortDef = state.sortDefKey?.let(doc.index::fieldDef)
-        val sorted = if (sortDef == null) {
+        val sorted = if (state.absent) {
+            // CST-69: inside each tag section; the lens is ignored (D23) and the stored order never changes.
+            val last = Appearances.lastPositions(doc, hiddenUnlocked)
+            groups.map { g ->
+                val byKey = g.rows.associateBy { it.key }
+                g.copy(rows = Appearances.sortAbsentKeys(g.rows.map { it.key }, last).map(byKey::getValue))
+            }
+        } else if (sortDef == null) {
             groups
         } else {
             val rows = groups.flatMap { it.rows }.distinctBy { it.key }.associateBy { it.key }
@@ -144,7 +160,7 @@ object CastFilterModel {
     }
 
     fun sortLabel(doc: ProjectDoc, state: FieldFilterState): String? =
-        state.sortDefKey?.let { k -> FieldFilters.sortOrders(doc).firstOrNull { it.defKey == k }?.label }
+        if (state.absent) CastUiCopy.SORT_ABSENT else state.sortDefKey?.let { k -> FieldFilters.sortOrders(doc).firstOrNull { it.defKey == k }?.label }
 
     /** Chips of the active filters (`소속 · 등불 결사`, `신장 · 150 ~ 170`, `나이순`); tapping one removes it. */
     fun activeFilters(doc: ProjectDoc, state: FieldFilterState): List<ActiveFilter> = buildList {
@@ -159,7 +175,7 @@ object CastFilterModel {
             if (range.isOpen) continue
             add(ActiveFilter(CastCopy.join(field.label, CastUiCopy.range(range.min, range.max)), state.range(defKey, RangeInput())))
         }
-        sortLabel(doc, state)?.let { add(ActiveFilter(it, state.copy(sortDefKey = null))) }
+        sortLabel(doc, state)?.let { add(ActiveFilter(it, state.copy(sortDefKey = null, absent = false))) }
     }
 }
 

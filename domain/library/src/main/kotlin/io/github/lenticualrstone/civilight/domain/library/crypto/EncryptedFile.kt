@@ -28,7 +28,8 @@ data class EncryptedFileSheet(val fileName: String, val field: PasswordField) {
 
     companion object {
         const val TITLE = "암호 파일"
-        const val NOTE = "이름 · 등급 · 내용 · 열면 보임"
+        // (0.2.0, LIB-92) The rating fragment is dropped, nothing added: no rating is shown once the file is open.
+        const val NOTE = "이름 · 내용 · 열면 보임"
         const val AFTER_NOTE = "열면 ‘숨긴 프로젝트’ 묶음으로 · 지문으로 다시 잠금"
         const val CANCEL = "취소"
         const val OPEN = "열기"

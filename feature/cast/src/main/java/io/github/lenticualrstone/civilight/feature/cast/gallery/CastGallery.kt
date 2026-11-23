@@ -95,7 +95,7 @@ object CastGallery {
             doc.liveness.isUnitLive(scene) && (hiddenUnlocked || !surfaces.hidden.isHidden(HideableKind.SCENE, scene))
         }
         sceneShown?.let { scene -> codes.sceneLabel(scene)?.let { return it } }
-        val tags = item.tagKeys.mapNotNull { doc.index.tag(it)?.name }
+        val tags = item.tagKeys.mapNotNull { io.github.lenticualrstone.civilight.domain.cast.CharacterEdits.liveTag(doc, it)?.name }
         return tags.joinToString(CastUiCopy.SEP).ifEmpty { null }
     }
 

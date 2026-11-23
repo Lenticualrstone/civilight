@@ -1,5 +1,16 @@
 package io.github.lenticualrstone.civilight.feature.world.time
 
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
+import io.github.lenticualrstone.civilight.designsystem.component.ListCreateRow
+import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateCard
+import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateCards
+import io.github.lenticualrstone.civilight.feature.world.common.WorldCreateDraft
+import io.github.lenticualrstone.civilight.feature.world.common.createdHighlight
+import io.github.lenticualrstone.civilight.ui.picker.UnitPickerSheet
+import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
@@ -98,13 +109,25 @@ fun TimelineScreen(route: Timeline, deps: FeatureDeps) {
     LaunchedEffect(viewName, anchorKey) { viewName?.let { vm.setView(TimelineView.valueOf(it), anchorKey) } }
     val selected = (deps.navigator.backStack.lastOrNull() as? EventDetail)?.eventKey.takeIf { LocalPaneRole.current == PaneRole.LIST }
     val timeline = ui
+    val gate = rememberHiddenGate(route.projectKey)
+    val scope = rememberCoroutineScope()
+    // (0.2.0, U-15, WLD-74) The `새 사건` create card: its draft (null = closed) and the row just made.
+    var createText by rememberSaveable { mutableStateOf<String?>(null) }
+    val draft = WorldCreateDraft.decode(createText)
+    var highlightKey by remember { mutableStateOf<String?>(null) }
+    fun create(open: Boolean) {
+        val d = draft ?: return
+        scope.launch {
+            val key = vm.save(WorldCreateCards.eventDraft(d), eventKey = null) ?: return@launch
+            createText = null
+            if (open) deps.navigator.openDetail(EventDetail(route.projectKey, key)) else highlightKey = key
+        }
+    }
 
     CivilightScreen(
         title = timeline?.title ?: WorldCopy.TIMELINE_TITLE,
         smallLine = timeline?.smallLine,
         back = worldBack(route, deps),
-        lens = doc?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
         actions = {
             if (timeline?.available == true) {
                 // WLD-64: the 연표 + 지도 screen (its only entry).
@@ -113,18 +136,26 @@ fun TimelineScreen(route: Timeline, deps: FeatureDeps) {
                     contentDescription = WorldCopy.TIMELINE_MAP,
                     onClick = { deps.navigator.push(TimelineMap(route.projectKey)) },
                 )
-                CivilightIconButton(
-                    icon = IconId.Plus,
-                    contentDescription = WorldCopy.CREATE_EVENT,
-                    onClick = { sheets.open(EventCreateSheet(route.projectKey)) },
-                    enabled = !readOnly,
-                )
             }
         },
         commandBar = { WorldCommandBar(deps, route.projectKey, timeline?.searchHint ?: WorldCopy.SEARCH_TIMELINE, EntrySurface.OTHER_IN_PROJECT) },
         sheets = sheets,
         localSheets = { key ->
             when (key) {
+                is CreateScenePickSheet -> doc?.let { d ->
+                    {
+                        UnitPickerSheet(
+                            doc = d, gate = gate, title = WorldCopy.PICK_SCENE,
+                            onPick = { picked ->
+                                WorldCreateDraft.decode(createText)?.let { createText = WorldCreateCards.withScene(it, picked).encode() }
+                                close()
+                            },
+                            onClose = ::close,
+                            selectedKey = draft?.sceneKey,
+                            levels = io.github.lenticualrstone.civilight.feature.world.term.RevealOptions.sceneLevels(d),
+                        )
+                    }
+                }
                 is AnchorPickSheet -> doc?.let { d ->
                     {
                         EventPickerSheet(
@@ -163,12 +194,32 @@ fun TimelineScreen(route: Timeline, deps: FeatureDeps) {
                             if (chip.view == TimelineView.ANCHOR) sheets.open(AnchorPickSheet) else viewName = chip.view.name
                         },
                         onRow = { row -> row.eventKey?.let { deps.navigator.openDetail(EventDetail(route.projectKey, it)) } },
+                        onCreate = if (readOnly) null else ({ createText = WorldCreateDraft.event().encode() }),
+                        highlightKey = highlightKey,
+                        onHighlightDone = { highlightKey = null },
                     )
                 }
             }
         }
+        // The card is hidden while its `씬 고르기` picker is on top, and comes back when it closes.
+        if (draft != null && !readOnly && timeline?.available == true && sheets.top !is CreateScenePickSheet) {
+            WorldCreateCard(
+                draft = draft,
+                doc = doc,
+                hiddenOpen = gate.open,
+                onChange = { createText = it.encode() },
+                onCancel = { createText = null },
+                onCreate = { create(open = false) },
+                onCreateAndOpen = { create(open = true) },
+                onPickScene = { sheets.open(CreateScenePickSheet) },
+            )
+        }
     }
 }
+
+/** (0.2.0, WLD-74) `씬 고르기` of the event create card (feature-local). */
+@Serializable
+data object CreateScenePickSheet : SheetKey
 
 @Composable
 private fun TimelineList(
@@ -177,11 +228,21 @@ private fun TimelineList(
     selectedKey: String?,
     onChip: (ViewChipUi) -> Unit,
     onRow: (TimelineRowUi) -> Unit,
+    onCreate: (() -> Unit)?,
+    highlightKey: String?,
+    onHighlightDone: () -> Unit,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    // (U-15.6, WLD-70) After `만들기` the list scrolls to the new event only if its row is out of view.
+    LaunchedEffect(highlightKey, ui.rows) {
+        val i = TimelineScroll.rowIndex(ui.rows, highlightKey, hasCreate = onCreate != null) ?: return@LaunchedEffect
+        if (listState.layoutInfo.visibleItemsInfo.none { it.index == i }) listState.animateScrollToItem(i)
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(
             start = 24.dp,
             end = 24.dp,
@@ -200,6 +261,11 @@ private fun TimelineList(
                 ui.chips.forEach { chip -> FilterChip(label = chip.label, selected = chip.selected, onClick = { onChip(chip) }) }
             }
         }
+        // (0.2.0, U-15.4, WLD-74) The list's first row `＋ 새 사건` (class b), above the first event; not in a
+        // read-only project.
+        if (onCreate != null) {
+            item(key = "create") { ListCreateRow(CreateKind.EVENT, onCreate, civilightItem().padding(top = 6.dp)) }
+        }
         items(ui.rows, key = { it.id }) { row ->
             if (row.kind == TimelineRowKind.DIVIDER) {
                 Box(
@@ -212,7 +278,7 @@ private fun TimelineList(
                     CivilightText(row.title, type.sec, color = colors.ink3)
                 }
             } else {
-                TimelineLine(row, selected = row.eventKey != null && row.eventKey == selectedKey, onClick = row.eventKey?.let { { onRow(row) } }, modifier = civilightItem())
+                TimelineLine(row, selected = row.eventKey != null && row.eventKey == selectedKey, onClick = row.eventKey?.let { { onRow(row) } }, modifier = civilightItem().createdHighlight(row.eventKey != null && row.eventKey == highlightKey, onHighlightDone))
             }
         }
         ui.footer?.let { footer ->

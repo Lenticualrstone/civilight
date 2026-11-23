@@ -29,6 +29,33 @@ object SettingsCopy {
     const val MORE = "지도 · 이미지 · 연표"
     const val MORE_SUB = "색면 · 홀로 · 생성 방식 · 이동 거리"
 
+    // (0.2.0, LIB-94, U-16) 서재 보기 · 카드 보기 · tilt switch.
+    const val LIBRARY_VIEW = "서재 보기"
+    const val CARD_VIEW = "카드 보기"
+
+    /**
+     * LIB-94 tilt switch row: copy id `TODO_COPY_LIB_VIEW_TILT` (to confirm), interim from the U-16 decision row
+     * `기기를 기울이면 살짝 따라온다` (spec 60 §8.9).
+     */
+    const val VIEW_TILT = "기울이면 따라옴"
+
+    // 서재 보기 values in settings order (00 §13.4).
+    const val LIB_BOOKSHELF = "3D 책장"
+    const val LIB_COVER_SPIN = "표지 회전"
+    const val LIB_MANUSCRIPT_STACK = "원고 더미"
+    const val LIB_ARCHIVE_HALL = "서고 회랑"
+    const val LIB_INDEX_DRAWER = "색인 카드 서랍"
+    const val LIB_CONSTELLATION = "별자리"
+    const val VIEW_LIST = "목록"
+
+    // 카드 보기 values in settings order (00 §13.4).
+    const val CARD_FAN_DECK = "부채꼴 덱"
+    const val CARD_CAROUSEL = "회전 목마"
+    const val CARD_STACK = "겹친 더미"
+    const val CARD_TAROT = "타로 펼침"
+    const val CARD_TILTED_WALL = "기울어진 벽"
+    const val CARD_ROLODEX = "롤로덱스"
+
     // 보관
     const val SECTION_KEEP = "보관"
     const val DRIVE = "Google Drive 자동 백업"
@@ -78,6 +105,7 @@ object SettingsCopy {
     const val AUTH_IN_USE = "사용 중"
     const val BACKUP_HIDDEN = "숨긴 것도 백업"
     const val BACKUP_HIDDEN_SUB = "Google Drive · 복구 암호로 잠금"
+    /** (0.2.0, LIB-92) Not drawn: the row left 설정 · 숨기기. */
     const val RATING_RULES = "수위 등급별 동작"
     const val RATING_RULES_SUB = "R-18 · 숨기기 · 캡처 가림 · 이름 가림"
 

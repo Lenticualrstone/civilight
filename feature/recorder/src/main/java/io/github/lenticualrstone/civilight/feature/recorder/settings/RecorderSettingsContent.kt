@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 /**
  * `설정 · 라이프 레코더` (LRC-44, board `LrSettings`): head small `설정`, title `라이프 레코더`, back;
  * section `받아쓰기` with the radios `기기 안` · `클라우드`, section `녹음` with the switches
- * `잠금 화면에서 녹음` · `원본 음성 보관` · `녹음 중 빛 띠` · `보던 곳 연결`. Cover: 24 dp margins;
+ * `원본 음성 보관` · `녹음 중 빛 띠` · `보던 곳 연결` (`잠금 화면에서 녹음` hidden in 0.2.0, LRC-48). Cover: 24 dp margins;
  * inner screens: the same list in the 560 dp reading column (LIB settings layout). Writes go to the
  * settings store in the app scope; the rows follow `deps.settings`.
  */

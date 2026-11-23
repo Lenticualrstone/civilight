@@ -103,6 +103,18 @@ abstract class ProjectViewModel(
         }
     }
 
+    /** (0.2.0) A content write with no undo step that undo and redo never revert ([ProjectStore.updateWithoutUndo]). */
+    suspend fun updateWithoutUndo(transform: (ProjectDoc) -> ProjectDoc): EditResult {
+        val s = awaitStore()
+        if (s.readOnly) return EditResult.READ_ONLY
+        return try {
+            s.updateWithoutUndo(transform = transform)
+            EditResult.APPLIED
+        } catch (e: ReadOnlyProjectException) {
+            EditResult.READ_ONLY
+        }
+    }
+
     /** [update] from UI callbacks. */
     fun edit(label: String, mergeKey: String? = null, transform: (ProjectDoc) -> ProjectDoc): Job =
         viewModelScope.launch { update(label, mergeKey, transform) }

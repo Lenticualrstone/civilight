@@ -228,7 +228,7 @@ class RecordScreenTest {
         val f = RecordFixture(this, r1)
         f.env.env = Fx.env(r18)
         f.unlock.value++
-        assertEquals(listOf("연결 · R-18"), f.view(this).screen.chips.map { it.text })
+        assertEquals(listOf("연결 · 이름 가림"), f.view(this).screen.chips.map { it.text })
     }
 
     @Test

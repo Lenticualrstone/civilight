@@ -67,4 +67,22 @@ class LensAndIndexTest {
         assertFalse("a new holder starts pending", c.index.value.complete)
         c.release()
     }
+
+    @Test
+    fun `WLD-73 with 용어 후보 off the index reads empty and complete, and turning it on scans again`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = TestScope(dispatcher)
+        val h = TermIndexes.acquire("POFF", scope, dispatcher)
+        val on = WorldTestFixture.stateA()
+        val off = on.copy(project = on.project.copy(termCandidates = false))
+        h.submit(off, TermAccess(false))
+        scope.advanceUntilIdle()
+        assertTrue("nothing waits on a scan that never runs", h.index.value.complete)
+        assertEquals(0, h.index.value.of(T1).size)
+        h.submit(on, TermAccess(false))
+        scope.advanceUntilIdle()
+        assertTrue(h.index.value.complete)
+        assertEquals(1, h.index.value.of(T1).size)
+        h.release()
+    }
 }

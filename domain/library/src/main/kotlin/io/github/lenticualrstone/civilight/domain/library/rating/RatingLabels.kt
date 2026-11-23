@@ -31,8 +31,17 @@ object RatingLabels {
     /** R-18 badges are red (`r18`); ALL and R-15 are outlined `ink2`. */
     fun isRed(rating: Rating): Boolean = rating == Rating.R18
 
-    /** Masked project label for widgets, notifications and recents (LIB-27, §6 Q8: always this literal). */
-    const val MASKED_PROJECT = "R-18 프로젝트"
+    /**
+     * (0.2.0, LIB-92) Masked name without ratings: `TODO_COPY_LIB_MASKED_NAME`, interim `이름 가림` (the
+     * existing words of `이름 · 표지 가림`). A rating word as a mask would mislead while ratings are gone.
+     */
+    const val TODO_COPY_LIB_MASKED_NAME = "이름 가림"
+
+    /** Masked project label for widgets, notifications and recents (LIB-27; 0.2.0: [TODO_COPY_LIB_MASKED_NAME]). */
+    const val MASKED_PROJECT = TODO_COPY_LIB_MASKED_NAME
+
+    /** The 0.1.0 masked label, kept only so tests can assert it never shows again. */
+    const val MASKED_PROJECT_010 = "R-18 프로젝트"
 
     /** Rating of an unknown stored value, read as the strictest known one (`ED`). */
     fun effective(rating: OpenEnum<Rating>): Rating = rating.known ?: Rating.R18

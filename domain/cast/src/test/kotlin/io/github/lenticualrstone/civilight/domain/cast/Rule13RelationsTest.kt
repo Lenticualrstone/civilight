@@ -315,7 +315,7 @@ class Rule13RelationsTest {
 
     @Test
     fun `TC-13-17 no relations on rows and cards`() {
-        val row = CastList.build(doc, Fx.L1_7).rows.single { it.key == K.RIEN }
+        val row = CastList.build(doc, Fx.L1_7).rows.first { it.key == K.RIEN }
         val card = CastList.card(doc, Fx.character(doc, K.RIEN), Fx.L1_7)
         for (word in listOf("경계", "선배", "의지", "거래 상대", "보호")) {
             assertFalse(word in row.subtitle)

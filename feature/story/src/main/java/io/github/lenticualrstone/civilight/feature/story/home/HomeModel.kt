@@ -9,7 +9,6 @@ import io.github.lenticualrstone.civilight.domain.story.structure.resumeTarget
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
-import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.model.project.WorldTimeMode
 import io.github.lenticualrstone.civilight.model.story.StoryUnit
 import io.github.lenticualrstone.civilight.navigation.CanvasBoard
@@ -22,8 +21,6 @@ import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.navigation.StoryStructure
 import io.github.lenticualrstone.civilight.navigation.Timeline
 import io.github.lenticualrstone.civilight.navigation.World
-import io.github.lenticualrstone.civilight.ui.lens.LensChipLabel
-import io.github.lenticualrstone.civilight.ui.lens.LensRules
 import io.github.lenticualrstone.civilight.ui.image.CoverUi
 import io.github.lenticualrstone.civilight.ui.image.ProjectCovers
 import java.time.LocalDate
@@ -59,6 +56,9 @@ data class HomeRow(
  */
 enum class HomeShortcut(val label: String, val dim: Boolean = false) {
     STORY(HomeCopy.SHORTCUT_STORY),
+
+    /** (0.2.0, N-41) `할 일 · 복선`: opens the list sheet over home ([HomeMarksSheet]), not a route. */
+    MARKS(HomeCopy.SHORTCUT_MARKS),
     CAST(HomeCopy.SHORTCUT_CAST),
     WORLD(HomeCopy.SHORTCUT_WORLD),
     TIMELINE(HomeCopy.SHORTCUT_TIMELINE),
@@ -69,9 +69,10 @@ enum class HomeShortcut(val label: String, val dim: Boolean = false) {
     SETTINGS(HomeCopy.SHORTCUT_SETTINGS, dim = true),
     ;
 
-    /** Where the shortcut goes; `설정` is the 프로젝트 설정 container (LIB-69). */
-    fun route(projectKey: Key): Route = when (this) {
+    /** Where the shortcut goes; `설정` is the 프로젝트 설정 container (LIB-69). Null: `할 일 · 복선` opens a sheet. */
+    fun route(projectKey: Key): Route? = when (this) {
         STORY -> StoryStructure(projectKey)
+        MARKS -> null
         CAST -> CastList(projectKey)
         WORLD -> World(projectKey)
         TIMELINE -> Timeline(projectKey)
@@ -88,8 +89,6 @@ data class HomeUi(
     val projectKey: Key,
     val name: String,
     val oneLiner: String?,
-    val rating: Rating,
-    val lens: LensChipLabel,
     val stats: List<HomeStat>,
     val resume: HomeResume?,
     /** `Ⅰ 1장 · 등불지기`; null when the structure has no level above the episodes. */
@@ -114,7 +113,7 @@ data class HomeUi(
     val coverLabel: String get() = if (cover.hash != null || cover.presetId != null) HomeCopy.COVER_CHANGE else HomeCopy.COVER_PICK
 
     /**
-     * Board `NewReady` (summary line, no stats but [newReadyStats], no `이어 쓰기`, no lens chip) while
+     * Board `NewReady` (summary line, no stats but [newReadyStats], no `이어 쓰기`) while
      * the block shows and nothing has been written yet. The head reads the project's name in every state
      * (QA U-06; the board's `새 프로젝트` head is not followed). Once there is an `이어 쓰기` target, home is
      * board `Home` again and the block sits above the chapter list (LIB-13 "on top", STO-01).
@@ -206,8 +205,6 @@ object HomeModel {
             projectKey = doc.project.key,
             name = doc.project.name,
             oneLiner = doc.project.oneLiner,
-            rating = doc.project.rating.known ?: Rating.ALL,
-            lens = LensRules.chipLabel(doc, doc.app.view.lens.point),
             stats = stats,
             resume = resume,
             listHeader = header,

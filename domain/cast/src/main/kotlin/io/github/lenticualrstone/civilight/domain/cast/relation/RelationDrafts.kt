@@ -208,6 +208,22 @@ object RelationDrafts {
         return next to KindChip(kind.key, kind.name)
     }
 
+    /**
+     * (0.2.0, CST-76) `만들기` of the relation-kind create card in a relation sheet: the category comes from
+     * the slot (`사이` or `<A>의 마음`, never asked). A `사이` kind with [pairName] filled is a 짝 kind
+     * (`선배 ↔ 후배`) whose [name] the partner holds (as 세라 holds `선배` in 리엔's sheet); empty makes a
+     * 대칭 kind. A `마음` kind has a name only. An existing kind of the same name and category is picked.
+     */
+    fun addKindFromCard(doc: ProjectDoc, slot: SheetSlot, name: String, pairName: String?, ctx: EditContext): Pair<ProjectDoc, KindChip>? {
+        if (slot == SheetSlot.ADDRESS || name.isBlank()) return null
+        val pair = pairName?.trim()?.nfc()?.takeIf { it.isNotEmpty() && slot == SheetSlot.BETWEEN }
+            ?: return addKind(doc, slot, name, ctx)
+        val existing = RelationKinds.of(doc, RelationCategory.BETWEEN).firstOrNull { it.name == name.trim().nfc() }
+        if (existing != null) return addKind(doc, slot, name, ctx)
+        val (next, kind) = RelationKinds.add(doc, RelationCategory.BETWEEN, name, ctx, RelationSymmetry.PAIR, pair)
+        return next to KindChip(kind.key, kind.name, true)
+    }
+
     // --- CST-30: the `관계` segment of `◆ 변화 기록` ---
 
     /** The segment at [blockKey] for the pair; values read just before the block (`만나기 전` for the first record). */

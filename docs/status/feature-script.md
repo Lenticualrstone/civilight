@@ -541,3 +541,31 @@ Batch 6 (all built and wired; none seen on a device; boards read: `Assets` (text
 - **FEATURES.md:** batch 5 rows SCR-49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60 → partial (SCR-49/50/51/56 logic tested). Earlier: update rows SCR-01, 04, 05, 06, 12, 14, 15, 16, 17, 18, 19, 20, (batch 2) SCR-02, 03, 07, 08, 09, 10, 11, 13, 21, 22, 38, 46, (batch 3) SCR-23 … SCR-34 and (batch 4) SCR-35, 36, 37, 39, 40, 41, 42, 43, 45, 47, 48 → partial, SCR-44 → done (logic) from this file (this lane may not edit it).
 - **Motion wave 2026-11-23, requests:** none blocking. `MotionLint` and the animator scale are the shared ones. (Optional, core:ui) `PaneSplitState` could expose a `settling` flag so a screen can tell a drag from the settle without reading `dragging`; the script does not need it.
 - **feature:story (QA 6 note):** the episode row `미정 · —` (an untitled, unwritten episode) is story's STO-03 / STO-04 behaviour; nothing here shows an episode row.
+
+## 0.2.0 lane (2026-11-24): U-14, U-01, U-02, N-27, N-28, N-29, N-41, N-43
+
+Status: **partial** (logic JVM-tested; nothing seen on an emulator yet). Build: `tools/gw :domain:script:test :feature:script:compileDebugKotlin :feature:script:testDebugUnitTest` exits 0: `domain:script` 189 tests (3 ignored as before), `feature:script` 257 tests, 0 failed.
+
+**Built.**
+- `domain:script` (additive): `ScriptWrite` (`send` · `edit` / `editResult` (changed · unchanged · refused) · `split` · `merge`, toasts), `DraftRules`, `MergeCheck`, `KindChange` (direction runs kept on every path, T-U14-26), `ChoiceLines`, `Particles`; `ReadAloud`; `Replace`; `VersionDiff`. Tests `Write020Test` (30).
+- `feature:script` `input/`: `Draft` + `Drafts` (pure reducer: typing as runs, Enter = `Break`, typed `@` / `(` `)`, `이 뒤에`, `고치기` set-aside and restore, `나누기` parts, cue chips, reconcile with the document: a removed block keeps the typed text, a hidden-and-locked one clears it); `SceneInView` + `BottomAnchor`; `DraftTransformation`; `DraftCues` (cue chips + `큐 넣기` sheet, switch on only); `WriteSheets` (kind menu, 찾기 · 바꾸기, 지난 판 + compare, 복선 심기, 다시 언급 · 거두기); `ReadAloudPlayer`; `WriteCopy`.
+- Screen: the DS `ScriptInputBar` is the only bottom bar (U-01); read-only shows `ScriptInputReadOnlyRow`; `대사만` shows no bar; header `이 씬 · 1-7` · `찾기` · `표시`; tap = select; two-sided swipe (`◆ 시간 · 참고 · 속성` / `고치기 · 이 뒤에 · 종류 · 씬 나누기 · 지우기`, right side off in read-only, `대사만` and during `고치기`); head and `씬 n 끝에` from one `SceneInView` result with the DS flash; scroll of the new block above the bar; bottom anchoring on bar or keyboard changes; 속성 rows `이 블록만 · 표시 이름`, `복선 심기`, `다시 언급 · 거두기`, `할 일`; 참고 candidate rows; `낭독` from `표시` and from 찾기; `지난 판` from 찾기.
+- Removed: the 0.1.0 bottom bar and editing header composables, the mic on the `에셋` screen's command field (S-8).
+- Draft durability: process memory per project (leaving and reopening the script, fold) + the screen's saved state (process death while the script is on the back stack).
+
+**Hidden or deviating, and why.**
+- `다음 씬` is never dimmed: the shared bar has no dimmed state, and a dimmed-looking button that does nothing would be a dead control. It always creates the next scene (undo removes an extra empty one). SCR-74 `[DEFAULT]` waits for the request below.
+- Asset creation from the cue picker uses the 0.1.0 `+ 에셋` form (the new asset is then listed, not picked at once); the U-15 create row in the asset picker is not built.
+- Episode ⋯ `판 남기기 · 지난 판` (story) and `원고 속 n곳 · 바꾸기` (cast, world) cannot open the script's sheets until shared keys exist; inside the script they open from 찾기 commands `지난 판` and `바꾸기`.
+- 0.1.0 in-block editing code in `ScriptViewModel` (and its tests `EnterTypeAheadTest`, `WritingLineTest`) is no longer reachable from the screen; it is left compiled for a later clean-up.
+
+**Copy to confirm (interim words, ids in KDoc of `WriteCopy`):** `TODO_COPY_SCR_KIND_HAS_CUES` (`큐 있음`), `TODO_COPY_SCR_KIND_CHOICE_LINES` (`2줄 이상`), `TODO_COPY_SCR_MERGE_SCENE_START` (`씬 처음`), `TODO_COPY_SCR_REPLACE_FIND` (`찾을 말`), `TODO_COPY_SCR_REPLACE_WITH` (`바꿀 말`), `TODO_COPY_SCR_REPLACED` (`{k}곳 바꿈`), `TODO_COPY_SCR_PLANT_CONFIRM` (`심기`), `TODO_COPY_SCR_KIND_KEEPS_DATA` (`저장된 내용 있음`, kind menu reason with `게임 제작 도구` off), `TODO_COPY_SCR_REPLACE_SCOPE` (`프로젝트 전체 · 블록 {n}`), version row subtitle `블록 {n}`.
+
+**Requests (0.2.0).**
+- **Release-blocking (data loss, §10 gate).** core:model `ScriptViewState`: an optional `draft` field (`_app/view.json`, never exported), so the draft survives process death after the script left the back stack (SCR-70). The feature encodes it already (`Drafts.encode`, T-U14-23); once the field exists, write it debounced on change and on ON_STOP, and read it in `openDraft`.
+- core:designsystem `ScriptInputBar`: a `nextSceneEnabled` flag (dimmed look, accessibility name `다음 씬 만들기 · 꺼짐`); `feature:script` `nextSceneEnabled(doc, scene)` is the rule to pass. Until then a tap that would pile up an empty scene creates nothing and scrolls to that empty scene's head (`NextScene.emptyAfter`).
+- core:navigation: shared sheet keys owned by SCRIPT for `지난 판` / `판 남기기` (episode key) and for 찾기 in replace mode with a prefilled query, so feature:story and feature:cast / feature:world can open them.
+
+## 0.2.0 integration (wave 2, orchestrator)
+
+Applied: `ScriptViewState.draft` (the draft is now kept in `_app/view.json` through `updateApp`, debounced and on clear; read back in `openDraft`; test `DraftPersistTest`). `ScriptInputBar(nextSceneEnabled)` dims `다음 씬` (`다음 씬 만들기 · 꺼짐`), fed by `NextScene.emptyAfter`. Script tour `명령 칸` step left out always (LIB-96). Not applied: core:navigation sheet keys for `지난 판` · `판 남기기` · replace-mode 찾기 (story, cast and world entries stay hidden); picker create rows.

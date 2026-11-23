@@ -91,7 +91,8 @@ internal fun ProjectCardsBlock(
                 ImageCard(
                     title = card.row.title,
                     meta = card.row.meta,
-                    rating = ThemeBridge.rating(card.row.rating),
+                    // (0.2.0, LIB-92) No rating badge on cards.
+                    rating = null,
                     statusChip = card.chip,
                     more = IconAction(ShelfCopy.MORE_LABEL) { onMenu(card.row.key) },
                     onClick = { onOpen(card.row.key) },

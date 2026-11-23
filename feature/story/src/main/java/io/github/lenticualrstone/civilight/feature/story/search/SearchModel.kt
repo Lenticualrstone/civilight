@@ -13,10 +13,15 @@ import io.github.lenticualrstone.civilight.domain.story.search.SearchFilter
 import io.github.lenticualrstone.civilight.domain.story.search.SearchItem
 import io.github.lenticualrstone.civilight.domain.story.search.SearchSectionKind
 import io.github.lenticualrstone.civilight.domain.story.search.SimilarName
+import io.github.lenticualrstone.civilight.domain.story.search.LineSpeaker
+import io.github.lenticualrstone.civilight.domain.story.search.MoreItem
+import io.github.lenticualrstone.civilight.domain.story.search.SearchMore
+import io.github.lenticualrstone.civilight.navigation.PageDoc
 import io.github.lenticualrstone.civilight.domain.story.structure.StoryOverview
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
+import io.github.lenticualrstone.civilight.navigation.CastList
 import io.github.lenticualrstone.civilight.navigation.CharacterProfile
 import io.github.lenticualrstone.civilight.navigation.CheckCenter
 import io.github.lenticualrstone.civilight.navigation.EventDetail
@@ -67,8 +72,64 @@ data class GalleryScope(val ownerKind: GalleryOwnerKind, val ownerKey: Key) {
 /** A header and its gallery rows: `갤러리 · 2` in the project search, `설명 · 1` by match field in [GalleryScope]. */
 data class GallerySection(val header: String, val hits: List<GalleryHit>)
 
+/** (0.2.0, N-13) The `그 밖 ▾` choices sheet and the `화자 ▾` sheet, local to the search overlay. */
+@kotlinx.serialization.Serializable
+data class SearchMoreSheet(val projectKey: Key) : io.github.lenticualrstone.civilight.navigation.SheetKey
+
+@kotlinx.serialization.Serializable
+data class SearchSpeakerSheet(val projectKey: Key) : io.github.lenticualrstone.civilight.navigation.SheetKey
+
 /** 검색 · 명령 as plain data over `domain:story` `ProjectSearch` (STO-36 … STO-38). */
 object SearchModel {
+    /** `그 밖 ▾`, or the picked kind `장소 ▾` (N-13). */
+    fun moreChip(more: SearchMore?): String = (more?.word ?: SearchCopy.MORE) + SearchCopy.CHEVRON
+
+    /** `화자 ▾`, or the picked speaker `세라 ▾`; a speaker no longer listed reads `화자 ▾`. */
+    fun speakerChip(speakerKey: Key?, speakers: List<LineSpeaker>): String =
+        (speakers.firstOrNull { it.key == speakerKey }?.name ?: SearchCopy.SPEAKER) + SearchCopy.CHEVRON
+
+    /** The `화자 ▾` chip is drawn only under `대사` (N-13). */
+    fun showsSpeaker(filter: SearchFilter, more: SearchMore?): Boolean = more == null && filter == SearchFilter.LINE
+
+    /**
+     * S-1: the lens chip stays only on the cast and world heads, and the script has no lens. So the search
+     * keeps `시점 바꾸기` only when opened over one of those heads ([keepsLensCommand]) and never lists
+     * `렌즈를 이 씬으로 맞추기` (SRCH-07).
+     */
+    fun withoutLensCommands(result: SearchResult, below: NavKey? = null): SearchResult {
+        val removed = if (keepsLensCommand(below)) setOf(SearchCommand.LENS_TO_SCENE) else LENS_COMMANDS
+        val sections = result.sections.mapNotNull { section ->
+            if (section.kind != SearchSectionKind.COMMAND) return@mapNotNull section
+            val kept = section.items.filterNot { (it as? SearchItem.CommandItem)?.command in removed }
+            if (kept.isEmpty()) null else section.copy(items = kept)
+        }
+        if (sections == result.sections) return result
+        val empty = if (sections.isEmpty() && result.gallery.isEmpty() && result.query.isNotBlank()) {
+            result.empty ?: EmptySearch(result.query, result.hiddenExcluded, emptyList())
+        } else {
+            result.empty
+        }
+        return result.copy(sections = sections, empty = empty)
+    }
+
+    private val LENS_COMMANDS = setOf(SearchCommand.CHANGE_LENS, SearchCommand.LENS_TO_SCENE)
+
+    /** S-1: the screens whose head draws the lens chip (the cast and world heads). */
+    fun keepsLensCommand(below: NavKey?): Boolean = below is CastList || below is World
+
+    /** Where a `그 밖 ▾` row goes: place and faction → card, event → detail, page → page. */
+    fun tap(projectKey: Key, item: MoreItem): SearchTap = SearchTap.Open(
+        when (item.kind) {
+            SearchMore.PLACE -> PlaceCard(projectKey, item.key)
+            SearchMore.FACTION -> FactionCard(projectKey, item.key)
+            SearchMore.EVENT -> EventDetail(projectKey, item.key)
+            SearchMore.PAGE -> PageDoc(projectKey, item.key)
+        },
+    )
+
+    /** Stable lazy key of a `그 밖 ▾` row. */
+    fun moreKey(item: MoreItem): String = "more:${item.kind}:${item.key}"
+
     /**
      * Whether the result list is drawn for [query] under [filter]: a typed query always, and the `명령` chip
      * also with an empty one (it lists every command of the context; QA 2026-11-23 #11).

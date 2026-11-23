@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -90,6 +91,10 @@ fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
     val scope = rememberCoroutineScope()
     var showEmpty by rememberSaveable(route.termKey) { mutableStateOf(false) }
     val card = ui
+    // (0.2.0, WLD-73) Opened from a `용어 후보 · N` row: scroll to the `후보` group once the card is open.
+    // Each body stage keeps its own list state (the stages cross-fade, so two lists can be composed at once);
+    // the open body starts at the group.
+    var toCandidates by rememberSaveable(route.termKey) { mutableStateOf(TermCardScroll.take(route.projectKey, route.termKey)) }
 
     fun choose(target: RevealTarget) {
         scope.launch {
@@ -132,7 +137,11 @@ fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
         CenterColumn {
             CardBodySwap(card, { stageOf(it?.access) }) { shown ->
                 val card = shown
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
+                val opened = card?.takeIf { it.access == CardAccess.Open && it.head != null }
+                val startAt = remember(opened != null) { if (toCandidates && opened != null) TermCardScroll.candidatesIndex(opened) ?: 0 else 0 }
+                val listState = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = startAt)
+                androidx.compose.runtime.LaunchedEffect(opened != null) { if (opened != null) toCandidates = false }
+                LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = cardPadding(padding)) {
                     if (card == null) return@LazyColumn
                     when (val access = card.access) {
                         is CardAccess.Locked -> item(key = "locked") { Box(civilightItem()) { LockedCard(access.text, gate.unlock) } }

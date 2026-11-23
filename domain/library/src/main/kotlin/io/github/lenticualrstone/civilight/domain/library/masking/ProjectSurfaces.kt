@@ -87,12 +87,13 @@ object ProjectSurfaces {
 
     /**
      * What a Life Recorder link to [project] shows instead of the project or scene name (LIB-28):
-     * `숨긴 프로젝트` while the hidden project is locked, the rating (`R-18`) when 라이프 레코더 연결
-     * 가리기 is on (also while open), else null (show the name).
+     * `숨긴 프로젝트` while the hidden project is locked, the masked label [RatingLabels.MASKED_PROJECT]
+     * (`TODO_COPY_LIB_MASKED_NAME`, never a rating word; 0.2.0 LIB-92, S-4) when 라이프 레코더 연결 가리기 is
+     * on (also while open), else null (show the name).
      */
     fun recorderLinkLabel(project: ProjectProfile, access: HiddenAccess = HiddenAccess.LOCKED): String? = when {
         project.hidden && !access.isProjectOpen(project.key) -> HIDDEN_PROJECT
-        project.protections.recorderLinkMask -> RatingLabels.badge(project.rating)
+        project.protections.recorderLinkMask -> RatingLabels.MASKED_PROJECT
         else -> null
     }
 }

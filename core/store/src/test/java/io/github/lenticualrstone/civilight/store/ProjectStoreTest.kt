@@ -306,6 +306,25 @@ class ProjectStoreTest {
     }
 
     @Test
+    fun aWriteWithoutUndoIsNoStepAndUndoRedoNeverRevertIt() = runTest {
+        val dir = newDir()
+        val (store, _) = openStore(dir)
+        store.update("인물 이름 바꿈") { it.renameCharacter("C1", "노아") }
+        store.updateWithoutUndo { it.copy(cast = it.cast.copy(characters = it.cast.characters.map { c -> if (c.key == "C1") c.copy(secretTabLocked = true) else c })) }
+        assertEquals(1, store.undoState.value.undoCount)
+        assertEquals("인물 이름 바꿈", store.undo())
+        val c1 = store.doc.value.cast.characters.first { it.key == "C1" }
+        assertEquals("리엔", c1.name)
+        assertTrue(c1.secretTabLocked)
+        store.redo()
+        assertTrue(store.doc.value.cast.characters.first { it.key == "C1" }.secretTabLocked)
+        // A no-op changes nothing; saved like any edit.
+        store.updateWithoutUndo { it }
+        store.flush()
+        assertTrue(ProjectStore.read(Fx.P, dir, testEnv()).cast.characters.first { it.key == "C1" }.secretTabLocked)
+    }
+
+    @Test
     fun editsWithOneMergeKeyFormOneStep() = runTest {
         val clock = ManualClock(Fx.T0)
         val (store, _) = openStore(newDir(), testEnv(clock))

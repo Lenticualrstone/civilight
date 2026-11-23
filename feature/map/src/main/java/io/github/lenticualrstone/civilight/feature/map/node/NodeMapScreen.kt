@@ -68,7 +68,6 @@ import io.github.lenticualrstone.civilight.navigation.LensSheet
 import io.github.lenticualrstone.civilight.navigation.MapReveal
 import io.github.lenticualrstone.civilight.navigation.NodeMap
 import io.github.lenticualrstone.civilight.navigation.PlaceCard
-import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 import io.github.lenticualrstone.civilight.ui.lens.lensChipLabel
@@ -135,15 +134,11 @@ fun NodeMapScreen(route: NodeMap, deps: FeatureDeps) {
         title = MapCopy.NODE_TITLE,
         smallLine = ui?.small,
         back = mapBack(deps),
-        lens = d?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
         actions = { CivilightIconButton(IconId.More, MapCopy.MORE, { sheets.open(MapMoreSheet) }) },
         commandBar = {
             CommandBar(
                 hint = MapCopy.NODE_SEARCH,
                 onClick = { sheets.open(NodeSearchSheet) },
-                onMic = { deps.navigator.push(Recording(projectKey = route.projectKey)) },
-                micLabel = MapCopy.RECORDER,
             )
         },
         banner = if (readOnly) ({ ReadOnlyBanner(MapCopy.READ_ONLY) }) else null,

@@ -5,6 +5,9 @@
     <!-- 녹음 계속 (LRC-09): a recording goes on in the background as a microphone foreground service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- U-13 · D32 (LRC-09): the ongoing recording notification is posted only with this on Android 13+;
+         asked from the recording screen when a take first records (NotificationAsk). Refused, the take still records. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 받아쓰기 · 클라우드 (LRC-12): online is checked when a take starts; offline takes use the on-device engine. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
@@ -15,29 +18,9 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
-        <!-- LRC-03 빠른 설정 타일. The label repeats the app-wide name `라이프 레코더` (TODO_COPY_LRC_01 `ED`); a manifest label cannot read Kotlin copy. -->
-        <service
-            android:name="io.github.lenticualrstone.civilight.feature.recorder.outside.RecorderTileService"
-            android:exported="true"
-            android:icon="@drawable/recorder_widget_mic"
-            android:label="라이프 레코더"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
-            </intent-filter>
-        </service>
-
-        <!-- LRC-02 / LRC-04 홈 화면 · 커버 화면 위젯. -->
-        <receiver
-            android:name="io.github.lenticualrstone.civilight.feature.recorder.outside.RecorderWidgetProvider"
-            android:exported="true"
-            android:label="라이프 레코더">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/recorder_widget_info" />
-        </receiver>
+        <!-- (0.2.0) LRC-48 · S-8: the quick-settings tile (RecorderTileService, LRC-03) and the home / cover-screen
+             widget (RecorderWidgetProvider, LRC-02 / LRC-04) are not offered, so neither is declared; the system drops
+             a tile or widget placed in 0.1.0 on upgrade. Their classes and resources stay for a later version. No
+             show-when-locked activity is declared (LRC-05). -->
     </application>
 </manifest>

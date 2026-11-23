@@ -192,7 +192,7 @@ class FieldTemplatesTest {
         val created = FieldTemplates.forProjectCreation(empty(), t, ctx)
         assertEquals(FieldBundle.TEMPLATE, created.project.fieldBundleAtCreation.known)
         assertEquals(1, FieldTemplates.candidates(created, EntityKind.PLACE).size)
-        assertTrue(FieldSettings.entryRow(created).second.startsWith("내 기본 · 고정 7 · 프로젝트 1"))
+        assertTrue(FieldSettings.entryRow(created).second.startsWith("내 기본 · 고정 6 · 프로젝트 1"))
         assertEquals("인물 1 · 장소 1", FieldTemplates.kindCounts(t))
         assertEquals("항목 없음", FieldTemplates.kindCounts(template()))
     }

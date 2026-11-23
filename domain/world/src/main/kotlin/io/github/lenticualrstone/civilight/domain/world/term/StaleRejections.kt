@@ -32,6 +32,8 @@ object StaleRejections {
         spots: Set<ScriptSpot>? = null,
         options: MatcherOptions = MatcherOptions(),
     ): ProjectDoc {
+        // (0.2.0, WLD-73) No scan and no release while `용어 후보` is off: the records are kept.
+        if (!doc.project.termCandidates) return doc
         val withRejections = spotsWithRejections(doc, access)
         val targets = if (spots == null) withRejections else withRejections intersect spots
         if (targets.isEmpty()) return doc

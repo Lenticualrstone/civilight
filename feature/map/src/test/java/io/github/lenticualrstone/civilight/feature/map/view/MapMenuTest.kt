@@ -12,6 +12,7 @@ import io.github.lenticualrstone.civilight.model.open
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The map menu rows (WLD-36 rename, WLD-56 … 62 entries) and the WLD-57 style chip. */
@@ -19,23 +20,23 @@ class MapMenuTest {
     private val doc = MapFx.doc()
 
     @Test
-    fun `each format map offers its editor, generated maps the re-roll, 지도 보기 the track`() {
+    fun `WLD-75 format editors, re-roll and 인물 동선 are hidden from every map menu`() {
         val world = doc.maps.getValue(K.MAP_WORLD)
-        assertEquals(listOf("이름", "칸 칠하기", "단계 다시 만들기", "인물 동선", "지우기"), MapMenu.rows(world, MapMenuScreen.VIEW).map { it.title })
+        assertEquals(listOf("이름", "지우기"), MapMenu.rows(world, MapMenuScreen.VIEW).map { it.title })
         val lower = doc.maps.getValue(K.MAP_LOWER_DISTRICT)
-        assertEquals(listOf("이름", "상세 지형 · 편집", "단계 다시 만들기"), MapMenu.rows(lower, MapMenuScreen.EDIT).map { it.title })
+        assertEquals(listOf("이름"), MapMenu.rows(lower, MapMenuScreen.EDIT).map { it.title })
         assertEquals("하층 구역 지도", MapMenu.rows(lower, MapMenuScreen.EDIT).first().subtitle)
         val node = doc.maps.getValue(K.MAP_ASH_MARKET)
         assertEquals(listOf(MapMenuAction.RENAME, MapMenuAction.DELETE), MapMenu.rows(node, MapMenuScreen.NODE).map { it.action })
     }
 
     @Test
-    fun `a map from another generator version shows the re-roll refused`() {
+    fun `WLD-75 no re-roll row, whatever the generator version`() {
         val world = doc.maps.getValue(K.MAP_WORLD)
         val old = world.copy(generation = world.generation!!.copy(generatorVersion = "gen-0"))
-        val row = MapMenu.rows(old, MapMenuScreen.VIEW).first { it.action == MapMenuAction.REROLL }
-        assertFalse(row.enabled)
-        assertEquals(MapCopy.REROLL_OTHER_VERSION, row.subtitle)
+        assertTrue(MapMenu.rows(old, MapMenuScreen.VIEW).none { it.action == MapMenuAction.REROLL })
+        assertFalse(MapMenu.canReroll(old))
+        assertEquals("단계 다시 만들기", MapCopy.REROLL_TITLE)
     }
 
     @Test

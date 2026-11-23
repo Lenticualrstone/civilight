@@ -4,6 +4,48 @@ All three batches done. Batch 1: WLD-01 02 03 04 06 08 09 10 11 12 17 18 19. Bat
 
 `tools/gw :feature:world:compileDebugKotlin :feature:world:testDebugUnitTest` exits 0: 135 JVM tests in 22 classes, all passing. `tools/gw :domain:world:test` exits 0: 123 tests, 1 ignored (pre-existing spec conflict WLD-T60), 0 failures (the count includes the map lane's tests in the `map` package). Nothing was run on a device or emulator; every screen is checked only by compiling and by the tests of its state builder.
 
+## 0.2.0 wave 2 (2026-11-24) · world lane (feature:world, feature:map, domain:world)
+
+Status: partial (JVM only, nothing run on the emulator). `tools/gw :domain:world:test` 144 tests (1 ignored, pre-existing WLD-T60), `:feature:world:testDebugUnitTest` 164, `:feature:map:testDebugUnitTest` 203, all passing (after the review fixes below). Uncommitted.
+
+Built:
+- **U-15 / WLD-70, WLD-74.** List create rows `＋ 새 장소 · 새 용어 · 새 세력` (`ListCreateRow`, class b), `＋ 새 사건` on the 연표, `＋ 새 지도` on the map list; head `+` buttons removed; empty-state `<kind> 만들기` buttons superseded. One create card (`common/WorldCreateCard.kt`, DS `CreateCardOverlay`) with the U-15.7 field sets; draft saved as JSON (`WorldCreateDraft`); `만들기` highlights the new row (`createdHighlight`, `CivilightMotion`), `만들고 열기` opens the card / event. Writes: `domain:world` `WorldCreate.create` (one edit, one undo step), events through `EventForms.save`. Hidden in read-only projects (U-15.10).
+- **Picker create row (U-15.3).** `common/WorldPlacePicker.kt`: `ItemPickerSheet` with `createKind = PLACE`, `‘<query>’ 새 장소` on no match, picker-mode card (`취소 · 만들기`), the new place returned as the pick, `상위 지역` swapping to a plain place list. Used by the event place picker. Domain: `WorldCreate.createPlaceAndPick`, `placePickerMatched`.
+- **WLD-72 automatic first reveal.** `TermReveals.effective` / `effectiveInfo` / `autoAnchor`; `TermQueries.reveal` is now the effective reveal (`storedReveal`, `isAutoReveal`); the auto record is synthetic (`auto-reveal:` key) and never written. `첫 공개 없음` notice, suggestion chip and `◇ 첫 공개 없음` row no longer fire for a term with usage. Hidden-scene card value `<episode> · 숨긴 씬`.
+- **WLD-73 candidate check.** Everything gated on `Project.termCandidates`: matcher/index (`TermIndexes` skips the scan; `TermQueries.scanPending` never true while off), `용어 후보 · N` last section of the 용어 tab (`candidateSection`, `WorldListItem.CandidateRow`, kept as a list in card view), card `후보` group, `글자 찾기` row and chip, `⋯ › 아님으로 둔 것`, stale `아님` release. Script data: `TermQueries.candidateSpans(blockKey)` + `referenceLine(span)` (`용어 후보 · 빛돌`).
+- **S-1 / WLD-71.** Lens chip kept on the 세계 head and the term, place and faction card heads; removed from 연표, event detail, 연표 + 지도 and every map screen (they read at `최신`). `시점별 공개` keeps its own scrubber without moving the project lens.
+- **S-3 / WLD-75.** `map/common/MapOffers.kt` decides what is reachable: only `IMAGE` maps editable; node, generated and sketch maps open view-only in 지도 보기 (base and overlays drawn, no `편집`, `지도 이미지 바꾸기`, style chip or `핀 옮기기`); routes not drawn; no scale bar or `축척 맞추기`; tool bar `이동 · 핀 · 영역 · 라벨 · 레이어`; ⋯ menu without format editors, re-roll and `인물 동선`. `＋ 새 지도` opens the system image picker at once and makes `지도 N` (`MapNames.nextDefault`). Hidden routes (`MapScale`, `MapFormatPicker`, `MapGenerate`, `SketchStraighten`, `DetailStamps`, `HexPaint`, `PolygonRegions`, `TextMap`, `CharacterTrack`) turn back at their entry (world `TravelModes` only once library hides its row, see Review fixes) (`HiddenRoute`; `NodeMap` → `MapView`). Delete and merge sheets leave out `경로 끝 N`.
+- **G-2 / WLD-76.** `배경 에셋` rows (place card, map sheet and side card) and game-text links in `원고 밖 · 메모` only with `게임 제작 도구` on.
+- **WLD-74 fix.** A dateless world event is listed after the dated world events before `이야기 시작` (`domain:world` `Timeline`).
+- **Travel check.** World and map draw no travel-check UI; scale and routes stay hidden even with the check on (D10); `이동 수단` hides with the library row.
+- **ICON.** Map editor undo `IconButtonSpec.MAP_UNDO` (a); world card `＋ 항목` `IconButtonSpec.ADD_FIELD` (b); create rows class b.
+
+Review fixes (2026-11-24, same wave):
+- `TravelModes` opens its editor again (`SHOWS_TRAVEL_MODES = true` in `WorldEntries.kt`) because `feature:library` still draws `프로젝트 설정 › 이동 수단`; a route that turned back made that row a control that does nothing. Flip the flag to false in the same change that hides the row (Request 6).
+- Map tour: `MapTourSteps` reads its step ids from the `ModuleTours` titles; the editor declares every step it has no target for (the old `경로`) absent (`TourStepAbsent`), so the tour runs `도구 줄 → 보이는 시점` with the 3-step copy now and with the 2-step copy later. `stepOfTool` is gone.
+- `지도에서 고르기`: generated and sketch maps stay pickable for their existing pins and regions, but a tap on an empty spot offers `새 장소` (a new pin) only on an image map (`PickState.canDropPin`, WLD-41).
+- `TermIndexes` publishes an empty, complete index while `용어 후보` is off (`OFF_INDEX`), so no reader waits on a scan that never runs. Stale `아님` release does not read this index (it is gated on `termCandidates` and rescans), and the alias save's `새로 찾음` count is now gated on `termCandidates` too.
+- `용어 후보 · N` row → the term card opens scrolled to its `후보` group (`term/TermCardScroll`, a one-shot request until the route has a flag, Request 8).
+- 세계 card view clears the `만들기` highlight key (no late flash in list view); the 연표 scrolls to a new event only if its row is out of view (`time/TimelineScroll`).
+- Delete sheet: `참조 N` and the staying rows leave out route ends while routes are hidden; the merge sheet's `옮길 참조 · N` likewise (`MergePlan.shownReferenceCount`). The merge toast (`domain:trash` `Messages`, no lane) still counts them.
+
+Hidden (no control drawn), with the reason:
+- Create card `이미지` (장소, 세력): the image picker needs an owner key before `만들기`; set on the card afterwards.
+- Event card `관련 인물` and the detail row: `TimelineEvent.relatedCharacterKeys` is not in `core:model`.
+- `TODO_COPY_WORLD_REVEAL_AUTO` row (back to automatic) and `TODO_COPY_WORLD_REVEAL_AUTO_MARK` mark: no copy.
+- Create rows in the `기준 사건` pickers and the term `관련` picker: not built.
+
+Requests (shared modules frozen):
+1. `core:ui` `PlacePickerSheet` (and the other pickers): forward `createKind` / `onCreate` to `ItemPickerSheet`; story (`SceneWhereContent`, bulk) and script (`SceneSheets`) then open a picker-mode card and write with `domain:world` `WorldCreate.createPlaceAndPick` (WLD-T83). The scene head picker has no create row until then.
+2. `core:model` `TimelineEvent.relatedCharacterKeys: List<ULID> = []` (WLD-74), then `Events.kt` gets it additively.
+3. Copy: `TODO_COPY_WORLD_REVEAL_AUTO`, `TODO_COPY_WORLD_REVEAL_AUTO_MARK`, `TODO_COPY_WORLD_CANDIDATES_SUB` (library's setting row).
+4. `domain:checks` `TermSource`: `scanning = doc.project.termCandidates && !index.complete` (or read `TermQueries.scanPending`), then re-run `TermChecksTest`; land with the library switch row. World's own `TermIndexes` now publishes a complete empty index while off, but `CheckInputs.candidates` may come from elsewhere.
+5. `domain:story` `ProjectSearch` (line ~222) reads the stored reveal only, so a term with only the automatic reveal shows `첫 공개 없음`: read `TermReveals.effectiveInfo(doc, termKey)` (or `TermQueries.reveal`) and mask a hidden scene as `TermQueries.revealCardValue` does.
+6. **Release-critical for `feature:library`:** (a) hide the `프로젝트 설정 › 이동 수단` row (`ProjectSettingsTarget.TRAVEL`, WLD-47; stored modes and `defaultTravelModeKey` kept), then world flips `SHOWS_TRAVEL_MODES` to false in the same change; (b) remove or hide the `인물 동선 · 장소와 때` tour (`TourModule.ROUTE_PLACE_TIME`, bound to `CharacterTrack`, which turns back at once) and any help row that starts it (S-9); (c) drop the `경로` step from the `TourModule.MAP` copy in `domain:library` `ModuleTours` (the map editor already skips it) and `경로` from the `도구 줄` step body (`이동 · 핀 · 영역 · 라벨 · 레이어 · 고른 것만 동작`); (d) the `용어 후보` switch row, landed together with Request 4.
+7. `feature:script`: draw `candidateSpans` (faint dotted underline, D13) and the `참고` rows; `잇기` / `아님` through `TermEdits.link` / `reject`. Also the `시간` tab (`panel/TimeTab.kt`): list `◇ <term> · 용어 첫 공개` for a term whose `TermReveals.effective(doc, termKey)` is the automatic reveal anchored at this block (WLD-72), without storing anything.
+8. `core:navigation`: a scroll target on `TermCard` (e.g. `at: String? = null`, `"candidates"`), so world can drop its one-shot `TermCardScroll`.
+9. Scope owner: record as 0.2.x follow-ups the hidden U-15 items (create card `이미지` for places and factions, event `관련 인물`, the scene-head place picker's create row, create rows in the `기준 사건` and term `관련` pickers) and, for 0.2.1, the WLD-72 `TODO_COPY_WORLD_REVEAL_AUTO` row (back to automatic, removes the stored record) and `…_AUTO_MARK` (needs copy, Request 3).
+
 ## Architecture
 
 Package `io.github.lenticualrstone.civilight.feature.world` (`src/main/java/...`). Composables stay thin: each screen has a pure `…State.build(doc, …)` (tested on `ExampleProject.build()`), a view model that combines the document, the hidden-item unlock and the candidate index into that state, and a screen that draws it.
@@ -263,3 +305,7 @@ Rows of `motion-audit.md` §4 feature:world, built with the shared helpers only 
   - `core:model` `PaneSplit.Modules`: an id for `연표 + 지도` (the screen uses `TIMELINE` for now, so it shares the 연표 list | detail ratio).
   - `feature:map` (QA 8): `MapListScreen` empty state, see the Motion pass section.
   - Spec owner: the copy listed under "Decisions to confirm"; the 48 dp thumbnail of world list rows (WLD-02..05).
+
+## 0.2.0 integration (wave 2, orchestrator)
+
+Applied: library hides `이동 수단`, so `SHOWS_TRAVEL_MODES = false`; the map tour and 인물 동선 tour are not offered (LIB-96); domain:checks `TermSource` scans only with `용어 후보` on; domain:story `ProjectSearch` reads the automatic reveal (passed in by feature:story); world command-bar mic removed (S-8); locked secret text left out of `TermQueries`. Not applied: `PlacePickerSheet` create forwarding, `TimelineEvent.relatedCharacterKeys`, `TermCard` scroll-target route flag.

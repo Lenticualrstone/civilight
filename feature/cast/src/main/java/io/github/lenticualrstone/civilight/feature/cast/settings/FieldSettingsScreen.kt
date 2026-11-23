@@ -148,7 +148,7 @@ fun FieldSettingsScreen(route: FieldSettingsRoute, deps: FeatureDeps) {
                 onAdd = { sheets.open(AddFieldSheet(route.projectKey, kind)) },
                 afterFixed = {
                     if (kind == EntityKind.CHARACTER) {
-                        items(HeaderFixed.entries, key = { "switch-${it.name}" }) { which ->
+                        items(FieldSettingsModel.headerSwitches(ready.doc), key = { "switch-${it.name}" }) { which ->
                             SwitchRow(
                                 which.label,
                                 FieldSettingsModel.showsInHeader(ready.doc, which),

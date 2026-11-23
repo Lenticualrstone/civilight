@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.board
 
+import io.github.lenticualrstone.civilight.domain.actions.CanvasActions
 import io.github.lenticualrstone.civilight.domain.cast.EditContext
 import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.domain.trash.ItemId
@@ -31,12 +32,36 @@ class CanvasBoardViewModel(
 ) : CanvasViewModel(projectKey, sessions, contextOf) {
     private var creatingCanvas = false
 
-    /** CNV-02 [PROPOSED]: a project without a canvas gets an empty one when the canvas is opened. */
+    /**
+     * CNV-02 [PROPOSED] / §13.6 `ED`: a project without a canvas gets an empty one when the canvas is opened.
+     * The latch is released once the write is done, so a later empty state can make one again.
+     */
     fun createFirstCanvas() {
         if (creatingCanvas) return
         creatingCanvas = true
-        act(CanvasCopy.UNDO_NEW_CANVAS) { doc, ctx ->
-            if (CanvasEdits.canvases(doc).isNotEmpty()) doc else CanvasEdits.createCanvas(doc, CanvasCopy.NEW_CANVAS_NAME, ctx).first
+        act(CanvasCopy.UNDO_NEW_CANVAS, then = { creatingCanvas = false }) { doc, ctx ->
+            if (CanvasActions.live(doc).isNotEmpty()) doc else CanvasListEdits.create(doc, CanvasCopy.NEW_CANVAS_NAME, ctx)?.first ?: doc
+        }
+    }
+
+    /** N-58 / U-15: `만들기` of the create card (`CanvasActions.create`); [then] gets the new canvas key. */
+    fun createCanvas(name: String, then: (EditResult, Key?) -> Unit) {
+        var made: Key? = null
+        act(CanvasCopy.UNDO_NEW_CANVAS, then = { then(it, made) }) { doc, ctx ->
+            CanvasListEdits.create(doc, name, ctx)?.also { made = it.second }?.first ?: doc
+        }
+    }
+
+    /** N-58 `이름 바꾸기` (`CanvasActions.rename`). */
+    fun renameCanvas(canvasKey: Key, name: String, then: (EditResult) -> Unit) {
+        act(CanvasCopy.UNDO_RENAME, then = then) { doc, ctx -> CanvasListEdits.rename(doc, canvasKey, name, ctx) }
+    }
+
+    /** N-58 `지우기` (`CanvasActions.delete`, trash kind `canvas`); [then] gets the trash entry and toast. */
+    fun deleteCanvas(canvasKey: Key, then: (EditResult, CanvasDeleted?) -> Unit) {
+        var deleted: CanvasDeleted? = null
+        act(CanvasCopy.UNDO_DELETE, then = { then(it, deleted) }) { doc, ctx ->
+            CanvasListEdits.delete(doc, canvasKey, ctx)?.also { deleted = it }?.doc ?: doc
         }
     }
 
@@ -100,9 +125,9 @@ class CanvasBoardViewModel(
         viewModelScope.launch { undo() }
     }
 
-    /** CNV-02: the canvas the home shortcut opens next (`_app/view.json` `lastCanvasKey`, never exported). */
+    /** CNV-02 / N-58: the canvas home `캔버스` opens next (`CanvasActions.opened`, `_app/view.json` `lastCanvasKey`). */
     fun markOpened(canvasKey: Key) {
-        actApp { app -> if (app.view.lastCanvasKey == canvasKey) app else app.copy(view = app.view.copy(lastCanvasKey = canvasKey)) }
+        actApp { app -> CanvasActions.opened(app, canvasKey) }
     }
 
     /** The canvas viewport is app state (`_app/view.json`), never exported (CNV-12 [PROPOSED]). */

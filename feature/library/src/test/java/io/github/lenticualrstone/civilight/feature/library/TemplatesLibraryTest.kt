@@ -63,7 +63,10 @@ class TemplatesLibraryTest {
         assertEquals(FieldBundle.TEMPLATE, doc.project.fieldBundleAtCreation.known)
         assertEquals(10, FieldSettings.projectFields(doc, EntityKind.CHARACTER).size)
         assertEquals(1, FieldSettings.projectFields(doc, EntityKind.PLACE).size)
-        assertTrue(FieldSettings.entryRow(doc).second.startsWith("내 기본 · 고정 7 · 프로젝트 10"))
+        // The fixed count follows `게임 제작 도구` (cast lane, G-2: a new project has it off), so only the template
+        // name and the project-field count are this test's.
+        val sub = FieldSettings.entryRow(doc).second
+        assertTrue(sub, sub.startsWith("내 기본 · 고정 ") && sub.contains(" · 프로젝트 10"))
         // No choice: `기본` (TC-F-15 unchanged).
         assertEquals(FieldBundle.BASIC, NewProjectForm().bundle)
         assertEquals("기본 ›", NewProjectRules.bundleRow(NewProjectForm(), listOf(mine), false).third)

@@ -38,6 +38,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -209,7 +210,8 @@ class OnboardingTest {
         assertEquals(
             listOf(
                 "스크립트 | 봤음", "인물 | 봤음", "세계 · 연표 | 아직 안 봄", "라이프 레코더 | 봤음",
-                "서재 · 숨기기 | 아직 안 봄", "지도 만들기 | 아직 안 봄", "인물 동선 · 장소와 때 | 아직 안 봄",
+                // (0.2.0 S-3, LIB-96) 지도 만들기 and 인물 동선 tours have no replay row.
+                "서재 · 숨기기 | 아직 안 봄",
             ),
             ui.modules.map { "${it.title} | ${it.sub}" },
         )
@@ -237,10 +239,12 @@ class OnboardingTest {
     }
 
     @Test
-    fun `LIB-28 the recorder shows the badge the library's rule gives, also while open`() {
+    fun `LIB-28 the recorder link mask shows the masked label, never a rating, also while open`() {
+        // (0.2.0, LIB-92) Parity with the recorder's LinkViews.ratingBadge is intentionally broken until the
+        // recorder lane switches to the masked label too (Request).
         Rating.entries.forEach { rating ->
             val masked = ProjectProfile("p", "검은 서약", rating, Protections(recorderLinkMask = true))
-            assertEquals(LinkViews.ratingBadge(rating), ProjectSurfaces.recorderLinkLabel(masked, HiddenAccess()))
+            assertEquals(RatingLabels.MASKED_PROJECT, ProjectSurfaces.recorderLinkLabel(masked, HiddenAccess()))
         }
         val plain = ProjectProfile("p", "유리 정원", Rating.R18, Protections())
         assertNull(ProjectSurfaces.recorderLinkLabel(plain))
@@ -257,11 +261,11 @@ class OnboardingTest {
         val masked = ProjectProfile("b", "외전", Rating.R18, Protections(nameMask = true))
         val hidden = ProjectProfile("c", "검은 서약", Rating.R18, Protections(hidden = true, nameMask = true))
         assertEquals("백업 끝 · 프로젝트 2 · 숨긴 프로젝트 1", LibraryNotices.backupDone(listOf(visible, masked, hidden)))
-        assertEquals("백업 끝 · 잿빛 새벽의 등불 · R-18 프로젝트", LibraryNotices.backupDone(listOf(visible, masked)))
+        assertEquals("백업 끝 · 잿빛 새벽의 등불 · 이름 가림", LibraryNotices.backupDone(listOf(visible, masked)))
         val restore = LibraryNotices.restoreDone(listOf(visible, hidden))
         assertTrue(restore.endsWith("프로젝트 1 · 숨긴 프로젝트 1"))
         assertTrue(LibraryNotices.exportDone(hidden).endsWith("숨긴 프로젝트 1"))
-        assertTrue(LibraryNotices.exportDone(masked).endsWith("R-18 프로젝트"))
+        assertTrue(LibraryNotices.exportDone(masked).endsWith("이름 가림"))
         listOf(restore, LibraryNotices.exportDone(hidden), LibraryNotices.backupDone(listOf(hidden))).forEach { assertFalse(it, it.contains("검은 서약")) }
     }
 }

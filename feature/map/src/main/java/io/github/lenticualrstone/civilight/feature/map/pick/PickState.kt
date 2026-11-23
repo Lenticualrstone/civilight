@@ -5,6 +5,7 @@ import io.github.lenticualrstone.civilight.domain.world.map.MapGeometry
 import io.github.lenticualrstone.civilight.domain.world.map.MapScales
 import io.github.lenticualrstone.civilight.domain.world.map.MapViews
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapBase
+import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapBases
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapHit
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapScene
@@ -43,6 +44,13 @@ data class PickUi(
  */
 object PickState {
     fun pickableMaps(doc: ProjectDoc) = MapViews.liveMaps(doc).filterNot { MapScales.isNodeMap(it) }
+
+    /**
+     * (0.2.0, S-3, WLD-41) Whether a tap on an empty spot of [mapKey] may offer `새 장소` (a place and a
+     * new pin): only on a map 0.2.0 edits (`MapOffers.editable`, an `IMAGE` map). Generated and sketch
+     * maps stay pickable for their existing pins and regions but get no new pin.
+     */
+    fun canDropPin(doc: ProjectDoc, mapKey: Key): Boolean = pickableMaps(doc).firstOrNull { it.key == mapKey }?.let(MapOffers::editable) == true
 
     fun scenePlace(doc: ProjectDoc, sceneKey: Key?): PlaceRef? = sceneKey?.let { k -> doc.manuscript.liveScenes.firstOrNull { it.key == k }?.place }
 

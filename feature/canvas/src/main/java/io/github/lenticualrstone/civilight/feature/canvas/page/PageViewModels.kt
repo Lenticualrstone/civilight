@@ -76,10 +76,11 @@ class PageListViewModel(
     sessions: ProjectSessions,
     contextOf: () -> EditContext,
 ) : CanvasViewModel(projectKey, sessions, contextOf) {
-    fun create(then: (EditResult, Key?) -> Unit) {
+    /** U-15: `만들기` of the create card; [then] gets the new page key. */
+    fun create(name: String, then: (EditResult, Key?) -> Unit) {
         var made: Key? = null
         act(PageCopy.UNDO_NEW_PAGE, then = { then(it, made) }) { doc, ctx ->
-            PageEdits.create(doc, ctx).also { made = it.second }.first
+            PageEdits.create(doc, name, ctx).also { made = it.second }.first
         }
     }
 }

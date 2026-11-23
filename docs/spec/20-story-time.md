@@ -1065,7 +1065,7 @@ Cast: 하르트 speaks in S8 and S9. Route 상층 관문 ↔ 결사의 문 = 38 
 - **SRCH-04** Query `오리지누` → `결과 없음`, `비슷한 이름` contains `오리지늄 등불 · 용어 · 첫 공개 1-7`, action `‘오리지누’ 용어로 만들기`.
 - **SRCH-05** Given character 노아 hidden and locked and a hidden locked scene 1-6 씬 5. Then no 노아 card result, no text from 1-6 씬 5, last line `숨긴 항목 제외`; 노아's dialogue in a visible scene is still found by its text.
 - **SRCH-06** Given 노아 in trash. Then no 노아 result.
-- **SRCH-07** Command rows: query `점검` → `› 점검 센터 열기 | 확인할 항목 3`; query `시점` → `› 시점 바꾸기 | 지금: 최신 · 1-7` (outside the script).
+- **SRCH-07** Command rows: query `점검` → `› 점검 센터 열기 | 확인할 항목 3`; query `시점` → `› 시점 바꾸기 | 지금: 최신 · 1-7` (outside the script). (0.2.0, S-1) `시점 바꾸기` is listed only when the search is opened over the cast head (`CastList`) or the world head (`World`), the screens that keep the lens chip; `렌즈를 이 씬으로 맞추기` is never listed (the script has no lens).
 
 ### 4.13 Check centre (MAIN, R12, R18–R22)
 

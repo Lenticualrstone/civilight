@@ -50,13 +50,13 @@ class MaskingHidingTest {
 
         val raised = Fx.env(p1 = raisedToR18(Fx.p1Doc()))
         val tags = Inbox.row(library, library.record(Fx.R1)!!, raised, Fx.NOW).linkTags
-        assertEquals(listOf("R-18"), tags.map { it.text })
+        assertEquals(listOf("이름 가림"), tags.map { it.text })
         assertEquals(2, tags.single().links.size)
-        assertEquals(listOf("연결 · R-18"), RecordScreens.of(library, Fx.R1, raised, Fx.NOW)!!.chips.map { it.text })
+        assertEquals(listOf("연결 · 이름 가림"), RecordScreens.of(library, Fx.R1, raised, Fx.NOW)!!.chips.map { it.text })
 
         // The same while the project is open.
         val open = Fx.env(p1 = raisedToR18(Fx.p1Doc()), unlock = UnlockSession(hiddenGroupUnlockedAt = Fx.NOW, itemsUnlocked = mapOf(Fx.P1 to Fx.NOW)))
-        assertEquals(listOf("R-18"), Inbox.row(library, library.record(Fx.R1)!!, open, Fx.NOW).linkTags.map { it.text })
+        assertEquals(listOf("이름 가림"), Inbox.row(library, library.record(Fx.R1)!!, open, Fx.NOW).linkTags.map { it.text })
     }
 
     private fun libraryLinkedTo(target: TargetRef): RecorderLibrary =
@@ -76,7 +76,7 @@ class MaskingHidingTest {
     fun LRC_T30_fixture_maskingTable() {
         val library = libraryLinkedTo(p3Scene)
         assertEquals(listOf("숨긴 프로젝트"), r3Tags(library, Fx.env()))
-        assertEquals(listOf("R-18"), r3Tags(library, Fx.env(unlock = UnlockSession(hiddenGroupUnlockedAt = Fx.NOW))))
+        assertEquals(listOf("이름 가림"), r3Tags(library, Fx.env(unlock = UnlockSession(hiddenGroupUnlockedAt = Fx.NOW))))
         // A hidden project without the rating mask shows the scene label once the group is open.
         val unmasked = Fx.p3Doc().let { it.copy(project = it.project.copy(protections = Protections(hidden = true))) }
         assertEquals(listOf("숨긴 프로젝트"), r3Tags(library, Fx.env(p3 = unmasked)))
@@ -169,7 +169,7 @@ class MaskingHidingTest {
         val menu = Inbox.projectMenu(io.github.lenticualrstone.civilight.model.recorder.ProjectFilter.All, Fx.env())
         assertEquals(listOf("모든 프로젝트", "잿빛 새벽의 등불", "유리 정원", "연결 없음"), menu.map { it.label })
         val open = Inbox.projectMenu(io.github.lenticualrstone.civilight.model.recorder.ProjectFilter.All, Fx.env(unlock = UnlockSession(hiddenGroupUnlockedAt = Fx.NOW)))
-        assertEquals(listOf("모든 프로젝트", "잿빛 새벽의 등불", "유리 정원", "R-18", "연결 없음"), open.map { it.label })
+        assertEquals(listOf("모든 프로젝트", "잿빛 새벽의 등불", "유리 정원", "이름 가림", "연결 없음"), open.map { it.label })
     }
 
     @Test

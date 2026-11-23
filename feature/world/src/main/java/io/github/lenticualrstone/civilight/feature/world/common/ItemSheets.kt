@@ -104,7 +104,8 @@ private fun SheetScope.ItemMenuContent(kind: WorldKind, key: Key, doc: ProjectDo
             }),
             compact = true,
         )
-        if (kind == WorldKind.TERM) {
+        // (0.2.0, WLD-73) `아님으로 둔 것` only while the project's `용어 후보` is on (the records are kept while off).
+        if (kind == WorldKind.TERM && doc.project.termCandidates) {
             // Read-only projects may still look at the list; `되돌리기` there is disabled.
             ListRow(
                 title = WorldCopy.MENU_REJECTIONS,

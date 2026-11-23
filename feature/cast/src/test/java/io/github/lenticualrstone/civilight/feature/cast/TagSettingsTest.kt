@@ -59,11 +59,16 @@ class TagSettingsTest {
     }
 
     @Test
-    fun `CST-12 add puts a new tag at the end, never a second one with the same name`() {
-        val added = TagSettingsModel.add(doc, "조연", CastFx.ctx())!!
+    fun `CST-12 new tags come from the create card only, never a second one with the same name`() {
+        val card = io.github.lenticualrstone.civilight.designsystem.component.CreateCardState.open(
+            io.github.lenticualrstone.civilight.designsystem.component.CreateKind.TAG,
+            io.github.lenticualrstone.civilight.designsystem.component.CreateCardMode.LIST,
+            "조연",
+        )
+        val added = io.github.lenticualrstone.civilight.feature.cast.create.CastCreate.createTag(doc, card, CastFx.action())!!.first
         assertEquals("조연", CharacterEdits.tags(added).last().name)
         assertFalse(TagSettingsModel.canName(added, "조연"))
-        assertNull(TagSettingsModel.add(added, "조연", CastFx.ctx()))
+        assertNull(io.github.lenticualrstone.civilight.feature.cast.create.CastCreate.createTag(added, card, CastFx.action()))
         assertTrue(TagSettingsModel.canName(doc, "조연"))
     }
 }

@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.gallery
 
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -125,9 +126,9 @@ fun GalleryOrderScreen(
                         maxLines = 1,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        CivilightButton(GalleryUiCopy.BTN_FIRST, { guarded { onMove(row.key, GalleryMove.FIRST) } }, Modifier.weight(1f), variant = ButtonVariant.GHOST, enabled = row.position > 1)
+                        CivilightButton(GalleryUiCopy.BTN_FIRST, { guarded { onMove(row.key, GalleryMove.FIRST) } }, Modifier.weight(1f), variant = ButtonVariant.GHOST, icon = IconButtonSpec.TO_TOP.icon, enabled = row.position > 1)
                         CivilightButton(GalleryUiCopy.BTN_MOVE, { guarded { set(GalleryOrder.startMove(state)) } }, Modifier.weight(1f), variant = ButtonVariant.PRIMARY, enabled = n > 1)
-                        CivilightButton(GalleryUiCopy.BTN_LAST, { guarded { onMove(row.key, GalleryMove.LAST) } }, Modifier.weight(1f), variant = ButtonVariant.GHOST, enabled = row.position < n)
+                        CivilightButton(GalleryUiCopy.BTN_LAST, { guarded { onMove(row.key, GalleryMove.LAST) } }, Modifier.weight(1f), variant = ButtonVariant.GHOST, icon = IconButtonSpec.TO_BOTTOM.icon, enabled = row.position < n)
                     }
                 }
             }

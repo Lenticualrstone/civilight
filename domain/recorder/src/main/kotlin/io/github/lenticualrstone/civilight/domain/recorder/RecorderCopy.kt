@@ -53,6 +53,12 @@ object RecorderCopy {
     const val BY_TEXT_SHORT = "글로"
     const val EMPTY_TITLE = "기록 없음"
     const val EMPTY_SUB = "명령 칸 마이크 · 홈 위젯 · 빠른 설정"
+
+    /**
+     * (0.2.0) LRC-50 · S-4: the label of a link into a project whose `라이프 레코더 연결 가리기` is on, in place of
+     * the rating badge. `TODO_COPY_LIB_MASKED_NAME` with its interim text (LIB-92).
+     */
+    const val MASKED_NAME = "이름 가림"
     const val HIDDEN_RECORDS = "숨긴 기록"
     const val HIDDEN_GROUP_SUB = "내용 · 날짜 · 길이 가림 · 검색 제외"
     const val OPEN_WITH_FINGERPRINT = "지문으로 보기"

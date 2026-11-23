@@ -44,7 +44,13 @@ import io.github.lenticualrstone.civilight.ui.tour.tourRunning
 import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import io.github.lenticualrstone.civilight.feature.script.layout.ScriptLayout
 import io.github.lenticualrstone.civilight.feature.script.motion.ScriptMotion
-import io.github.lenticualrstone.civilight.feature.script.motion.StaggeredSwipeRow
+import io.github.lenticualrstone.civilight.feature.script.motion.SwipeButtonSpec
+import io.github.lenticualrstone.civilight.feature.script.motion.TwoSidedSwipeRow
+import io.github.lenticualrstone.civilight.designsystem.component.SwipeSide
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.designsystem.text.MarkerGlyph
+import io.github.lenticualrstone.civilight.designsystem.text.MarkerKind
 import io.github.lenticualrstone.civilight.feature.script.panel.PanelTab
 import io.github.lenticualrstone.civilight.feature.script.state.BlockRow
 import io.github.lenticualrstone.civilight.feature.script.state.EditorState
@@ -119,6 +125,12 @@ class ManuscriptActions(
     val candidateWindow: @Composable (row: BlockRow) -> Unit = {},
     /** The margin `▲` (SCR-56). */
     val onMarginWarning: (() -> Unit)? = null,
+    /** (0.2.0) The block's look beyond selection (`고치는 중`, new, `이 뒤에` target). */
+    val look: (row: BlockRow) -> BlockLook = { BlockLook() },
+    /** (0.2.0, SCR-30) The right swipe's five buttons; empty turns the right swipe off. */
+    val editButtons: (row: BlockRow) -> List<SwipeButtonSpec> = { emptyList() },
+    /** Which side of which row is open (one row at a time). */
+    val onSwipe: (rowKey: String?, side: SwipeSide) -> Unit = { _, _ -> },
 )
 
 /**
@@ -142,6 +154,7 @@ fun Manuscript(
     previewOnly: Boolean = false,
     /** The block row whose swipe buttons are open (SCR-30). */
     revealedRow: String? = null,
+    revealedSide: SwipeSide = SwipeSide.REFERENCE,
 ) {
     val motion = CivilightTheme.motion
     val column = if (layout.wide) Modifier.padding(start = layout.columnStart.dp).width(layout.columnWidth.dp) else Modifier.fillMaxWidth()
@@ -240,17 +253,21 @@ fun Manuscript(
                             actions.editableBlock(row, enter)
                         } else {
                             // CNV-40: no swipe while a block is being typed.
-                            SwipeBlock(row, revealedRow == row.key, actions, enter, enabled = !editor.editing) {
+                            val side = if (revealedRow == row.key) revealedSide else SwipeSide.CLOSED
+                            val look = actions.look(row).let { if (side != SwipeSide.CLOSED) it.copy(numbered = true) else it }
+                            SwipeBlock(row, side, actions, enter, enabled = !previewOnly) {
                                 BlockView(
                                     row = row,
                                     selected = editor.selected == row.blockKey,
                                     showParens = showParens,
-                                    inheritedHint = editor.inheritedHint == row.blockKey,
+                                    inheritedHint = false,
+                                    look = look,
                                     onTapText = { offset ->
                                         actions.onReveal(null)
                                         actions.onTapBlock(row, offset)
                                     },
-                                    onSpeaker = if (readOnly || previewOnly) null else ({ actions.onSpeaker(row) }),
+                                    // (0.2.0, SCR-20) The label only selects (the tap goes to the block).
+                                    onSpeaker = null,
                                     onTapOption = { option ->
                                         actions.onReveal(null)
                                         actions.onTapOption(row, option)
@@ -274,36 +291,42 @@ fun Manuscript(
 }
 
 /**
- * A block row with its swipe-left buttons (SCR-30, DS SwipeTabs): `◆ 시간` (`acc` when the block
- * carries a `◆`), `참고`, `속성`. The swipe only reveals them; a button selects the block and opens
- * the panel at that tab. TalkBack gets the same three as custom actions (no gesture needed).
+ * (0.2.0, SCR-30) A block row with both swipe sides: left `◆ 시간 · 참고 · 속성` (opens the panel at that tab,
+ * also for reading), right `고치기 · 이 뒤에 · 종류 · 씬 나누기 · 지우기` ([ManuscriptActions.editButtons]). The swipe
+ * only reveals; TalkBack gets every button as a custom action.
  */
 @Composable
 private fun SwipeBlock(
     row: BlockRow,
-    revealed: Boolean,
+    side: SwipeSide,
     actions: ManuscriptActions,
     modifier: Modifier,
     enabled: Boolean,
     content: @Composable () -> Unit,
 ) {
+    val colors = CivilightTheme.colors
     fun open(tab: PanelTab) {
-        actions.onReveal(null)
+        actions.onSwipe(null, SwipeSide.CLOSED)
         actions.onPanel(row, tab)
     }
-    StaggeredSwipeRow(
-        revealed = revealed,
-        onRevealedChange = { actions.onReveal(if (it) row.key else null) },
-        onTime = { open(PanelTab.TIME) },
-        onReference = { open(PanelTab.REF) },
-        onProperties = { open(PanelTab.PROPS) },
-        timeHasChange = row.hasChange,
-        labels = listOf(PanelTab.TIME.label, PanelTab.REF.label, PanelTab.PROPS.label),
+    val reference = listOf(
+        SwipeButtonSpec(PanelTab.TIME.label, { open(PanelTab.TIME) }, labelColor = if (row.hasChange) colors.acc else null) {
+            MarkerGlyph(MarkerKind.CHANGE, size = 11.dp)
+        },
+        SwipeButtonSpec(PanelTab.REF.label, { open(PanelTab.REF) }) { CivilightIcon(IconId.Paper, null, size = 18.dp, tint = colors.ink2) },
+        SwipeButtonSpec(PanelTab.PROPS.label, { open(PanelTab.PROPS) }) { CivilightIcon(IconId.Props, null, size = 18.dp, tint = colors.ink2) },
+    )
+    val edit = actions.editButtons(row).map { b ->
+        SwipeButtonSpec(b.label, { actions.onSwipe(null, SwipeSide.CLOSED); b.onClick() }, b.labelColor, b.enabled, b.icon)
+    }
+    TwoSidedSwipeRow(
+        side = side,
+        onSideChange = { actions.onSwipe(if (it == SwipeSide.CLOSED) null else row.key, it) },
+        reference = reference,
+        edit = edit,
         enabled = enabled,
         modifier = modifier.semantics {
-            customActions = listOf(PanelTab.TIME, PanelTab.REF, PanelTab.PROPS).map { tab ->
-                CustomAccessibilityAction(tab.label) { open(tab); true }
-            }
+            customActions = (reference + edit).filter { it.enabled }.map { b -> CustomAccessibilityAction(b.label) { b.onClick(); true } }
         },
         content = content,
     )

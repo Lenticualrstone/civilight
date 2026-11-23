@@ -117,7 +117,7 @@ class LinksAndRoutesTest {
             project = p1.project.copy(rating = Rating.R18.open(), protections = p1.project.protections.copy(recorderLinkMask = true)),
         )
         val rows = LinkPickerRows.sections(Fx.env(masked), "잿빛", emptyList(), null).flatMap { it.rows }
-        assertEquals("R-18", rows.first { it.candidate.target.kind == RecorderTargetKind.PROJECT }.title)
+        assertEquals("이름 가림", rows.first { it.candidate.target.kind == RecorderTargetKind.PROJECT }.title)
     }
 
     @Test

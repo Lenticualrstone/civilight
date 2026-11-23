@@ -8,6 +8,14 @@ All three batches are done: batch 1 built CNV-01 … CNV-10, batch 2 built CNV-1
 
 **0.1.0 wave, step 3 of 3 (gallery part 2: GAL-10 … GAL-22, the three shared sheets, `사진`):** built and described under "Gallery part 2" below. `tools/gw :feature:canvas:compileDebugKotlin :feature:canvas:testDebugUnitTest` exits 0 with 159 JVM tests in 15 classes, all passing (20 new in `GalleryEditRulesTest`). No domain module or shared module was changed. Every gallery screen item stays **partial** until the orchestrator's emulator pass.
 
+**0.2.0 wave 2 (canvas lane):** `tools/gw :feature:canvas:compileDebugKotlin :feature:canvas:testDebugUnitTest` exits 0 with 211 JVM tests in 22 classes, all passing (14 new: `CanvasListTest` 9, `HoloDefaultTest` 3, `CanvasIconButtonsTest` 2). No shared or domain module was changed. Nothing was run on an emulator, so every item below is **partial**.
+
+- **N-58 several canvases:** the canvas name `▾` in the head opens the list sheet (`캔버스`: `＋ 새 캔버스` row, live canvases with `노드 N`, the open one marked, row `⋯`). The entry is the same with one canvas. The row `⋯` has `이름 바꾸기 · 지우기`, drawn like the page menu (S-6, D14). `지우기` shows only while another live canvas remains. Every write goes through `CanvasActions` (`create` · `rename` · `delete` · `restore` · `opened` · `openTarget`). A delete shows the trash toast, and its `되돌리기` restores that trash entry. The restore runs on the app scope with its own project session (`CanvasWrites`), so it still works after the user leaves the canvas screen while the toast is up (toasts outlive a popped screen, DS-67); the toast belongs to the project (`showFor`) and leaves with it. Home `캔버스` (`CanvasBoard(p)`, no key) opens `CanvasActions.openTarget`: the last opened canvas while it is live, else the first one. Read-only projects show the rows only.
+- **U-15 pages and canvases:** the page list's head `+` is replaced by the top row `＋ 새 페이지` (shown with 0 pages too, left out when read-only). It opens the shared create card (`이름`) with `취소 · 만들고 열기 · 만들기`. `만들기` stays on the list, scrolls the new row (list) or card (card view) into view and flashes it with `hl` for `createdRowHighlightMs` (feature-local `createdFlash`, not a selection). `만들고 열기` opens the page straight into editing (feature-local `JustCreatedPages` mark read once by the page screen, `PageAutoEdit`), as the head `+` did in 0.1.0 (CNV-14). Canvases use the same card from the list sheet; the new canvas row flashes the same way and only the open canvas is drawn as `current`.
+- **S-7 holo:** a new image has holo off. `AppSettings.holoDefaultForNewImages` defaults to false, and `GalleryActions.add` defaults to false. The `홀로그램 효과 기본` setting row still exists, and a user who turned it on in 0.1.0 keeps it (scope §8). Images that had holo keep it, and holo is set per image.
+- **U-03 / U-11:** checked on the JVM and in code only. The foil draws only where `item.holo` is on. Under reduced motion the tilt is `STILL`, with no sweep and no sensor. The shelf card fits between the bars (`CardFit`, tested in `core:designsystem` `CardFitTest`), and the tilt moves the foil only, never the card's geometry, clipped to the card. Not checked on an emulator.
+- **ICON:** gallery viewer `이전` · `다음` (a, off at an end), `설명` (b toggle with state), `고치기` (a). Picked-card panel `보기` · `고치기` (a, next to `⋯`); `설명 쓰기` stays text. `여러 장 고르기` (b `고르기`), `다시 잠그기` (b), `맨 앞` · `맨 뒤` (b icons on the existing buttons), `지문으로 보기` on the locked card and the node sheet (b). Viewer close uses `IconButtonSpec.CLOSE`. `CanvasIconButtonsTest` runs `IconButtonLint` over the module's main sources.
+
 ## Architecture
 
 The package is `io.github.lenticualrstone.civilight.feature.canvas` (`src/main/java/...`). Composables stay thin. The rules are pure Kotlin objects, tested on `ExampleProject.build()` with fixtures S0 and S0-noRel in `src/test/.../CanvasFx.kt`.
@@ -502,6 +510,18 @@ Batch 3:
 
 ## Requests
 
+- **0.2.0 (canvas lane):**
+  - **feature:script (U-15.4 에셋):** the asset list and the asset picker in the 연출 input are `feature:script` (`AssetsScreen`, `CueEditor`). `feature:canvas` has no asset surface, so the `＋ 새 에셋` row and card (`종류 · 이름 · 파일`, `CreateKind.ASSET`, only with `게임 제작 도구` on via `GameTools.on`) were not built here.
+  - **core:designsystem (ICON A6):** `SheetHeader` still draws its close as the text `닫기` (`TextAction`). The list makes it an icon-only `close` (`IconButtonSpec.CLOSE`). One change there covers every sheet head in this module (about 15).
+  - **core:designsystem (ICON B21):** `LockRow`'s action (`지문으로 보기` on the page list and page doc) is text only; the list wants the `fingerprint` icon before it.
+  - **Copy to confirm:** `캔버스 목록` (accessibility name of the head name `▾`), `노드 N` (list row sub-line), list sheet title `캔버스`, rename card `이름 바꾸기` with `이름` and `바꾸기`. These are existing vocabulary words; no `TODO_COPY_*` is left.
+  - **core:designsystem / core:ui (feature-local workarounds):** `CanvasTopBar` is a local copy of the glass top bar because `TopGlassBar` takes a plain title (an `onTitle` on the shared bar would remove it). The new-row highlight after `만들기` is a feature-local `hl` flash (`common/CreatedFlash.kt`) drawn behind the row, or over a page card; a DS-72 highlight state on `ListRow` (and on cards) would replace it.
+  - **Deferred (not in 0.2.0):** canvas reorder. 00 §13.6 names it, the N-58 scope row does not; `CanvasActions` has no reorder and no control is drawn (nothing visible). Request for the next wave: `CanvasActions.reorder` (domain:actions), then a list-sheet control. `lastCanvasKey` lives in `_app/view.json` (DECISIONS, code); 00 §13.6 says `_app/activity.json`, and the spec should follow.
+  - **`PageCopy.MENU`** is `페이지 메뉴` (board label kept); the icon list's ⋯ default is `메뉴`.
+  - **Trash:** a deleted canvas is listed in the project trash under `전체` (kind word `캔버스`, `domain:trash` `TrashListing`), so it stays restorable after the toast.
+  - **S-6 menu shape:** the page ⋯ (`고치기 · 숨기기 · 지우기`) is on the page head; the canvas has no head ⋯, and its actions (`이름 바꾸기 · 지우기`) are on the list row ⋯, drawn with the same `ActionRows`. If S-6 means a head ⋯ on the canvas too, it needs a spec line.
+
+
 - **Gallery part 2 (step 3):**
   - **core:model / CNV-25:** an `ImageSlot` (or slot-registry entry) for gallery items. The crop editor now takes `CropTarget.GALLERY` with the project-cover slot as a stand-in for its first frame, and the `ImageSpecs` gallery row is drawn by hand.
   - **core:ui (optional):** a size parameter on `GalleryCard` for the grouped rows (162 × 216, 132 × 176). Today a leading size modifier wins over the card's own size; the title type stays the large card's.
@@ -556,3 +576,7 @@ Batch 3:
 - **DS `Popover`:** the inner popover animates in and on an outside tap, but a programmatic close (selecting another node, the tool bar) removes it from composition and so closes at once. If that reads badly on the emulator, the DS popover would need a `visible` input.
 - **Emulator pass items specific to this module:** the second-card nudge may move only the card text (the shared image is drawn by the transition overlay, outside the card's layer); the tool bar's `animateContentSize` sits after the caller's `fillMaxWidth`, so inner → cover may snap; an unsaved view does not refit after a fold or unfold (the fit is latched);  the whole-screen crossfade of loading, no canvas and board inside `CanvasBoardScreen` (`CivilightScreen` nested in `AnimatedContent`); the cropped-frame match between the picker thumbnail and the stage (a re-crop of an image with an existing crop starts from a centred thumbnail); the flip animation squashes the picture through zero width.
 - **FEATURES.md:** rows CNV-01 … CNV-11, CNV-13 … CNV-16, CNV-21 … CNV-31 and CNV-45 → partial; CNV-12 → done. This module may not edit that file.
+
+## 0.2.0 integration (wave 2, orchestrator)
+
+Applied: page and gallery command-bar mics removed (S-8); `SheetHeader` close is the A6 icon. Not applied: `ListRow` highlight state (local `createdFlash` kept), tappable `TopGlassBar` title, `CanvasActions.reorder`, asset create in place (feature:script; asset create rows stay unbuilt).

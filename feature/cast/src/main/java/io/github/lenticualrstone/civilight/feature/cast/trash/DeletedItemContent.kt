@@ -30,7 +30,7 @@ import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.navigation.DeleteImpactSheet
 import io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
-import io.github.lenticualrstone.civilight.ui.picker.CharacterPickerSheet
+import io.github.lenticualrstone.civilight.feature.cast.create.CastCharacterPicker
 import io.github.lenticualrstone.civilight.ui.picker.FactionPickerSheet
 import io.github.lenticualrstone.civilight.ui.picker.HiddenGate
 import io.github.lenticualrstone.civilight.ui.picker.PlacePickerSheet
@@ -63,7 +63,7 @@ fun SheetScope.DeletedItemContent(sheet: DeleteImpactSheet, doc: ProjectDoc, rea
     val action = bulkName?.let { name -> view.bulk.firstOrNull { it.kind.name == name } }
     val to = target
     when {
-        action != null && to == null -> BulkPicker(doc, sheet.kind, sheet.itemKey, gate, action.label, onPick = { target = it }) { bulkName = null }
+        action != null && to == null -> BulkPicker(sheet.projectKey, doc, sheet.kind, sheet.itemKey, gate, action.label, onPick = { target = it }) { bulkName = null }
         action != null && to != null -> {
             val line = remember(doc, to) { DeletedItemModel.preview(doc, sheet.kind, sheet.itemKey, to, action.kind) }
             SheetHeader(action.label, onClose = { target = null }, closeLabel = CastUiCopy.BTN_CLOSE)
@@ -107,10 +107,11 @@ fun SheetScope.DeletedItemContent(sheet: DeleteImpactSheet, doc: ProjectDoc, rea
 
 /** The replacement, from the picker of the deleted item's kind (search · tags for characters). */
 @Composable
-private fun SheetScope.BulkPicker(doc: ProjectDoc, kind: EntityKind, from: Key, gate: HiddenGate, title: String, onPick: (Key) -> Unit, onClose: () -> Unit) {
+private fun SheetScope.BulkPicker(projectKey: Key, doc: ProjectDoc, kind: EntityKind, from: Key, gate: HiddenGate, title: String, onPick: (Key) -> Unit, onClose: () -> Unit) {
     val pick: (Key) -> Unit = { key -> if (key != from && ItemTrash.isLive(doc, kind, key)) onPick(key) }
     when (kind) {
-        EntityKind.CHARACTER -> CharacterPickerSheet(doc, gate, onPick = pick, onClose = onClose, title = title)
+        // U-15.3 (§8.3 Q45): the bulk speaker picker has the create row; a created character is live by construction.
+        EntityKind.CHARACTER -> CastCharacterPicker(projectKey, doc, gate, title, onPick = { key -> if (key != from) onPick(key) }, onClose = onClose)
         EntityKind.PLACE -> PlacePickerSheet(doc, gate, title, onPick = { pick(it.key) }, onClose = onClose, includeRegions = false)
         EntityKind.TERM -> TermPickerSheet(doc, gate, title, onPick = { key, _ -> pick(key) }, onClose = onClose)
         EntityKind.FACTION -> FactionPickerSheet(doc, gate, title, onPick = pick, onClose = onClose)

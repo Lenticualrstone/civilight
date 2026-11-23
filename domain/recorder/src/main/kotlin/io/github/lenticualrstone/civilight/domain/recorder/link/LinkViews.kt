@@ -36,6 +36,13 @@ object LinkViews {
     }
 
     /**
+     * (0.2.0) LRC-50: the label of every link into a project with `라이프 레코더 연결 가리기` on. Ratings are no
+     * longer shown (S-4), so it never prints `R-18`; several such links of one project share it and collapse
+     * into one chip.
+     */
+    fun maskedLabel(): String = RecorderCopy.MASKED_NAME
+
+    /**
      * The view of [link], or null when it is not shown at all because [record] is hidden and
      * hidden records are locked (step 1). [runs] decide the `@` form.
      */
@@ -50,8 +57,8 @@ object LinkViews {
         // (2) hidden project, locked; also when it is trashed or purged.
         if (project != null && env.isLockedHidden(project)) return v(LinkDisplay.HIDDEN_PROJECT, RecorderCopy.HIDDEN_PROJECT)
         if (project == null && link.lastLabelHidden && target.isProject) return v(LinkDisplay.HIDDEN_PROJECT, RecorderCopy.HIDDEN_PROJECT)
-        // (3) 라이프 레코더 연결 가리기: the rating only, also while the project is open.
-        if (project != null && project.linkMask) return v(LinkDisplay.MASK_RATING, ratingBadge(project.rating))
+        // (3) 라이프 레코더 연결 가리기: the masked name only (LRC-50), also while the project is open.
+        if (project != null && project.linkMask) return v(LinkDisplay.MASK_RATING, maskedLabel())
         val resolved = Targets.resolve(env, target)
         val purged = link.purgedAt != null || resolved.state == TargetState.PURGED
         // (4) hidden item, items locked; also in the trash; after purge never the name.

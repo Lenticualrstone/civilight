@@ -8,8 +8,10 @@ import io.github.lenticualrstone.civilight.domain.story.time.BandTable
 import io.github.lenticualrstone.civilight.domain.story.time.SceneTimes
 import io.github.lenticualrstone.civilight.domain.story.time.TimeLabels
 import io.github.lenticualrstone.civilight.domain.story.time.word
-import io.github.lenticualrstone.civilight.domain.world.map.Travel
+import io.github.lenticualrstone.civilight.domain.actions.ActionContext
+import io.github.lenticualrstone.civilight.domain.actions.ProjectSettingActions
 import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.game.GameTools
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.project.Band
 import io.github.lenticualrstone.civilight.model.project.DayBoundary
@@ -33,15 +35,21 @@ enum class ProjectSettingsTarget {
  */
 data class CoverSettingsRow(val title: String, val sub: String, val value: String)
 
-/** The two `스크립트 추가 칸` switches (SCR-24, SCR-25). */
-enum class ScriptSwitch { STAGE_POSITION, VOICE_ID }
+/**
+ * The switches of 프로젝트 설정: `무대 위치` · `보이스 ID` (SCR-24, SCR-25), (0.2.0) `게임 제작 도구` (LIB-91, G-1)
+ * and `용어 후보` (WLD-73, S-5).
+ */
+enum class ScriptSwitch { STAGE_POSITION, VOICE_ID, GAME_TOOLS, TERM_CANDIDATES }
 
 /** A `title · sub · value ›` row that opens [target]; a null [sub] or [value] is not drawn (`›` alone). */
 data class ProjectLinkRow(val target: ProjectSettingsTarget, val title: String, val sub: String?, val value: String?)
 
-data class ProjectSwitchRow(val switch: ScriptSwitch, val title: String, val sub: String, val on: Boolean)
+data class ProjectSwitchRow(val switch: ScriptSwitch, val title: String, val sub: String?, val on: Boolean)
 
-/** `스크립트 추가 칸`: two switches, then `ID 형식` and `전환 문구`. */
+/**
+ * `스크립트 추가 칸`: (0.2.0) `게임 제작 도구` first, then with it on `무대 위치` · `보이스 ID` and `ID 형식`, and
+ * always `전환 문구` (LIB-91, G-08).
+ */
 data class ScriptSectionUi(val switches: List<ProjectSwitchRow>, val links: List<ProjectLinkRow>)
 
 /**
@@ -57,7 +65,7 @@ object ProjectSettingsRows {
         ProjectLinkRow(ProjectSettingsTarget.LEVELS, ProjectSettingsCopy.LEVELS, doc.project.structure.levels.joinToString(" › "), ProjectSettingsCopy.CHANGE),
         worldTime(doc),
         notation(doc),
-        ProjectLinkRow(ProjectSettingsTarget.TRAVEL, ProjectSettingsCopy.TRAVEL, Travel.modes(doc).joinToString(" · ") { Travel.modeLabel(it) }, ProjectSettingsCopy.CHANGE),
+        // (0.2.0 S-3, WLD-47) No `이동 수단` row: travel modes are hidden (stored modes kept).
         ProjectLinkRow(ProjectSettingsTarget.DAY_BANDS, ProjectSettingsCopy.DAY_BANDS, dayBands(doc), ProjectSettingsCopy.CHANGE),
     )
 
@@ -81,17 +89,27 @@ object ProjectSettingsRows {
 
     fun script(doc: ProjectDoc): ScriptSectionUi {
         val s = doc.project.script
+        val game = GameTools.on(doc)
+        // (0.2.0, LIB-91, G-2) While `게임 제작 도구` is off the voice and stage rows are hidden; their values stay stored.
         return ScriptSectionUi(
-            switches = listOf(
-                ProjectSwitchRow(ScriptSwitch.STAGE_POSITION, ProjectSettingsCopy.STAGE, ProjectSettingsCopy.STAGE_SUB, s.stagePositionEnabled),
-                ProjectSwitchRow(ScriptSwitch.VOICE_ID, ProjectSettingsCopy.VOICE_ID, ProjectSettingsCopy.VOICE_ID_SUB, s.voiceIdEnabled),
+            switches = listOfNotNull(
+                ProjectSwitchRow(ScriptSwitch.GAME_TOOLS, ProjectSettingsCopy.GAME_TOOLS, ProjectSettingsCopy.GAME_TOOLS_SUB, game),
+                ProjectSwitchRow(ScriptSwitch.STAGE_POSITION, ProjectSettingsCopy.STAGE, ProjectSettingsCopy.STAGE_SUB, s.stagePositionEnabled).takeIf { game },
+                ProjectSwitchRow(ScriptSwitch.VOICE_ID, ProjectSettingsCopy.VOICE_ID, ProjectSettingsCopy.VOICE_ID_SUB, s.voiceIdEnabled).takeIf { game },
             ),
-            links = listOf(
-                ProjectLinkRow(ProjectSettingsTarget.VOICE_FORMAT, ProjectSettingsCopy.VOICE_FORMAT, voiceFormatSub(doc), ProjectSettingsCopy.CHANGE),
+            links = listOfNotNull(
+                ProjectLinkRow(ProjectSettingsTarget.VOICE_FORMAT, ProjectSettingsCopy.VOICE_FORMAT, voiceFormatSub(doc), ProjectSettingsCopy.CHANGE).takeIf { game },
                 ProjectLinkRow(ProjectSettingsTarget.TRANSITION, ProjectSettingsCopy.TRANSITION, transitionSub(doc), ProjectSettingsCopy.CHANGE),
             ),
         )
     }
+
+    /**
+     * (0.2.0, WLD-73, S-5) Section `세계`: the `용어 후보` switch (default on). Its sub is
+     * `TODO_COPY_WORLD_CANDIDATES_SUB`, which has no interim copy, so no sub is drawn.
+     */
+    fun world(doc: ProjectDoc): List<ProjectSwitchRow> =
+        listOf(ProjectSwitchRow(ScriptSwitch.TERM_CANDIDATES, ProjectSettingsCopy.TERM_CANDIDATES, null, doc.project.termCandidates))
 
     /** `연도만 · 시작 1200년` · `연도만`; `시간 없이` has no start year. */
     fun worldTime(doc: ProjectDoc): ProjectLinkRow {
@@ -159,14 +177,31 @@ object ProjectSettingsRows {
     }
 }
 
-/** The two script switches as project writes (SCR-24 `무대 위치`, SCR-25 `보이스 ID`); no-ops return [doc]. */
+/**
+ * The 프로젝트 설정 switches as project writes (SCR-24 `무대 위치`, SCR-25 `보이스 ID`; 0.2.0 `게임 제작 도구` and
+ * `용어 후보` through `domain:actions` [ProjectSettingActions], DECISIONS §1); no-ops return [doc]. Turning a
+ * switch off only hides: nothing is deleted or regenerated (scope §8 rule 1).
+ */
 object ScriptSettingsEdit {
-    fun set(doc: ProjectDoc, switch: ScriptSwitch, on: Boolean): ProjectDoc {
+    fun set(doc: ProjectDoc, switch: ScriptSwitch, on: Boolean, ctx: ActionContext = ActionContext(doc.project.updatedAt)): ProjectDoc {
         val s = doc.project.script
         val next = when (switch) {
             ScriptSwitch.STAGE_POSITION -> s.copy(stagePositionEnabled = on)
             ScriptSwitch.VOICE_ID -> s.copy(voiceIdEnabled = on)
+            ScriptSwitch.GAME_TOOLS -> return ProjectSettingActions.setGameTools(doc, on, ctx)
+            ScriptSwitch.TERM_CANDIDATES -> return ProjectSettingActions.setTermCandidates(doc, on, ctx)
         }
         return if (next == s) doc else doc.copy(project = doc.project.copy(script = next))
+    }
+
+    /** (0.2.0 LIB-91, WLD-73) `게임 제작 도구` and `용어 후보` are written without an undo step. */
+    fun withoutUndo(switch: ScriptSwitch): Boolean = switch == ScriptSwitch.GAME_TOOLS || switch == ScriptSwitch.TERM_CANDIDATES
+
+    /** The undo label of [switch] (the row's title). */
+    fun label(switch: ScriptSwitch): String = when (switch) {
+        ScriptSwitch.STAGE_POSITION -> ProjectSettingsCopy.STAGE
+        ScriptSwitch.VOICE_ID -> ProjectSettingsCopy.VOICE_ID
+        ScriptSwitch.GAME_TOOLS -> ProjectSettingsCopy.GAME_TOOLS
+        ScriptSwitch.TERM_CANDIDATES -> ProjectSettingsCopy.TERM_CANDIDATES
     }
 }

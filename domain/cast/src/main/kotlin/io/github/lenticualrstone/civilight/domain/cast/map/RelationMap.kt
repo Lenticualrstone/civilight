@@ -143,7 +143,7 @@ object RelationMap {
         }
         val drawn = lines.flatMap { listOf(it.endA, it.endB) }.toSet()
         val nodes = visible.filter { it.key in drawn }.map { c ->
-            val tag = c.tagKeys.firstNotNullOfOrNull { doc.index.tag(it)?.name }
+            val tag = c.tagKeys.firstNotNullOfOrNull { io.github.lenticualrstone.civilight.domain.cast.CharacterEdits.liveTag(doc, it)?.name }
             val notYet = if (FirstAppearance.isAfterLens(doc, c.key, lens)) FirstAppearance.label(doc, c.key) else null
             MapNode(c.key, c.name, CastCopy.join(tag ?: c.oneLiner, notYet))
         }

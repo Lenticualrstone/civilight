@@ -1,7 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.story.search
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -38,6 +36,13 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
+import io.github.lenticualrstone.civilight.designsystem.component.ChipFlow
+import io.github.lenticualrstone.civilight.designsystem.component.ListRow
+import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
+import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
+import io.github.lenticualrstone.civilight.domain.story.search.MoreItem
+import io.github.lenticualrstone.civilight.domain.story.search.MoreResult
+import io.github.lenticualrstone.civilight.domain.story.search.SearchMore
 import io.github.lenticualrstone.civilight.designsystem.component.NoResults
 import io.github.lenticualrstone.civilight.designsystem.component.SearchField
 import io.github.lenticualrstone.civilight.designsystem.component.SearchHit
@@ -81,11 +86,17 @@ fun SearchScreen(route: ProjectSearch, deps: FeatureDeps) {
     var field by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(route.query, TextRange(route.query.length))) }
     var filterName by rememberSaveable { mutableStateOf(SearchFilter.ALL.name) }
     val filter = SearchFilter.valueOf(filterName)
+    // (0.2.0, N-13) `그 밖 ▾` kind and `화자 ▾` speaker.
+    var moreName by rememberSaveable { mutableStateOf<String?>(null) }
+    val more = moreName?.let(SearchMore::valueOf)
+    var speakerKey by rememberSaveable { mutableStateOf<String?>(null) }
     val below = navigator.backStack.let { stack -> stack.getOrNull(stack.size - 2) }
     // Opened from a gallery's command bar (GAL-04): gallery images only, the hint line instead of chips.
     val galleryScope = SearchModel.galleryScope(below)
     LaunchedEffect(below) { vm.setBelow(below) }
     LaunchedEffect(filter) { vm.setFilter(filter) }
+    LaunchedEffect(more) { vm.setMore(more) }
+    LaunchedEffect(speakerKey) { vm.setSpeaker(speakerKey) }
     // The overlay opens ready to type (STO-36: the command bar tap goes straight to the query).
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -108,33 +119,87 @@ fun SearchScreen(route: ProjectSearch, deps: FeatureDeps) {
     }
 
     // `RenumberSheet` is SCRIPT's shared sheet (registered by feature:script), so it opens here too.
-    SheetHostLayout(sheets) {
+    SheetHostLayout(
+        sheets,
+        localSheets = { key ->
+            when (key) {
+                is SearchMoreSheet -> {
+                    {
+                        val closeSheet: () -> Unit = ::close
+                        SheetHeader(title = SearchCopy.MORE, onClose = closeSheet)
+                        SearchMore.entries.forEach { kind ->
+                            ListRow(title = kind.word, selected = kind == more, onClick = {
+                                moreName = kind.name
+                                closeSheet()
+                            })
+                        }
+                    }
+                }
+                is SearchSpeakerSheet -> {
+                    {
+                        val closeSheet: () -> Unit = ::close
+                        SheetHeader(title = SearchCopy.SPEAKER, onClose = closeSheet)
+                        SheetScrollBody {
+                            ListRow(title = SearchCopy.ALL_SPEAKERS, selected = ui?.speakerKey == null, onClick = {
+                                speakerKey = null
+                                closeSheet()
+                            })
+                            ui?.speakers.orEmpty().forEach { s ->
+                                ListRow(title = s.name, selected = s.key == ui?.speakerKey, onClick = {
+                                    speakerKey = s.key
+                                    closeSheet()
+                                })
+                            }
+                        }
+                    }
+                }
+                else -> null
+            }
+        },
+    ) {
         Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg.copy(alpha = SCRIM)), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = 560.dp).fillMaxSize().statusBarsPadding().imePadding().padding(horizontal = 16.dp)) {
-                SearchField(
-                    value = field,
-                    onValueChange = {
-                        field = it
-                        vm.setQuery(it.text)
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp).focusRequester(focus),
-                    onClose = { navigator.pop() },
-                )
+                // DS-70 A5: the field's close is icon only, read `찾기 닫기` (drawn by the DS field).
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SearchField(
+                        value = field,
+                        onValueChange = {
+                            field = it
+                            vm.setQuery(it.text)
+                        },
+                        modifier = Modifier.weight(1f).focusRequester(focus),
+                        onClose = { navigator.pop() },
+                    )
+                }
                 if (galleryScope != null) {
                     CivilightText(galleryScope.hint, CivilightTheme.type.small, Modifier.padding(top = 8.dp, bottom = 10.dp), color = CivilightTheme.colors.ink3, maxLines = 1)
                 } else {
-                    Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        SearchFilter.entries.forEach { f -> FilterChip(f.word, f == filter, { filterName = f.name }) }
+                    // N-13: the six chips, `그 밖 ▾` last, and `화자 ▾` under `대사`; they wrap, so cover width
+                    // needs no horizontal scroll.
+                    ChipFlow(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                        SearchFilter.entries.forEach { f ->
+                            FilterChip(f.word, more == null && f == filter, {
+                                filterName = f.name
+                                moreName = null
+                            })
+                        }
+                        FilterChip(SearchModel.moreChip(more), more != null, { sheets.open(SearchMoreSheet(p)) })
+                        if (SearchModel.showsSpeaker(filter, more)) {
+                            val speakers = ui?.speakers.orEmpty()
+                            FilterChip(SearchModel.speakerChip(ui?.speakerKey, speakers), ui?.speakerKey != null, { sheets.open(SearchSpeakerSheet(p)) })
+                        }
                     }
                 }
                 val u = ui
                 val result = u?.result
                 // QA #11: the `명령` chip lists the commands with an empty query too (SearchModel.listsWithoutQuery).
                 val shows = if (galleryScope != null) field.text.isNotBlank() && u?.gallery == galleryScope else SearchModel.listsWithoutQuery(field.text, filter)
-                if (u != null && result != null && shows) {
+                val moreResult = u?.moreResult
+                if (u != null && more != null && galleryScope == null) {
+                    if (moreResult != null && field.text.isNotBlank() && u.more == more) {
+                        MoreResults(moreResult) { go(SearchModel.tap(p, it)) }
+                    }
+                } else if (u != null && result != null && shows) {
                     Results(
                         result = result,
                         scoped = galleryScope != null,
@@ -145,6 +210,27 @@ fun SearchScreen(route: ProjectSearch, deps: FeatureDeps) {
                     )
                 }
             }
+        }
+    }
+}
+
+/** The rows of one `그 밖 ▾` kind (N-13): names with the match boxed, or `결과 없음`. */
+@Composable
+private fun MoreResults(result: MoreResult, onItem: (MoreItem) -> Unit) {
+    val empty = result.empty
+    if (empty != null) {
+        NoResults(title = empty.title, context = empty.line)
+        return
+    }
+    val colors = CivilightTheme.colors
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item(key = "h:more:${result.kind}") { SectionLabel(result.header, civilightItem().padding(top = 14.dp)) }
+        items(result.items.size, key = { SearchModel.moreKey(result.items[it]) }) { i ->
+            val item = result.items[i]
+            NameRow(item.name, null, null, civilightItem()) { onItem(item) }
+        }
+        result.footer?.let { footer ->
+            item(key = "footer") { CivilightText(footer, CivilightTheme.type.small, civilightItem().padding(top = 14.dp), color = colors.ink3) }
         }
     }
 }

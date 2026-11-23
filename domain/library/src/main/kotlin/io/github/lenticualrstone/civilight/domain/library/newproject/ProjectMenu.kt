@@ -20,7 +20,10 @@ enum class ProjectMenuAction { OPEN, RENAME, RATING, HIDE, UNHIDE, BACKUP_EXPORT
 
 data class ProjectMenuRow(val action: ProjectMenuAction, val title: String, val sub: String?)
 
-/** The `LibMenu` sheet (LIB-02). */
+/**
+ * The `LibMenu` sheet (LIB-02). (0.2.0, LIB-92) [ratingBadge] is still filled from the stored value but
+ * no surface draws it.
+ */
 data class ProjectMenu(val title: String, val ratingBadge: String, val sub: String, val rows: List<ProjectMenuRow>) {
     val close: String get() = "닫기"
 }
@@ -31,6 +34,7 @@ object ProjectMenus {
      * (`ED`, read-only); a hidden project (reachable only while the group is open) offers `숨김 풀기`
      * instead of `프로젝트 숨기기`. `표지 이미지` follows `이름 바꾸기` with `지금 <source word>` or
      * `없음 · 첫 글자 카드` (U-08 LIB-81); [fileExists] says whether a cover original is on this device.
+     * (0.2.0, LIB-92) Rows: `열기 · 이름 바꾸기 · 표지 이미지 · 프로젝트 숨기기 (숨김 풀기) · 백업 · 내보내기 · 지우기`.
      */
     fun of(doc: ProjectDoc, isExample: Boolean = false, fileExists: (String) -> Boolean = { true }): ProjectMenu {
         val p = doc.project
@@ -40,7 +44,7 @@ object ProjectMenus {
             if (!isExample) {
                 add(ProjectMenuRow(ProjectMenuAction.RENAME, "이름 바꾸기", null))
                 add(ProjectMenuRow(ProjectMenuAction.COVER, CoverSummary.TITLE, CoverSummary.menuSub(doc, fileExists)))
-                add(ProjectMenuRow(ProjectMenuAction.RATING, "수위 등급", RatingLabels.menuSub(RatingLabels.effective(p.rating))))
+                // (0.2.0, LIB-92, S-4) No `수위 등급` row: the rating is kept in the project, never shown or set.
                 if (p.protections.hidden) {
                     add(ProjectMenuRow(ProjectMenuAction.UNHIDE, "숨김 풀기", null))
                 } else {

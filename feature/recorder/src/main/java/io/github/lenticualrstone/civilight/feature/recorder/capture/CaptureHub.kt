@@ -413,13 +413,26 @@ class CaptureHub(
         val session = s.session ?: return null
         if (s.stage != CaptureStage.RECORDING) return null
         pausedForTour = false
+        // Set before the save starts: a state collector running inside it (Main.immediate) already sees it.
+        val done = Job()
+        leaving = done
         // Undispatched: `stopAndSave` releases the microphone and moves to `정리 중` before its first suspension.
-        return scope.launch(start = CoroutineStart.UNDISPATCHED) {
+        val save = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             stopAndSave()
             val now = s
             if (now.stage == CaptureStage.PROCESSING && now.session?.recordKey == session.recordKey) keepInInbox()
         }
+        save.invokeOnCompletion { done.complete() }
+        return save
     }
+
+    /**
+     * The save of the last [leave], complete once the record is written. The background service waits for it
+     * before it stops (the task removed from recents leaves no screen to keep the process).
+     */
+    @Volatile
+    var leaving: Job? = null
+        private set
 
     /** System back: a recording is saved and left ([leave]); `정리 중` keeps the record in the inbox. */
     suspend fun back() {

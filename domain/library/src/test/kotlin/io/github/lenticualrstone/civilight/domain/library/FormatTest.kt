@@ -390,7 +390,7 @@ class FormatTest {
         assertEquals("암호", sheet.field.label)
         assertEquals("내보낼 때 정한 암호", sheet.field.hint)
         assertEquals("암호 파일", sheet.title)
-        assertEquals("이름 · 등급 · 내용 · 열면 보임", sheet.note)
+        assertEquals("이름 · 내용 · 열면 보임", sheet.note)
         assertEquals("열면 ‘숨긴 프로젝트’ 묶음으로 · 지문으로 다시 잠금", sheet.afterNote)
         assertEquals(listOf("취소", "열기"), sheet.buttons)
         // Nothing about the project is readable outside.

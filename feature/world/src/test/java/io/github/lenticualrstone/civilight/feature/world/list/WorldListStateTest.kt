@@ -26,7 +26,10 @@ class WorldListStateTest {
     fun `WLD-T02 list row in state A`() {
         val ui = terms(WorldTestFixture.stateA())
         assertEquals("잿빛 새벽의 등불", ui.projectName)
-        assertEquals(listOf("공개됨 · 최신 · 1-7", "아직 공개 전"), sections(ui))
+        // (0.2.0, WLD-73) The candidate list is the last section while `용어 후보` is on.
+        assertEquals("공개됨 · 최신 · 1-7", sections(ui)[0])
+        assertEquals("아직 공개 전", sections(ui)[1])
+        assertTrue(sections(ui).last().startsWith("용어 후보 · "))
         val row = rows(ui).single { it.key == T1 }
         assertEquals("오리지늄 등불", row.title)
         val description = io.github.lenticualrstone.civilight.feature.world.common.RichTextEdit.textOf(WorldTestFixture.stateA().index.term(T1)!!.description)

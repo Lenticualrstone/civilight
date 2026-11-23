@@ -143,7 +143,7 @@ object ProfileModel {
                 "${CastCopy.PLANNED} · ${StoryLabels.anchorPoint(doc, r.anchor)}" to (r.valueAs(String.serializer())?.takeIf { it.isNotBlank() } ?: c.name)
             },
         )
-        val tagNames = c.tagKeys.mapNotNull { doc.index.tag(it)?.name }
+        val tagNames = io.github.lenticualrstone.civilight.domain.cast.CharacterEdits.liveTagNames(doc, c)
         val tags = FixedRow(FixedField.TAGS, CastUiCopy.TAGS, CastCopy.joinAll(tagNames))
         // CST-13: `인물 초상 · 인물 배경` read `잿빛 새벽` / `내 이미지`, or `이미지 고르기` while empty.
         val images = CharacterImages.slotRows(doc, characterKey).map { row ->

@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.story
 
 import io.github.lenticualrstone.civilight.domain.checks.CheckInputs
 import io.github.lenticualrstone.civilight.domain.checks.CheckListRow
+import io.github.lenticualrstone.civilight.domain.checks.FixAction
 import io.github.lenticualrstone.civilight.domain.checks.FixKind
 import io.github.lenticualrstone.civilight.domain.checks.ProjectChecks
 import io.github.lenticualrstone.civilight.domain.story.checks.CheckFilter
@@ -125,7 +126,7 @@ class CheckCenterModelTest {
 
     @Test
     fun onlyButtonsWithAnEffectAreDrawn_andReadOnlyDrawsNoEdits() {
-        val unavailable = setOf(FixKind.RELINK_RECORD, FixKind.BULK_REPLACE)
+        val unavailable = setOf(FixKind.RELINK_RECORD, FixKind.BULK_REPLACE, FixKind.FIX_SCALE)
         for (r in report.results) {
             val shown = CheckFixes.shown(doc, p, r, r.actions, inputs).map { it.first.kind }
             val expected = r.actions.filter { a ->
@@ -137,6 +138,15 @@ class CheckCenterModelTest {
             val readOnly = CheckFixes.shown(doc, p, r, r.actions, inputs, readOnly = true).map { it.second }
             assertTrue(readOnly.all { it is FixEffect.Navigate || it is FixEffect.OpenBulk || it == FixEffect.Unlock })
         }
+    }
+
+    /** S-3 hides the map's distance tools: `◇ 축척 없음 › 축척 고치기` has no effect and is not drawn. */
+    @Test
+    fun fixScaleIsUnavailableAndNotDrawn_S3() {
+        val row = item(CheckType.SPEAKER_MISSING)
+        val fix = FixAction("축척 고치기", FixKind.FIX_SCALE, target = K.SCENE_1_7_3)
+        assertEquals(FixEffect.Unavailable, CheckFixes.effect(doc, p, row, fix, inputs))
+        assertTrue(CheckFixes.shown(doc, p, row, listOf(fix), inputs).isEmpty())
     }
 
     private fun hasTrashEntry(itemKey: String?): Boolean {

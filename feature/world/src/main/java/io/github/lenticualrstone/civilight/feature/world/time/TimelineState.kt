@@ -10,6 +10,7 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.world.EventKind
 import io.github.lenticualrstone.civilight.ui.lens.LensRules
+import io.github.lenticualrstone.civilight.model.position.LensPoint
 
 /** What a 연표 row is: its dot and title colour follow it (board `Timeline`). */
 enum class TimelineRowKind { WORLD_EVENT, STORY_EVENT, CHAPTER, DIVIDER }
@@ -63,7 +64,8 @@ object TimelineState {
         }
 
     fun build(doc: ProjectDoc, view: TimelineView, anchorEventKey: Key?, hiddenOpen: Boolean): TimelineUi {
-        val lens = LensRules.effective(doc, doc.app.view.lens.point)
+        // (0.2.0, S-1, WLD-71) No lens chip here: the 연표 reads at `최신`.
+        val lens: LensPoint = LensPoint.Latest
         val anchorEvent = anchorEventKey?.let { doc.index.event(it) }?.takeIf { it.deletedAt == null }
         // Without a live anchor event the anchor view has nothing to measure from: fall back to 에피소드 기준.
         val shownView = if (view == TimelineView.ANCHOR && anchorEvent == null) TimelineView.EPISODE else view

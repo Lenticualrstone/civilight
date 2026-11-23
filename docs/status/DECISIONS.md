@@ -42,6 +42,9 @@ Every feature agent follows this file. It settles the "pick one" requests from t
 | (0.2.0) Episode versions `판 남기기` · `이 판 글로` · automatic `내보낸 판` (N-29) | `domain:actions` `VersionActions.capture` · `restoreBlockText` · `canRestore` · `captureForExport` (PDF: call it with the plan after drawing; CSV and engine JSON: `ExportActions.run` already does) | — |
 | (0.2.0) Several canvases (N-58) | `domain:actions` `CanvasActions` (`live` · `openTarget` · `opened` · `create` · `rename` · `delete` · `restore`); last opened = `_app/view.json › lastCanvasKey` | — |
 | (0.2.0) CSV and engine JSON without choice voices (N-23) | `domain:actions` `ExportActions.run` (plan through `withoutChoiceVoices`) | `ExportRun.run` directly for CSV or JSON |
+| (0.2.0) Check lists and counts (S-2, D33): every `확인할 항목 N`, badge or list built from `domain:checks` | `domain:checks` `WritingChecks.run` · `check` · `header` (gated kinds left out) | `ProjectChecks.run` / `check` outside `domain:checks` (guarded by `WritingChecksGuardTest`) |
+| (0.2.0) Content writes that are no undo step: `게임 제작 도구`, `용어 후보`, `이 탭 잠그기`, and what an export writes after its save (`내보낸 판`, fixed voice IDs) | `core:store` `ProjectStore.updateWithoutUndo` (also patches every kept undo/redo step, so undo never reverts it), through `core:ui` `ProjectViewModel.updateWithoutUndo` or `feature:library` `ProjectWriter.editWithoutUndo` | an ordinary `update` step; `clearUndo` |
+| (0.2.0) Unsent script draft (U-14) | `core:model` `ScriptViewState.draft` (`_app/view.json`, never exported), written through `updateApp` by `feature:script` | a side file; process memory only |
 
 ## 2. Who owns what during the feature phase
 

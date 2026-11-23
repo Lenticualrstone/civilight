@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import io.github.lenticualrstone.civilight.domain.actions.TagActions
+import io.github.lenticualrstone.civilight.feature.cast.common.toAction
 import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
 import io.github.lenticualrstone.civilight.domain.cast.EditContext
 import io.github.lenticualrstone.civilight.model.Key
@@ -27,7 +29,7 @@ object FixedFieldEdits {
 
     /** The character's tags as picks, in its order. */
     fun picks(doc: ProjectDoc, characterKey: Key): List<TagPick> =
-        doc.index.character(characterKey)?.tagKeys.orEmpty().mapNotNull { key -> doc.index.tag(key)?.let { TagPick(it.key, it.name) } }
+        doc.index.character(characterKey)?.tagKeys.orEmpty().mapNotNull { key -> CharacterEdits.liveTag(doc, key)?.let { TagPick(it.key, it.name) } }
 
     /** Tapping a project tag chip: on when off, off when on (a chip, never a guess). */
     fun toggle(picks: List<TagPick>, key: Key, name: String): List<TagPick> =
@@ -45,15 +47,21 @@ object FixedFieldEdits {
         }
     }
 
-    /** Saves the picks: new names become project tags, then the character's tags are set in pick order. */
+    /**
+     * Saves the picks: new names become project tags (`TagActions.create`; an existing live name picks that
+     * tag), then the character's tags are set in pick order. (0.2.0, N-44) Keys of tags in the trash stay on
+     * the character, so restoring the tag re-attaches it.
+     */
     fun apply(doc: ProjectDoc, characterKey: Key, picks: List<TagPick>, ctx: EditContext): ProjectDoc {
         var next = doc
-        val keys = picks.map { pick ->
-            pick.key ?: CharacterEdits.addTag(next, pick.name, ctx).let { (d, tag) ->
-                next = d
-                tag.key
-            }
+        val keys = picks.mapNotNull { pick ->
+            pick.key ?: CharacterEdits.tags(next).firstOrNull { it.name.nfc() == pick.name.trim().nfc() }?.key
+                ?: TagActions.create(next, pick.name, null, ctx.toAction())?.let { (d, tag) ->
+                    next = d
+                    tag.key
+                }
         }
-        return CharacterEdits.setTags(next, characterKey, keys, ctx)
+        val trashed = doc.index.character(characterKey)?.tagKeys.orEmpty().filter { CharacterEdits.liveTag(doc, it) == null && doc.index.tag(it) != null }
+        return CharacterEdits.setTags(next, characterKey, keys + trashed, ctx)
     }
 }

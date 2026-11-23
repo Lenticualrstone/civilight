@@ -84,7 +84,8 @@ object RevealMoves {
     }
 
     fun toast(before: TermQueries, after: TermQueries, termKey: Key): String? {
-        val from = before.reveal(termKey)?.episodeLabel ?: return null
+        // (0.2.0) Moving away from the automatic reveal is a first hand-set (`◇ 첫 공개 1-2`), not a move.
+        val from = before.storedReveal(termKey)?.episodeLabel ?: return null
         val to = after.reveal(termKey)?.episodeLabel ?: return null
         val added = newWarnings(before, after, termKey).size
         return buildString {

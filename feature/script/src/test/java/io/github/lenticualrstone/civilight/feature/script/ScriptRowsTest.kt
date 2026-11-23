@@ -42,10 +42,9 @@ class ScriptRowsTest {
     }
 
     @Test
-    fun `SCR-01 an empty scene gets one virtual dialogue line with the inherited speaker`() {
-        val empty = rows().filterIsInstance<EmptySceneRow>().single()
-        assertEquals(K.SCENE_1_7_4, empty.sceneKey)
-        assertEquals("리엔", empty.speaker?.text)
+    fun `SCR-01 (0_2_0) an empty scene is its head only, with no virtual line`() {
+        assertTrue(rows().none { it is EmptySceneRow })
+        assertTrue(rows().any { it is HeadRow && it.sceneKey == K.SCENE_1_7_4 })
         assertTrue(rows(readOnly = true).none { it is EmptySceneRow })
     }
 

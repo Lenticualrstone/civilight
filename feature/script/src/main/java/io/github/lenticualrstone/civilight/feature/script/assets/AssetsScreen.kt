@@ -31,7 +31,6 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.readingMeasur
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.feature.script.ui.ScriptCommandField
 import io.github.lenticualrstone.civilight.model.script.ScriptAssetKind
-import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.ScriptAssets
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
@@ -84,7 +83,6 @@ fun AssetsScreen(route: ScriptAssets, deps: FeatureDeps) {
                 onText = { query = it },
                 onSubmit = { focusManager.clearFocus() },
                 onClose = ::stopSearch,
-                onMic = { deps.navigator.push(Recording(projectKey = route.projectKey)) },
                 focusRequester = focus,
                 hint = AssetsCopy.SEARCH_HINT,
             )

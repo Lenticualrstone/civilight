@@ -50,6 +50,39 @@ data class ProjectProtectionSettings(val rating: Rating, val rows: List<Protecti
     val ratingRowValue: String get() = "${RatingLabels.badge(rating)} ›"
 
     companion object {
+        /** (0.2.0, LIB-92) Section label of 프로젝트 설정 (was `등급 · 숨기기`). */
+        const val SECTION_020 = "숨기기"
+
+        /**
+         * (0.2.0, LIB-92, D34) `이름 가리기` sub: `TODO_COPY_LIB_NAME_MASK_SUB`, interim `위젯 · 알림 · 최근 항목`
+         * (the LIB-25 sub, existing).
+         */
+        const val TODO_COPY_LIB_NAME_MASK_SUB = "위젯 · 알림 · 최근 항목"
+
+        /**
+         * (0.2.0, LIB-92) `라이프 레코더 연결 가리기` sub: the 0.1.0 `기록의 연결에 등급만 표시` names a rating the link
+         * no longer shows (it shows `TODO_COPY_LIB_MASKED_NAME`). Interim from existing words, to confirm.
+         */
+        const val TODO_COPY_LIB_RECORDER_MASK_SUB = "기록의 연결에 이름 가림"
+
+        /**
+         * (0.2.0, LIB-92, S-4) The four switches without any rating: same titles and subs, no
+         * `<rating> 기본과 다름` marker. [rating] keeps the stored value (D34) and is never drawn.
+         */
+        fun withoutRating(rating: Rating, protections: Protections): ProjectProtectionSettings {
+            val rows = of(rating, protections, RatingDefaults()).rows.map { row ->
+                row.copy(
+                    differsMarker = null,
+                    sub = when (row.protection) {
+                        Protection.NAME_MASK -> TODO_COPY_LIB_NAME_MASK_SUB
+                        Protection.RECORDER_LINK_MASK -> TODO_COPY_LIB_RECORDER_MASK_SUB
+                        else -> row.sub
+                    },
+                )
+            }
+            return ProjectProtectionSettings(rating, rows)
+        }
+
         fun of(rating: Rating, protections: Protections, defaults: RatingDefaults): ProjectProtectionSettings {
             val def = RatingDefaultsTable.defaultsFor(rating, defaults)
             val rows = Protection.entries.map { p ->

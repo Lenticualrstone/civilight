@@ -2,6 +2,8 @@
 
 package io.github.lenticualrstone.civilight.feature.cast
 
+import io.github.lenticualrstone.civilight.feature.cast.field.SecretFieldGate
+
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import io.github.lenticualrstone.civilight.feature.cast.field.FieldHistorySheetContent
@@ -63,8 +65,8 @@ fun EntryProviderScope<NavKey>.castEntries(deps: FeatureDeps) {
     entry<TemplateEdit> { route -> TemplateEditScreen(route, deps) }
     entry<TemplateFieldEdit> { route -> TemplateFieldEditScreen(route, deps) }
 
-    deps.sheets.register<FieldValueEditSheet> { sheet -> FieldValueSheetContent(sheet) }
-    deps.sheets.register<FieldHistorySheet> { sheet -> FieldHistorySheetContent(sheet) }
+    deps.sheets.register<FieldValueEditSheet> { sheet -> SecretFieldGate(sheet.kind, sheet.entityKey, sheet.fieldDefKey) { FieldValueSheetContent(sheet) } }
+    deps.sheets.register<FieldHistorySheet> { sheet -> SecretFieldGate(sheet.kind, sheet.entityKey, sheet.fieldDefKey) { FieldHistorySheetContent(sheet) } }
     deps.sheets.register<AddFieldSheet> { sheet -> AddFieldSheetContent(sheet) }
     deps.sheets.register<RelationEditSheet> { sheet -> RelationEditContent(sheet) }
     deps.sheets.register<DeleteImpactSheet> { sheet -> DeleteImpactContent(sheet) }

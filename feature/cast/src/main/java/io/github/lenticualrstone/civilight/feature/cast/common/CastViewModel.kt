@@ -38,6 +38,16 @@ open class CastViewModel(
         then: (EditResult) -> Unit = {},
         transform: (ProjectDoc, EditContext) -> ProjectDoc,
     ): Job = viewModelScope.launch { then(apply(label, mergeKey, transform)) }
+
+    /**
+     * (0.2.0, CST-73) A write with no undo step that undo and redo never revert (`이 탭 잠그기`): project undo
+     * can then never turn the lock off without the device prompt.
+     */
+    fun actWithoutUndo(then: (EditResult) -> Unit = {}, transform: (ProjectDoc, EditContext) -> ProjectDoc): Job =
+        viewModelScope.launch {
+            val ctx = contextOf()
+            then(updateWithoutUndo { doc -> transform(doc, ctx) })
+        }
 }
 
 /**

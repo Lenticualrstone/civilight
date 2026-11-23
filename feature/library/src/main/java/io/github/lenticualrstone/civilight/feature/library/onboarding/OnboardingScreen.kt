@@ -17,7 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,7 +48,6 @@ import io.github.lenticualrstone.civilight.navigation.Onboarding
 import io.github.lenticualrstone.civilight.navigation.OnboardingPage
 import io.github.lenticualrstone.civilight.navigation.RestoreBackup
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** 첫 실행 설정 (LIB-15): 환영 and the three setup pages, one route per page. */
@@ -209,8 +207,8 @@ private fun SafeCard(icon: IconId, title: String, sub: String, trailing: @Compos
 
 /**
  * `OnbVoice` (라이프 레코더 · 3/4): the recorder card, then the two choices. `마이크 허용` shows its
- * reason (`녹음할 때만 사용`) on the card before the system prompt opens; `홈 화면 위젯 추가` asks
- * the launcher to pin the recorder widget. Each card reads as chosen once the device says so.
+ * reason (`녹음할 때만 사용`) on the card before the system prompt opens; it reads as chosen once the
+ * device says so. (0.2.0 S-8) The `홈 화면 위젯 추가` choice is gone with the widget.
  */
 @Composable
 private fun VoicePage(onNext: () -> Unit, onSkip: () -> Unit) {
@@ -218,21 +216,7 @@ private fun VoicePage(onNext: () -> Unit, onSkip: () -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     var micGranted by remember { mutableStateOf(DeviceChoices.micGranted(context)) }
-    var widgetPlaced by remember { mutableStateOf(DeviceChoices.widgetPlaced(context)) }
-    var widgetAsked by remember { mutableIntStateOf(0) }
     val micPrompt = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> micGranted = granted }
-    val toasts = io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps.current.toasts
-    // The pin dialog belongs to the launcher; look for the placed widget for a while after asking.
-    LaunchedEffect(widgetAsked) {
-        if (widgetAsked == 0) return@LaunchedEffect
-        repeat(WIDGET_POLLS) {
-            delay(WIDGET_POLL_MS)
-            if (DeviceChoices.widgetPlaced(context)) {
-                widgetPlaced = true
-                return@LaunchedEffect
-            }
-        }
-    }
     OnbFrame(
         top = { SetupTopRow(current = 2, onSkip = onSkip) },
         buttons = { LaterNextButtons(onLater = onNext, onNext = onNext) },
@@ -258,19 +242,8 @@ private fun VoicePage(onNext: () -> Unit, onSkip: () -> Unit) {
                 onClick = { if (!micGranted) micPrompt.launch(DeviceChoices.MIC_PERMISSION) },
                 subtitle = OnboardingCopy.MIC_SUB,
             )
-            ChoiceCard(
-                OnboardingCopy.WIDGET_TITLE,
-                selected = widgetPlaced,
-                onClick = {
-                    if (widgetPlaced) return@ChoiceCard
-                    if (DeviceChoices.requestWidget(context)) widgetAsked++
-                    else toasts.show(OnboardingCopy.WIDGET_UNSUPPORTED, actionLabel = null)
-                },
-                subtitle = OnboardingCopy.WIDGET_SUB,
-            )
+            // (0.2.0 S-8, LIB-95) No `홈 화면 위젯 추가`: the recorder widget is not declared any more.
         }
     }
 }
 
-private const val WIDGET_POLLS = 60
-private const val WIDGET_POLL_MS = 500L

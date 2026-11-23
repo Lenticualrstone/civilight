@@ -35,6 +35,8 @@ fun SheetScope.LayersSheet(
     preview: ScriptPreview,
     onLayer: (LayerRow, Boolean) -> Unit,
     onPreview: (ScriptPreview) -> Unit,
+    /** SCR-28: the `낭독` chip is dimmed when the episode has no step. */
+    readAloudEnabled: Boolean = true,
 ) {
     SheetHeader(title = ScriptCopy.LAYERS_TITLE, onClose = ::close, subtitle = ScriptCopy.LAYERS_SUB)
     SheetScrollBody(Modifier.padding(top = 6.dp, bottom = 16.dp)) {
@@ -51,7 +53,7 @@ fun SheetScope.LayersSheet(
         Spacer(Modifier.height(8.dp))
         val chosen = LayersModel.selectedChip(preview)
         ChipFlow {
-            LayersModel.CHIPS.forEach { chip ->
+            LayersModel.chips(readAloudEnabled).forEach { chip ->
                 FilterChip(
                     label = chip.label,
                     selected = chip.preview == chosen,

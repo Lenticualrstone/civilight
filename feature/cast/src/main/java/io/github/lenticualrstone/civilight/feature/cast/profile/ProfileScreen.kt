@@ -1,5 +1,23 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import io.github.lenticualrstone.civilight.ui.project.EditResult
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.github.lenticualrstone.civilight.domain.actions.CharacterFieldActions
+import io.github.lenticualrstone.civilight.domain.cast.Appearances
+import io.github.lenticualrstone.civilight.feature.cast.common.toAction
+import io.github.lenticualrstone.civilight.feature.cast.common.CastAuth
+import io.github.lenticualrstone.civilight.model.game.GameTools
+import io.github.lenticualrstone.civilight.ui.security.AuthAvailability
+import io.github.lenticualrstone.civilight.ui.security.AuthRequest
+import io.github.lenticualrstone.civilight.ui.security.AuthResult
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -109,26 +127,116 @@ import io.github.lenticualrstone.civilight.domain.story.search.CommandBar as Com
 /** The character record (CST-07 … CST-12, CST-28); its sheets carry the edits. */
 class ProfileViewModel(
     projectKey: Key,
+    private val characterKey: Key,
     sessions: ProjectSessions,
     contextOf: () -> io.github.lenticualrstone.civilight.domain.cast.EditContext,
-) : CastViewModel(projectKey, sessions, contextOf)
+) : CastViewModel(projectKey, sessions, contextOf) {
+    /**
+     * The selected tab and the 비밀 gate (CST-73). Held here, not in saved UI state: a configuration change
+     * (fold, unfold) keeps a confirmed tab open, and nothing outlives the record.
+     */
+    private val tabState = MutableStateFlow<TabGateState?>(null)
+    val tabs: StateFlow<TabGateState?> = tabState
+
+    fun ensureTabs(initial: () -> TabGateState) {
+        if (tabState.value == null) set(initial())
+    }
+
+    /** Synchronous, so a relock from the lifecycle observer reaches the secret sheets before the next frame. */
+    fun updateTabs(change: (TabGateState) -> TabGateState) {
+        tabState.value?.let { set(change(it)) }
+    }
+
+    private fun set(state: TabGateState) {
+        tabState.value = state
+        CastAuth.publishTab(characterKey, state)
+    }
+
+    override fun onCleared() {
+        CastAuth.publishTab(characterKey, null)
+        super.onCleared()
+    }
+}
 
 /** 인물 기록 (`Profile`, `RTEditTwo`, `RTPlanned`, `Relations`; inner in the `TwoCast` right pane or `ColCast`). */
 @Composable
 fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
-    val vm = entryViewModel { ProfileViewModel(route.projectKey, deps.projects, deps::editContext) }
+    // Keyed by character: the inner pane swaps records under one entry, and the 비밀 gate must never carry over.
+    val vm = entryViewModel(key = "profile:${route.characterKey}") { ProfileViewModel(route.projectKey, route.characterKey, deps.projects, deps::editContext) }
     val load by vm.state.collectAsState()
     val ready = load as? ProjectLoad.Ready ?: return
     val doc = ready.doc
     val p = route.projectKey
     val c = route.characterKey
     val gate = rememberHiddenGate(p)
-    var tab by rememberSaveable { mutableIntStateOf(route.tab.ordinal) }
+    // CST-74: 4 tabs while `게임 제작 도구` is off. CST-73: the 비밀 tab behind the device lock while locked.
+    val gameTools = GameTools.on(doc)
+    val storedLocked = doc.index.character(c)?.secretTabLocked == true
+    // CST-73: the lock turned off by anything but the confirmed `이 탭 잠그기` switch asks for the device lock first
+    // (since 0.2.0 the lock is written without an undo step, so undo and redo cannot; this guards any other writer); the tab is treated as locked while that prompt is on screen, and a cancel locks it again.
+    var ownUnlock by remember(c) { mutableStateOf(false) }
+    var unlockPending by remember(c) { mutableStateOf(false) }
+    val secretLocked = storedLocked || unlockPending
+    vm.ensureTabs { SecretTabGate.open(route.tab, gameTools, secretLocked) }
+    val tabState = vm.tabs.collectAsState().value ?: SecretTabGate.open(route.tab, gameTools, secretLocked)
+    LaunchedEffect(gameTools) { vm.updateTabs { SecretTabGate.gameToolsChanged(it, gameTools) } }
+    val shownTabs = ProfileTabs.shown(gameTools)
+    val shownTab = tabState.shown(secretLocked)
+    val prompting = tabState.prompting(secretLocked)
+    LaunchedEffect(prompting) {
+        if (!prompting) return@LaunchedEffect
+        val result = deps.biometric.authenticate(AuthRequest(ProfileTabs.label(ProfileTab.SECRET)))
+        vm.updateTabs { if (result == AuthResult.SUCCESS) SecretTabGate.confirm(it) else SecretTabGate.cancel(it) }
+    }
+    var lastStored by remember(c) { mutableStateOf(storedLocked) }
+    LaunchedEffect(storedLocked) {
+        val was = lastStored
+        lastStored = storedLocked
+        if (!was || storedLocked) return@LaunchedEffect
+        if (ownUnlock) {
+            ownUnlock = false
+            return@LaunchedEffect
+        }
+        if (ready.readOnly) return@LaunchedEffect
+        unlockPending = true
+        vm.updateTabs { SecretTabGate.background(it) }
+        if (!CastAuth.confirm(deps, AuthRequest(ProfileTabs.label(ProfileTab.SECRET)))) {
+            vm.actWithoutUndo(then = { unlockPending = false }) { d, ctx -> CharacterFieldActions.setSecretTabLocked(d, c, true, ctx.toAction()) }
+        } else {
+            unlockPending = false
+        }
+    }
+    // CST-73: leaving the record (a screen pushed over it, another record in the pane, the record popped) locks the
+    // tab again and coming back asks again. The record only re-parented (fold, unfold: the activity handles those
+    // configuration changes itself, so nothing is recreated) is still the top of the back stack and keeps it.
+    val lockedNow by rememberUpdatedState(secretLocked)
+    DisposableEffect(vm, c) {
+        vm.updateTabs { SecretTabGate.foreground(it, lockedNow) }
+        onDispose {
+            if (deps.navigator.backStack.lastOrNull() != route) {
+                vm.updateTabs { SecretTabGate.background(it, ownPrompt = CastAuth.inFlight) }
+                // Unpublished while left: a sheet opened from another screen asks on its own.
+                CastAuth.publishTab(c, null)
+            }
+        }
+    }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, vm, secretLocked) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> vm.updateTabs { SecretTabGate.background(it, ownPrompt = CastAuth.inFlight) }
+                Lifecycle.Event.ON_START -> vm.updateTabs { SecretTabGate.foreground(it, secretLocked) }
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     var showEmpty by rememberSaveable { mutableStateOf(false) }
     var headerExpanded by rememberSaveable { mutableStateOf(false) }
     val wide = LocalWindowLayout.current.isInner
     val cover = !wide
-    val ui = ProfileUi(ProfileTab.entries[tab], showEmpty, headerExpanded)
+    val ui = ProfileUi(shownTab, showEmpty, headerExpanded)
     val built = remember(doc, ui, cover, gate.open, ready.readOnly) { ProfileModel.build(doc, c, ui, cover, gate.open, ready.readOnly) }
     // Every row `보기` or `항목 더 보기` can bring in, so those rows fold in and out instead of jumping (P2).
     val full = remember(doc, ui, cover, gate.open, ready.readOnly) { ProfileModel.build(doc, c, ui.copy(showEmpty = true, headerExpanded = true), cover, gate.open, ready.readOnly) }
@@ -152,7 +260,10 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     val editable = !state.readOnly && !leaving
     val trash = rememberItemTrash(p)
     val writes = remember(deps, p) { CastWrites(deps, p) }
+    val scope = rememberCoroutineScope()
     val recorderLink = rememberRecorderLink(p, c, doc)
+    // CST-73: the merge sheet itself asks for the device lock before it shows a locked character's values.
+    val openMerge: () -> Unit = { sheets.open(MergeItemsSheet(p, EntityKind.CHARACTER, c, c)) }
     val actions = RecordActions(
         editable = editable,
         onField = { sheets.open(FieldValueEditSheet(p, EntityKind.CHARACTER, c, it)) },
@@ -187,7 +298,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
         onArchive = { key -> deps.navigator.push(ArchiveDocEdit(p, c, key)) },
         onDeletedPartner = { partner -> sheets.open(DeleteImpactSheet(p, EntityKind.CHARACTER, partner)) },
         onRecorder = { deps.navigator.push(RecorderInbox(projectKey = p, targetKind = RecorderLinkModel.TARGET_KIND, targetKey = c)) },
-        onSameNameMerge = { sheets.open(MergeItemsSheet(p, EntityKind.CHARACTER, c, c)) },
+        onSameNameMerge = { openMerge() },
         onGalleryAdd = { sheets.open(GalleryAddSheet(p, GalleryOwnerKind.CHARACTER, c)) },
         onGalleryAll = { deps.navigator.push(Gallery.ofCharacter(p, c)) },
         // The gallery screen opens in its remembered view (card, grid or list) with this item picked (GAL-08).
@@ -198,8 +309,8 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
             back = if (inDetailPane) null else IconAction(CastUiCopy.BACK) { deps.navigator.pop() },
             lens = lensChipLabel(doc),
             onLens = { sheets.open(LensSheet(p)) },
-            add = if (editable && ui.tab == ProfileTab.GAME_TEXT) IconAction(CastUiCopy.NEW_VOICE_LINE) { sheets.open(VoiceLineSheet(p, c)) } else null,
-            menu = if (editable) IconAction(CastUiCopy.menuLabel(state.name)) { sheets.open(RecordMenuSheet(p, c)) } else null,
+            add = if (editable && gameTools && ui.tab == ProfileTab.GAME_TEXT) IconAction(CastUiCopy.NEW_VOICE_LINE) { sheets.open(VoiceLineSheet(p, c)) } else null,
+            menu = if (editable) IconAction(CastUiCopy.MENU) { sheets.open(RecordMenuSheet(p, c)) } else null,
             collapsed = collapsed,
             collapsedTitle = state.name,
             collapsedSmallLine = state.header.title.substringBefore(CastCopy.SEP),
@@ -207,16 +318,17 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
             // the lens backs up `값이 바뀌는 때` when the header has no field row.
             lensModifier = Modifier.tourTarget(CastTourSteps.LENS).tourTarget(CastTourSteps.TIMED_VALUE, fallback = true),
             tabs = {
-                CivilightTabs(CastUiCopy.TABS, tab, { tab = it }, Modifier.weight(1f)) { i ->
-                    CastTourSteps.stepOfTab(i)?.let { Modifier.tourTarget(it) } ?: Modifier
+                CivilightTabs(ProfileTabs.labels(gameTools), shownTabs.indexOf(shownTab).coerceAtLeast(0), { i ->
+                    vm.updateTabs { SecretTabGate.select(it, shownTabs[i], secretLocked) }
+                }, Modifier.weight(1f)) { i ->
+                    CastTourSteps.stepOfTab(shownTabs[i].ordinal)?.let { Modifier.tourTarget(it) } ?: Modifier
                 }
             },
             commandBar = {
                 CommandBarView(
                     hint = CommandHints.placeholder(CommandScreen.PROFILE),
                     onClick = { deps.navigator.push(ProjectSearch(p)) },
-                    onMic = { deps.navigator.push(Recording(projectKey = p, targetKind = RecorderTargetKind.CHARACTER.name, targetKey = c)) },
-                    micLabel = CastUiCopy.MIC,
+                    // S-8: the recorder opens only from home; no mic on this bar.
                 )
             },
             sheets = sheets,
@@ -225,6 +337,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                     is NameEditSheet -> { { NameSheetContent(key) } }
                     is OneLinerEditSheet -> { { OneLinerSheetContent(key) } }
                     is TagsEditSheet -> { { TagsSheetContent(key) } }
+                    is SpeechSummarySheet -> { { SpeechSummaryContent(key) } }
                     is DisplayNameEditSheet -> { { DisplayNameSheetContent(key) } }
                     is DisplayNameHistorySheet -> { { DisplayNameHistoryContent(key) } }
                     is VoiceLineSheet -> { { VoiceLineContent(key) } }
@@ -242,7 +355,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                                     writes.launch(if (hide) CastUiCopy.BTN_HIDE else CastUiCopy.BTN_UNHIDE, { d, ctx -> Step(CharacterEdits.setHidden(d, c, hide, ctx.edit), Unit) })
                                 },
                                 onDelete = { close(); trash.requestDelete(EntityKind.CHARACTER, c, sheets::open) },
-                                onMerge = { close(); sheets.open(MergeItemsSheet(p, EntityKind.CHARACTER, c, c)) },
+                                onMerge = { close(); openMerge() },
                             )
                         }
                     }
@@ -252,6 +365,31 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
         ) { padding ->
             val art = remember(doc, c, wide) { CharacterImages.background(doc, c, inner = wide) }
             val gallery = remember(doc, c, gate.open) { CastGallery.section(doc, c, gate.open) }
+            val canAuthenticate = remember { deps.biometric.availability() != AuthAvailability.NONE }
+            val secret = SecretTabExtras(
+                summaryEdit = if (editable) ({ sheets.open(SpeechSummarySheet(p, c)) }) else null,
+                locked = secretLocked,
+                // CST-73: shown when the device can authenticate, or when the lock is already on (never hidden while set).
+                showLock = canAuthenticate || secretLocked,
+                lockEnabled = editable && canAuthenticate,
+                onLock = { on ->
+                    if (on) {
+                        vm.updateTabs(SecretTabGate::lockedFromInside)
+                        ownUnlock = false
+                        vm.actWithoutUndo { d, ctx -> CharacterFieldActions.setSecretTabLocked(d, c, true, ctx.toAction()) }
+                    } else {
+                        // Turning it off asks for the device lock first; a cancel leaves it on.
+                        scope.launch {
+                            if (CastAuth.confirm(deps, AuthRequest(ProfileTabs.label(ProfileTab.SECRET)))) {
+                                ownUnlock = true
+                                vm.actWithoutUndo(then = { if (it != EditResult.APPLIED) ownUnlock = false }) { d, ctx ->
+                                    CharacterFieldActions.setSecretTabLocked(d, c, false, ctx.toAction())
+                                }
+                            }
+                        }
+                    }
+                },
+            )
             // The art's top edge: the content starts under the floating buttons, or at the art (no inset).
             val topPad by animateDpAsState(if (art == null) recordTopInset() else 0.dp, motion.move(CivilightMotion.standard), label = "recordTop")
             LazyColumn(
@@ -266,7 +404,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                 item(key = "tab") {
                     // No clip: the gallery row runs past the list's side padding and must not be cut while the tabs swap.
                     AnimatedContent(ui.tab, transitionSpec = { motion.swap(clip = false) }, label = "recordTab") { shown ->
-                        TabBody(doc, c, state, fullState, ui.copy(tab = shown), gate.open, gallery, wide, actions, recorderLink)
+                        TabBody(doc, c, state, fullState, ui.copy(tab = shown), gate.open, gallery, wide, actions, recorderLink, secret)
                     }
                 }
             }
@@ -340,16 +478,21 @@ private fun TabBody(
     inner: Boolean,
     actions: RecordActions,
     recorderLink: String?,
+    secret: SecretTabExtras,
 ) {
     when (ui.tab) {
-        ProfileTab.OVERVIEW -> OverviewTab(doc, state, full, ui.showEmpty, gallery, inner, actions, recorderLink)
+        ProfileTab.OVERVIEW -> {
+            // CST-71: appearance bars and `마지막 등장`, drawn by the tab directly under the field table.
+            val bars = remember(doc, characterKey, hiddenUnlocked) { Appearances.of(doc, characterKey, hiddenUnlocked) }
+            OverviewTab(doc, state, full, ui.showEmpty, gallery, inner, actions, recorderLink) { AppearanceSection(bars) }
+        }
         ProfileTab.RELATIONS -> RelationsTab(state, actions)
         ProfileTab.SPEECH -> {
             val c = doc.index.character(characterKey) ?: return
             val lens = doc.castLens
             val chips = remember(doc, hiddenUnlocked) { RelationViews.addressChips(doc, characterKey, lens, hiddenUnlocked) }
             val hidden = RelationViews.hiddenPartnerCount(doc, characterKey, hiddenUnlocked).takeIf { it > 0 }?.let(RelationViews::hiddenRow)
-            SpeechTab(c.speechBody.docText, chips, hidden, actions)
+            SpeechTab(c.speechBody.docText, chips, hidden, actions, summary = c.speechSummary, onSummary = secret.summaryEdit)
         }
         ProfileTab.GAME_TEXT -> {
             val progress = VoiceLines.progress(doc, characterKey)
@@ -357,8 +500,20 @@ private fun TabBody(
             GameTextTab(progress.sectionTitle, progress.fraction, VoiceLines.ORDER_LABEL, VoiceLines.rows(doc, characterKey), ArchiveDocs.sectionTitle(doc, characterKey), archive, actions)
         }
         ProfileTab.SECRET -> {
-            val secret = remember(doc) { Profile.secretTab(doc, characterKey, doc.castLens) }
-            SecretTab(doc, secret.rows, secret.body.docText, actions)
+            val secretView = remember(doc) { Profile.secretTab(doc, characterKey, doc.castLens) }
+            SecretTab(doc, secretView.rows, secretView.body.docText, actions) {
+                if (secret.showLock) SecretLockRow(secret.locked, secret.lockEnabled, secret.onLock)
+            }
         }
     }
 }
+
+/** What the `말투` and `비밀` tabs add in 0.2.0 (CST-72, CST-73). */
+private data class SecretTabExtras(
+    val summaryEdit: (() -> Unit)?,
+    val locked: Boolean,
+    val showLock: Boolean,
+    val lockEnabled: Boolean,
+    val onLock: (Boolean) -> Unit,
+)
+

@@ -1,33 +1,23 @@
 package io.github.lenticualrstone.civilight.feature.script
 
-import androidx.compose.runtime.key
-import io.github.lenticualrstone.civilight.ui.tour.TourHold
-import io.github.lenticualrstone.civilight.ui.tour.TourStepAbsent
-import io.github.lenticualrstone.civilight.ui.tour.tourRunning
-import io.github.lenticualrstone.civilight.ui.tour.tourTarget
-import io.github.lenticualrstone.civilight.feature.script.ui.AppearOnJoin
-import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -35,54 +25,114 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.GlassScaffold
+import io.github.lenticualrstone.civilight.designsystem.component.InputContext
+import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputActions
+import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputBar
+import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputEvent
+import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputReadOnlyRow
+import io.github.lenticualrstone.civilight.designsystem.component.SwipeSide
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.component.ToastHost
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
-import io.github.lenticualrstone.civilight.designsystem.theme.Motion
-import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
-import io.github.lenticualrstone.civilight.feature.script.motion.barSwap
-import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
-import io.github.lenticualrstone.civilight.model.app.PaneSplit
-import io.github.lenticualrstone.civilight.ui.window.PaneSplitHandle
-import io.github.lenticualrstone.civilight.ui.window.rememberPaneSplitState
-import io.github.lenticualrstone.civilight.feature.script.motion.ScriptScroll
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
-import io.github.lenticualrstone.civilight.domain.script.BlockOps
+import io.github.lenticualrstone.civilight.designsystem.theme.Motion
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
 import io.github.lenticualrstone.civilight.domain.script.Labels
+import io.github.lenticualrstone.civilight.domain.script.MergeCheck
+import io.github.lenticualrstone.civilight.domain.script.ReadAloud
 import io.github.lenticualrstone.civilight.domain.script.ScriptCommands
-import io.github.lenticualrstone.civilight.feature.script.editor.CaretEvent
-import io.github.lenticualrstone.civilight.feature.script.editor.WritingLineTracker
-import io.github.lenticualrstone.civilight.feature.script.layout.ScriptLayout
+import io.github.lenticualrstone.civilight.feature.script.assets.AssetForm
+import io.github.lenticualrstone.civilight.feature.script.assets.AssetFormSheet
+import io.github.lenticualrstone.civilight.feature.script.assets.AssetFormSheetKey
+import io.github.lenticualrstone.civilight.feature.script.assets.AssetsCopy
+import io.github.lenticualrstone.civilight.feature.script.change.ChangeActions
+import io.github.lenticualrstone.civilight.feature.script.change.ChangePickSheet
+import io.github.lenticualrstone.civilight.feature.script.change.ChangePickSheetKey
+import io.github.lenticualrstone.civilight.feature.script.change.ChangeSheet
+import io.github.lenticualrstone.civilight.feature.script.change.ChangeSheetKey
+import io.github.lenticualrstone.civilight.feature.script.fold.FoldRules
+import io.github.lenticualrstone.civilight.feature.script.fold.PanelHandover
+import io.github.lenticualrstone.civilight.feature.script.fold.PanelScrollMemory
+import io.github.lenticualrstone.civilight.feature.script.input.ChipSpeakerSheetKey
+import io.github.lenticualrstone.civilight.feature.script.input.DraftEffect
+import io.github.lenticualrstone.civilight.feature.script.input.DraftLinkSheetKey
+import io.github.lenticualrstone.civilight.feature.script.input.DraftMark
+import io.github.lenticualrstone.civilight.feature.script.input.DraftTransformation
+import io.github.lenticualrstone.civilight.feature.script.input.Drafts
+import io.github.lenticualrstone.civilight.feature.script.input.FindActions
+import io.github.lenticualrstone.civilight.feature.script.input.FindSheet
+import io.github.lenticualrstone.civilight.feature.script.input.FindSheetKey
+import io.github.lenticualrstone.civilight.feature.script.input.KindMenu
+import io.github.lenticualrstone.civilight.feature.script.input.KindMenuSheet
+import io.github.lenticualrstone.civilight.feature.script.input.KindMenuSheetKey
+import io.github.lenticualrstone.civilight.feature.script.input.MarkPickSheet
+import io.github.lenticualrstone.civilight.feature.script.input.MarkPickSheetKey
+import io.github.lenticualrstone.civilight.feature.script.input.PlantSheet
+import io.github.lenticualrstone.civilight.feature.script.input.PlantSheetKey
+import io.github.lenticualrstone.civilight.feature.script.input.DraftCueChips
+import io.github.lenticualrstone.civilight.feature.script.input.DraftCueSheet
+import io.github.lenticualrstone.civilight.feature.script.input.DraftCueSheetKey
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import io.github.lenticualrstone.civilight.feature.script.input.ReadAloudPlayer
+import io.github.lenticualrstone.civilight.feature.script.input.SceneInView
+import io.github.lenticualrstone.civilight.feature.script.input.BottomAnchor
+import io.github.lenticualrstone.civilight.feature.script.input.VersionCompareSheet
+import io.github.lenticualrstone.civilight.feature.script.input.VersionCompareSheetKey
+import io.github.lenticualrstone.civilight.feature.script.input.VersionsSheet
+import io.github.lenticualrstone.civilight.feature.script.input.VersionsSheetKey
+import io.github.lenticualrstone.civilight.feature.script.input.WriteCopy
 import io.github.lenticualrstone.civilight.feature.script.layers.LayersModel
 import io.github.lenticualrstone.civilight.feature.script.layers.LayersSheet
 import io.github.lenticualrstone.civilight.feature.script.layers.LayersSheetKey
+import io.github.lenticualrstone.civilight.feature.script.layout.ScriptLayout
+import io.github.lenticualrstone.civilight.feature.script.layout.TabletopLayout
+import io.github.lenticualrstone.civilight.feature.script.layout.foldInFrameDp
+import io.github.lenticualrstone.civilight.feature.script.layout.rememberTabletopFoldPx
+import io.github.lenticualrstone.civilight.feature.script.links.BlockTap
+import io.github.lenticualrstone.civilight.feature.script.links.LinkCardActions
+import io.github.lenticualrstone.civilight.feature.script.links.LinkCardSheet
+import io.github.lenticualrstone.civilight.feature.script.links.LinkCardSheetKey
+import io.github.lenticualrstone.civilight.feature.script.motion.SwipeButtonSpec
+import io.github.lenticualrstone.civilight.feature.script.motion.barSwap
 import io.github.lenticualrstone.civilight.feature.script.panel.PanelActions
+import io.github.lenticualrstone.civilight.feature.script.panel.PanelContent
 import io.github.lenticualrstone.civilight.feature.script.panel.PanelSheet
 import io.github.lenticualrstone.civilight.feature.script.panel.PanelSheetKey
 import io.github.lenticualrstone.civilight.feature.script.panel.PanelTab
 import io.github.lenticualrstone.civilight.feature.script.panel.PanelTabBody
 import io.github.lenticualrstone.civilight.feature.script.panel.ScriptSidePanel
+import io.github.lenticualrstone.civilight.feature.script.panel.TabletopPanel
 import io.github.lenticualrstone.civilight.feature.script.records.Relink
-import io.github.lenticualrstone.civilight.feature.script.select.ClipboardStrip
+import io.github.lenticualrstone.civilight.feature.script.records.RelinkSheet
+import io.github.lenticualrstone.civilight.feature.script.records.RelinkSheetKey
+import io.github.lenticualrstone.civilight.feature.script.readonly.ReadOnlyFrame
 import io.github.lenticualrstone.civilight.feature.script.select.MoveSheet
 import io.github.lenticualrstone.civilight.feature.script.select.MoveSheetKey
 import io.github.lenticualrstone.civilight.feature.script.select.SelectBottomBar
@@ -91,81 +141,38 @@ import io.github.lenticualrstone.civilight.feature.script.select.SelectRowModel
 import io.github.lenticualrstone.civilight.feature.script.select.SelectRows
 import io.github.lenticualrstone.civilight.feature.script.select.SelectRules
 import io.github.lenticualrstone.civilight.feature.script.select.SelectTopBar
-import io.github.lenticualrstone.civilight.feature.script.change.ChangeActions
-import io.github.lenticualrstone.civilight.feature.script.change.ChangePickSheet
-import io.github.lenticualrstone.civilight.feature.script.change.ChangePickSheetKey
-import io.github.lenticualrstone.civilight.feature.script.change.ChangeSheet
-import io.github.lenticualrstone.civilight.feature.script.change.ChangeSheetKey
-import io.github.lenticualrstone.civilight.feature.script.records.RelinkSheet
-import io.github.lenticualrstone.civilight.feature.script.records.RelinkSheetKey
 import io.github.lenticualrstone.civilight.feature.script.state.BlockRow
 import io.github.lenticualrstone.civilight.feature.script.state.CommandAction
-import io.github.lenticualrstone.civilight.feature.script.state.CommandSuggestions
-import io.github.lenticualrstone.civilight.feature.script.ui.CommandSuggestionRows
-import io.github.lenticualrstone.civilight.feature.script.state.CommandRow
 import io.github.lenticualrstone.civilight.feature.script.state.CommandRouting
-import io.github.lenticualrstone.civilight.feature.script.state.EditorState
-import io.github.lenticualrstone.civilight.feature.script.state.EmptySceneRow
+import io.github.lenticualrstone.civilight.feature.script.state.HeadRow
 import io.github.lenticualrstone.civilight.feature.script.state.HeaderModel
+import io.github.lenticualrstone.civilight.feature.script.state.HiddenSceneRow
 import io.github.lenticualrstone.civilight.feature.script.state.ScriptOps
 import io.github.lenticualrstone.civilight.feature.script.state.ScriptRow
 import io.github.lenticualrstone.civilight.feature.script.state.ScriptRowKeys
-import io.github.lenticualrstone.civilight.feature.script.state.SpeakerLook
-import io.github.lenticualrstone.civilight.feature.script.state.SpeakerModel
-import io.github.lenticualrstone.civilight.feature.script.state.SpeakerTarget
-import io.github.lenticualrstone.civilight.feature.script.ui.BlockAddSheet
-import io.github.lenticualrstone.civilight.feature.script.ui.BlockAddSheetKey
-import io.github.lenticualrstone.civilight.feature.script.ui.CueActions
-import io.github.lenticualrstone.civilight.feature.script.ui.DirectionSheet
-import io.github.lenticualrstone.civilight.feature.script.ui.DirectionSheetKey
+import io.github.lenticualrstone.civilight.feature.script.ui.BlockLook
 import io.github.lenticualrstone.civilight.feature.script.ui.KindSheet
 import io.github.lenticualrstone.civilight.feature.script.ui.KindSheetKey
-import io.github.lenticualrstone.civilight.feature.script.editor.FieldOwner
-import io.github.lenticualrstone.civilight.feature.script.ui.EditableBlock
-import io.github.lenticualrstone.civilight.feature.script.ui.EditingTopBar
-import io.github.lenticualrstone.civilight.feature.script.ui.KeyboardToolbar
 import io.github.lenticualrstone.civilight.feature.script.ui.LinkSheet
 import io.github.lenticualrstone.civilight.feature.script.ui.LinkSheetKey
 import io.github.lenticualrstone.civilight.feature.script.ui.Manuscript
 import io.github.lenticualrstone.civilight.feature.script.ui.ManuscriptActions
 import io.github.lenticualrstone.civilight.feature.script.ui.PositionSheet
 import io.github.lenticualrstone.civilight.feature.script.ui.PositionSheetKey
-import io.github.lenticualrstone.civilight.feature.script.ui.ScriptBottomBar
-import io.github.lenticualrstone.civilight.feature.script.ui.ScriptCommandField
 import io.github.lenticualrstone.civilight.feature.script.ui.ScriptTopBar
 import io.github.lenticualrstone.civilight.feature.script.ui.SpeakerSheet
 import io.github.lenticualrstone.civilight.feature.script.ui.SpeakerSheetKey
 import io.github.lenticualrstone.civilight.model.Key
-import io.github.lenticualrstone.civilight.feature.script.fold.FoldRules
-import io.github.lenticualrstone.civilight.feature.script.fold.KeepAnchorOnResize
-import io.github.lenticualrstone.civilight.feature.script.fold.PanelHandover
-import io.github.lenticualrstone.civilight.feature.script.fold.PanelScrollMemory
-import androidx.compose.animation.AnimatedVisibility
-import io.github.lenticualrstone.civilight.feature.script.assets.AssetForm
-import io.github.lenticualrstone.civilight.feature.script.assets.AssetFormSheet
-import io.github.lenticualrstone.civilight.feature.script.assets.AssetFormSheetKey
+import io.github.lenticualrstone.civilight.model.app.PaneSplit
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.game.GameTools
 import io.github.lenticualrstone.civilight.model.script.BlockKind
+import io.github.lenticualrstone.civilight.model.script.ScriptPreview
 import io.github.lenticualrstone.civilight.navigation.CheckCenter
 import io.github.lenticualrstone.civilight.navigation.NewUnitSheet
-import io.github.lenticualrstone.civilight.navigation.CheckCenterFilter
-import io.github.lenticualrstone.civilight.navigation.RecorderRecordDetail
-import io.github.lenticualrstone.civilight.feature.script.links.BlockTap
-import io.github.lenticualrstone.civilight.feature.script.terms.TermCopy
-import io.github.lenticualrstone.civilight.feature.script.links.CandidateWindow
-import io.github.lenticualrstone.civilight.feature.script.links.LinkCardActions
-import io.github.lenticualrstone.civilight.feature.script.links.LinkCardSheet
-import io.github.lenticualrstone.civilight.feature.script.links.LinkCardSheetKey
-import io.github.lenticualrstone.civilight.feature.script.links.LinkFixes
-import io.github.lenticualrstone.civilight.domain.script.Links
-import io.github.lenticualrstone.civilight.domain.world.term.TermCandidate
-import io.github.lenticualrstone.civilight.model.text.TextRun
-import io.github.lenticualrstone.civilight.feature.script.readonly.ReadOnlyFooter
-import io.github.lenticualrstone.civilight.feature.script.readonly.ReadOnlyFrame
-import io.github.lenticualrstone.civilight.feature.script.readonly.ReadOnlyTopBar
-import io.github.lenticualrstone.civilight.navigation.RenumberSheet
 import io.github.lenticualrstone.civilight.navigation.ProjectSearch
-import io.github.lenticualrstone.civilight.navigation.Recording
+import io.github.lenticualrstone.civilight.navigation.RecorderRecordDetail
+import io.github.lenticualrstone.civilight.navigation.RenumberSheet
 import io.github.lenticualrstone.civilight.navigation.SceneWhereSheet
 import io.github.lenticualrstone.civilight.navigation.Script
 import io.github.lenticualrstone.civilight.navigation.ScriptAssets
@@ -174,48 +181,72 @@ import io.github.lenticualrstone.civilight.navigation.UnitMenuSheet
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
+import io.github.lenticualrstone.civilight.ui.picker.CharacterPickerSheet
+import io.github.lenticualrstone.civilight.ui.picker.LinkPickerSheet
 import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.scaffold.LocalToasts
 import io.github.lenticualrstone.civilight.ui.scaffold.SheetHost
 import io.github.lenticualrstone.civilight.ui.scaffold.SheetHostLayout
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
-import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
+import io.github.lenticualrstone.civilight.ui.tour.TourHold
+import io.github.lenticualrstone.civilight.ui.tour.TourStepAbsent
+import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import io.github.lenticualrstone.civilight.ui.window.FoldPosture
-import io.github.lenticualrstone.civilight.feature.script.layout.TabletopLayout
-import io.github.lenticualrstone.civilight.feature.script.layout.foldInFrameDp
-import io.github.lenticualrstone.civilight.feature.script.layout.rememberTabletopFoldPx
-import io.github.lenticualrstone.civilight.feature.script.panel.TabletopPanel
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.foundation.layout.height
+import io.github.lenticualrstone.civilight.ui.window.PaneSplitHandle
+import io.github.lenticualrstone.civilight.ui.window.rememberPaneSplitState
 import kotlinx.coroutines.launch
 
 /**
- * The script screen (SCR-01, SCR-14 … SCR-20): one episode's manuscript under the 118 dp glass
- * header, the command row and command field at the bottom; while typing, the 76 dp editing header
- * and the keyboard toolbar. Built on `GlassScaffold` (not `CivilightScreen`) because the script
- * swaps its bars while typing; the toast host is drawn here the same way `CivilightScreen` does.
+ * The script screen (0.2.0: SCR-01, SCR-14, SCR-70 … SCR-74): one episode's manuscript under the glass header
+ * (`이 씬 · 1-7` · `찾기` · `표시`), always in the reading state; text is written only in the input bar at the
+ * bottom (or, in a read-only project, the `예시 프로젝트` row). A block tap selects; swipes reveal buttons.
+ * Built on `GlassScaffold`; the toast host is drawn here the same way `CivilightScreen` does.
  */
 @Composable
 fun ScriptScreen(route: Script, deps: FeatureDeps) {
     val vm = entryViewModel { ScriptViewModel(route, deps) }
     val content by vm.content.collectAsState()
-    val editor by vm.editor.collectAsState()
     val sheets = rememberSheetHost()
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.flushNow() }
+    // SCR-70: the draft survives process death through the saved state (the process memory covers the rest).
+    var savedDraft by rememberSaveable { mutableStateOf<String?>(null) }
+    val draft by vm.draft.collectAsState()
+    // Read once, before the effect below overwrites it with the live draft.
+    val restoredDraft = remember { savedDraft }
+    LaunchedEffect(Unit) { vm.restoreSavedDraft(restoredDraft) }
+    LaunchedEffect(draft) { savedDraft = Drafts.encode(draft) }
     val c = content
-    // SCR-31 / SCR-66: one scroll per panel tab, shared by the side panel and the cover sheet.
     val panelScroll = remember(c != null) { PanelScrollMemory(c?.doc?.app?.view?.script?.panel?.scroll.orEmpty()) }
     val gate = rememberHiddenGate(route.projectKey)
+    var readAloudAt by rememberSaveable { mutableStateOf<Int?>(null) }
     val panelActions = { open: (SheetKey) -> Unit, leave: () -> Unit -> scriptPanelActions(route, deps, vm, gate.open, open, leave) }
-    SheetHostLayout(sheets, localSheets = { key -> scriptSheet(key, vm, c?.doc, editor, panelActions, panelScroll) }) {
+    val startReadAloud: () -> Unit = {
+        val doc = vm.content.value?.doc
+        val unit = vm.content.value?.unitKey
+        if (doc != null && unit != null) {
+            val steps = ReadAloud.steps(doc, unit, GameTools.on(doc), gate.open)
+            val from = vm.editor.value.selected ?: vm.sceneInViewKey?.let { s -> doc.manuscript.liveBlocksOf(s).firstOrNull()?.key }
+            readAloudAt = ReadAloud.indexAt(steps, doc, from).takeIf { it >= 0 }
+        }
+    }
+    SheetHostLayout(sheets, localSheets = { key -> scriptSheet(key, route, deps, vm, c, gate.open, gate.unlock, panelActions, panelScroll, startReadAloud) }) {
         if (c == null) {
-            // LIB-19: the tour waits until the script knows whether it is the read-only example.
             TourHold()
             Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
         } else {
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                ScriptFrame(route, deps, vm, c, editor, sheets, maxWidth.value, maxHeight.value, panelScroll)
+                ScriptFrame(route, deps, vm, c, sheets, maxWidth.value, maxHeight.value, panelScroll, startReadAloud)
+            }
+            // SCR-28: 낭독 over the whole screen; `닫기` and back return with the step's block selected.
+            val at = readAloudAt
+            if (at != null) {
+                val steps = remember(c.doc, c.unitKey, gate.open) { ReadAloud.steps(c.doc, c.unitKey, GameTools.on(c.doc), gate.open) }
+                fun close(block: Key?) {
+                    readAloudAt = null
+                    block?.let { vm.selectBlock(it); vm.aboveInput.tryEmit(ScriptRowKeys.block(it)) }
+                }
+                LocalBackHandler.current(true) { close(steps.getOrNull(at)?.blockKey) }
+                ReadAloudPlayer(c.doc, steps, at.coerceIn(0, (steps.size - 1).coerceAtLeast(0)), onIndex = { readAloudAt = it }, onClose = ::close)
             }
         }
     }
@@ -224,18 +255,28 @@ fun ScriptScreen(route: Script, deps: FeatureDeps) {
 /** Content of the script's own sheets (shell.md §5: feature-local keys). */
 private fun scriptSheet(
     key: SheetKey,
+    route: Script,
+    deps: FeatureDeps,
     vm: ScriptViewModel,
-    doc: ProjectDoc?,
-    editor: EditorState,
+    c: ScriptContent?,
+    unlocked: Boolean,
+    unlock: () -> Unit,
     panelActions: (open: (SheetKey) -> Unit, leave: () -> Unit) -> PanelActions,
     panelScroll: PanelScrollMemory,
+    startReadAloud: () -> Unit,
 ): (@Composable SheetScope.() -> Unit)? {
-    doc ?: return null
+    val doc = c?.doc ?: return null
     return when (key) {
         is LayersSheetKey -> {
             {
                 val view = doc.app.view.script
-                LayersSheet(view.layers, view.preview, onLayer = vm::setLayer, onPreview = vm::setPreview)
+                val readAloud = remember(doc, c.unitKey, unlocked) { LayersModel.readAloudEnabled(doc, c.unitKey, unlocked) }
+                LayersSheet(view.layers, view.preview, onLayer = vm::setLayer, onPreview = { p ->
+                    if (p == ScriptPreview.READ_ALOUD) {
+                        close()
+                        startReadAloud()
+                    } else vm.setPreview(p)
+                }, readAloudEnabled = readAloud)
             }
         }
         is PanelSheetKey -> {
@@ -244,21 +285,98 @@ private fun scriptSheet(
                 val panel by vm.panel.collectAsState()
                 val actions = panelActions(::open, ::close)
                 PanelSheet(tab, vm::setPanelTab, scrollOf = panelScroll::state) { shown ->
-                    panel?.takeIf { it.tab == shown }?.let { PanelTabBody(it, wide = false, actions = actions) }
+                    panel?.takeIf { it.tab == shown }?.let { PanelBody(it, wide = false, actions = actions, c = c, vm = vm) }
                 }
             }
         }
-        is BlockAddSheetKey -> {
+        is KindMenuSheetKey -> {
             {
-                val position = ScriptOps.addPosition(doc, editor, key.headerScene)
-                BlockAddSheet(
-                    subline = position?.let { ScriptCommands.addSheetSubline(doc, it) } ?: ScriptCopy.ADD_BELOW,
-                    currentKind = ScriptOps.currentKind(doc, editor),
-                    readOnly = vm.readOnly,
-                    onPick = { row ->
-                        val kind = row.kind
-                        if (kind != null) vm.addBlock(kind, key.headerScene) else vm.newSceneSheet(key.headerScene)?.let(::open)
+                val draft by vm.draft.collectAsState()
+                val block = key.blockKey?.let(doc.index::block)
+                val editBlock = (draft.mark as? DraftMark.Edit)?.blockKey?.let(doc.index::block)
+                val current = block?.kind?.known ?: draft.kind
+                KindMenuSheet(KindMenu.rows(current, block, editBlock.takeIf { block == null }, GameTools.on(doc))) { kind ->
+                    if (key.blockKey != null) vm.convertKind(key.blockKey, kind) else vm.pickChipKind(kind)
+                }
+            }
+        }
+        is ChipSpeakerSheetKey -> {
+            {
+                val draft by vm.draft.collectAsState()
+                val gate = rememberHiddenGate(route.projectKey)
+                CharacterPickerSheet(
+                    doc = doc,
+                    gate = gate,
+                    onPick = { picked ->
+                        close()
+                        vm.pickChipSpeaker(picked)
                     },
+                    onClose = ::close,
+                    sceneCast = ScriptOps.sceneCast(doc, key.sceneKey),
+                    recent = doc.app.view.script.recentSpeakers,
+                    currentKey = draft.speakerKey,
+                )
+            }
+        }
+        is DraftLinkSheetKey -> {
+            {
+                LinkPickerSheet(
+                    doc = doc,
+                    gate = rememberHiddenGate(key.projectKey),
+                    title = ScriptCopy.LINK_PICKER_TITLE,
+                    onPick = { kind, target, text ->
+                        close()
+                        vm.insertDraftLink(kind, target, text)
+                    },
+                    onClose = ::close,
+                )
+            }
+        }
+        is FindSheetKey -> {
+            {
+                val game = GameTools.on(doc)
+                val commands = ScriptCommands.commands(doc, c.unitKey).filterNot { it.startsWith("/") }
+                    .filterNot { !game && it == AssetsCopy.TITLE }
+                    .filterNot { c.readOnly && it == io.github.lenticualrstone.civilight.feature.script.select.MoveCopy.TITLE } +
+                    // SCR-28: `낭독` is offered only when the episode has a step (as the `표시` chip).
+                    listOfNotNull(WriteCopy.READ_ALOUD_CMD.takeIf { LayersModel.readAloudEnabled(doc, c.unitKey, unlocked) }, WriteCopy.VERSIONS_CMD)
+                FindSheet(
+                    key, doc, c.unitKey, unlocked, c.readOnly, commands,
+                    FindActions(
+                        jumpTo = { block ->
+                            vm.selectBlock(block)
+                            vm.aboveInput.tryEmit(ScriptRowKeys.block(block))
+                        },
+                        command = { text -> vm.commandRequests.tryEmit(text) },
+                        replace = vm::replaceHits,
+                    ),
+                )
+            }
+        }
+        is DraftCueSheetKey -> {
+            {
+                DraftCueSheet(key, doc, onPick = vm::addDraftCue, onNewAsset = { kind ->
+                    AssetForm.kindOf(kind)?.let { open(AssetFormSheetKey(route.projectKey, kind = it)) }
+                })
+            }
+        }
+        is VersionsSheetKey -> {
+            { VersionsSheet(key, doc, c.readOnly, vm.defaultVersionName(), vm::keepVersion) }
+        }
+        is VersionCompareSheetKey -> {
+            {
+                VersionCompareSheet(key, doc, unlocked, c.readOnly, onUnlock = unlock) { block -> vm.restoreVersionText(key.versionKey, block) }
+            }
+        }
+        is PlantSheetKey -> {
+            { PlantSheet(key, doc) { name, payoff -> vm.plantMark(key.blockKey, name, payoff) } }
+        }
+        is MarkPickSheetKey -> {
+            {
+                MarkPickSheet(
+                    key, doc, unlocked,
+                    onMention = { f -> vm.mentionMark(f, key.blockKey) },
+                    onPayoff = { f -> vm.payoffMark(f, key.blockKey) },
                 )
             }
         }
@@ -280,23 +398,10 @@ private fun scriptSheet(
             {
                 val block = doc.index.block(key.blockKey)
                 KindSheet(
-                    subline = block?.let { io.github.lenticualrstone.civilight.domain.script.Labels.number(it.number) }.orEmpty(),
+                    subline = block?.let { Labels.number(it.number) }.orEmpty(),
                     choices = ScriptOps.kindChoices(doc, key.blockKey),
                     readOnly = vm.readOnly,
-                    onPick = { kind -> vm.changeKind(key.blockKey, kind) },
-                )
-            }
-        }
-        is DirectionSheetKey -> {
-            {
-                DirectionSheet(
-                    key, doc, vm.readOnly,
-                    CueActions(
-                        add = { kind, asset, effect -> vm.addCue(key.blockKey, kind, asset, effect) },
-                        replace = { cue, asset, effect -> vm.replaceCue(key.blockKey, cue, asset, effect) },
-                        remove = { cue -> vm.removeCue(key.blockKey, cue) },
-                        addAsset = { kind -> AssetForm.kindOf(kind)?.let { open(AssetFormSheetKey(key.projectKey, kind = it)) } },
-                    ),
+                    onPick = { kind -> vm.convertKind(key.blockKey, kind) },
                 )
             }
         }
@@ -306,7 +411,6 @@ private fun scriptSheet(
         is ChangeSheetKey -> {
             {
                 val draft by vm.changeDraft.collectAsState()
-                // After process death the sheet comes back without its draft: start a fresh one.
                 LaunchedEffect(key) { vm.changeDraftOf(key.blockKey) }
                 ChangeSheet(
                     key, doc, draft?.takeIf { it.blockKey == key.blockKey },
@@ -322,8 +426,8 @@ private fun scriptSheet(
         }
         is MoveSheetKey -> {
             {
-                val unlocked = rememberHiddenGate(key.projectKey).open
-                MoveSheet(key, doc, unlocked) { position -> vm.moveBlocks(key.blockKeys, position) }
+                val open = rememberHiddenGate(key.projectKey).open
+                MoveSheet(key, doc, open) { position -> vm.moveBlocks(key.blockKeys, position) }
             }
         }
         is LinkCardSheetKey -> {
@@ -345,11 +449,39 @@ private fun scriptSheet(
         }
         is RelinkSheetKey -> {
             {
-                val unlocked = rememberHiddenGate(key.projectKey).open
-                RelinkSheet(Relink.of(doc, key.recordKey, unlocked), vm.readOnly) { block -> vm.relinkRecord(key.recordKey, block) }
+                val open = rememberHiddenGate(key.projectKey).open
+                RelinkSheet(Relink.of(doc, key.recordKey, open), vm.readOnly) { block -> vm.relinkRecord(key.recordKey, block) }
             }
         }
         else -> null
+    }
+}
+
+/**
+ * A panel tab's body; the `참고` tab starts with the selected block's term candidates while the project
+ * setting `용어 후보` is on (SCR-33, S-5): `용어 후보 · 등불 · 잇기 · 아님`.
+ */
+@Composable
+private fun PanelBody(content: PanelContent, wide: Boolean, actions: PanelActions, c: ScriptContent, vm: ScriptViewModel) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (content.tab == PanelTab.REF && c.doc.project.termCandidates) {
+            val row = content.selected?.let { key -> c.rows.firstOrNull { it.key == ScriptRowKeys.block(key) } as? BlockRow }
+            val raw = row?.runs?.joinToString("") { it.shownText }.orEmpty()
+            row?.termCandidates?.forEach { span ->
+                val word = raw.substring(span.start.coerceIn(0, raw.length), span.end.coerceIn(0, raw.length))
+                Row(Modifier.fillMaxWidth().background(colors.tint).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CivilightText("${io.github.lenticualrstone.civilight.feature.script.terms.TermCopy.LAYER} · ", type.small, color = colors.ink3, maxLines = 1)
+                    CivilightText(word, type.itemTitle, Modifier.weight(1f), color = colors.ink, maxLines = 1)
+                    if (!c.readOnly) {
+                        TextAction(io.github.lenticualrstone.civilight.feature.script.links.LinkCopy.LINK, { vm.linkCandidate(span.candidate) })
+                        TextAction(io.github.lenticualrstone.civilight.feature.script.links.LinkCopy.REJECT, { vm.rejectCandidate(span.candidate) })
+                    }
+                }
+            }
+        }
+        PanelTabBody(content, wide = wide, actions = actions)
     }
 }
 
@@ -359,32 +491,28 @@ private fun ScriptFrame(
     deps: FeatureDeps,
     vm: ScriptViewModel,
     c: ScriptContent,
-    editor: EditorState,
     sheets: SheetHost,
     widthDp: Float,
     heightDp: Float,
     panelScroll: PanelScrollMemory,
+    startReadAloud: () -> Unit,
 ) {
     val doc = c.doc
-    // LIB-19: steps with nothing on this screen (the example's `명령 칸`) are left out of the tour.
+    val editor by vm.editor.collectAsState()
+    val draft by vm.draft.collectAsState()
+    val fresh by vm.fresh.collectAsState()
     ScriptTourSteps.absent(c.readOnly).forEach { step -> key(step) { TourStepAbsent(step) } }
-    // SCR-03: the side panel is open by default on inner screens; `닫기` closes it for this entry.
     var panelOpen by rememberSaveable { mutableStateOf(true) }
     val panelTab by vm.panelTab.collectAsState()
     val panel by vm.panel.collectAsState()
-    // SCR-36 `[PROPOSED]`: select mode hides the side panel; the column takes the area.
     val select by vm.select.collectAsState()
     val selecting = select.active
-    val clipboard by vm.clipboard.collectAsState()
     val selectListState = rememberLazyListState()
-    // SCR-69: in tabletop posture the screen splits at the fold: manuscript above, panel tabs and
-    // the command area below (select mode keeps the whole height for its list and bars).
     var frameTopPx by remember { mutableFloatStateOf(0f) }
     val foldPx = rememberTabletopFoldPx()
-    val densityScale = androidx.compose.ui.platform.LocalDensity.current.density
-    val tabletop = foldPx?.let { TabletopLayout.of(FoldPosture.TABLETOP, heightDp, foldInFrameDp(it, frameTopPx, densityScale)) }
+    val density = LocalDensity.current
+    val tabletop = foldPx?.let { TabletopLayout.of(FoldPosture.TABLETOP, heightDp, foldInFrameDp(it, frameTopPx, density.density)) }
     val split = tabletop?.takeIf { !selecting }
-    // The manuscript's height follows the fold: it shrinks to the upper half and grows back on the fold tokens.
     val upperHeight by animateFloatAsState(
         split?.upper ?: heightDp,
         CivilightTheme.motion.move(if (split != null) CivilightMotion.foldOpen else CivilightMotion.foldClose),
@@ -392,30 +520,26 @@ private fun ScriptFrame(
     )
     val upperSettled = split == null && kotlin.math.abs(upperHeight - heightDp) < 0.5f
     val motion = CivilightTheme.motion
-    // CNV-47: the manuscript | panel ratio is the writer's own (drag, or the handle's buttons), stored by the shell.
     val panelWanted = panelOpen && !selecting && tabletop == null
     val baseLayout = ScriptLayout.of(widthDp, panelWanted)
     val paneSplit = rememberPaneSplitState(PaneSplit.Modules.SCRIPT_PANEL, widthDp, ScriptLayout.of(widthDp, panelOpen = true).areaWidth)
     val targetLayout = if (baseLayout.panel && paneSplit.resizable) ScriptLayout.of(widthDp, true, area = paneSplit.leftDp) else baseLayout
-    // SCR-66: a panel that opens slides in over the manuscript, which re-wraps once, when the panel has arrived;
-    // on close the manuscript takes the width at once and the panel fades out over it.
     var panelArrived by remember { mutableStateOf(targetLayout.panel) }
     LaunchedEffect(targetLayout.panel, motion) {
         if (!targetLayout.panel) {
             panelArrived = false
         } else if (!panelArrived) {
-            delay(motion.delayMs(CivilightMotion.foldOpen.durationMs))
+            kotlinx.coroutines.delay(motion.delayMs(CivilightMotion.foldOpen.durationMs))
             panelArrived = true
         }
     }
     val layout = if (targetLayout.panel && !panelArrived && !motion.reduced) targetLayout.keepingAreaOf(ScriptLayout.of(widthDp, false)) else targetLayout
-    // SCR-27: `대사만` is a read-only view of the same episode.
     val preview = doc.app.view.script.preview
     val previewOnly = !LayersModel.isEditable(preview)
-    // SCR-30: one block's swipe buttons are open at a time; scrolling closes them.
+    // SCR-30: one row open at a time, on one side; scrolling closes it.
     var revealedRow by remember { mutableStateOf<String?>(null) }
+    var revealedSide by remember { mutableStateOf(SwipeSide.CLOSED) }
     val wide = layout.wide
-    val saved by vm.saved.collectAsState()
     val canUndo by vm.canUndo.collectAsState()
     val entered by vm.entered.collectAsState()
     val target by vm.target.collectAsState()
@@ -426,47 +550,74 @@ private fun ScriptFrame(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
-    val fieldFocus = remember { FocusRequester() }
-    val commandFocus = remember { FocusRequester() }
-    var commandTyping by rememberSaveable { mutableStateOf(false) }
-    var commandText by rememberSaveable { mutableStateOf("") }
-    // SCR-56: the `용어 후보` whose small window is open (block, candidate).
-    var openCandidate by remember { mutableStateOf<Pair<Key, TermCandidate>?>(null) }
     val rows = c.rows
-    LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) revealedRow = null }
-
-    // --- Where the header is (rule 22 §6) ---
-    val selectRows = if (selecting) SelectRows.of(doc, rows, select, doc.app.view.script.layers, gate.open) else emptyList()
-    val sceneUnderBar by remember(rows, selecting) {
-        derivedStateOf { if (selecting) sceneUnderSelectBar(selectListState, selectRows) else sceneUnderTopBar(listState, rows) }
+    val game = GameTools.on(doc)
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            revealedRow = null
+            revealedSide = SwipeSide.CLOSED
+        }
     }
-    // In select mode the header (and `모두`) follow the scene under the bar, never a selected block
-    // scrolled out of view: `모두` must not check blocks the writer cannot see.
-    val headerState = if (selecting) editor.copy(selected = null, virtualScene = null) else editor
-    val header = HeaderModel.of(doc, c.unitKey, c.time, headerState, sceneUnderBar, editor.editing, saved)
+
+    // --- The scene in view (SCR-71): the item directly above the input bar ---
+    var bottomPadPx by remember { mutableIntStateOf(0) }
+    val sceneInView by remember(rows) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val items = info.visibleItemsInfo.mapNotNull { item ->
+                when (val row = rows.getOrNull(item.index)) {
+                    is HeadRow -> SceneInView.Item(row.sceneKey, SceneInView.Kind.HEAD, item.offset.toFloat(), (item.offset + item.size).toFloat())
+                    is HiddenSceneRow -> SceneInView.Item(row.sceneKey, SceneInView.Kind.HIDDEN_ROW, item.offset.toFloat(), (item.offset + item.size).toFloat())
+                    is BlockRow -> SceneInView.Item(row.sceneKey, SceneInView.Kind.BLOCK, item.offset.toFloat(), (item.offset + item.size).toFloat())
+                    else -> null
+                }
+            }
+            val inputTop = (info.viewportEndOffset - bottomPadPx).toFloat()
+            SceneInView.target(items, inputTop) ?: rows.firstOrNull { it !is HiddenSceneRow }?.sceneKey
+        }
+    }
+    // SCR-71 bottom anchoring: the manuscript moves with the bar's top edge (snap, no animation).
+    LaunchedEffect(listState) {
+        var last: Int? = null
+        snapshotFlow { listState.layoutInfo.viewportEndOffset - bottomPadPx }
+            .collect { top ->
+                if (top <= 0) return@collect
+                val d = BottomAnchor.delta(last, top, listState.isScrollInProgress)
+                last = top
+                if (d != 0f) listState.scrollBy(d)
+            }
+    }
+    val sceneKey = sceneInView?.takeIf { doc.manuscript.isLiveUnit(it) }
+    vm.sceneInViewKey = sceneKey
+    val sceneNumber = sceneKey?.let { Labels.sceneOrdinal(doc, it) }
+    var flash by remember { mutableIntStateOf(0) }
+    var lastScene by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(sceneNumber) {
+        if (lastScene != null && sceneNumber != null && lastScene != sceneNumber) flash++
+        lastScene = sceneNumber
+    }
+    LaunchedEffect(vm) { vm.placeFlashes.collect { flash++ } }
+    val selectRows = if (selecting) SelectRows.of(doc, rows, select, doc.app.view.script.layers, gate.open) else emptyList()
+    val selectScene by remember(rows, selecting) { derivedStateOf { if (selecting) sceneUnderSelectBar(selectListState, selectRows) else null } }
+    val header = HeaderModel.of(doc, c.unitKey, c.time, editor.copy(selected = null, virtualScene = null), if (selecting) selectScene else sceneKey, false, true)
     val headerScene = header.sceneKey
     val coverPanelOpen = sheets.top is PanelSheetKey
     LaunchedEffect(layout.panel, coverPanelOpen, headerScene, split != null) {
         vm.setPanelRequest(headerScene, layout.panel || coverPanelOpen || split != null)
     }
 
-    // --- Open at the target once (SCR-01 entry) ---
+    // --- Open at the target once (SCR-01 entry: the block directly above the input bar) ---
     var openedAtTarget by rememberSaveable { mutableStateOf(false) }
+    var pendingAbove by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(target, rows.isNotEmpty()) {
         val t = target ?: return@LaunchedEffect
         if (openedAtTarget || rows.isEmpty()) return@LaunchedEffect
-        val key = t.blockKey?.let(ScriptRowKeys::block) ?: t.sceneKey?.let(ScriptRowKeys::head)
-        val index = key?.let { k -> rows.indexOfFirst { it.key == k } } ?: -1
-        if (index >= 0) listState.scrollToItem(index)
+        val key = t.blockKey?.let(ScriptRowKeys::block)
+            ?: t.sceneKey?.let { s -> doc.manuscript.liveBlocksOf(s).lastOrNull()?.key?.let(ScriptRowKeys::block) ?: ScriptRowKeys.head(s) }
+        if (key != null) pendingAbove = key
         openedAtTarget = true
     }
-    // Rows are rebuilt off the main thread, so a requested row may not be in [rows] yet: the request
-    // waits in state until it is.
     var pendingScroll by remember { mutableStateOf<String?>(null) }
-
-    // --- Fold and unfold (SCR-66) ---
-    // A restored entry (the app was closed, e.g. on fold) whose view model is new gets its block,
-    // caret and scroll back; never a fresh entry, which opens at its route target.
     val restoredEntry = remember { openedAtTarget }
     LaunchedEffect(rows.isNotEmpty()) {
         if (rows.isEmpty() || vm.foldRestoreChecked) return@LaunchedEffect
@@ -480,13 +631,11 @@ private fun ScriptFrame(
         val top = listState.layoutInfo.visibleItemsInfo.firstOrNull { ScriptRowKeys.blockKeyOf(it.key.toString()) != null }?.key?.toString()
         vm.saveFoldState(c.unitKey, top, panelScroll.offsets())
     }
-    KeepAnchorOnResize(listState, rows, editor, layout.areaWidth)
     PanelHandover(
-        // The tabletop's lower half shows the panel, as the side panel does.
         sideLayout = tabletop != null || ScriptLayout.of(widthDp, panelOpen = true).panel,
         sheetOpen = sheets.top is PanelSheetKey,
         panelOpen = panelOpen,
-        editing = editor.editing,
+        editing = false,
         selecting = selecting,
     ) { handover ->
         if (handover.closeSheet && sheets.top is PanelSheetKey) sheets.close()
@@ -494,259 +643,172 @@ private fun ScriptFrame(
         if (handover.openSheet) sheets.open(PanelSheetKey(route.projectKey))
     }
     LaunchedEffect(vm) { vm.scrollTo.collect { key -> pendingScroll = key } }
+    LaunchedEffect(vm) { vm.scrollAboveInput.collect { key -> pendingAbove = key } }
     LaunchedEffect(vm) { vm.sheetRequests.collect { key -> sheets.open(key) } }
-    // SCR-49 / SCR-53: a scene made by story's `NewUnitSheet` over the script takes the caret.
     val newUnitOpen = sheets.top is NewUnitSheet
     LaunchedEffect(newUnitOpen) { if (newUnitOpen) vm.followNewScene(c.unitKey) else vm.stopFollowingNewScene() }
     LaunchedEffect(pendingScroll, rows) {
         val key = pendingScroll ?: return@LaunchedEffect
         if (rows.none { it.key == key }) return@LaunchedEffect
-        // Under the cover panel sheet the row goes to the top, so it stays visible above the sheet (SCR-31).
-        bringIntoView(listState, rows, key, motion, force = sheets.top is PanelSheetKey)
+        showAboveInput(listState, rows, key, motion, bottomPadPx, with(density) { ABOVE_GAP.toPx() })
         pendingScroll = null
     }
-
-    // --- Caret focus: the caret row's field holds focus while no sheet is open ---
-    val caretRow = editor.caretRowKey
-    val sheetOpen = sheets.top != null
-    // The caret's row exists, and for a choice block also the caret's option line (rows lag the store).
-    val caretRowReady = caretRow != null && rows.any { row ->
-        row.key == caretRow && editor.caretOption.let { option -> option == null || (row as? BlockRow)?.options?.any { it.optionKey == option } == true }
-    }
-    // Keyed on the option line too: moving the caret to another option swaps the field (SCR-09).
-    // LIB-19: while the script tour shows, nothing is typed (its first target is the command row).
-    val touring = tourRunning()
-    LaunchedEffect(caretRow, editor.caretOption, sheetOpen, caretRowReady, touring) {
-        if (touring || caretRow == null || sheetOpen || !caretRowReady) return@LaunchedEffect
-        // The field exists only while its row is composed: bring it into view first.
-        val index = rows.indexOfFirst { it.key == caretRow }
-        if (index >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.key == caretRow }) listState.scrollToItem(index)
-        repeat(FOCUS_TRIES) {
-            withFrameNanos { }
-            // Not attached yet (the row is being composed): throws, or returns false on newer Compose.
-            val result = runCatching { fieldFocus.requestFocus() }
-            if (result.isSuccess && result.getOrNull() != false) {
-                // A field that kept focus under a sheet does not bring the keyboard back by itself.
-                keyboard?.show()
-                return@LaunchedEffect
-            }
-        }
-    }
-
-    // --- Fixed writing line (SCR-14) ---
-    val tracker = remember { WritingLineTracker() }
-    val frame = remember { FrameBounds() }
-    val dragged by listState.interactionSource.collectIsDraggedAsState()
-    if (!editor.editing) tracker.reset()
-    fun onCaret(top: Float, bottom: Float, event: CaretEvent) {
-        frame.caretTop = top
-        frame.caretBottom = bottom
-        val kind = if (dragged || (listState.isScrollInProgress && !frame.selfScrolling)) CaretEvent.USER_SCROLL else event
-        val delta = tracker.onCaret(kind, top, bottom, frame.visibleTop, frame.visibleBottom)
-        if (kotlin.math.abs(delta) >= 1f) {
-            scope.launch {
-                frame.selfScrolling = true
-                try {
-                    listState.scrollBy(delta)
-                } finally {
-                    frame.selfScrolling = false
-                }
-            }
-        }
+    LaunchedEffect(pendingAbove, rows) {
+        val key = pendingAbove ?: return@LaunchedEffect
+        if (rows.none { it.key == key }) return@LaunchedEffect
+        showAboveInput(listState, rows, key, motion, bottomPadPx, with(density) { ABOVE_GAP.toPx() })
+        pendingAbove = null
     }
 
     // --- Actions ---
-    /**
-     * SCR-55: a link tapped outside typing. A live target opens its card in its area, a locked hidden
-     * one asks for the unlock, a deleted one opens the link card (`다른 항목에 잇기 · 글로 풀기 · …`).
-     */
-    fun openLink(blockKey: Key, link: TextRun.Link): Boolean = when (Links.state(doc, link, gate.open)) {
-        Links.State.Live -> LinkFixes.liveRoute(route.projectKey, link)?.let { deps.navigator.push(it); true } ?: false
-        is Links.State.Hidden -> {
-            gate.unlock()
-            true
-        }
-        is Links.State.Deleted, is Links.State.Purged -> {
-            sheets.open(LinkCardSheetKey(route.projectKey, blockKey, link.linkKey))
-            true
-        }
-    }
-    fun openSpeaker(t: SpeakerTarget) {
-        if (!vm.readOnly) sheets.open(SpeakerSheetKey.of(route.projectKey, t))
-    }
-    fun openAddSheet() = sheets.open(BlockAddSheetKey(route.projectKey, headerScene))
-
-    /**
-     * A sheet opened while typing: the keyboard goes down so the sheet is not behind it (sheets do
-     * not move above the keyboard); the caret stays and the keyboard returns when the sheet closes.
-     */
-    fun openOverKeyboard(key: SheetKey) {
-        keyboard?.hide()
-        sheets.open(key)
-    }
-    fun openLayers() = openOverKeyboard(LayersSheetKey(route.projectKey))
-
-    /** A swipe button (SCR-30): the side panel on inner screens, the panel sheet on cover. */
     fun openPanel(blockKey: Key, tab: PanelTab) {
         revealedRow = null
-        if (editor.editing) {
-            focusManager.clearFocus()
-            keyboard?.hide()
-        }
+        revealedSide = SwipeSide.CLOSED
         vm.openPanelAt(blockKey, tab)
         when {
-            split != null -> Unit // SCR-69: the lower half already shows the panel.
+            split != null -> Unit
             ScriptLayout.of(widthDp, panelOpen = true).panel -> panelOpen = true
             else -> sheets.open(PanelSheetKey(route.projectKey))
         }
     }
-    fun openNewScene() {
-        vm.newSceneSheet(headerScene)?.let(sheets::open)
+    fun openFind(replace: Boolean = false) {
+        keyboard?.hide()
+        sheets.open(FindSheetKey(route.projectKey, replace = replace))
     }
-    /** `블록 고르기` (SCR-36): typing ends and the keyboard goes. */
+    fun openLayers() {
+        keyboard?.hide()
+        sheets.open(LayersSheetKey(route.projectKey))
+    }
     fun startSelect() {
         focusManager.clearFocus()
         keyboard?.hide()
         vm.enterSelect(rows)
     }
-    fun stopCommand() {
-        commandTyping = false
-        commandText = ""
-        focusManager.clearFocus()
-    }
-    fun submitCommand(text: String) {
+    fun runCommand(text: String) {
+        when (text) {
+            WriteCopy.READ_ALOUD_CMD -> return startReadAloud()
+            WriteCopy.VERSIONS_CMD -> return sheets.open(VersionsSheetKey(route.projectKey, c.unitKey))
+        }
         when (val action = CommandRouting.route(doc, c.unitKey, text)) {
-            CommandAction.Nothing -> return
-            CommandAction.OpenAddSheet -> openAddSheet()
-            is CommandAction.AddBlock -> vm.addBlock(action.kind, headerScene)
-            CommandAction.NewScene -> openNewScene()
             is CommandAction.Jump -> {
                 action.blockKey?.let(vm::selectBlock)
-                scope.launch { bringIntoView(listState, rows, action.rowKey, motion, force = true) }
+                pendingAbove = action.rowKey
             }
             CommandAction.SetLens -> headerScene?.let(vm::setLensToScene)
             is CommandAction.Renumber -> sheets.open(RenumberSheet(route.projectKey, action.unitKey))
             CommandAction.SelectMode -> startSelect()
             CommandAction.OpenCheckCenter -> deps.navigator.push(CheckCenter(route.projectKey))
-            CommandAction.OpenAssets -> deps.navigator.push(ScriptAssets(route.projectKey))
+            CommandAction.OpenAssets -> if (game) deps.navigator.push(ScriptAssets(route.projectKey))
             is CommandAction.Search -> deps.navigator.push(ProjectSearch(route.projectKey, action.query))
+            else -> Unit
         }
-        stopCommand()
     }
-    // LIB-19: the tour starts over a script being typed (`이어 쓰기`): leave typing as `완료` does, so the
-    // command row the first step points at is on screen, not the keyboard toolbar under the keyboard.
-    LaunchedEffect(touring, editor.editing, commandTyping) {
-        if (!touring || (!editor.editing && !commandTyping)) return@LaunchedEffect
-        if (editor.editing) vm.done()
-        if (commandTyping) stopCommand()
-        focusManager.clearFocus()
-        keyboard?.hide()
+    LaunchedEffect(vm) { vm.commandRequests.collect { runCommand(it) } }
+    LocalBackHandler.current(selecting && sheets.top == null) { vm.leaveSelect() }
+    // Back with an `이 뒤에` mark clears it (the draft stays). Back never ends 고치기: that would drop the edit.
+    LocalBackHandler.current(draft.mark is DraftMark.After && sheets.top == null && !selecting) { vm.closeMark() }
+
+    // --- The input bar (SCR-70) ---
+    var imeUp by remember { mutableStateOf(false) }
+    var fieldFocused by remember { mutableStateOf(false) }
+    val inputState = Drafts.inputState(draft, doc, sceneNumber, flash, imeUp, fieldFocused)
+    val editKey = (draft.mark as? DraftMark.Edit)?.blockKey
+    val mergeReason = editKey?.let { MergeCheck.reason(doc, it, draft.kind, draft.speakerKey) }?.let(WriteCopy::mergeReason)
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val runLayout = remember(draft.runs, draft.pendingParenAt, draft.parenOpen, draft.selEnd) {
+        io.github.lenticualrstone.civilight.feature.script.editor.RunLayout.of(
+            draft.runs, showParens = true, pendingParenAt = draft.pendingParenAt,
+            openParenEndAt = draft.selEnd.takeIf { draft.parenOpen && draft.pendingParenAt == null },
+        )
     }
-    // System back while typing leaves editing first (as `완료`); with the command field open, closes it.
-    LocalBackHandler.current(editor.editing && !sheetOpen) {
-        vm.done()
-        focusManager.clearFocus()
-    }
-    LocalBackHandler.current(commandTyping && !sheetOpen) { stopCommand() }
-    LocalBackHandler.current(selecting && !sheetOpen) { vm.leaveSelect() }
-
-
-    val speakerTarget = vm.speakerTarget()
-    val speakerName = speakerTarget?.speakerKey?.let { Labels.speakerName(doc, it) }
-
-    /** The bottom of the script: select bar, keyboard toolbar, or the command row and field (SCR-69: in the lower half). */
+    val transformation = remember(runLayout, colors, type) { DraftTransformation(runLayout, colors, type) }
+    val inputActions = ScriptInputActions(
+        onEvent = { e ->
+            when (e) {
+                is ScriptInputEvent.TextChanged -> {
+                    if (vm.onDraftText(e.text, e.selectionStart, e.selectionEnd) == DraftEffect.OPEN_LINK_PICKER) {
+                        sheets.open(DraftLinkSheetKey(route.projectKey))
+                    }
+                }
+                ScriptInputEvent.EnterPressed -> {
+                    val t = draft.text
+                    val at = draft.selEnd.coerceIn(0, t.length)
+                    vm.onDraftText(t.substring(0, at) + "\n" + t.substring(at), at + 1, at + 1)
+                }
+                is ScriptInputEvent.Ime -> imeUp = e.visible
+                is ScriptInputEvent.Focus -> fieldFocused = e.focused
+                ScriptInputEvent.CloseMark -> vm.closeMark()
+                else -> Unit
+            }
+        },
+        onSend = {
+            vm.sendDraft(sceneKey)
+            revealedRow = null
+        },
+        onSpeakerChip = { if (draft.kind == BlockKind.DIALOGUE) sheets.open(ChipSpeakerSheetKey(route.projectKey, sceneKey)) },
+        onKindChip = { sheets.open(KindMenuSheetKey(route.projectKey, editKey = editKey)) },
+        onNextScene = { vm.nextScene(sceneKey) },
+        onSplit = vm::splitDraft,
+        onMerge = vm::mergeDraft,
+        onParen = vm::openDraftParen,
+        onLink = { sheets.open(DraftLinkSheetKey(route.projectKey)) },
+        onChange = { (editKey ?: editor.selected)?.let { b -> vm.changeSheetFor(b)?.let(sheets::open) } },
+        onUndo = vm::undoStep,
+    )
     val bottomContent: @Composable () -> Unit = {
-        val bottomMode = if (selecting) BottomMode.SELECT else if (editor.editing) BottomMode.TOOLBAR else BottomMode.COMMAND
-        // Motion audit, row 1: the bottom bar crossfades between select bar, keyboard toolbar and command row.
-        AnimatedContent(bottomMode, transitionSpec = { motion.barSwap() }, contentAlignment = Alignment.BottomStart, label = "scriptBottomBar") { mode ->
-        if (mode == BottomMode.SELECT) {
-            val checked = SelectRules.ordered(select, rows)
-            SelectBottomBar(
-                bar = SelectRows.bar(doc, select),
-                onMove = { sheets.open(MoveSheetKey(route.projectKey, checked)) },
-                onDelete = { vm.deleteChecked(checked) },
-                onCut = { vm.clipChecked(checked, cut = true) },
-                onCopy = { vm.clipChecked(checked, cut = false) },
-                onNewScene = if (c.readOnly) null else ({
-                    // The checked blocks decide the sheet; select mode ends so the new scene can take the caret.
-                    val key = vm.newSceneSheet(headerScene)
-                    vm.leaveSelect()
-                    key?.let(sheets::open)
-                }),
-            )
-        } else if (mode == BottomMode.TOOLBAR) {
-            val kind = ScriptOps.currentKind(doc, editor)
-            KeyboardToolbar(
-                kindLabel = Labels.kindLabel(kind),
-                speakerName = speakerName,
-                showSpeaker = kind == BlockKind.DIALOGUE,
-                onKind = { openOverKeyboard(BlockAddSheetKey(route.projectKey, headerScene)) },
-                onSpeaker = { speakerTarget?.let { t -> if (!vm.readOnly) openOverKeyboard(SpeakerSheetKey.of(route.projectKey, t)) } },
-                onParen = if (ScriptOps.takesParens(kind)) vm::openParen else null,
-                parenOn = editor.parenMode,
-                onLink = {
-                    val block = editor.caretBlock
-                    if (block != null) openOverKeyboard(LinkSheetKey(route.projectKey, block, vm.rawCaret, editor.caretOption))
-                },
-                onUndo = vm::undoStep,
-                canUndo = canUndo,
-                onChange = editor.caretBlock?.takeIf { !vm.readOnly }?.let { block ->
-                    { vm.changeSheetFor(block)?.let(::openOverKeyboard) }
-                },
-            )
-        } else {
-            val selectedKind = ScriptOps.currentKind(doc, editor)
-            val selectedRow = editor.selected?.let { key -> rows.firstOrNull { it.key == ScriptRowKeys.block(key) } as? BlockRow }
-            Box(Modifier.windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars)).then(if (c.readOnly) Modifier else Modifier.tourTarget(ScriptTourSteps.COMMAND))) {
-                // LIB-19 `명령 칸`: the read-only example has no command field here, so its tour skips that step.
-                ScriptBottomBar(
-                    row = CommandRow.of(editor, c.readOnly, previewOnly, panelShown = layout.panel || split != null, wide = wide),
-                    speakerName = speakerName,
-                    onSpeaker = { speakerTarget?.let(::openSpeaker) },
-                    onLayers = ::openLayers,
-                    onLineBreak = vm::lineBreak,
-                    lineBreakEnabled = selectedKind != null && selectedKind in BlockOps.TEXT_KINDS,
-                    timeHasChange = selectedRow?.hasChange == true,
-                    onPanelTab = { tab -> editor.selected?.let { openPanel(it, tab) } },
-                ) {
-                    if (c.readOnly) {
-                        // SCR-60: `예시 홈으로 · 온보딩 끝내기` in place of the command field.
-                        ReadOnlyFooter(
-                            onHome = { ReadOnlyFrame.goHome(deps, route.projectKey) },
-                            onFinish = { ReadOnlyFrame.finish(deps, route.projectKey) },
-                        )
-                        return@ScriptBottomBar
-                    }
-                    // SCR-40: blocks on the clipboard paste below the selected block.
-                    clipboard?.let { entry ->
-                        val below = editor.selected?.takeIf { !c.readOnly && doc.manuscript.isLiveBlock(it) }
-                        AppearOnJoin { ClipboardStrip(entry, canPaste = below != null) { below?.let(vm::pasteBelow) } }
-                    }
-                    // SCR-68: matching commands as rows while typing (a visible path to `에셋` · `블록 고르기`).
-                    if (commandTyping) AppearOnJoin { CommandSuggestionRows(CommandSuggestions.of(doc, c.unitKey, commandText), ::submitCommand) }
-                    ScriptCommandField(
-                        typing = commandTyping,
-                        text = commandText,
-                        onStart = { commandTyping = true },
-                        onText = { commandText = it },
-                        onSubmit = ::submitCommand,
-                        onClose = ::stopCommand,
-                        onMic = {
-                            deps.navigator.push(
-                                Recording(
-                                    surface = RECORDER_SURFACE,
-                                    projectKey = route.projectKey,
-                                    targetKind = headerScene?.let { RECORDER_TARGET_SCENE },
-                                    targetKey = headerScene,
-                                    caretBlockKey = editor.selected,
-                                ),
-                            )
-                        },
-                        focusRequester = commandFocus,
+        val mode = when {
+            selecting -> BottomMode.SELECT
+            c.readOnly -> BottomMode.READ_ONLY
+            previewOnly -> BottomMode.NONE
+            else -> BottomMode.INPUT
+        }
+        AnimatedContent(mode, transitionSpec = { motion.barSwap() }, contentAlignment = Alignment.BottomStart, label = "scriptBottomBar") { m ->
+            when (m) {
+                BottomMode.SELECT -> {
+                    val checked = SelectRules.ordered(select, rows)
+                    SelectBottomBar(
+                        bar = SelectRows.bar(doc, select),
+                        onMove = { sheets.open(MoveSheetKey(route.projectKey, checked)) },
+                        onDelete = { vm.deleteChecked(checked) },
+                        onCut = { vm.clipChecked(checked, cut = true) },
+                        onCopy = { vm.clipChecked(checked, cut = false) },
+                        onNewScene = null,
                     )
                 }
+                // SCR-60: `예시 프로젝트` with `예시 홈으로` · `온보딩 끝내기` in place of the input bar.
+                BottomMode.READ_ONLY -> ScriptInputReadOnlyRow(
+                    onSecondary = { ReadOnlyFrame.goHome(deps, route.projectKey) },
+                    onPrimary = { ReadOnlyFrame.finish(deps, route.projectKey) },
+                )
+                BottomMode.INPUT -> ScriptInputBar(
+                    state = inputState,
+                    actions = inputActions,
+                    modifier = Modifier.tourTarget(ScriptTourSteps.COMMAND),
+                    context = InputContext(
+                        readOnly = false,
+                        hasCues = game && draft.kind == BlockKind.DIRECTION && draft.cues.isNotEmpty(),
+                        hasTargetBlock = editor.selected != null,
+                        canUndo = canUndo,
+                    ),
+                    mergeOffReason = mergeReason,
+                    // SCR-74 [DEFAULT]: `다음 씬` is off while it would only pile onto an empty scene.
+                    nextSceneEnabled = NextScene.emptyAfter(doc, c.unitKey, route.projectKey, sceneKey, vm.lastNextScene) == null,
+                    speakerMenuOpen = sheets.top is ChipSpeakerSheetKey,
+                    kindMenuOpen = sheets.top is KindMenuSheetKey,
+                    visualTransformation = transformation,
+                    // SCR-08: cue chips only with `게임 제작 도구` on, under `연출`.
+                    cues = if (game && draft.kind == BlockKind.DIRECTION) {
+                        {
+                            DraftCueChips(doc, draft.cues, onRemove = vm::removeDraftCue, onAdd = {
+                                sheets.open(DraftCueSheetKey(route.projectKey, c.unitKey))
+                            })
+                        }
+                    } else null,
+                )
+                // 대사만 (SCR-27) is a reading view: no input bar (nothing in it could act).
+                BottomMode.NONE -> Spacer(Modifier.fillMaxWidth().windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
-        }
         }
     }
 
@@ -755,218 +817,114 @@ private fun ScriptFrame(
             .fillMaxSize()
             .onGloballyPositioned { frameTopPx = it.positionInWindow().y },
     ) {
-        // SCR-03: header, manuscript and bottom bar span the area left of the panel only.
         Box(
-            (if (upperSettled) Modifier.fillMaxHeight() else Modifier.height(upperHeight.dp))
-                .width(layout.areaWidth.dp)
-                // The writing line (SCR-14) works inside this area: in tabletop posture, the upper half.
-                .onGloballyPositioned { frame.rootTop = it.positionInRoot().y; frame.height = it.size.height.toFloat() },
+            (if (upperSettled) Modifier.fillMaxHeight() else Modifier.height(upperHeight.dp)).width(layout.areaWidth.dp),
         ) {
-        GlassScaffold(
-            topBar = {
-                val topMode = when {
-                    selecting -> TopBarMode.SELECT
-                    editor.editing -> TopBarMode.EDIT
-                    c.readOnly -> TopBarMode.READ_ONLY
-                    else -> TopBarMode.READ
-                }
-                // Motion audit, row 1: the header crossfades between reading, typing and select mode.
-                AnimatedContent(topMode, transitionSpec = { motion.barSwap() }, contentAlignment = Alignment.TopStart, label = "scriptTopBar") { mode ->
-                    when (mode) {
-                        TopBarMode.SELECT -> SelectTopBar(header.line, onAll = { vm.checkAll(rows, headerScene) }, onDone = vm::leaveSelect)
-                        TopBarMode.EDIT -> EditingTopBar(header.line) {
-                            vm.done()
-                            focusManager.clearFocus()
-                            keyboard?.hide()
-                        }
-                        // SCR-60: the read-only example's banner header (board `OnbExampleScript`).
-                        TopBarMode.READ_ONLY -> ReadOnlyTopBar(header.line)
-                        TopBarMode.READ -> ScriptTopBar(
-                            title = doc.project.name,
-                            line = header.line,
-                            positionLabel = header.positionLabel,
-                            wide = wide,
-                            onPositionLabel = {
-                                val scene = header.sceneKey ?: return@ScriptTopBar
-                                sheets.open(PositionSheetKey(route.projectKey, scene, header.positionLabel.orEmpty()))
-                            },
-                            onLayers = ::openLayers,
-                        )
-                    }
-                }
-            },
-            bottomBar = { AnimatedVisibility(split == null, enter = motion.enter(CivilightMotion.foldOpen), exit = motion.exit(CivilightMotion.foldClose)) { bottomContent() } },
-            overlay = { padding ->
-                Box(
-                    Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding() + TOAST_GAP),
-                    contentAlignment = Alignment.BottomCenter,
-                ) {
-                    ToastHost(message = toast?.text, actionLabel = toast?.actionLabel, onAction = toast?.onAction?.let { { toasts.act() } })
-                }
-            },
-        ) { padding ->
-            frame.updateBars(padding)
-            LaunchedEffect(frame.visibleBottom, editor.editing) {
-                if (editor.editing && frame.caretBottom > 0f) onCaret(frame.caretTop, frame.caretBottom, CaretEvent.VIEWPORT)
-            }
-            Box(Modifier.fillMaxSize()) {
-            if (selecting) {
-                SelectList(
-                    rows = selectRows,
-                    listState = selectListState,
-                    padding = padding,
-                    layout = layout,
-                    onToggle = { key -> vm.toggleChecked(key, rows) },
-                    onDrop = vm::moveBlocks,
-                )
-            } else Manuscript(
-                rows = rows,
-                editor = editor,
-                showParens = doc.app.view.script.layers.paren,
-                readOnly = c.readOnly,
-                entered = entered,
-                listState = listState,
-                padding = padding,
-                layout = layout,
-                actions = ManuscriptActions(
-                    onTapBlock = { row, offset ->
-                        if (commandTyping) stopCommand()
-                        vm.tapBlock(row.blockKey, row.isText, offset)
-                        // SCR-08: a direction block's cues are edited in its sheet.
-                        if (row.kind == BlockKind.DIRECTION) sheets.open(DirectionSheetKey(route.projectKey, row.blockKey))
-                    },
-                    onTapOption = { row, option ->
-                        if (commandTyping) stopCommand()
-                        option.optionKey?.let { vm.tapOption(row.blockKey, it) }
-                    },
-                    onSpeaker = { row -> openSpeaker(SpeakerTarget(row.blockKey, row.speaker?.characterKey, row.sceneKey)) },
-                    onTapEmptyScene = { scene ->
-                        if (commandTyping) stopCommand()
-                        vm.tapEmptyScene(scene)
-                    },
-                    onOpenHead = { scene -> sheets.open(SceneWhereSheet(route.projectKey, scene)) },
-                    onHeadMenu = { scene ->
-                        if (commandTyping) stopCommand()
-                        // The menu's split, merge and delete act on the store: typed text goes first.
-                        vm.flushNow()
-                        openOverKeyboard(UnitMenuSheet(route.projectKey, scene))
-                    },
-                    onUnlockHidden = gate.unlock,
-                    onNewScene = if (c.readOnly) null else {
-                        { sheets.open(NewUnitSheet(route.projectKey, parentKey = c.unitKey.takeIf { it != route.projectKey })) }
-                    },
-                    emptySpeaker = { row -> emptySpeaker(doc, editor, row) },
-                    onEntered = vm::enteredShown,
-                    editableBlock = { row, modifier ->
-                        EditableBlock(
-                            kind = row.kind ?: BlockKind.NARRATION,
-                            speaker = row.speaker,
-                            number = row.number,
-                            speakerMarks = row.speakerMarks,
-                            memoPrefix = row.memoPrefix,
-                            value = vm.fieldValue,
-                            runs = vm.editRuns,
-                            linkLooks = row.linkLooks,
-                            parenMode = editor.parenMode,
-                            inheritedHint = editor.inheritedHint == row.blockKey,
-                            focusRequester = fieldFocus,
-                            onValueChange = { value -> vm.onFieldChange(value, FieldOwner(row.key, editor.caretOption.takeIf { row.kind == BlockKind.CHOICE })) },
-                            onFocusLost = { option -> if (sheets.top == null) vm.onFieldFocusLost(row.key, option) },
-                            onSpeaker = { openOverKeyboard(SpeakerSheetKey.of(route.projectKey, SpeakerTarget(row.blockKey, row.speaker?.characterKey, row.sceneKey))) },
-                            onCaret = ::onCaret,
-                            modifier = modifier,
-                            slot = row.slot(selected = true),
-                            options = if (row.kind == BlockKind.CHOICE) row.options else emptyList(),
-                            caretOption = editor.caretOption,
-                            onTapOption = { option -> option.optionKey?.let { vm.tapOption(row.blockKey, it) } },
-                            addressHints = row.addressHints,
-                        )
-                    },
-                    editableEmpty = { row, modifier ->
-                        EditableBlock(
-                            kind = BlockKind.DIALOGUE,
-                            speaker = emptySpeaker(doc, editor, row) ?: SpeakerModel(ScriptCopy.NO_SPEAKER, null, SpeakerLook.UNSET, null),
-                            number = null,
-                            speakerMarks = emptyList(),
-                            memoPrefix = null,
-                            value = vm.fieldValue,
-                            runs = vm.editRuns,
-                            linkLooks = emptyMap(),
-                            parenMode = editor.parenMode,
-                            inheritedHint = editor.pendingSpeaker == null && row.speaker != null,
-                            focusRequester = fieldFocus,
-                            onValueChange = { value -> vm.onFieldChange(value, FieldOwner(row.key)) },
-                            onFocusLost = { option -> if (sheets.top == null) vm.onFieldFocusLost(row.key, option) },
-                            onSpeaker = { speakerTarget?.let { t -> openOverKeyboard(SpeakerSheetKey.of(route.projectKey, t)) } },
-                            onCaret = ::onCaret,
-                            modifier = modifier,
-                        )
-                    },
-                    onPanel = { row, tab -> openPanel(row.blockKey, tab) },
-                    onReveal = { key -> revealedRow = key },
-                    onTapTarget = { row, tap ->
-                        if (commandTyping) stopCommand()
-                        when (tap) {
-                            is BlockTap.Candidate -> {
-                                openCandidate = row.blockKey to tap.candidate
-                                true
-                            }
-                            is BlockTap.Link -> openLink(row.blockKey, tap.link)
-                            is BlockTap.Source -> {
-                                // SCR-59: the record opens in the recorder (audio plays there).
-                                deps.navigator.push(RecorderRecordDetail(tap.recordKey))
-                                true
-                            }
-                        }
-                    },
-                    openCandidate = { row -> openCandidate?.takeIf { it.first == row.blockKey }?.second },
-                    candidateWindow = { row ->
-                        val open = openCandidate?.takeIf { it.first == row.blockKey }?.second
-                        val window = open?.let { c.terms?.popover(it) }
-                        if (open != null && window != null) {
-                            CandidateWindow(
-                                window, c.readOnly,
-                                onLink = {
-                                    vm.linkCandidate(open)
-                                    openCandidate = null
+            GlassScaffold(
+                topBar = {
+                    AnimatedContent(selecting, transitionSpec = { motion.barSwap() }, contentAlignment = Alignment.TopStart, label = "scriptTopBar") { sel ->
+                        if (sel) {
+                            SelectTopBar(header.line, onAll = { vm.checkAll(rows, headerScene) }, onDone = vm::leaveSelect)
+                        } else {
+                            ScriptTopBar(
+                                title = doc.project.name,
+                                // SCR-60: `읽기 전용 · 편집 불가` replaces the position line.
+                                line = if (c.readOnly) WriteCopy.READ_ONLY_LINE else header.line,
+                                positionLabel = header.positionLabel,
+                                wide = wide,
+                                onPositionLabel = {
+                                    val scene = header.sceneKey ?: return@ScriptTopBar
+                                    sheets.open(PositionSheetKey(route.projectKey, scene, header.positionLabel.orEmpty()))
                                 },
-                                onReject = {
-                                    vm.rejectCandidate(open)
-                                    openCandidate = null
-                                },
-                                onDismiss = { openCandidate = null },
+                                onLayers = ::openLayers,
+                                onFind = { openFind() },
                             )
                         }
-                    },
-                    onMarginWarning = { deps.navigator.push(CheckCenter(route.projectKey, CheckCenterFilter.TERM)) },
-                ),
-                headMenuOpen = (sheets.top as? UnitMenuSheet)?.unitKey,
-                previewOnly = previewOnly,
-                revealedRow = revealedRow,
-            )
-            // SCR-27: while `대사만` is on, a chip under the header says so and opens `표시`; SCR-56: so does
-            // `표시 · 용어 후보 · 켬` while the candidate layer is on.
-            val headerChips = listOfNotNull(
-                LayersModel.headerChip(preview),
-                TermCopy.CHIP.takeIf { doc.app.view.script.layers.termCandidates && !previewOnly },
-            )
-            FoldRevealValue(
-                headerChips.takeIf { it.isNotEmpty() },
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = padding.calculateTopPadding() + 4.dp)
-                    .padding(horizontal = if (layout.wide) layout.columnStart.dp + 24.dp else 24.dp),
-                label = "headerChips",
-            ) { chips ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    chips.forEach { chip -> FilterChip(label = chip, selected = true, onClick = ::openLayers) }
+                    }
+                },
+                bottomBar = { AnimatedVisibility(split == null, enter = motion.enter(CivilightMotion.foldOpen), exit = motion.exit(CivilightMotion.foldClose)) { bottomContent() } },
+                overlay = { padding ->
+                    Box(
+                        Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding() + TOAST_GAP),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
+                        ToastHost(message = toast?.text, actionLabel = toast?.actionLabel, onAction = toast?.onAction?.let { { toasts.act() } })
+                    }
+                },
+            ) { padding ->
+                with(density) { bottomPadPx = padding.calculateBottomPadding().roundToPx() }
+                Box(Modifier.fillMaxSize()) {
+                    if (selecting) {
+                        SelectList(
+                            rows = selectRows,
+                            listState = selectListState,
+                            padding = padding,
+                            layout = layout,
+                            onToggle = { key -> vm.toggleChecked(key, rows) },
+                            onDrop = vm::moveBlocks,
+                        )
+                    } else Manuscript(
+                        rows = rows,
+                        editor = editor,
+                        showParens = doc.app.view.script.layers.paren,
+                        readOnly = c.readOnly,
+                        entered = entered,
+                        listState = listState,
+                        padding = padding,
+                        layout = layout,
+                        actions = ManuscriptActions(
+                            onTapBlock = { row, offset -> vm.tapBlock(row.blockKey, row.isText, offset) },
+                            onTapOption = { row, option -> option.optionKey?.let { vm.tapOption(row.blockKey, it) } },
+                            onSpeaker = { row -> vm.tapBlock(row.blockKey, row.isText, null) },
+                            onTapEmptyScene = { scene -> vm.tapEmptyScene(scene) },
+                            onOpenHead = { scene -> sheets.open(SceneWhereSheet(route.projectKey, scene)) },
+                            onHeadMenu = { scene ->
+                                keyboard?.hide()
+                                sheets.open(UnitMenuSheet(route.projectKey, scene))
+                            },
+                            onUnlockHidden = gate.unlock,
+                            onNewScene = if (c.readOnly) null else ({ vm.nextScene(null) }),
+                            emptySpeaker = { null },
+                            onEntered = vm::enteredShown,
+                            editableBlock = { _, _ -> },
+                            editableEmpty = { _, _ -> },
+                            onPanel = { row, tab -> openPanel(row.blockKey, tab) },
+                            onReveal = { key -> revealedRow = key; if (key == null) revealedSide = SwipeSide.CLOSED },
+                            onTapTarget = { _, tap ->
+                                when (tap) {
+                                    // SCR-59: the record opens in the recorder (audio plays there).
+                                    is BlockTap.Source -> {
+                                        deps.navigator.push(RecorderRecordDetail(tap.recordKey))
+                                        true
+                                    }
+                                    // SCR-55, SCR-56: a link or a candidate only selects its block.
+                                    else -> false
+                                }
+                            },
+                            onMarginWarning = null,
+                            look = { row ->
+                                when {
+                                    row.blockKey == editKey -> BlockLook(tag = WriteCopy.EDITING_TAG, numbered = true)
+                                    (draft.mark as? DraftMark.After)?.blockKey == row.blockKey -> BlockLook(numbered = true, afterTarget = true)
+                                    fresh[row.blockKey] != null -> BlockLook(tag = fresh[row.blockKey], numbered = true)
+                                    else -> BlockLook()
+                                }
+                            },
+                            editButtons = { row -> editButtons(row, c.readOnly || previewOnly || draft.editing, vm, sheets, route, doc, c.unitKey) },
+                            onSwipe = { key, side ->
+                                revealedRow = key
+                                revealedSide = side
+                                if (key != null) vm.clearFresh()
+                            },
+                        ),
+                        headMenuOpen = (sheets.top as? UnitMenuSheet)?.unitKey,
+                        previewOnly = previewOnly,
+                        revealedRow = revealedRow,
+                        revealedSide = revealedSide,
+                    )
                 }
             }
-            }
         }
-        }
-        // SCR-66 / CNV-34: the panel comes in 48 dp from the right on `foldOpen` and fades on `foldClose`;
-        // reduced motion: a 120 ms fade. Its width is the writer's ratio (CNV-47).
         val panelWidth = rememberLastNonNull(targetLayout.panelWidth.takeIf { targetLayout.panel }) ?: ScriptLayout.PANEL_WIDTH
         AnimatedVisibility(
             visible = targetLayout.panel,
@@ -974,7 +932,7 @@ private fun ScriptFrame(
             enter = motion.panelEnter(),
             exit = motion.panelExit(),
         ) {
-            val actions = scriptPanelActions(route, deps, vm, gate.open, open = ::openOverKeyboard, leave = {})
+            val actions = scriptPanelActions(route, deps, vm, gate.open, open = { sheets.open(it) }, leave = {})
             ScriptSidePanel(
                 tab = panelTab,
                 onSelectTab = vm::setPanelTab,
@@ -982,16 +940,12 @@ private fun ScriptFrame(
                 scrollOf = panelScroll::state,
                 width = panelWidth.dp,
             ) { tab ->
-                panel?.takeIf { it.tab == tab }?.let { PanelTabBody(it, wide = true, actions = actions) }
+                panel?.takeIf { it.tab == tab }?.let { PanelBody(it, wide = true, actions = actions, c = c, vm = vm) }
             }
         }
-        // CNV-47: the handle sits on the divider, which is the panel's left edge. Nothing shows when the
-        // window is too narrow for two 280 dp panes.
         if (targetLayout.panel) {
             PaneSplitHandle(paneSplit, Modifier.align(Alignment.CenterStart).offset(x = (targetLayout.areaWidth - HANDLE_HALF).dp))
         }
-        // SCR-69: the lower half in tabletop posture: panel tabs, then the command area (the keyboard comes up here).
-        // The lower half comes up from the fold and goes back down on the fold tokens (motion audit, row 3).
         val lastSplit = rememberLastNonNull(split)
         AnimatedVisibility(
             visible = split != null,
@@ -999,7 +953,7 @@ private fun ScriptFrame(
             exit = motion.exit(CivilightMotion.foldClose),
         ) {
             if (lastSplit != null) {
-                val actions = scriptPanelActions(route, deps, vm, gate.open, open = ::openOverKeyboard, leave = {})
+                val actions = scriptPanelActions(route, deps, vm, gate.open, open = { sheets.open(it) }, leave = {})
                 TabletopPanel(
                     tab = panelTab,
                     onSelectTab = vm::setPanelTab,
@@ -1007,28 +961,42 @@ private fun ScriptFrame(
                     modifier = Modifier.padding(top = (lastSplit.upper + lastSplit.gap).dp).height(lastSplit.lower.dp).fillMaxWidth(),
                     commandArea = bottomContent,
                 ) { tab ->
-                    panel?.takeIf { it.tab == tab }?.let { PanelTabBody(it, wide = true, actions = actions) }
+                    panel?.takeIf { it.tab == tab }?.let { PanelBody(it, wide = true, actions = actions, c = c, vm = vm) }
                 }
             }
         }
     }
 }
 
-/** The speaker on an empty scene's line: a held pick for the next dialogue, else the inherited one (SCR-18). */
-private fun emptySpeaker(doc: ProjectDoc, editor: EditorState, row: EmptySceneRow): SpeakerModel? {
-    val pending = editor.pendingSpeaker?.takeIf { editor.virtualScene == row.sceneKey }
-    if (pending != null) {
-        val name = Labels.speakerName(doc, pending) ?: return row.speaker
-        return SpeakerModel(name, null, SpeakerLook.NAMED, pending)
-    }
-    return row.speaker
+/** The right swipe's five buttons (SCR-30); none in read-only projects, `대사만` or during `고치기`. */
+private fun editButtons(
+    row: BlockRow,
+    off: Boolean,
+    vm: ScriptViewModel,
+    sheets: SheetHost,
+    route: Script,
+    doc: ProjectDoc,
+    unitKey: Key,
+): List<SwipeButtonSpec> {
+    if (off || row.kind == null) return emptyList()
+    val key = row.blockKey
+    return listOfNotNull(
+        // SCR-55: no `고치기` on a block whose text would show a locked hidden item in the field.
+        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.EDIT, { vm.swipeEdit(key) }) { SwipeIcon(IconId.Edit) }
+            .takeIf { !row.editLocked },
+        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.INSERT_AFTER, { vm.swipeAfter(key) }) { SwipeIcon(IconId.InsertAfter) },
+        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.KIND, { sheets.open(KindMenuSheetKey(route.projectKey, blockKey = key)) }) { SwipeIcon(IconId.Kind) },
+        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.SCENE_CUT, {
+            // SCR-49: not the last block → `씬 나누기` below it; the last → `다음 씬 만들기` after its scene.
+            sheets.open(ScriptOps.newSceneSheet(doc, route.projectKey, key, row.sceneKey, unitKey))
+        }) { SwipeIcon(IconId.SceneCut) },
+        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.DELETE, { vm.swipeDelete(key) }) { SwipeIcon(IconId.Trash) },
+    )
 }
 
-/** The scene of the first row whose bottom is below the top bar's edge (rule 22 §6). */
-private fun sceneUnderTopBar(listState: LazyListState, rows: List<ScriptRow>): Key? {
-    val info = listState.layoutInfo
-    val first = info.visibleItemsInfo.firstOrNull { it.offset + it.size > 0 } ?: return rows.firstOrNull()?.sceneKey
-    return rows.getOrNull(first.index)?.sceneKey
+@Composable
+private fun SwipeIcon(icon: IconId) {
+    CivilightIcon(icon, null, size = 18.dp, tint = CivilightTheme.colors.ink2)
 }
 
 /** Select mode: the scene of the first select row under the top bar. */
@@ -1044,54 +1012,31 @@ private fun sceneUnderSelectBar(listState: LazyListState, rows: List<SelectRowMo
     return null
 }
 
-/** Scrolls [key] into view when it is not (fully) on screen, or always with [force]. */
-private suspend fun bringIntoView(listState: LazyListState, rows: List<ScriptRow>, key: String, motion: Motion, force: Boolean = false) {
+/**
+ * SCR-71: scrolls so [key]'s bottom sits [gapPx] above the input bar (a block taller than the band shows its
+ * top). Motion through `CivilightMotion` (`enter`, decelerate); reduced motion snaps.
+ */
+private suspend fun showAboveInput(listState: LazyListState, rows: List<ScriptRow>, key: String, motion: Motion, bottomPadPx: Int, gapPx: Float) {
     val index = rows.indexOfFirst { it.key == key }
     if (index < 0) return
-    val visible = listState.layoutInfo.visibleItemsInfo.any { it.key == key }
-    if (!force && visible) return
-    ScriptScroll.show(listState, index, motion)
+    if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) listState.scrollToItem(index)
+    val info = listState.layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+    val bandTop = info.beforeContentPadding.toFloat()
+    val bandBottom = (info.viewportEndOffset - bottomPadPx).toFloat() - gapPx
+    val delta = if (item.size > bandBottom - bandTop) item.offset - bandTop else (item.offset + item.size) - bandBottom
+    if (kotlin.math.abs(delta) < 1f) return
+    if (motion.reduced) listState.scrollBy(delta) else listState.animateScrollBy(delta, motion.spec(CivilightMotion.enter))
 }
-
-/** Bar and caret geometry in root pixels, for the fixed writing line. */
-private class FrameBounds {
-    var rootTop = 0f
-    var height = 0f
-    var topBar = 0f
-    var bottomBar = 0f
-    var caretTop = 0f
-    var caretBottom = 0f
-    var selfScrolling = false
-    val visibleTop: Float get() = rootTop + topBar
-    val visibleBottom: Float get() = rootTop + height - bottomBar
-}
-
-@Composable
-private fun FrameBounds.updateBars(padding: PaddingValues) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    with(density) {
-        topBar = padding.calculateTopPadding().toPx()
-        bottomBar = padding.calculateBottomPadding().toPx()
-    }
-}
-
-/** What the script's header shows (motion audit, row 1). */
-private enum class TopBarMode { READ, EDIT, SELECT, READ_ONLY }
 
 /** What the script's bottom bar shows (motion audit, row 1). */
-private enum class BottomMode { COMMAND, TOOLBAR, SELECT }
+private enum class BottomMode { INPUT, READ_ONLY, SELECT, NONE }
 
-/** Frames to wait for the caret row's field to attach before focusing it. */
-private const val FOCUS_TRIES = 6
-
-/** Half of the pane split handle's 44 dp touch area (CNV-47): it is centred on the divider. */
 private const val HANDLE_HALF = 22f
 
-/** The tabletop's lower half rises this far on unfold. */
 private val TABLETOP_RISE = 24.dp
 
-/** A toast sits 6 dp above the bottom bar (DS-27, as `CivilightScreen`). */
 private val TOAST_GAP = 6.dp
 
-/** `Recording.surface` for the script's mic (LRC-01; the recorder lane's route contract). */
-private const val RECORDER_SURFACE = "script"
+/** SCR-71: a new block's bottom sits 12 dp above the input bar. */
+private val ABOVE_GAP = 12.dp

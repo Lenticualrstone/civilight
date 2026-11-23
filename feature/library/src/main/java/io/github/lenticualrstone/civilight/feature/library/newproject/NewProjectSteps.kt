@@ -65,9 +65,9 @@ private fun FieldCaption(text: String, modifier: Modifier = Modifier, trailing: 
     }
 }
 
-/** 1/4 `이름과 형식` (LIB-09; boards `NewName`, `NewNameR18`). */
+/** 1/4 `이름과 형식` (LIB-09; board `NewName`; 0.2.0: no rating, LIB-92). */
 @Composable
-internal fun ColumnScope.NameStep(form: NewProjectForm, defaults: RatingDefaults, recoverySet: Boolean, update: FormUpdate) {
+internal fun ColumnScope.NameStep(form: NewProjectForm, update: FormUpdate) {
     CivilightTextField(value = form.name, onValueChange = { v -> update { it.copy(name = v) } }, label = NewProjectCopy.NAME)
     CivilightTextField(
         value = form.oneLiner,
@@ -85,30 +85,8 @@ internal fun ColumnScope.NameStep(form: NewProjectForm, defaults: RatingDefaults
             ChoiceCard(title, selected = form.format == format, onClick = { update { NewProjectRules.withFormat(it, format) } }, subtitle = sub)
         }
     }
-    FieldCaption(NewProjectCopy.RATING, trailing = NewProjectCopy.RATING_NOTE)
-    RatingCells(form.rating, onSelect = { r -> update { it.copy(rating = r) } })
-    FoldRevealValue(NewProjectRules.r18Block(form, defaults, recoverySet)) { block ->
-        val colors = CivilightTheme.colors
-        val type = CivilightTheme.type
-        Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(colors.sel).padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            CivilightText(block.header, type.small, color = colors.ink3)
-            block.lines.forEach { line ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CivilightIcon(IconId.Check, contentDescription = null, size = 16.dp, tint = colors.acc)
-                    CivilightText(line, type.command.merge(TextStyle(fontSize = 13.sp, lineHeight = 18.sp)), color = colors.ink)
-                }
-            }
-            block.warning?.let { warning ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CivilightText("◇", type.command, color = colors.ink2)
-                    CivilightText(warning, type.command.merge(TextStyle(fontSize = 13.sp, lineHeight = 18.sp)), color = colors.ink)
-                }
-            }
-        }
-    }
+    // (0.2.0, LIB-92, S-4) No `수위 등급` row, picker or R-18 block: a new project stores `rating: all` with the
+    // `전체` protections (all off, D34).
 }
 
 /**

@@ -43,8 +43,6 @@ import io.github.lenticualrstone.civilight.domain.library.rating.Protection
 import io.github.lenticualrstone.civilight.domain.library.rating.ProtectionSettingRow
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
-import io.github.lenticualrstone.civilight.feature.library.rating.RatingPickContent
-import io.github.lenticualrstone.civilight.feature.library.rating.RatingPickSheet
 import io.github.lenticualrstone.civilight.navigation.DayBandSettings
 import io.github.lenticualrstone.civilight.navigation.ProjectSettings
 import io.github.lenticualrstone.civilight.navigation.RelationKindSettings
@@ -68,9 +66,10 @@ import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
  * - `구조`: `단계 이름` (→ [StructureLevels], this lane), `세계 시간` (→ `WorldCalendar`), `때 표기`,
  *   `이동 수단`, `하루 · 시간대` (other areas' screens);
  * - `인물`: `인물 항목`, `관계 종류` (cast);
- * - `등급 · 숨기기` (LIB-25): `수위 등급` → picker → `바뀌는 것`, then the four protection switches
- *   with `<rating> 기본과 다름` in `acc` where a value differs;
- * - `스크립트 추가 칸`: `무대 위치` and `보이스 ID` switches, `ID 형식`, `전환 문구` (script).
+ * - (0.2.0) `세계`: `용어 후보` (WLD-73);
+ * - `숨기기` (LIB-25, 0.2.0 LIB-92): the four protection switches; no rating row or marker;
+ * - `스크립트 추가 칸`: (0.2.0) `게임 제작 도구` (LIB-91), then with it on `무대 위치` and `보이스 ID` switches
+ *   and `ID 형식`, and always `전환 문구` (script).
  * The read-only example disables every row.
  */
 @Composable
@@ -85,12 +84,6 @@ internal fun ProjectSettingsScreen(route: ProjectSettings, services: LibraryServ
         smallLine = current?.projectName,
         back = IconAction(BACK_LABEL) { deps.navigator.pop() },
         sheets = sheets,
-        localSheets = { key ->
-            when (key) {
-                is RatingPickSheet -> sheetBody { ui?.let { RatingPickContent(key.projectKey, it.protection.rating) } }
-                else -> null
-            }
-        },
     ) { padding ->
       // Loading → content (audit row 7): the page fades in once the document is read.
       ContentSwap(current != null, Modifier.fillMaxSize(), label = "projectSettings") { ready ->
@@ -121,11 +114,9 @@ internal fun ProjectSettingsScreen(route: ProjectSettings, services: LibraryServ
                 }
                 LinkSection(ProjectSettingsCopy.SECTION_STRUCTURE, current.structure, !current.readOnly, onOpen = open)
                 LinkSection(ProjectSettingsCopy.SECTION_CAST, current.cast, !current.readOnly, onOpen = open)
-                ProtectionSection(
-                    ui = current,
-                    onRating = { sheets.open(RatingPickSheet(route.projectKey)) },
-                    onSwitch = vm::switch,
-                )
+                // (0.2.0, WLD-73) `세계`: `용어 후보`.
+                SwitchSection(ProjectSettingsCopy.SECTION_WORLD, current.world, !current.readOnly, onSwitch = vm::scriptSwitch)
+                ProtectionSection(ui = current, onSwitch = vm::switch)
                 ScriptSection(current.script, !current.readOnly, onSwitch = vm::scriptSwitch, onOpen = open)
             }
         }
@@ -168,20 +159,28 @@ private fun LinkRow(row: ProjectLinkRow, enabled: Boolean, onOpen: (ProjectSetti
 @Composable
 private fun ScriptSection(ui: ScriptSectionUi, enabled: Boolean, onSwitch: (ScriptSwitch, Boolean) -> Unit, onOpen: (ProjectSettingsTarget) -> Unit) {
     SectionHead(ProjectSettingsCopy.SECTION_SCRIPT, first = false)
-    ui.switches.forEach { row ->
-        SwitchRow(title = row.title, checked = row.on, onCheckedChange = { on -> onSwitch(row.switch, on) }, subtitle = row.sub, enabled = enabled)
-    }
+    ui.switches.forEach { row -> ProjectSwitch(row, enabled, onSwitch) }
     ui.links.forEach { row -> LinkRow(row, enabled, onOpen) }
 }
 
 @Composable
-private fun ProtectionSection(ui: ProjectSettingsUi, onRating: () -> Unit, onSwitch: (Protection, Boolean) -> Unit) {
+private fun SwitchSection(title: String, rows: List<ProjectSwitchRow>, enabled: Boolean, onSwitch: (ScriptSwitch, Boolean) -> Unit) {
+    if (rows.isEmpty()) return
+    SectionHead(title, first = false)
+    rows.forEach { row -> ProjectSwitch(row, enabled, onSwitch) }
+}
+
+@Composable
+private fun ProjectSwitch(row: ProjectSwitchRow, enabled: Boolean, onSwitch: (ScriptSwitch, Boolean) -> Unit) {
+    SwitchRow(title = row.title, checked = row.on, onCheckedChange = { on -> onSwitch(row.switch, on) }, subtitle = row.sub, enabled = enabled)
+}
+
+@Composable
+private fun ProtectionSection(ui: ProjectSettingsUi, onSwitch: (Protection, Boolean) -> Unit) {
     val p = ui.protection
     val enabled = !ui.readOnly
+    // (0.2.0, LIB-92) `숨기기`: the four switches only; no `수위 등급` row.
     SectionHead(ProjectSettingsCopy.SECTION_PROTECTION, first = false)
-    Box(Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA)) {
-        SettingsValueRow(title = p.ratingRowTitle, onClick = { if (enabled) onRating() }, value = p.ratingRowValue, subtitle = p.ratingRowSub)
-    }
     p.rows.forEach { row -> ProtectionSwitchRow(row, enabled) { on -> onSwitch(row.protection, on) } }
 }
 

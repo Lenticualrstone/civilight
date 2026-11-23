@@ -79,9 +79,20 @@ sealed interface WorldListItem {
         override val id: String get() = "lock"
     }
 
-    /** No items yet: `용어 없음` and the primary `용어 만들기`. */
+    /**
+     * No items yet: `용어 없음`. (0.2.0, WLD-02) The primary [button] is superseded by the list's create row
+     * and is no longer drawn; the line stays under the create row.
+     */
     data class Empty(val line: String, val button: String) : WorldListItem {
         override val id: String get() = "empty"
+    }
+
+    /**
+     * (0.2.0, WLD-73) A row of the `용어 후보 · N` section: term name, `후보 3`, and `◇ 공개 전 후보 1` when
+     * some candidates come before the reveal. A tap opens the term card.
+     */
+    data class CandidateRow(val key: Key, val title: String, val fragment: String, val right: String?) : WorldListItem {
+        override val id: String get() = "cand:$key"
     }
 }
 
@@ -103,11 +114,12 @@ object WorldListState {
             WorldTab.PLACES -> worldItems(WorldKind.PLACE, WorldCards(doc, hiddenOpen).placeList())
             WorldTab.FACTIONS -> worldItems(WorldKind.FACTION, WorldCards(doc, hiddenOpen).factionList())
         }
-        return WorldListUi(doc.project.name, tab, items, candidatesPending = tab == WorldTab.TERMS && !index.complete)
+        return WorldListUi(doc.project.name, tab, items, candidatesPending = tab == WorldTab.TERMS && doc.project.termCandidates && !index.complete)
     }
 
     private fun termItems(doc: ProjectDoc, lens: LensPoint, index: CandidateIndex, hiddenOpen: Boolean): List<WorldListItem> {
-        val list = TermQueries(doc, index, TermAccess(hiddenOpen)).list(lens)
+        val queries = TermQueries(doc, index, TermAccess(hiddenOpen))
+        val list = queries.list(lens)
         val out = ArrayList<WorldListItem>()
         list.lockRow?.let { out += WorldListItem.Lock(it) }
         if (list.emptyLine != null) {
@@ -121,6 +133,11 @@ object WorldListState {
         if (list.pending.isNotEmpty()) {
             out += WorldListItem.Section(list.pendingTitle)
             list.pending.mapTo(out, ::termRow)
+        }
+        // (0.2.0, WLD-73) The candidate list is the last section while the project's `용어 후보` is on.
+        queries.candidateSection(lens)?.let { section ->
+            out += WorldListItem.Section(section.title)
+            section.rows.mapTo(out) { WorldListItem.CandidateRow(it.termKey, it.name, it.fragment, it.right) }
         }
         return out
     }

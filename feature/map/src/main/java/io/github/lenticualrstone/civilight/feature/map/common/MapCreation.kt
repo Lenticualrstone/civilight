@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.map.common
 
+import io.github.lenticualrstone.civilight.domain.world.map.MapNames
 import io.github.lenticualrstone.civilight.domain.world.common.EditContext
 import io.github.lenticualrstone.civilight.domain.world.map.MapEdit
 import io.github.lenticualrstone.civilight.domain.world.map.MapEdits
@@ -30,9 +31,12 @@ object MapCreation {
         return if (w != null && h != null && w > 0 && h > 0) MapSize(w, h) else null
     }
 
-    /** `이미지 가져오기`: an IMAGE map on [blob], kept uncropped at full resolution. */
+    /**
+     * `이미지 가져오기`: an IMAGE map on [blob], kept uncropped at full resolution. (0.2.0, WLD-75) It is
+     * named `지도 N`, the smallest N no live map uses.
+     */
     fun imageMap(doc: ProjectDoc, blob: Blob, ctx: EditContext, parent: MapParent? = null): Created? {
-        val made = MapEdits.newMap(doc, MapBaseKind.IMAGE, ctx, parent = parent) as? MapEdit.Applied ?: return null
+        val made = MapEdits.newMap(doc, MapBaseKind.IMAGE, ctx, name = MapNames.nextDefault(doc), parent = parent) as? MapEdit.Applied ?: return null
         val based = MapEdits.replaceBase(made.doc, made.value.key, blob.hash, sizeOf(blob), ctx) ?: return null
         return Created(withBlob(based, blob), made.value.key)
     }

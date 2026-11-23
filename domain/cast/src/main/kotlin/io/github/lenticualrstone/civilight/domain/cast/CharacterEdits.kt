@@ -42,16 +42,29 @@ object CharacterEdits {
     /**
      * A new character: new key, the next record number (never reused), empty fields, no relations;
      * placed after the last character. Only the name is required.
+     *
+     * (0.2.0, CST-66) The create card also passes [displayNameBase] (stored as the base display name,
+     * with no change record) and [tagKeys] (only live tags are kept). One edit, one undo step.
      */
-    fun create(doc: ProjectDoc, name: String, ctx: EditContext, oneLiner: String? = null): Pair<ProjectDoc, Character> {
+    fun create(
+        doc: ProjectDoc,
+        name: String,
+        ctx: EditContext,
+        oneLiner: String? = null,
+        displayNameBase: String? = null,
+        tagKeys: List<Key> = emptyList(),
+    ): Pair<ProjectDoc, Character> {
         val n = name.trim().nfc()
         require(n.isNotEmpty()) { "character name is empty" }
         val counters = doc.project.counters
+        val live = tags(doc).mapTo(HashSet()) { it.key }
         val character = Character(
             key = ctx.newKey(),
             recordNo = counters.nextCharacterRecordNo,
             name = n,
+            displayNameBase = displayNameBase?.trim()?.nfc()?.takeIf { it.isNotEmpty() },
             oneLiner = oneLiner?.trim()?.nfc()?.takeIf { it.isNotEmpty() },
+            tagKeys = tagKeys.distinct().filter { it in live },
             order = OrderKeys.after(doc.cast.characters.maxOfOrNull { it.order }),
             updatedAt = ctx.now,
             updatedBy = ctx.device,
@@ -91,23 +104,36 @@ object CharacterEdits {
     fun setTags(doc: ProjectDoc, key: Key, tagKeys: List<Key>, ctx: EditContext): ProjectDoc =
         update(doc, key, ctx) { it.copy(tagKeys = tagKeys.distinct()) }
 
-    /** Adds a project tag (names are unique per project: an existing name returns that tag). */
+    /**
+     * Adds a project tag (names are unique among live tags: an existing live name returns that tag).
+     * (0.2.0, N-44) A trashed tag of the same name is not reused; it stays in the trash. New tags of the
+     * create card go through `domain:actions` `TagActions.create` (DECISIONS §1).
+     */
     fun addTag(doc: ProjectDoc, name: String, ctx: EditContext): Pair<ProjectDoc, Tag> {
         val n = name.trim().nfc()
         require(n.isNotEmpty()) { "tag name is empty" }
-        doc.project.tags.firstOrNull { it.name.nfc() == n }?.let { return doc to it }
+        tags(doc).firstOrNull { it.name.nfc() == n }?.let { return doc to it }
         val tag = Tag(ctx.newKey(), n, OrderKeys.after(doc.project.tags.maxOfOrNull { it.order }), ctx.now, ctx.device)
         return doc.copy(project = doc.project.copy(tags = doc.project.tags + tag)) to tag
     }
 
-    /** Project tags in order. */
-    fun tags(doc: ProjectDoc): List<Tag> = doc.project.tags.sortedWith(compareBy<Tag>({ it.order }, { it.key }))
+    /**
+     * Project tags in order. (0.2.0, N-44, CST-75) Live tags only: a trashed tag appears nowhere (no chip,
+     * section, field chip, picker chip or tag search hit) until it is restored.
+     */
+    fun tags(doc: ProjectDoc): List<Tag> = doc.project.tags.filter { it.isLive }.sortedWith(compareBy<Tag>({ it.order }, { it.key }))
+
+    /** (0.2.0, N-44) The live tag of [tagKey], or null when it is gone or in the trash. */
+    fun liveTag(doc: ProjectDoc, tagKey: Key): Tag? = doc.index.tag(tagKey)?.takeIf { it.isLive }
+
+    /** (0.2.0, N-44) Names of the character's live tags, in the character's order. */
+    fun liveTagNames(doc: ProjectDoc, character: Character): List<String> = character.tagKeys.mapNotNull { liveTag(doc, it)?.name }
 
     /** Renames a tag (names stay unique: an existing other tag with the name refuses with null). Keys stay, so nothing else changes. */
     fun renameTag(doc: ProjectDoc, tagKey: Key, name: String, ctx: EditContext): ProjectDoc? {
         val n = name.trim().nfc()
         require(n.isNotEmpty()) { "tag name is empty" }
-        if (doc.project.tags.any { it.key != tagKey && it.name.nfc() == n }) return null
+        if (tags(doc).any { it.key != tagKey && it.name.nfc() == n }) return null
         return doc.copy(
             project = doc.project.copy(
                 tags = doc.project.tags.map { if (it.key == tagKey) it.copy(name = n, updatedAt = ctx.now, updatedBy = ctx.device) else it },

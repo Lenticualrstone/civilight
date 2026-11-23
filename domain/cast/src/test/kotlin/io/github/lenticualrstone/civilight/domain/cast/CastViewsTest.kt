@@ -30,7 +30,7 @@ class CastViewsTest {
     private val ctx = Fx.ctx()
 
     @Test
-    fun `list groups by first tag with chips in tag order`() {
+    fun `list groups by every live tag with chips in tag order`() {
         val view = CastList.build(doc, Fx.LATEST)
         assertEquals("잿빛 새벽의 등불", view.projectName)
         assertEquals("인물", view.title)
@@ -40,7 +40,8 @@ class CastViewsTest {
         assertTrue(view.chips.first().selected)
         assertEquals(listOf("주연", "등불 결사", "하층 구역", "상층"), view.groups.map { it.title })
         assertEquals(listOf("리엔", "하르트", "세라"), view.groups.first().rows.map { it.name })
-        assertEquals(listOf("마르타", "테오"), view.groups[1].rows.map { it.name })
+        // CST-68: a character with several tags is listed under each of them.
+        assertEquals(listOf("리엔", "세라", "마르타", "테오"), view.groups[1].rows.map { it.name })
         assertEquals("이름 · 초성 · 태그로 찾기", view.searchHint)
         assertNull(view.lockRow)
         assertNull(view.empty)
@@ -68,7 +69,7 @@ class CastViewsTest {
     @Test
     fun `search by name, 초성 and tag`() {
         // 초성 match anywhere in the name: 리엔, and 엘리오 (`리오`).
-        assertEquals(listOf("리엔", "엘리오"), CastList.build(doc, Fx.LATEST, query = "ㄹㅇ").rows.map { it.name })
+        assertEquals(listOf("리엔", "엘리오"), CastList.build(doc, Fx.LATEST, query = "ㄹㅇ").rows.map { it.name }.distinct())
         assertEquals(listOf("리엔"), CastList.build(doc, Fx.LATEST, query = "ㄹㅇ", selectedTag = K.TAG_LEAD).rows.map { it.name })
         assertEquals(listOf("오웬", "도르", "고든"), CastList.build(doc, Fx.LATEST, query = "하층").rows.map { it.name })
         val none = CastList.build(doc, Fx.LATEST, query = "없는 이름")

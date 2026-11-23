@@ -51,6 +51,15 @@ data class UndoStack(
         return copy(undo = (undo + entry).takeLast(limit), redo = emptyList())
     }
 
+    /**
+     * (0.2.0) Applies a write that is not an undo step to every kept step too, so a later undo or redo never
+     * reverts it. A step whose document the write cannot apply to (it throws) is kept as it was.
+     */
+    fun patch(transform: (ProjectDoc) -> ProjectDoc): UndoStack {
+        fun UndoEntry.patched(): UndoEntry = runCatching { copy(doc = transform(doc).copy()) }.getOrDefault(this)
+        return copy(undo = undo.map { it.patched() }, redo = redo.map { it.patched() })
+    }
+
     /** Steps back from [current]; null when there is nothing to undo. */
     fun undo(current: ProjectDoc): Pair<UndoStack, UndoEntry>? {
         val entry = undo.lastOrNull() ?: return null

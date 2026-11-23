@@ -66,6 +66,24 @@ internal class SettingsViewModel(private val services: LibraryServices) : ViewMo
     /** The choices of a 지도 · 이미지 · 연표 value picker, as stored now. */
     fun options(value: MoreValue): List<ValueOption> = DisplaySettingsState.options(value, deps.settings.value)
 
+    /**
+     * (0.2.0, LIB-94) A `서재 보기` or `카드 보기` pick applies at once. The store's setter also turns that
+     * screen's head toggle to the 3D view (a `목록` pick leaves it), so the choice is visible on return.
+     */
+    fun chooseView(kind: ViewKind, id: String) {
+        viewModelScope.launch {
+            when (kind) {
+                ViewKind.LIBRARY -> ViewStyles.libraryStyleOf(id)?.let { settingsStore.setLibraryStyle(it) }
+                ViewKind.CARD -> ViewStyles.cardStyleOf(id)?.let { settingsStore.setCastCardStyle(it) }
+            }
+        }
+    }
+
+    /** (0.2.0, LIB-94) `TODO_COPY_LIB_VIEW_TILT`. */
+    fun setViewTilt(on: Boolean) {
+        viewModelScope.launch { settingsStore.setViewTilt(on) }
+    }
+
     fun setLayout(layout: UnfoldedLayout) {
         viewModelScope.launch { settingsStore.setUnfoldedLayout(layout) }
     }

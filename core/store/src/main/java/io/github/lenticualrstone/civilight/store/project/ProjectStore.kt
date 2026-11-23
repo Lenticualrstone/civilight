@@ -122,6 +122,34 @@ class ProjectStore internal constructor(
         }
     }
 
+    /**
+     * (0.2.0) A content write that is no undo step and that a later undo or redo does not revert: [transform]
+     * also runs on every kept step ([UndoStack.patch]). For settings the spec keeps out of undo (`게임 제작 도구`,
+     * `용어 후보`, `이 탭 잠그기`) and for what an export writes after its save (`내보낸 판`, fixed voice IDs).
+     * Without [carry], [transform] itself runs on each kept step, so it must be a plain field write that makes
+     * sense on an older document. A write derived from the current text (an export's `내보낸 판`) passes [carry]
+     * instead: it gets each kept step with the live document before and after [transform], and carries only
+     * that difference over. Returns the new document.
+     *
+     * @throws ReadOnlyProjectException for a read-only project.
+     */
+    suspend fun updateWithoutUndo(
+        carry: ((step: ProjectDoc, before: ProjectDoc, after: ProjectDoc) -> ProjectDoc)? = null,
+        transform: (ProjectDoc) -> ProjectDoc,
+    ): ProjectDoc {
+        if (readOnly) throw ReadOnlyProjectException(key)
+        return editing.withLock {
+            checkOpen()
+            val before = _doc.value
+            val after = transform(before)
+            require(after.project.key == key) { "an edit cannot change the project key" }
+            if (after == before) return@withLock before
+            _undo.value = _undo.value.patch(if (carry == null) transform else { step -> carry(step, before, after) })
+            commitInMemory(after, contentChanged = true)
+            after
+        }
+    }
+
     /** Changes app-only state (`_app/…`: last position, lens, view state). No undo step; allowed when read-only. */
     suspend fun updateApp(transform: (ProjectAppState) -> ProjectAppState) {
         editing.withLock {

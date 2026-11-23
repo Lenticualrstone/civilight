@@ -322,7 +322,7 @@ class CustomFieldsTest {
     @Test
     fun `TC-F-17 list row composition`() {
         assertEquals("17세 · 등불 결사 · 막내 등불지기", Profile.listSubtitle(doc, K.RIEN, Fx.LATEST))
-        val row = CastList.build(doc, Fx.LATEST).rows.single { it.key == K.RIEN }
+        val row = CastList.build(doc, Fx.LATEST).rows.first { it.key == K.RIEN }
         assertEquals("1-2", row.firstAppearance)
         assertEquals("리", row.initial)
     }

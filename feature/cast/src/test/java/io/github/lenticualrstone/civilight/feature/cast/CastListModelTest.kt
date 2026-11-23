@@ -33,7 +33,7 @@ class CastListModelTest {
     @Test
     fun `TC-F-17 list row of 리엔 at 최신`() {
         val state = CastListModel.build(doc, CastListUi(), hiddenUnlocked = false, readOnly = false)
-        val rien = state.view.rows.single { it.key == K.RIEN }
+        val rien = state.view.rows.first { it.key == K.RIEN }
         assertEquals("17세 · 등불 결사 · 막내 등불지기", rien.subtitle)
         assertEquals("1-2", rien.firstAppearance)
         assertEquals("리", rien.initial)
@@ -43,14 +43,14 @@ class CastListModelTest {
     fun `TC-13-17 list rows carry no relation text`() {
         val rows = CastListModel.build(doc, CastListUi(), hiddenUnlocked = false, readOnly = false).view.rows
         for (word in listOf("경계", "보호", "선배", "후배", "거래 상대")) {
-            assertFalse(word, rows.single { it.key == K.RIEN }.subtitle.contains(word))
+            assertFalse(word, rows.first { it.key == K.RIEN }.subtitle.contains(word))
         }
     }
 
     @Test
     fun `CST-11 하르트 row carries the display-name note`() {
         val state = CastListModel.build(doc, CastListUi(), hiddenUnlocked = false, readOnly = false)
-        val hart = state.view.rows.single { it.key == K.HART }
+        val hart = state.view.rows.first { it.key == K.HART }
         assertTrue(hart.subtitle, hart.subtitle.contains("표시 이름 ??? (1-8까지)"))
     }
 
@@ -108,19 +108,20 @@ class CastListModelTest {
         assertTrue(none.view.noResults)
         val closed = CastListModel.stopSearch(typing)
         assertEquals("", closed.query)
-        assertEquals(11, CastListModel.build(doc, closed, false, false).view.rows.size)
+        // CST-68: a character with several tags is listed once per tag; `전체 11` counts each once.
+        assertEquals(11, CastListModel.build(doc, closed, false, false).view.rows.map { it.key }.distinct().size)
     }
 
     @Test
     fun `a query left over outside the typing state does not filter`() {
         val stale = CastListUi(query = "ㄹㅇ", searching = false)
-        assertEquals(11, CastListModel.build(doc, stale, false, false).view.rows.size)
+        assertEquals(11, CastListModel.build(doc, stale, false, false).view.rows.map { it.key }.distinct().size)
     }
 
     @Test
     fun `values follow the stored lens`() {
         val past = doc.atLens(LensPoint.UnitEnd(K.EPISODE_1_2))
-        val rien = CastListModel.build(past, CastListUi(), false, false).view.rows.single { it.key == K.RIEN }
+        val rien = CastListModel.build(past, CastListUi(), false, false).view.rows.first { it.key == K.RIEN }
         assertFalse("소속 is 없음 before 1-3", rien.subtitle.contains("등불 결사"))
     }
 

@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.map.view
 
+import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -149,8 +150,6 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
         title = ui?.title.orEmpty(),
         smallLine = ui?.small,
         back = mapBack(deps),
-        lens = d?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
         actions = { CivilightIconButton(IconId.More, MapCopy.MORE, { sheets.open(MapMoreSheet) }) },
         sheets = sheets,
         localSheets = { key ->
@@ -160,7 +159,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                     MapMoreContent(
                         rows = map?.let { MapMenu.rows(it, MapMenuScreen.VIEW) }.orEmpty(),
                         onRow = { action -> close(); menu.onRow(action, d) },
-                        canScale = map != null && !MapScales.isNodeMap(map),
+                        canScale = map != null && MapOffers.showsScale(map),
                         defaultSize = settings.largeMapExport,
                         exporting = exporter.exporting,
                         onScale = { close(); deps.navigator.push(MapScaleRoute(route.projectKey, route.mapKey)) },
@@ -209,7 +208,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
             }
             val moving = state.moving
             val place = state.place
-            val scale = d?.maps?.get(route.mapKey)?.let { ScaleBars.label(d, it, contentWidth, barPx) } ?: state.scale
+            val scale = d?.maps?.get(route.mapKey)?.takeIf(MapOffers::showsScale)?.let { ScaleBars.label(d, it, contentWidth, barPx) } ?: state.scale
             FoldSwitch(inner) { isInner ->
                 val kind = MapBars.view(moving != null, place != null, isInner)
                 val bar = ViewBar(state, readOnly, scale)
@@ -228,7 +227,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                             modifier = Modifier.padding(16.dp).fillMaxWidth(),
                         )
                         pl != null && k == MapBars.PLACE -> PlacePanel(
-                            place = pl, inner = false, readOnly = b.readOnly,
+                            place = pl, inner = false, readOnly = b.readOnly, canMove = b.state.canMovePin, showsAssets = b.state.showsAssets,
                             onClose = { selectedPin = null },
                             onMove = { movingPin = pl.pinKey; movingTo = null },
                             onOpenCard = { deps.navigator.push(PlaceCard(route.projectKey, pl.placeKey)) },
@@ -249,7 +248,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                     val side = place?.takeIf { moving == null }?.let { MapBarSlot(MapBars.PLACE, it) }
                     MapBar(side, Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 40.dp, end = 16.dp).width(270.dp), alignment = Alignment.TopCenter) { _, pl ->
                         PlacePanel(
-                            place = pl, inner = true, readOnly = readOnly,
+                            place = pl, inner = true, readOnly = readOnly, canMove = state.canMovePin, showsAssets = state.showsAssets,
                             onClose = { selectedPin = null },
                             onMove = { movingPin = pl.pinKey; movingTo = null },
                             onOpenCard = { deps.navigator.push(PlaceCard(route.projectKey, pl.placeKey)) },
@@ -284,7 +283,7 @@ private fun BottomTools(
             state.chips.forEach { chip -> FilterChip(chip.label, chip.selected, { onChip(chip.layerKey) }) }
             state.styleChip?.let { LayerFlagChip(MapCopy.STYLE, it, onStyle) }
             if (state.canReplaceBase) FilterChip(MapCopy.BTN_REPLACE_BASE, false, onReplaceBase, enabled = !readOnly)
-            FilterChip(MapCopy.BTN_EDIT, false, onEdit, enabled = !readOnly)
+            if (state.canEdit) FilterChip(MapCopy.BTN_EDIT, false, onEdit, enabled = !readOnly)
         }
     }
 }
@@ -295,6 +294,8 @@ private fun PlacePanel(
     place: PlacePanelUi,
     inner: Boolean,
     readOnly: Boolean,
+    canMove: Boolean,
+    showsAssets: Boolean,
     onClose: () -> Unit,
     onMove: () -> Unit,
     onOpenCard: () -> Unit,
@@ -314,14 +315,14 @@ private fun PlacePanel(
         if (place.description.isNotBlank()) CivilightText(place.description, type.body, maxLines = 4)
         CardRow(MapCopy.APPEARANCE, place.appearance)
         if (inner && place.parentName != null) CardRow(MapCopy.REGION_OF_PLACE, place.parentName)
-        CardRow(MapCopy.BACKGROUND_ASSETS, place.backgroundAssets.toString())
+        if (showsAssets) CardRow(MapCopy.BACKGROUND_ASSETS, place.backgroundAssets.toString())
         place.childMaps.forEach { (key, name) -> CardRow(MapCopy.CHILD_MAP, name, onClick = { onChildMap(key) }) }
         ButtonRow(Modifier.padding(top = 4.dp)) {
             if (inner) {
                 CivilightButton(MapCopy.BTN_PLACE_CARD, onOpenCard, Modifier.weight(1f))
-                CivilightButton(MapCopy.BTN_MOVE_PIN, onMove, Modifier.weight(1f), variant = ButtonVariant.GHOST, enabled = !readOnly)
+                if (canMove) CivilightButton(MapCopy.BTN_MOVE_PIN, onMove, Modifier.weight(1f), variant = ButtonVariant.GHOST, enabled = !readOnly)
             } else {
-                CivilightButton(MapCopy.BTN_MOVE_PIN, onMove, Modifier.weight(1f), variant = ButtonVariant.GHOST, enabled = !readOnly)
+                if (canMove) CivilightButton(MapCopy.BTN_MOVE_PIN, onMove, Modifier.weight(1f), variant = ButtonVariant.GHOST, enabled = !readOnly)
                 CivilightButton(MapCopy.BTN_OPEN_PLACE_CARD, onOpenCard, Modifier.weight(1f))
             }
         }

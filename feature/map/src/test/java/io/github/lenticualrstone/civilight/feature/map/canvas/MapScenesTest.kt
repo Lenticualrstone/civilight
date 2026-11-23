@@ -40,18 +40,21 @@ class MapScenesTest {
     }
 
     @Test
-    fun `routes follow their pins and carry the map chip`() {
+    fun `WLD-75 routes are kept but not drawn, their domain chip is unchanged`() {
         val scene = MapScenes.build(doc, lower, LensPoint.Latest, false, SceneMode.VIEW)
-        val route = scene.routes.first { it.key == K.ROUTE_GATE_TO_UPPER_GATE }
-        assertEquals(Point(0.20f, 0.40f), route.points.first())
-        assertEquals("결사의 문 → 상층 관문 · 도보 2일 4시간 · 38 km", route.label)
+        assertTrue(scene.routes.isEmpty())
+        val route = lower.routes.first { it.key == K.ROUTE_GATE_TO_UPPER_GATE }
+        assertEquals(Point(0.20f, 0.40f), io.github.lenticualrstone.civilight.domain.world.map.Routes.points(lower, route).first())
+        assertEquals("결사의 문 → 상층 관문 · 도보 2일 4시간 · 38 km", io.github.lenticualrstone.civilight.domain.world.map.Routes.sheet(doc, lower, route).mapLabel)
         assertEquals("하층 구역", scene.labels.single().text)
     }
 
     @Test
     fun `a layer filter keeps only that layer`() {
         val scene = MapScenes.build(doc, lower, LensPoint.Latest, false, SceneMode.VIEW, layerFilter = K.mapLayer(2))
-        assertEquals(2, scene.routes.size)
+        // (0.2.0, WLD-75) The layer's two routes are kept in the map but not drawn.
+        assertEquals(2, lower.routes.count { it.layerKey == K.mapLayer(2) })
+        assertTrue(scene.routes.isEmpty())
         assertTrue(scene.pins.isEmpty())
         assertTrue(scene.regions.isEmpty())
     }

@@ -73,7 +73,8 @@ class PanelAndRowsTest {
 
     @Test
     fun `SCR-08 a direction row reads its cues`() {
-        assertEquals("▸ 배경 하층 거리(새벽) ♪ 잔불", block(K.BLOCK_041).text)
+        // SCR-08 (0.2.0, T-U14-12): cues joined with two spaces.
+        assertEquals("▸ 배경 하층 거리(새벽)  ♪ 잔불", block(K.BLOCK_041).text)
         assertFalse(block(K.BLOCK_041).isText)
     }
 

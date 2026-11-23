@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.domain.cast.field
 
+import io.github.lenticualrstone.civilight.model.game.GameTools
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
 import io.github.lenticualrstone.civilight.domain.cast.DisplayNames
 import io.github.lenticualrstone.civilight.domain.cast.FirstAppearance
@@ -125,7 +126,8 @@ object Profile {
             if (settings.showFirstAppearanceInHeader) {
                 FirstAppearance.label(doc, characterKey)?.let { add(FieldRow("첫 등장", it)) }
             }
-            if (settings.showVoiceProgressInHeader) {
+            // (0.2.0, CST-74) The 보이스 row belongs to the game tools: hidden while they are off, the setting kept.
+            if (settings.showVoiceProgressInHeader && GameTools.on(doc)) {
                 val p = VoiceLines.progress(doc, characterKey)
                 if (p.total > 0) add(FieldRow("보이스", p.text))
             }

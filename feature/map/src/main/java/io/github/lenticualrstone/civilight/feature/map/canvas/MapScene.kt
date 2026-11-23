@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.map.canvas
 
+import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
 import io.github.lenticualrstone.civilight.domain.world.map.MapReveal
 import io.github.lenticualrstone.civilight.domain.world.map.OverlayKind
 import io.github.lenticualrstone.civilight.domain.world.map.RegionShapes
@@ -129,7 +130,8 @@ object MapScenes {
             val dim = dimOf(r.key, r.layerKey) ?: return@mapNotNull null
             SceneRegion(r.key, r.name, r.color, RegionShapes.shapeAt(doc, map.key, r, lens), dim)
         }
-        val routes = map.routes.mapNotNull { r ->
+        // (0.2.0, WLD-75) Routes are hidden: kept in the map, never drawn.
+        val routes = if (!MapOffers.DRAWS_ROUTES) emptyList() else map.routes.mapNotNull { r ->
             val dim = dimOf(r.key, r.layerKey) ?: return@mapNotNull null
             val points = Routes.points(map, r)
             if (points.size < 2) return@mapNotNull null

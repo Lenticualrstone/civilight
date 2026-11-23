@@ -53,6 +53,17 @@ object WorldCardRows {
     fun withView(viewByScreen: Map<String, ViewMode>, tab: WorldTab, cards: Boolean): Map<String, ViewMode> =
         viewByScreen + (screenId(tab) to if (cards) ViewMode.CARD else ViewMode.LIST)
 
+    /**
+     * The lines card view keeps as list lines: the lock and empty lines, and (0.2.0, WLD-73) the `용어 후보 · N`
+     * section with its rows, which stays a list.
+     */
+    fun cardViewLines(items: List<WorldListItem>): List<WorldListItem> {
+        val firstCandidate = items.indexOfFirst { it is WorldListItem.CandidateRow }
+        val tail = if (firstCandidate <= 0) emptyList() else items.subList(firstCandidate - 1, items.size)
+            .filter { it is WorldListItem.CandidateRow || it is WorldListItem.Section }
+        return items.filter { it is WorldListItem.Lock || it is WorldListItem.Empty } + tail
+    }
+
     /** Groups the list's rows under their sections; lock and empty lines are left to the list. */
     fun build(doc: ProjectDoc, items: List<WorldListItem>): List<WorldCardRowUi> {
         val out = ArrayList<WorldCardRowUi>()

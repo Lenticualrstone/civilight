@@ -38,12 +38,15 @@ object PageEdits {
         doc.pages.values.filter { it.deletedAt == null }.sortedWith(compareBy<Page>({ it.order }, { it.key }))
 
     /** A new empty page after the others (CNV-14 [PROPOSED]); it opens straight into editing. */
-    fun create(doc: ProjectDoc, ctx: EditContext): Pair<ProjectDoc, Key> {
+    fun create(doc: ProjectDoc, ctx: EditContext): Pair<ProjectDoc, Key> = create(doc, "", ctx)
+
+    /** U-15.9: a new page named [name] from the create card (`이름` only) after the others. */
+    fun create(doc: ProjectDoc, name: String, ctx: EditContext): Pair<ProjectDoc, Key> {
         val key = ctx.newKey()
         val page = Page(
             key = key,
             order = OrderKeys.after(doc.pages.values.maxOfOrNull { it.order }),
-            name = "",
+            name = name.trim().nfc(),
             createdAt = ctx.now,
             updatedAt = ctx.now,
             updatedBy = ctx.device,

@@ -83,7 +83,7 @@ class ShellRulesTest {
         assertEquals(TaskLabel.APP_NAME, hidden.taskLabel)
         val masked = WindowProtection.forProject(Protections(captureBlock = true, nameMask = true))
         assertTrue(masked.secure)
-        assertEquals("R-18 프로젝트", masked.taskLabel?.text)
+        assertEquals("이름 가림", masked.taskLabel?.text)
         assertTrue(WindowProtection.forProject(Protections()).isNone)
         assertEquals(TaskLabel.APP_NAME, (masked + hidden).taskLabel)
     }

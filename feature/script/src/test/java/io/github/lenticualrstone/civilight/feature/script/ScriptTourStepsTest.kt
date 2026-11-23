@@ -19,15 +19,16 @@ class ScriptTourStepsTest {
     }
 
     @Test
-    fun `the read-only example leaves the command step out, a writable script keeps all three`() {
-        // Emulator QA round 2: the example draws `예시 홈으로 · 온보딩 끝내기` where `명령 칸` would be.
+    fun `the command step is left out everywhere in 0_2_0`() {
+        // Emulator QA round 2: the example draws `예시 홈으로 · 온보딩 끝내기` where `명령 칸` would be; (0.2.0 LIB-96)
+        // U-14 removed the command bar and its mic, so a writable script leaves the step out too.
         assertEquals(setOf(ScriptTourSteps.COMMAND), ScriptTourSteps.absent(readOnly = true))
-        assertEquals(emptySet<Int>(), ScriptTourSteps.absent(readOnly = false))
+        assertEquals(setOf(ScriptTourSteps.COMMAND), ScriptTourSteps.absent(readOnly = false))
         assertEquals(
             listOf(ScriptTourSteps.BLOCK, ScriptTourSteps.HEAD),
             TourStepFilter.shown(ScriptTourSteps.COUNT, ScriptTourSteps.absent(readOnly = true)),
         )
-        assertEquals(listOf(0, 1, 2), TourStepFilter.shown(ScriptTourSteps.COUNT, ScriptTourSteps.absent(readOnly = false)))
+        assertEquals(listOf(1, 2), TourStepFilter.shown(ScriptTourSteps.COUNT, ScriptTourSteps.absent(readOnly = false)))
     }
 
     @Test
@@ -41,7 +42,8 @@ class ScriptTourStepsTest {
     fun `a row step with no row on screen leaves the tour`() {
         assertEquals(emptySet<Int>(), ScriptTourSteps.missing("block:a", "head:1", readOnly = false))
         assertEquals(setOf(ScriptTourSteps.HEAD), ScriptTourSteps.missing("block:a", null, readOnly = true))
-        assertEquals(setOf(ScriptTourSteps.BLOCK, ScriptTourSteps.HEAD), ScriptTourSteps.missing(null, null, readOnly = false))
+        // (0.2.0) With `명령 칸` always absent, no rows on screen would leave nothing: the guard keeps both.
+        assertEquals(emptySet<Int>(), ScriptTourSteps.missing(null, null, readOnly = false))
         // Never every step: the read-only script with no rows keeps them (guard against a tour that blinks).
         assertEquals(emptySet<Int>(), ScriptTourSteps.missing(null, null, readOnly = true))
     }

@@ -2,7 +2,6 @@ package io.github.lenticualrstone.civilight.domain.library.export
 
 import io.github.lenticualrstone.civilight.domain.library.common.UnitCodes
 import io.github.lenticualrstone.civilight.domain.library.format.RecorderSlice
-import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.ExportFormat
 import io.github.lenticualrstone.civilight.model.app.ExportOptions
@@ -71,7 +70,18 @@ sealed interface ExportRow {
         override val label: String get() = "휴지통도 포함"
     }
 
+    /**
+     * (0.2.0, LIB-97, N-29) `.civilight` only: `TODO_COPY_LIB_EXPORT_VERSIONS` switch, shown only when the
+     * project has at least one episode version; on → `versions/` is written.
+     */
+    data class IncludeVersions(val on: Boolean) : ExportRow {
+        override val label: String get() = TODO_COPY_LIB_EXPORT_VERSIONS
+    }
+
     companion object {
+        /** LIB-97 row label, interim `지난 판도 포함` (pattern of `휴지통도 포함`; `지난 판` is N-29 copy). */
+        const val TODO_COPY_LIB_EXPORT_VERSIONS = "지난 판도 포함"
+
         /** The warning line under the password fields (`RHRecoveryPw` pattern `잊으면 … 열 수 없음`). */
         const val PASSWORD_WARNING = "잊으면 파일을 열 수 없음"
 
@@ -146,9 +156,11 @@ object ExportSheets {
             val slice = RecorderSlice.select(recorder, doc.key, doc.project.protections.hidden, options.encrypt)
             if (slice.linkedCount > 0) rows += ExportRow.RecorderRecords(slice.linkedCount, options.includeRecorderAudio, slice.excludedHidden)
             rows += ExportRow.IncludeTrash(options.includeTrash)
+            if (hasVersions(doc)) rows += ExportRow.IncludeVersions(options.includeVersions)
         }
         return ExportSheet(
-            sub = "${doc.project.name} · ${RatingLabels.badge(doc.project.rating)}",
+            // (0.2.0, LIB-92) No rating badge in the sub.
+            sub = doc.project.name,
             format = format,
             rows = rows,
             warnings = warnings,
@@ -160,6 +172,9 @@ object ExportSheets {
             },
         )
     }
+
+    /** (0.2.0, LIB-97) Whether [doc] holds at least one episode version (the versions row shows only then). */
+    fun hasVersions(doc: ProjectDoc): Boolean = doc.versions.values.any { it.versions.isNotEmpty() }
 
     /**
      * `범위` value: a top-level unit reads `<n><level> 전체` (`1장 전체`); a deeper one

@@ -72,8 +72,8 @@ object ModuleTours {
             TourStep("설정 › 숨기기", "위젯 · 최근 항목 · 검색에서 빠짐"),
         )
         TourModule.MAP -> listOf(
-            TourStep("도구 줄", "이동 · 핀 · 영역 · 경로 · 라벨 · 레이어 · 고른 것만 동작"),
-            TourStep("경로", "거리 · 이동 수단 → 걸리는 날"),
+            // (0.2.0 S-3) No `경로` step and no `경로` tool: routes, scale and travel modes are hidden.
+            TourStep("도구 줄", "이동 · 핀 · 영역 · 라벨 · 레이어 · 고른 것만 동작"),
             TourStep("보이는 시점", "이 시점부터 지도에 나옴 · 쓰인 곳"),
         )
         TourModule.ROUTE_PLACE_TIME -> listOf(
@@ -84,6 +84,13 @@ object ModuleTours {
             TourStep("인물 동선", "씬 순서대로 지도 위에"),
         )
     }
+
+    /**
+     * (0.2.0, LIB-96, S-9) The tours the app offers (`도움말 · 안내 다시 보기` rows and first entry). Left out:
+     * `인물 동선 · 장소와 때` (인물 동선 and routes are hidden by S-3) and `지도 만들기` (LIB-96 lists it with the
+     * map tools S-3 hides). Their seen flags are kept.
+     */
+    val offered: List<TourModule> get() = TourModule.entries - TourModule.ROUTE_PLACE_TIME - TourModule.MAP
 
     /**
      * How many steps [module] lists. The tour on screen can run fewer (a step its screen has nothing

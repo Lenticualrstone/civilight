@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.card
 
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -144,7 +145,7 @@ fun LockedCard(count: Int, inner: Boolean, onUnlock: () -> Unit, modifier: Modif
             CivilightIcon(IconId.Lock, null, size = 22.dp, tint = colors.ink2)
             CivilightText(CardCopy.hiddenProjects(count), type.title.merge(TextStyle(fontSize = 20.sp, lineHeight = 26.sp)), color = colors.ink)
             CivilightText(CardCopy.LOCKED_SUB, type.small, color = colors.ink3)
-            CivilightButton(CardCopy.BTN_UNLOCK, onUnlock, Modifier.padding(top = 6.dp).fillMaxWidth(), variant = ButtonVariant.PRIMARY)
+            CivilightButton(CardCopy.BTN_UNLOCK, onUnlock, Modifier.padding(top = 6.dp).fillMaxWidth(), variant = ButtonVariant.PRIMARY, icon = IconButtonSpec.SHOW_WITH_FINGERPRINT.icon)
         }
     }
 }

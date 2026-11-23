@@ -41,7 +41,7 @@ object TagSettingsModel {
     /** A new name is usable when it is not blank and no other tag has it (NFC). */
     fun canName(doc: ProjectDoc, name: String, except: Key? = null): Boolean {
         val n = name.trim().nfc()
-        return n.isNotEmpty() && doc.project.tags.none { it.key != except && it.name.nfc() == n }
+        return n.isNotEmpty() && CharacterEdits.tags(doc).none { it.key != except && it.name.nfc() == n }
     }
 
     /**
@@ -50,12 +50,8 @@ object TagSettingsModel {
      */
     fun rename(doc: ProjectDoc, key: Key, name: String, ctx: EditContext): ProjectDoc? {
         val n = name.trim().nfc()
-        val tag = doc.project.tags.firstOrNull { it.key == key } ?: return null
+        val tag = CharacterEdits.liveTag(doc, key) ?: return null
         if (n.isEmpty() || tag.name == n || !canName(doc, n, except = key)) return null
         return CharacterEdits.renameTag(doc, key, n, ctx)
     }
-
-    /** `넣기`: a new tag at the end; null when the name is not usable. */
-    fun add(doc: ProjectDoc, name: String, ctx: EditContext): ProjectDoc? =
-        if (!canName(doc, name)) null else CharacterEdits.addTag(doc, name, ctx).first
 }

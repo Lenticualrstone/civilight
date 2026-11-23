@@ -138,15 +138,18 @@ fun LibrarySearchScreen(route: LibrarySearch, deps: FeatureDeps) {
 
     Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg.copy(alpha = SCRIM)), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.widthIn(max = 560.dp).fillMaxSize().statusBarsPadding().imePadding().padding(horizontal = 16.dp)) {
-            SearchField(
-                value = field,
-                onValueChange = {
-                    field = it
-                    vm.setQuery(it.text)
-                },
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp).focusRequester(focus),
-                onClose = { navigator.pop() },
-            )
+            // DS-70 A5: the close is icon only, read `찾기 닫기`.
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                SearchField(
+                    value = field,
+                    onValueChange = {
+                        field = it
+                        vm.setQuery(it.text)
+                    },
+                    modifier = Modifier.weight(1f).focusRequester(focus),
+                    onClose = { navigator.pop() },
+                )
+            }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 LibrarySearchModel.filters.forEach { f -> FilterChip(f.word, f == filter, { filterName = f.name }) }
             }
@@ -193,6 +196,14 @@ object SearchCopy {
 
     /** The same from the project gallery (GAL-04, GAL-10). */
     const val ALL_GALLERIES_FIND = "모든 갤러리 · 제목 · 설명 · 태그"
+
+    /** (0.2.0, N-13) `그 밖 ▾` (picks `장소 · 세력 · 사건 · 페이지`) and `화자 ▾` under `대사`; a picked value reads `장소 ▾`. */
+    const val MORE = "그 밖"
+    const val SPEAKER = "화자"
+    const val CHEVRON = " ▾"
+
+    /** First row of the `화자 ▾` sheet: every speaker (the chip's own word under `대사`). */
+    const val ALL_SPEAKERS = "전체"
 }
 
 private const val SCRIM = 0.82f

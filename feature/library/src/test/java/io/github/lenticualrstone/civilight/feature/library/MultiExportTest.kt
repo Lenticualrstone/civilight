@@ -6,6 +6,9 @@ import io.github.lenticualrstone.civilight.domain.library.hiding.HiddenItems
 import io.github.lenticualrstone.civilight.feature.library.backup.RecoveryPasswordState
 import io.github.lenticualrstone.civilight.feature.library.export.ExportFormRules
 import io.github.lenticualrstone.civilight.feature.library.export.MultiExport
+import io.github.lenticualrstone.civilight.feature.library.export.ExportCopy
+import io.github.lenticualrstone.civilight.domain.library.rating.RatingLabels
+import io.github.lenticualrstone.civilight.model.project.Rating
 import io.github.lenticualrstone.civilight.feature.library.openfile.OpenFileFlow
 import io.github.lenticualrstone.civilight.feature.library.openfile.OpenStage
 import io.github.lenticualrstone.civilight.model.app.ExportFormat
@@ -37,6 +40,21 @@ class MultiExportTest {
         assertEquals(files[1].fileName.removeSuffix(".civilight") + " (2).civilight", files[2].fileName)
         assertEquals(listOf(true, true, true), MultiExport.rows(docs, picked).map { it.checked })
         assertEquals(2, MultiExport.files(docs, MultiExport.toggle(picked, ashen.key), now, zone).size)
+    }
+
+    @Test
+    fun `LIB-92 S-4 no rating badge on the checklist rows`() {
+        val ashen = LibFx.ashen()
+        val oath = LibFx.oath()
+        val rows = MultiExport.rows(listOf(ashen, oath), setOf(ashen.key, oath.key))
+        val badges = Rating.entries.map { RatingLabels.badge(it) }
+        rows.forEach { row ->
+            val text = listOfNotNull(row.title, row.subtitle).joinToString(" ")
+            badges.forEach { assertFalse("$text shows $it", text.contains(it)) }
+            assertFalse(text, text.contains("R-1"))
+        }
+        // The R-18 project still locks by default (D34); a plain one has no sub-line.
+        assertEquals(listOf(null, ExportCopy.PASSWORD), rows.map { it.subtitle })
     }
 
     @Test

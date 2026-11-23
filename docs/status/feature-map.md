@@ -9,6 +9,9 @@ Package `io.github.lenticualrstone.civilight.feature.map`. Build and tests: `too
   - Batch 2: `map/TravelModeEdits.kt`, `map/LayerOrder.kt`, `map/MapNesting.kt`, `map/NodeEdits.kt`, tested by `MapAuthoringTest` (WLD-45, 47, 48, 50).
   - Batch 3: `map/HexEdits.kt` (`줄` line, `paintCells`, `setOrientation`, `setCoordEvery`, `infoLine`) and `map/DetailEdits.kt` (author lines, line points flagged author-edited, stamps that attach to the river or road under them, `moveStamp`, `stampChip`), tested by `MapFormatEditsTest` (WLD-58, 60).
 
+
+**0.2.0 (2026-11-24):** maps are simplified per S-3 / WLD-75 (`common/MapOffers.kt`, `common/HiddenRoute.kt`); see `feature-world.md` › `0.2.0 wave 2` for what was built, hidden and requested.
+
 ## Motion wave (0.1.0, 2026-11-23)
 
 Motion audit §4 "feature:map", most visible first, through the shared helpers only (`motion.swap` / `move` / `enter` / `exit`, `ContentSwap`, `FoldReveal`, `civilightItem`, `animatedFraction` / `animatedAlpha` / `animatedColor`, `rememberUnhide`, `SidePanelHost`, `TabContent`, `SnapCardRow`). No duration or curve literal is left in the module: `MapMotionLintTest` runs `MotionLint.lintModule` and passes. Build line: `tools/gw :feature:map:compileDebugKotlin :feature:map:testDebugUnitTest` exits 0, 188 tests, nothing run on a device or emulator, so **every row below is partial until the orchestrator sees it on the emulator**. `domain:world` was not touched in this wave.
@@ -390,3 +393,7 @@ Earlier batches:
 - **Story lane (bulk 장소 정하기, WLD-52)**: the inner `장소별 씬 수` overlay needs the count per place of the selected scenes; `PickOnMap` carries only one `sceneCount`. If the bulk table needs it, add the scene keys (or a request key the map can read them from) to the route.
 - **app / merged manifest check**: `feature/map/src/main/AndroidManifest.xml` declares `MapSketchFileProvider` (authority `${applicationId}.map.sketch`, not exported; cache paths `map_sketch/` for the WLD-39 camera and `map_export/` for WLD-51 shares). Please confirm it in the merged manifest when APK builds resume. If any module ever declares the `CAMERA` permission, `ACTION_IMAGE_CAPTURE` will need it granted at run time.
 - **FEATURES.md**: mark WLD-36 … 55 as partial (this lane may not edit it).
+
+## 0.2.0 integration (wave 2, orchestrator)
+
+Applied: NodeMap command-bar mic removed (S-8); `지도 만들기` tour no longer offered (LIB-96), MAP tour copy has no `경로` step.

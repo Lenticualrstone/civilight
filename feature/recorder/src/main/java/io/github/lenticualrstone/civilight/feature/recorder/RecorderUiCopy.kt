@@ -49,8 +49,11 @@ object RecorderUiCopy {
     /** Title of the scene list behind `씬 고르기 ›` (the row's words without the chevron). */
     const val PICK_SCENE_TITLE = "씬 고르기"
 
-    /** Title of the biometric prompt when an R-18 project is chosen as a 넣기 destination (`ED`: the shared mask label). */
-    const val R18_PROMPT = "R-18 프로젝트"
+    /**
+     * Title of the biometric prompt when a protected (stored R-18, D34) project is chosen as a 넣기 destination.
+     * TODO_COPY_LRC_R18_PROMPT: interim is the masked-name label (S-4 shows no rating anywhere; LRC-50).
+     */
+    const val PROTECTED_PROMPT = RecorderCopy.MASKED_NAME
 
     /** Placeholder of the card search in `카드에 넣기` (LRC-35; `ED`: the picker's own). */
     const val CARD_SEARCH = PickerCopy.SEARCH_PLACEHOLDER

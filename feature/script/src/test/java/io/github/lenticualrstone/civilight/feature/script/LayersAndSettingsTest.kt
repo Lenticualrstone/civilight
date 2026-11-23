@@ -36,12 +36,13 @@ class LayersAndSettingsTest {
     @Test
     fun `SCR-26 the 표시 rows read as the board, in order, with the spec defaults`() {
         assertEquals(
-            listOf("연출 지시", "작가 메모", "시스템 텍스트", "변화 표식", "호칭 힌트", "괄호 지문", "용어 후보"),
+            // (0.2.0, SCR-26) `용어 후보` left the sheet: the project setting decides (S-5).
+            listOf("연출 지시", "작가 메모", "시스템 텍스트", "변화 표식", "호칭 힌트", "괄호 지문"),
             LayersModel.ROWS.map { it.title },
         )
         assertEquals("[기록] 같은 화면 문구 · 전환 문구", LayerRow.SYSTEM.sub)
         val defaults = ScriptLayers()
-        assertEquals(listOf(true, true, true, true, false, true, false), LayersModel.ROWS.map { LayersModel.isOn(defaults, it) })
+        assertEquals(listOf(true, true, true, true, false, true), LayersModel.ROWS.map { LayersModel.isOn(defaults, it) })
         for (row in LayersModel.ROWS) {
             val off = LayersModel.set(defaults, row, false)
             assertFalse(LayersModel.isOn(off, row))
@@ -94,9 +95,9 @@ class LayersAndSettingsTest {
     }
 
     @Test
-    fun `SCR-28 낭독 is shown disabled and a stored 낭독 draws as 쓰기`() {
+    fun `SCR-28 낭독 is enabled, opens the player and never stays selected`() {
         assertEquals(listOf("쓰기", "대사만", "낭독"), LayersModel.CHIPS.map { it.label })
-        assertEquals(listOf(true, true, false), LayersModel.CHIPS.map { it.enabled })
+        assertEquals(listOf(true, true, true), LayersModel.CHIPS.map { it.enabled })
         assertEquals(ScriptPreview.WRITE, LayersModel.effective(ScriptPreview.READ_ALOUD))
         assertEquals(ScriptPreview.WRITE, LayersModel.selectedChip(ScriptPreview.READ_ALOUD))
         assertTrue(LayersModel.isEditable(ScriptPreview.READ_ALOUD))

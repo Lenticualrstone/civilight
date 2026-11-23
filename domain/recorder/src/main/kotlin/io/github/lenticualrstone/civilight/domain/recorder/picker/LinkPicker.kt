@@ -116,7 +116,7 @@ object LinkPicker {
         val project = env.project(e.target.projectKey)
         val projectLabel = when {
             project == null -> ""
-            project.linkMask -> LinkViews.ratingBadge(project.rating)
+            project.linkMask -> LinkViews.maskedLabel()
             else -> project.name
         }
         return LinkCandidate(e.target, e.name, runText, projectLabel, group, linked)

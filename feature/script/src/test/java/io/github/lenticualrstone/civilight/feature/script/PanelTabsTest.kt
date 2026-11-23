@@ -216,13 +216,10 @@ class PanelTabsTest {
     }
 
     @Test
-    fun `SCR-23 a spoken choice option shows its own voice ID`() {
+    fun `N-23 a choice block shows no voice ID, not even for a 0_1_0 spoken option`() {
         val p = props(doc, K.BLOCK_1_5_CHOICE)
         assertNull(p.voice)
-        val option = p.optionVoices.single()
-        assertEquals("#006-1", option.number)
-        assertEquals(VoiceField("RIE_0105_006_1", "자동", editable = false), option.field)
-        assertEquals("보이스 ID · #006-1", ScriptCopy.optionVoiceLabel(option.number))
+        assertTrue(p.optionVoices.isEmpty())
     }
 
     @Test

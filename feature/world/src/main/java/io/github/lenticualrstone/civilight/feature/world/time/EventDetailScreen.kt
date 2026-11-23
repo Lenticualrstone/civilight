@@ -85,8 +85,6 @@ fun EventDetailScreen(route: EventDetail, deps: FeatureDeps) {
         },
         smallLine = detail?.paneTitle,
         back = worldBack(route, deps),
-        lens = doc?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
         actions = {
             if (detail?.access == EventAccess.Open) {
                 CivilightIconButton(

@@ -3,6 +3,9 @@ package io.github.lenticualrstone.civilight.feature.library.settings
 import io.github.lenticualrstone.civilight.model.Timestamp
 import io.github.lenticualrstone.civilight.model.app.AnimationPref
 import io.github.lenticualrstone.civilight.model.app.AppSettings
+import io.github.lenticualrstone.civilight.model.app.CardStyle
+import io.github.lenticualrstone.civilight.model.app.LibraryStyle
+import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfViewRenderers
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
 import io.github.lenticualrstone.civilight.model.app.ThemeMode
 import io.github.lenticualrstone.civilight.model.app.UnfoldedLayout
@@ -26,6 +29,13 @@ data class SettingsUi(
     val recovery: SettingsLinkRow,
     val appLock: SettingsSwitchRow,
     val hiding: SettingsLinkRow,
+    /**
+     * (0.2.0, LIB-94) `서재 보기` · `카드 보기` · tilt switch, after `펼친 화면 배치`. Each is null (not drawn)
+     * while the views it would change have no renderer ([ViewStyles.libraryRow] …).
+     */
+    val libraryView: SettingsLinkRow? = null,
+    val cardView: SettingsLinkRow? = null,
+    val tilt: SettingsSwitchRow? = null,
     /** `인물 템플릿` · `템플릿 3` (CST-58; hidden templates are never counted while locked). */
     val templates: SettingsLinkRow = SettingsLinkRow(SettingsCopy.TEMPLATES_TITLE, SettingsCopy.templatesSub(0), null),
 )
@@ -41,6 +51,7 @@ data class HidingSettingsUi(
     /** `지문 · 실패하면 기기 PIN · 사용 중`; the status only while a device lock exists. */
     val biometricStatus: String?,
     val backupHidden: SettingsSwitchRow,
+    /** (0.2.0, LIB-92) Kept for the model; not drawn (the row left 설정 · 숨기기). */
     val ratingRules: SettingsLinkRow,
 )
 
@@ -109,6 +120,8 @@ object SettingsState {
         now: Timestamp,
         zone: ZoneId,
         visibleTemplates: Int = 0,
+        libraryViews: Set<LibraryStyle> = ShelfViewRenderers.available,
+        cardViews: Set<CardStyle> = CardViewMirror.available,
     ): SettingsUi = SettingsUi(
         themeIndex = themeIndex(settings.theme),
         textSize = SettingsLinkRow(SettingsCopy.TEXT_SIZE, textSizeLabel(settings.textSizeStep), textSizeValue(settings.textSizeStep)),
@@ -134,6 +147,9 @@ object SettingsState {
             value = relockTitle(settings.relockPolicy),
         ),
         templates = SettingsLinkRow(SettingsCopy.TEMPLATES_TITLE, SettingsCopy.templatesSub(visibleTemplates), null),
+        libraryView = ViewStyles.libraryRow(settings, libraryViews),
+        cardView = ViewStyles.cardRow(settings, cardViews),
+        tilt = ViewStyles.tiltRow(settings, libraryViews, cardViews),
     )
 
     /**

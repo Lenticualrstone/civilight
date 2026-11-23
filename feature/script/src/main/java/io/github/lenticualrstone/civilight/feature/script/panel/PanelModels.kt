@@ -97,13 +97,23 @@ data class PropsModel(
     /** The record behind [source]; tapping the field opens it in the recorder (SCR-59). */
     val sourceRecordKey: Key? = null,
     val readOnly: Boolean = false,
+    /** (0.2.0, N-43) `이 블록만 · 표시 이름` of a dialogue block ("" = none); null on other kinds. */
+    val blockDisplayName: String? = null,
+    /** (0.2.0, N-41) `복선 · {name} · {열림|거둠}` lines of marks on this block. */
+    val marks: List<String> = emptyList(),
+    /** `복선 심기` (every kind but `작가 메모`). */
+    val canPlant: Boolean = false,
+    /** `할 일` of a memo block: null on other kinds; [todoDone] = `끝냄`. */
+    val todo: Boolean? = null,
+    val todoDone: Boolean = false,
 ) {
     companion object {
         fun of(doc: ProjectDoc, selected: Key?, readOnly: Boolean, unlocked: Boolean = false, zone: ZoneId = ZoneId.systemDefault()): PropsModel {
             val block = selected?.let(doc.index::block)?.takeIf { doc.manuscript.isLiveBlock(it.key) }
                 ?: return PropsModel(ScriptCopy.NO_SELECTED_BLOCK, null, null, null)
             val kind = block.kind.known
-            val canChangeKind = !readOnly && ScriptOps.kindChoices(doc, block.key).any { it.enabled && !it.current }
+            // (0.2.0, SCR-13) Through the kind menu; a conversion its check blocks is dimmed there.
+            val canChangeKind = !readOnly && kind != null
             val dialogue = kind == BlockKind.DIALOGUE
             var speaker: PropField? = null
             var deleted: DeletedSpeaker? = null
@@ -139,9 +149,11 @@ data class PropsModel(
                 }
             }
             val settings = doc.project.script
-            val stage = if (dialogue && settings.stagePositionEnabled) StageField(block.stage?.known, enabled = !readOnly) else null
-            val voice = if (dialogue && settings.voiceIdEnabled) voiceField(doc, block, readOnly, zone) else null
-            val optionVoices = if (kind == BlockKind.CHOICE && settings.voiceIdEnabled) optionVoices(doc, block, zone) else emptyList()
+            // (0.2.0, G-2, SCR-79) Stage and voice rows only with `게임 제작 도구` on; choice options never show an ID (N-23).
+            val game = io.github.lenticualrstone.civilight.model.game.GameTools.on(doc)
+            val stage = if (dialogue && game && settings.stagePositionEnabled) StageField(block.stage?.known, enabled = !readOnly) else null
+            val voice = if (dialogue && game && settings.voiceIdEnabled) voiceField(doc, block, readOnly, zone) else null
+            val optionVoices = emptyList<OptionVoice>()
             val changes = PanelRecords.onBlock(doc, block.key).map { PanelRecords.changeLink(doc, it) }
             val source = block.recorderSource?.takeIf { kind == BlockKind.MEMO }?.let {
                 PropField(ScriptCopy.SOURCE_FIELD, ScriptCopy.recorderSource(Labels.monthDayTime(it.recordedAt, zone)))
@@ -161,6 +173,17 @@ data class PropsModel(
                 source = source,
                 sourceRecordKey = block.recorderSource?.recordKey.takeIf { source != null },
                 readOnly = readOnly,
+                blockDisplayName = if (dialogue) block.displayNameOverride.orEmpty() else null,
+                marks = io.github.lenticualrstone.civilight.model.marks.Marks.on(doc, block.key).map { m ->
+                    io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.markLine(
+                        m.foreshadow.name,
+                        if (m.foreshadow.payoff == null) io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.OPEN
+                        else io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.PAID_OFF,
+                    )
+                },
+                canPlant = !readOnly && kind != null && kind != BlockKind.MEMO,
+                todo = if (kind == BlockKind.MEMO) block.todo != null else null,
+                todoDone = block.todo?.done == true,
             )
         }
 

@@ -2,6 +2,10 @@ package io.github.lenticualrstone.civilight.feature.script.layers
 
 import io.github.lenticualrstone.civilight.feature.script.terms.TermCopy
 import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
+import io.github.lenticualrstone.civilight.domain.script.ReadAloud
+import io.github.lenticualrstone.civilight.model.Key
+import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.game.GameTools
 import io.github.lenticualrstone.civilight.model.script.ScriptLayers
 import io.github.lenticualrstone.civilight.model.script.ScriptPreview
 
@@ -19,7 +23,7 @@ enum class LayerRow(val title: String, val sub: String) {
     TERM_CANDIDATES(TermCopy.LAYER, TermCopy.LAYER_SUB),
 }
 
-/** A `미리 보기` chip (SCR-27, SCR-28): `낭독` is shown disabled until Q-08 is answered. */
+/** A `미리 보기` chip (SCR-27, SCR-28): `낭독` is dimmed while the episode has no step ([LayersModel.chips]). */
 data class PreviewChip(val preview: ScriptPreview, val label: String, val enabled: Boolean)
 
 /**
@@ -27,13 +31,22 @@ data class PreviewChip(val preview: ScriptPreview, val label: String, val enable
  * `_app/view.json` (per project and device, Q-14 `ED`); they only change what the manuscript draws.
  */
 object LayersModel {
-    val ROWS: List<LayerRow> = LayerRow.entries
+    /** (0.2.0, SCR-26) The `용어 후보` row is gone: underlines follow the project setting `용어 후보` (WLD-73). */
+    val ROWS: List<LayerRow> = LayerRow.entries - LayerRow.TERM_CANDIDATES
 
     val CHIPS: List<PreviewChip> = listOf(
         PreviewChip(ScriptPreview.WRITE, ScriptCopy.PREVIEW_WRITE, enabled = true),
         PreviewChip(ScriptPreview.DIALOGUE_ONLY, ScriptCopy.PREVIEW_DIALOGUE, enabled = true),
-        PreviewChip(ScriptPreview.READ_ALOUD, ScriptCopy.PREVIEW_READ_ALOUD, enabled = false),
+        PreviewChip(ScriptPreview.READ_ALOUD, ScriptCopy.PREVIEW_READ_ALOUD, enabled = true),
     )
+
+    /** (0.2.0, SCR-28) The chips with `낭독` dimmed when the episode has no step ([readAloudEnabled]). */
+    fun chips(readAloud: Boolean): List<PreviewChip> =
+        CHIPS.map { if (it.preview == ScriptPreview.READ_ALOUD) it.copy(enabled = readAloud) else it }
+
+    /** `낭독` has something to play: at least one step in the episode (SCR-28; the 찾기 command follows it). */
+    fun readAloudEnabled(doc: ProjectDoc, unitKey: Key, unlocked: Boolean): Boolean =
+        ReadAloud.steps(doc, unitKey, GameTools.on(doc), unlocked).isNotEmpty()
 
     fun isOn(layers: ScriptLayers, row: LayerRow): Boolean = when (row) {
         LayerRow.DIRECTION -> layers.direction

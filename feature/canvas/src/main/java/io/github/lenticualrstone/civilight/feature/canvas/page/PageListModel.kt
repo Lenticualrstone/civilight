@@ -35,6 +35,9 @@ data class PageListView(
 ) {
     val lockedRow: String? get() = if (lockedCount > 0) PageCopy.hiddenPages(lockedCount) else null
     val isEmpty: Boolean get() = rows.isEmpty() && lockedCount == 0
+
+    /** U-15.1 / U-15.10: the `＋ 새 페이지` row; left out in read-only projects (the example). */
+    val canCreate: Boolean get() = !readOnly
 }
 
 /** The page list (CNV-14, CNV-16, T-CNV-22): live pages in their order; trashed pages leave it. */

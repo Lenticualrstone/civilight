@@ -15,6 +15,7 @@ import io.github.lenticualrstone.civilight.domain.trash.Impact
 import io.github.lenticualrstone.civilight.domain.trash.ItemId
 import io.github.lenticualrstone.civilight.domain.trash.ItemKind
 import io.github.lenticualrstone.civilight.domain.trash.Messages
+import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.domain.trash.RestoreOps
 import io.github.lenticualrstone.civilight.domain.trash.RestoreOutcome
 import io.github.lenticualrstone.civilight.domain.trash.SheetRow
@@ -81,9 +82,18 @@ object ItemTrash {
     fun needsSheet(doc: ProjectDoc, kind: EntityKind, key: Key, recorder: RecorderLibrary?): Boolean? =
         impact(doc, kind, key, recorder)?.needsSheet
 
-    /** The sheet for [impact] (`RCDeleteImpact`). A hidden item shows counts only (no scene list). */
-    fun sheet(kind: EntityKind, impact: DeleteImpact, hiddenLocked: Boolean = false): ImpactSheetView {
-        val sheet = Messages.impactSheet(impact, hiddenLocked)
+    /** `게임 텍스트`, the owned row of voice lines and archive documents (`domain:trash` `Messages`); copy in [CastUiCopy]. */
+    val GAME_TEXT_ROW: String get() = CastUiCopy.TABS[io.github.lenticualrstone.civilight.navigation.ProfileTab.GAME_TEXT.ordinal]
+
+    /**
+     * The sheet for [impact] (`RCDeleteImpact`). A hidden item shows counts only (no scene list). (0.2.0,
+     * CST-74) While `게임 제작 도구` is off ([gameTools] false) the `게임 텍스트 n` row is left out; the voice
+     * lines and archive documents still go to the trash with the character and come back with it.
+     */
+    fun sheet(kind: EntityKind, impact: DeleteImpact, hiddenLocked: Boolean = false, gameTools: Boolean = true): ImpactSheetView {
+        // The row is left out by its kind (the impact's count), never by matching the label text.
+        val shown = if (gameTools) impact else impact.copy(owned = impact.owned - io.github.lenticualrstone.civilight.domain.trash.OwnedKind.GAME_TEXT)
+        val sheet = Messages.impactSheet(shown, hiddenLocked)
         val word = kind.label
         return ImpactSheetView(
             title = sheet.title,

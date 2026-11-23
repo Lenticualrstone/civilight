@@ -23,20 +23,23 @@ class SettingsTest {
 
     @Test
     fun LRC_44_rowsSectionsAndDefaultsAsDrawn() {
+        // (0.2.0) LRC-48: `잠금 화면에서 녹음` is not drawn; `녹음` heads the next switch instead.
         val rows = RecorderSettingsRows.of(AppSettings())
-        assertEquals(RecorderSettingId.entries, rows.map { it.id })
-        assertEquals(listOf("받아쓰기", null, "녹음", null, null, null), rows.map { it.row.section })
-        assertEquals(listOf("기기 안", "클라우드", "잠금 화면에서 녹음", "원본 음성 보관", "녹음 중 빛 띠", "보던 곳 연결"), rows.map { it.row.title })
+        assertEquals(RecorderSettingId.entries - RecorderSettingId.LOCK_SCREEN, rows.map { it.id })
+        assertEquals(listOf("받아쓰기", null, "녹음", null, null), rows.map { it.row.section })
+        assertEquals(listOf("기기 안", "클라우드", "원본 음성 보관", "녹음 중 빛 띠", "보던 곳 연결"), rows.map { it.row.title })
         assertEquals(
             listOf(
-                "오프라인 · 음성이 기기 밖으로 나가지 않음", "정확도↑ · 음성 전송 · 인터넷 필요", "새 녹음만 · 기록함은 잠금 해제 후",
+                "오프라인 · 음성이 기기 밖으로 나가지 않음", "정확도↑ · 음성 전송 · 인터넷 필요",
                 "글과 함께 · 30일 뒤 정리 가능", "말소리 크기 표시", "시작한 곳을 칩으로 · 언제든 빼기",
             ),
             rows.map { it.row.sub },
         )
-        assertEquals(listOf(true, true, false, false, false, false), rows.map { it.row.radio })
+        assertEquals(listOf(true, true, false, false, false), rows.map { it.row.radio })
         // Defaults: 기기 안 chosen, every switch on.
-        assertEquals(listOf(true, false, true, true, true, true), rows.map { it.row.on })
+        assertEquals(listOf(true, false, true, true, true), rows.map { it.row.on })
+        // The domain's full list is unchanged (0.1.0 order, the hidden row included).
+        assertEquals(RecorderSettingId.entries, RecorderSettingsRows.all(AppSettings()).map { it.id })
     }
 
     @Test
@@ -56,7 +59,7 @@ class SettingsTest {
         assertFalse(s.recorderGlow)
         s = RecorderSettingsRows.apply(s, RecorderSettingId.PRESET_LINK, false)
         assertFalse(s.recorder.presetLink)
-        assertEquals(listOf(true, false, false, false, false, false), RecorderSettingsRows.of(s).map { it.row.on })
+        assertEquals(listOf(true, false, false, false, false, false), RecorderSettingsRows.all(s).map { it.row.on })
     }
 
     @Test

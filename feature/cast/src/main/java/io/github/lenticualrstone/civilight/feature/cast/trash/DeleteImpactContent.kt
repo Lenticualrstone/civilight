@@ -92,7 +92,8 @@ fun SheetScope.DeleteImpactContent(sheet: DeleteImpactSheet) {
         }
         return
     }
-    val view = remember(impact, unlock) { ItemTrash.sheet(sheet.kind, impact, hiddenLocked = !unlock.itemsOpen(sheet.projectKey)) }
+    val gameTools = io.github.lenticualrstone.civilight.model.game.GameTools.on(ready.doc)
+    val view = remember(impact, unlock, gameTools) { ItemTrash.sheet(sheet.kind, impact, hiddenLocked = !unlock.itemsOpen(sheet.projectKey), gameTools = gameTools) }
     ImpactSheetBody(
         view,
         onCancel = {

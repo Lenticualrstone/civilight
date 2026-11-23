@@ -134,8 +134,6 @@ fun TimelineMapScreen(route: TimelineMap, deps: FeatureDeps) {
         title = WorldCopy.TIMELINE_TITLE,
         smallLine = WorldCopy.SMALL_TIMELINE_MAP,
         back = worldBack(route, deps),
-        lens = doc?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
         commandBar = { WorldCommandBar(deps, route.projectKey, WorldCopy.SEARCH_TIMELINE) },
         sheets = sheets,
     ) { padding ->

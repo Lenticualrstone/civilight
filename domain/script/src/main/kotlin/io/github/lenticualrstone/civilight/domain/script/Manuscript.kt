@@ -139,10 +139,16 @@ object Manuscript {
     }
 
     /** Text of a block as drawn. */
-    fun blockText(doc: ProjectDoc, block: Block, layers: ScriptLayers): String = when (block.kind.known) {
+    fun blockText(doc: ProjectDoc, block: Block, layers: ScriptLayers): String = blockText(doc, block, layers) { it }
+
+    /** [blockText] on screen: links to locked hidden items masked ([unlocked] false, SCR-55). */
+    fun blockText(doc: ProjectDoc, block: Block, layers: ScriptLayers, unlocked: Boolean): String =
+        blockText(doc, block, layers) { Runs.masked(doc, it, unlocked) }
+
+    private fun blockText(doc: ProjectDoc, block: Block, layers: ScriptLayers, mask: (List<TextRun>) -> List<TextRun>): String = when (block.kind.known) {
         BlockKind.DIRECTION -> cueText(doc, block)
-        BlockKind.CHOICE -> BlockOps.orderedOptions(block).mapIndexed { i, o -> "${i + 1} ${render(o.runs, layers)}" }.joinToString("\n")
-        else -> render(block.runs, layers)
+        BlockKind.CHOICE -> BlockOps.orderedOptions(block).mapIndexed { i, o -> "${i + 1} ${render(mask(o.runs), layers)}" }.joinToString("\n")
+        else -> render(mask(block.runs), layers)
     }
 
     private fun render(runs: List<TextRun>, layers: ScriptLayers): String =
@@ -177,7 +183,7 @@ object Manuscript {
             for (b in blocks) {
                 if (!isShown(b.kind.known, layers, preview)) continue
                 out += Row.BlockRow(
-                    b, speakerLabel(doc, b, unlocked), blockText(doc, b, layers), Records.marksOn(doc, b.key, layers),
+                    b, speakerLabel(doc, b, unlocked), blockText(doc, b, layers, unlocked), Records.marksOn(doc, b.key, layers),
                     if (layers.addressHint) addressHints(doc, b, unlocked) else emptyList(),
                 )
             }

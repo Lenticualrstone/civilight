@@ -28,7 +28,8 @@ class DetailAndShapeTest {
     @Test
     fun `WLD-60 the detailed-terrain tool bar and its panel tabs`() {
         assertEquals(listOf("이동", "도장", "강", "길", "라벨", "영역", "레이어"), EditTool.DETAIL.map { it.label })
-        assertEquals(listOf("이동", "핀", "영역", "경로", "라벨", "레이어"), EditTool.BASE.map { it.label })
+        // (0.2.0, WLD-75) The image map's bar has no `경로`.
+        assertEquals(listOf("이동", "핀", "영역", "라벨", "레이어"), EditTool.BASE.map { it.label })
         assertEquals(2, Editor.chooseTool(EditorState(), EditTool.LAYER, detail = true).panelTab)
         assertEquals(1, Editor.chooseTool(EditorState(), EditTool.LAYER).panelTab)
     }
