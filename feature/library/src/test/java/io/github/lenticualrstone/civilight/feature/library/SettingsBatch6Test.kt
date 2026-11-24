@@ -21,14 +21,12 @@ import io.github.lenticualrstone.civilight.model.app.MapStylePref
 import io.github.lenticualrstone.civilight.model.app.RatingDefaults
 import io.github.lenticualrstone.civilight.model.app.SceneNotationPref
 import io.github.lenticualrstone.civilight.model.app.TextMapEngine
-import io.github.lenticualrstone.civilight.model.app.UnfoldedLayout
 import io.github.lenticualrstone.civilight.model.project.SceneNotation
 import io.github.lenticualrstone.civilight.navigation.HelpReplay
 import io.github.lenticualrstone.civilight.navigation.RecorderSettings
 import io.github.lenticualrstone.civilight.navigation.RecoveryPassword
 import io.github.lenticualrstone.civilight.navigation.SettingsBackup
 import io.github.lenticualrstone.civilight.navigation.SettingsHiding
-import io.github.lenticualrstone.civilight.navigation.SettingsLayout
 import io.github.lenticualrstone.civilight.navigation.SettingsMore
 import io.github.lenticualrstone.civilight.navigation.SettingsMotion
 import io.github.lenticualrstone.civilight.navigation.SettingsTextSize
@@ -94,17 +92,6 @@ class SettingsBatch6Test {
         assertEquals("남은 공간 1.2 GB · 프로젝트 340 MB", ui.storage.sub)
         assertNull("no detail screen is drawn: no value", ui.storage.value)
         assertNull(BackupSettingsState.build(AppSettings(), BackupBook(), emptyList(), LibFx.NOW, zone).storage.sub)
-    }
-
-    @Test
-    fun `LIB-66 two layouts, 목록 + 상세 by default`() {
-        val ui = DisplaySettingsState.layout(AppSettings())
-        assertEquals(listOf("목록 + 상세", "가운데 한 칸"), ui.options.map { it.title })
-        assertEquals(listOf("왼쪽 목록 · 오른쪽 고른 항목", "읽기 폭 유지 · 양옆 여백"), ui.options.map { it.sub })
-        assertEquals(listOf(true, false), ui.options.map { it.selected })
-        assertTrue(ui.note.startsWith("서재 · 홈 · 인물"))
-        val center = DisplaySettingsState.layout(AppSettings(unfoldedLayout = UnfoldedLayout.CENTER_COLUMN))
-        assertEquals(listOf(false, true), center.options.map { it.selected })
     }
 
     @Test
@@ -179,7 +166,6 @@ class SettingsBatch6Test {
     fun `CNV-18 every 설정 row opens its screen`() {
         val expected = mapOf(
             SettingsRootRow.TEXT_SIZE to SettingsTextSize,
-            SettingsRootRow.LAYOUT to SettingsLayout,
             SettingsRootRow.MOTION to SettingsMotion,
             SettingsRootRow.MORE to SettingsMore,
             SettingsRootRow.DRIVE to SettingsBackup,

@@ -39,8 +39,10 @@ class PaneSplitAndMotionTest {
     @Test
     fun `default keeps each module's own layout`() {
         assertEquals(390f, PaneSplitRules.leftWidth(800f, PaneSplit.DEFAULT, 390f), 0.01f)
-        assertEquals(390f, PaneSplitRules.listDetailDefaultLeft(800f), 0.01f)
-        assertEquals(320f, PaneSplitRules.listDetailDefaultLeft(640f), 0.01f)
+        // r3: list 300 upright (`Two*` 300 + 1 + 403), 320 on its side (`L*` 320 + 1 + 612), at most half.
+        assertEquals(300f, PaneSplitRules.listDetailDefaultLeft(704f), 0.01f)
+        assertEquals(320f, PaneSplitRules.listDetailDefaultLeft(933f, landscape = true), 0.01f)
+        assertEquals(290f, PaneSplitRules.listDetailDefaultLeft(580f), 0.01f)
         // A window too narrow for two minimums keeps today's layout whatever is stored.
         assertEquals(275f, PaneSplitRules.leftWidth(550f, PaneSplit.TWO_ONE, 275f), 0.01f)
         assertEquals(390f, PaneSplitRules.leftWidth(800f, PaneSplit.TWO_ONE, 390f, inner = false), 0.01f)

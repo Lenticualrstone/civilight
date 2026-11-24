@@ -24,7 +24,6 @@ import io.github.lenticualrstone.civilight.feature.library.projectsettings.Proje
 import io.github.lenticualrstone.civilight.feature.library.protection.ProtectionCopy
 import io.github.lenticualrstone.civilight.feature.library.rating.RatingCopy
 import io.github.lenticualrstone.civilight.feature.library.rating.RatingSettingsState
-import io.github.lenticualrstone.civilight.feature.library.settings.LayoutSettingsCopy
 import io.github.lenticualrstone.civilight.feature.library.settings.MoreSettingsCopy
 import io.github.lenticualrstone.civilight.feature.library.settings.MotionSettingsCopy
 import io.github.lenticualrstone.civilight.feature.library.settings.SettingsCopy
@@ -40,7 +39,7 @@ import java.lang.reflect.Modifier
 
 /** DECISIONS §3: every value of this module's copy objects passes the design-system copy lint. */
 class LibraryCopyLintTest {
-    private val objects: List<Any> = listOf(ShelfCopy, NewProjectCopy, RatingCopy, ProtectionCopy, ProjectSettingsCopy, TrashScreenCopy, ExportCopy, SettingsCopy, OpenFileCopy, OnboardingCopy, HelpCopy, BackupCopy, RecoveryCopy, RestoreCopy, LayoutSettingsCopy, MotionSettingsCopy, MoreSettingsCopy, io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfViewCopy, io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary)
+    private val objects: List<Any> = listOf(ShelfCopy, NewProjectCopy, RatingCopy, ProtectionCopy, ProjectSettingsCopy, TrashScreenCopy, ExportCopy, SettingsCopy, OpenFileCopy, OnboardingCopy, HelpCopy, BackupCopy, RecoveryCopy, RestoreCopy, MotionSettingsCopy, MoreSettingsCopy, io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfViewCopy, io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy, io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary)
 
     /** `Object.FIELD` → string value, for every constant of every copy object. */
     private fun values(): Map<String, String> = objects.flatMap { obj ->

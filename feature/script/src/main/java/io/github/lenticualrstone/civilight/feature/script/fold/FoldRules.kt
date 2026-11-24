@@ -9,7 +9,7 @@ import io.github.lenticualrstone.civilight.model.script.ScriptRestore
 /**
  * Fold and unfold continuity (SCR-66, boards `MFoldScript`, `FoldSpec`): the cover bottom sheet and
  * the inner side panel are the same element. Only its shape changes; its tab and per-tab scroll
- * stay. A closed panel stays closed. While typing, the caret and the keyboard stay, so folding then
+ * stay. A panel the writer closed stays closed (r3: remembered per screen). While typing, the caret and the keyboard stay, so folding then
  * opens no sheet. The anchor row keeps its height on screen.
  */
 object FoldRules {
@@ -37,8 +37,10 @@ object FoldRules {
         selecting: Boolean,
     ): Handover? = when {
         wasSide == isSide -> null
-        // Unfold: the sheet becomes the side panel; no sheet = a closed panel stays closed.
-        isSide -> Handover(closeSheet = sheetOpen, panelOpen = sheetOpen)
+        // Unfold: the sheet becomes the side panel. With no sheet the panel comes back as the writer last left it
+        // on the inner screen (decision 0.2.3 · r3: the closed state is remembered per screen; a closed panel keeps
+        // its rail and reopen button, so it stays closed only when the writer closed it).
+        isSide -> Handover(closeSheet = sheetOpen, panelOpen = sheetOpen || panelOpen)
         // Fold: an open side panel becomes the sheet, unless typing (caret and keyboard stay) or selecting.
         else -> Handover(openSheet = panelOpen && !editing && !selecting, panelOpen = panelOpen)
     }

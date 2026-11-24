@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.script
 
 import io.github.lenticualrstone.civilight.feature.script.motion.SwipeDrag
+import io.github.lenticualrstone.civilight.feature.script.motion.TwoSideDrag
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -103,5 +104,22 @@ class SwipeDragTest {
         assertEquals(before + 1, drag.releases)
         drag.cancel() // no drag: nothing
         assertEquals(before + 1, drag.releases)
+    }
+
+    @Test
+    fun `0_2_3 gesture rules - a two-sided row takes a drag only in a direction it can move`() {
+        val drag = TwoSideDrag()
+        val ref = 192f
+        val edit = 300f
+        // Closed: left opens the reference side, right the edit side.
+        assertTrue(drag.canStart(-10f, ref, edit, refOn = true, editOn = true))
+        assertTrue(drag.canStart(10f, ref, edit, refOn = true, editOn = true))
+        // No edit side (read-only, during 고치기): a rightward drag is left to the screen behind the row.
+        assertFalse(drag.canStart(10f, ref, edit, refOn = true, editOn = false))
+        // Fully open on the reference side: further left is not this row's; right closes it.
+        drag.onDelta(-ref, ref, edit, refOn = true, editOn = true)
+        drag.release(ref, edit, refOn = true, editOn = true)
+        assertFalse(drag.canStart(-10f, ref, edit, refOn = true, editOn = true))
+        assertTrue(drag.canStart(10f, ref, edit, refOn = true, editOn = true))
     }
 }

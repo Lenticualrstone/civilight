@@ -47,7 +47,7 @@ import kotlin.math.sin
  * `perspective: 1000px; perspective-origin: 50% 42%`, the projects as small 3D books (110 × 156 × 18 at
  * scale 0.5) on tilted orbits, one orbit per 형식 (장편 at (150, 318) r 100 · 110 s a turn, 단편 at (262, 540)
  * r 60 · 80 s; this port adds 설정만 at (96, 452) r 44 · 70 s). The lock star floats alone at (322, 176); the
- * new-project slot sits at (74, 590). 앞으로: the book spins in (rotateY −372°) to (195, 272, z 90) at ×1.08
+ * new-project slot sits at (74, 540) (board 590, raised in 0.2.3 so the dock no longer cuts it). 앞으로: the book spins in (rotateY −372°) to (195, 272, z 90) at ×1.08
  * while the rest fall back 180 and fade to 0.22 (to 0 behind the lock). Drag turns the orbits (0.012 rad a px).
  */
 internal object StarsGeo {
@@ -60,7 +60,15 @@ internal object StarsGeo {
     const val BW = 110f
     const val BH = 156f
     const val NX = 74f
-    const val NY = 590f
+
+    /**
+     * (0.2.3) The new-project slot's centre: 540 (board 590), so its 96-tall place ends at 604, inside the stage's
+     * 500 above the dock's top edge ([newSlotBottom]); at 590 the bar cut its `+`. Still clear of 설정만's orbit.
+     */
+    const val NY = 540f
+
+    /** The slot's foot in stage units (board y − [TOP]). */
+    val newSlotBottom: Float get() = NY - 32f + 96f - TOP
 
     class Orbit(val cx: Float, val cy: Float, val r: Float, val amp: Float, val per: Float, val ph: Float)
 

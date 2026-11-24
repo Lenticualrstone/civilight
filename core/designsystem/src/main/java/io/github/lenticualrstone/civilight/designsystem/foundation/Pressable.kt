@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.designsystem.foundation
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -45,7 +46,17 @@ fun Modifier.focusRing(focused: Boolean, shape: Shape, color: Color, width: Dp =
 
 /** Interaction kinds for [pressable]. */
 sealed interface PressAction {
-    data class Click(val onClick: () -> Unit, val label: String? = null) : PressAction
+    /**
+     * A tap, and (0.2.3) an optional long press with its accessibility label. The long press fires only while the
+     * finger stays inside the touch slop (`GestureRules.cancelsLongPress`), so it never fights a swipe row, a
+     * pager or a scroll that starts on the same finger.
+     */
+    data class Click(
+        val onClick: () -> Unit,
+        val label: String? = null,
+        val onLongClick: (() -> Unit)? = null,
+        val longClickLabel: String? = null,
+    ) : PressAction
     data class Toggle(val value: Boolean, val onValueChange: (Boolean) -> Unit) : PressAction
     data class Select(val selected: Boolean, val onClick: () -> Unit) : PressAction
 }
@@ -80,14 +91,27 @@ fun Modifier.pressable(
     val overlay = animatedFraction(pressed && enabled && !scaling && pressOverlay, CivilightMotion.press, label = "pressOverlay")
     val ink = CivilightTheme.colors.ink
     val interactive = when (action) {
-        is PressAction.Click -> Modifier.clickable(
-            interactionSource = source,
-            indication = null,
-            enabled = enabled,
-            onClickLabel = action.label,
-            role = role,
-            onClick = action.onClick,
-        )
+        is PressAction.Click -> if (action.onLongClick != null) {
+            Modifier.combinedClickable(
+                interactionSource = source,
+                indication = null,
+                enabled = enabled,
+                onClickLabel = action.label,
+                role = role,
+                onLongClickLabel = action.longClickLabel,
+                onLongClick = action.onLongClick,
+                onClick = action.onClick,
+            )
+        } else {
+            Modifier.clickable(
+                interactionSource = source,
+                indication = null,
+                enabled = enabled,
+                onClickLabel = action.label,
+                role = role,
+                onClick = action.onClick,
+            )
+        }
         is PressAction.Toggle -> Modifier.toggleable(
             value = action.value,
             interactionSource = source,
@@ -134,8 +158,10 @@ fun Modifier.pressable(
     onClickLabel: String? = null,
     interactionSource: MutableInteractionSource? = null,
     pressOverlay: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
 ): Modifier = pressable(
-    action = PressAction.Click(onClick, onClickLabel),
+    action = PressAction.Click(onClick, onClickLabel, onLongClick, onLongClickLabel),
     enabled = enabled,
     role = role,
     hitTarget = hitTarget,

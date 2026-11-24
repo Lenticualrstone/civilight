@@ -6,13 +6,6 @@ import io.github.lenticualrstone.civilight.model.app.LargeMapExport
 import io.github.lenticualrstone.civilight.model.app.MapStylePref
 import io.github.lenticualrstone.civilight.model.app.SceneNotationPref
 import io.github.lenticualrstone.civilight.model.app.TextMapEngine
-import io.github.lenticualrstone.civilight.model.app.UnfoldedLayout
-
-/** One `펼친 화면 배치` card (LIB-66): thumbnail kind, title, sub, radio. */
-data class LayoutOption(val layout: UnfoldedLayout, val title: String, val sub: String, val selected: Boolean)
-
-/** 설정 · 펼친 화면 배치 (LIB-66, board `LayoutSettings`). */
-data class LayoutSettingsUi(val options: List<LayoutOption>, val note: String)
 
 /** One `애니메이션` radio (LIB-67). */
 data class MotionOption(val pref: AnimationPref, val title: String, val sub: String?, val selected: Boolean)
@@ -62,14 +55,6 @@ data class MoreSettingsUi(
 object DisplaySettingsState {
     /** (0.2.0, S-3) Value rows not drawn: generated and sketch maps are hidden ([MoreSettingsUi.mapRows]). */
     val HIDDEN_MAP_VALUES: Set<MoreValue> = setOf(MoreValue.MAP_STYLE, MoreValue.TERRAIN_ENGINE)
-
-    fun layout(settings: AppSettings): LayoutSettingsUi = LayoutSettingsUi(
-        options = listOf(
-            LayoutOption(UnfoldedLayout.LIST_DETAIL, LayoutSettingsCopy.LIST_DETAIL, LayoutSettingsCopy.LIST_DETAIL_SUB, settings.unfoldedLayout == UnfoldedLayout.LIST_DETAIL),
-            LayoutOption(UnfoldedLayout.CENTER_COLUMN, LayoutSettingsCopy.CENTER, LayoutSettingsCopy.CENTER_SUB, settings.unfoldedLayout == UnfoldedLayout.CENTER_COLUMN),
-        ),
-        note = LayoutSettingsCopy.NOTE,
-    )
 
     fun motion(settings: AppSettings): MotionSettingsUi = MotionSettingsUi(
         animation = listOf(

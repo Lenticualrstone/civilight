@@ -2,9 +2,6 @@ package io.github.lenticualrstone.civilight.feature.script.motion
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +31,9 @@ import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.SwipeReveal
 import io.github.lenticualrstone.civilight.designsystem.component.SwipeSide
+import io.github.lenticualrstone.civilight.designsystem.foundation.GestureRules
 import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
+import io.github.lenticualrstone.civilight.designsystem.foundation.horizontalSwipe
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.startHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
@@ -103,11 +102,14 @@ fun TwoSidedSwipeRow(
             Modifier
                 .offset { IntOffset(drag.offset.roundToInt(), 0) }
                 .background(colors.bg)
-                .draggable(
-                    orientation = Orientation.Horizontal,
+                // 0.2.3 gesture rules (core `GestureRules`): undecided inside the slop (a tap or the block's long press stays
+                // possible), given up to the manuscript's scroll as soon as the drag reads vertical, and taken only in a
+                // direction this row can still move (a closed row with no edit side lets a rightward drag through).
+                .horizontalSwipe(
                     enabled = enabled,
-                    state = rememberDraggableState { delta -> drag.onDelta(delta, refPx, editPx, refOn, editOn) },
-                    onDragStopped = {
+                    canStart = { dx -> drag.canStart(dx, refPx, editPx, refOn, editOn) },
+                    onDelta = { delta -> drag.onDelta(delta, refPx, editPx, refOn, editOn) },
+                    onStop = {
                         val settled = drag.release(refPx, editPx, refOn, editOn)
                         if (settled != side) onSideChange(settled)
                     },
@@ -153,6 +155,13 @@ class TwoSideDrag {
     val offset: Float get() = offsetState.floatValue
     val dragging: Boolean get() = draggingState.value
     val releases: Int get() = releasesState.intValue
+
+    /**
+     * Whether a drag starting toward [dx]'s sign can move this row (0.2.3 `GestureRules.canMove`): left down to the
+     * reference side, right up to the edit side, each only when that side has buttons.
+     */
+    fun canStart(dx: Float, refPx: Float, editPx: Float, refOn: Boolean, editOn: Boolean): Boolean =
+        GestureRules.canMove(dx, offset, min = if (refOn) -refPx else 0f, max = if (editOn) editPx else 0f)
 
     fun onDelta(delta: Float, refPx: Float, editPx: Float, refOn: Boolean, editOn: Boolean) {
         draggingState.value = true

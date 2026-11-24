@@ -8,7 +8,6 @@ import io.github.lenticualrstone.civilight.model.app.LibraryStyle
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfViewRenderers
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
 import io.github.lenticualrstone.civilight.model.app.ThemeMode
-import io.github.lenticualrstone.civilight.model.app.UnfoldedLayout
 import io.github.lenticualrstone.civilight.domain.library.common.TimeLabels
 import java.time.ZoneId
 
@@ -22,7 +21,6 @@ data class SettingsSwitchRow(val title: String, val sub: String?, val on: Boolea
 data class SettingsUi(
     val themeIndex: Int,
     val textSize: SettingsLinkRow,
-    val layout: SettingsLinkRow,
     val motion: SettingsLinkRow,
     val more: SettingsLinkRow,
     val drive: SettingsSwitchRow,
@@ -30,7 +28,7 @@ data class SettingsUi(
     val appLock: SettingsSwitchRow,
     val hiding: SettingsLinkRow,
     /**
-     * (0.2.0, LIB-94) `서재 보기` · `카드 보기` · tilt switch, after `펼친 화면 배치`. Each is null (not drawn)
+     * (0.2.0, LIB-94) `서재 보기` · `카드 보기` · tilt switch, after `글자 크기`. Each is null (not drawn)
      * while the views it would change have no renderer ([ViewStyles.libraryRow] …).
      */
     val libraryView: SettingsLinkRow? = null,
@@ -85,11 +83,6 @@ object SettingsState {
     /** Only `보통` has a name (other names: not in sources, Q-ST-02); the others show `›` alone. */
     fun textSizeValue(step: Int): String? = if (clampStep(step) == 0) SettingsCopy.TEXT_SIZE_DEFAULT else null
 
-    fun layoutValue(layout: UnfoldedLayout): String = when (layout) {
-        UnfoldedLayout.LIST_DETAIL -> SettingsCopy.LAYOUT_LIST_DETAIL
-        UnfoldedLayout.CENTER_COLUMN -> SettingsCopy.LAYOUT_CENTER
-    }
-
     fun motionValue(pref: AnimationPref): String = when (pref) {
         AnimationPref.FOLLOW_SYSTEM -> SettingsCopy.MOTION_FOLLOW
         AnimationPref.ALWAYS_REDUCE -> SettingsCopy.MOTION_ALWAYS
@@ -125,7 +118,6 @@ object SettingsState {
     ): SettingsUi = SettingsUi(
         themeIndex = themeIndex(settings.theme),
         textSize = SettingsLinkRow(SettingsCopy.TEXT_SIZE, textSizeLabel(settings.textSizeStep), textSizeValue(settings.textSizeStep)),
-        layout = SettingsLinkRow(SettingsCopy.LAYOUT, SettingsCopy.LAYOUT_SUB, layoutValue(settings.unfoldedLayout)),
         motion = SettingsLinkRow(SettingsCopy.MOTION, SettingsCopy.MOTION_SUB, motionValue(settings.animation)),
         more = SettingsLinkRow(SettingsCopy.MORE, SettingsCopy.MORE_SUB, null),
         drive = SettingsSwitchRow(

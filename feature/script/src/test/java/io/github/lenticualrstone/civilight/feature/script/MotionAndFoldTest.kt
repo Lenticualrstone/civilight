@@ -79,10 +79,15 @@ class MotionAndFoldTest {
             FoldRules.Handover(closeSheet = true, panelOpen = true),
             FoldRules.onLayoutChange(wasSide = false, isSide = true, sheetOpen = true, panelOpen = false, editing = false, selecting = false),
         )
-        // Unfold with no sheet: a closed panel stays closed.
+        // Unfold with no sheet: the panel comes back as the writer left it on the inner screen (r3, remembered per
+        // screen): open stays open, closed stays closed.
+        assertEquals(
+            FoldRules.Handover(panelOpen = true),
+            FoldRules.onLayoutChange(wasSide = false, isSide = true, sheetOpen = false, panelOpen = true, editing = false, selecting = false),
+        )
         assertEquals(
             FoldRules.Handover(panelOpen = false),
-            FoldRules.onLayoutChange(wasSide = false, isSide = true, sheetOpen = false, panelOpen = true, editing = false, selecting = false),
+            FoldRules.onLayoutChange(wasSide = false, isSide = true, sheetOpen = false, panelOpen = false, editing = false, selecting = false),
         )
         // Fold with the side panel open: it becomes the sheet.
         assertEquals(

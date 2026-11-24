@@ -5,7 +5,7 @@ import io.github.lenticualrstone.civilight.model.app.PaneSplit
 /**
  * CNV-47 펼친 화면 비율 as plain numbers (dp). A two-pane frame is `left | 1 dp divider | right`; the
  * stored [PaneSplit] gives the left pane's share of the two panes' width, `DEFAULT` the module's own left
- * width (CNV-33 390, script 488). JVM-tested; the composables in `PaneSplitFrame.kt` only call these.
+ * width (r3 list 300 · 320, script panel its own). JVM-tested; the composables in `PaneSplitFrame.kt` only call these.
  */
 object PaneSplitRules {
     /** Each pane keeps at least this width (CNV-47). */
@@ -50,8 +50,24 @@ object PaneSplitRules {
     /** Where a released drag settles: the nearest of `1:2 · 1:1 · 2:1`. */
     fun settle(leftDp: Float, totalDp: Float): PaneSplit = PaneSplit.nearest(fractionOf(leftDp, totalDp))
 
-    /** The default left width of `목록 + 상세` (CNV-33): 390, or half of a narrow Medium window (Q-LY-01). */
-    fun listDetailDefaultLeft(totalDp: Float): Float = minOf(WindowLayout.LIST_PANE_DP.toFloat(), totalDp / 2f)
+    /**
+     * (0.2.3) Where a released drag settles when the module's own width [defaultLeftDp] is a target too: `기본`
+     * when the drag ends nearer to it than to any of `1:2 · 1:1 · 2:1`, so every choice stays reachable by touch.
+     */
+    fun settle(leftDp: Float, totalDp: Float, defaultLeftDp: Float): PaneSplit {
+        val snap = settle(leftDp, totalDp)
+        val snapLeft = leftWidth(totalDp, snap, defaultLeftDp)
+        return if (kotlin.math.abs(leftDp - defaultLeftDp) < kotlin.math.abs(leftDp - snapLeft)) PaneSplit.DEFAULT else snap
+    }
+
+    /**
+     * The default left width of `목록 + 상세` (r3): 300 upright (`Two*`), 320 on its side (`L*`), never more
+     * than half of the frame (Q-LY-01).
+     */
+    fun listDetailDefaultLeft(totalDp: Float, landscape: Boolean = false): Float {
+        val pane = if (landscape) WindowLayout.LIST_PANE_LANDSCAPE_DP else WindowLayout.LIST_PANE_PORTRAIT_DP
+        return minOf(pane.toFloat(), totalDp / 2f)
+    }
 
     /** Popover buttons in on-screen order (`1:2 · 1:1 · 2:1 · 기본`). */
     val CHOICES: List<PaneSplit> = PaneSplit.SNAP + PaneSplit.DEFAULT

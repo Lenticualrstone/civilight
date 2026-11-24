@@ -105,6 +105,9 @@ internal class PlaneBuffer(capacity: Int = 96) {
     var offX = 0f
     var offY = 0f
 
+    /** (0.2.3) The frame's height in board units: the board's 500, or more where the scene runs on under the bars. */
+    var frameH = ShelfScene.STAGE_H
+
     /** The near limit (fraction of the perspective) past which a plane is not drawn. */
     var nearFrac = 0.92f
 
@@ -206,7 +209,11 @@ internal class PlaneBuffer(capacity: Int = 96) {
         return -1
     }
 
-    /** A flat backdrop over the whole frame (z 0 projects 1:1), behind everything. */
+    /**
+     * A flat backdrop over the board's 500 (z 0 projects 1:1), behind everything. (0.2.3) Kept at 500 so no board
+     * gradient stretches; below it, where the frame runs on under the bars, every backdrop's foot is `bg`, which
+     * the scene's own background already is.
+     */
     fun backdrop(frameW: Float, paint: PlanePaint) {
         val p = add(frameW, ShelfScene.STAGE_H)
         p.m.translate(offX, offY)

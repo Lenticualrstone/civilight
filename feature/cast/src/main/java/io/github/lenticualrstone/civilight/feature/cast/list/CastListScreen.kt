@@ -52,6 +52,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.TextFieldValue
@@ -367,7 +374,10 @@ private fun CastCardViewHost(
             }
         }
         }
-        Box(Modifier.height(stageH).fillMaxWidth().padding(top = 8.dp)) {
+        // 0.2.3: the list pane beside a profile is 300 / 320 dp (r3 `Two*` / `L*`), narrower than the 390 dp card rig, and
+        // the shell draws the list pane above the detail: the rig is cut at the pane's sides so no card draws over the
+        // profile. Only the sides: lifted cards and shadows may still reach above and below the stage.
+        Box(Modifier.height(stageH).fillMaxWidth().padding(top = 8.dp).clipSides()) {
             if (noCards || (state.view.rows.isEmpty() && state.view.lockRow == null)) {
                 NoResults(CastUiCopy.NO_RESULTS, side.padding(top = 16.dp))
             } else {
@@ -560,4 +570,17 @@ private fun CastRowView(row: CastRow, image: SlotImage?, selected: Boolean, onCl
         onClick = onClick,
         selected = selected,
     )
+}
+
+/** Clips drawing at the left and right edges only (a stage whose cards may rise above or below its box). */
+private fun Modifier.clipSides(): Modifier = graphicsLayer {
+    // A layer clip (not a draw clip) so touches in the cut-off strips reach the profile beside the pane, too.
+    clip = true
+    shape = SidesOnlyShape
+}
+
+/** The box widened only up and down (one height each way): cuts the sides, lets lifted cards reach above and below. */
+private object SidesOnlyShape : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
+        Outline.Rectangle(Rect(0f, -size.height, size.width, size.height * 2f))
 }

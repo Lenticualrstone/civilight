@@ -4,6 +4,17 @@ import android.app.Activity
 import android.content.Context
 import android.view.accessibility.AccessibilityManager
 import android.util.Log
+import android.os.SystemClock
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import io.github.lenticualrstone.civilight.ui.back.BackCopy
+import io.github.lenticualrstone.civilight.ui.back.BackLayers
+import io.github.lenticualrstone.civilight.ui.back.BackPolicy
+import io.github.lenticualrstone.civilight.ui.back.BackSnapshot
+import io.github.lenticualrstone.civilight.ui.back.BackStep
+import io.github.lenticualrstone.civilight.ui.scaffold.ToastController
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
@@ -119,7 +130,7 @@ fun CivilightRoot(
         val motionState = rememberUpdatedState(motion)
         val backStack = rememberNavBackStack(*startRoutes.toTypedArray())
         val navigator = remember(backStack) { BackStackNavigator(backStack) { activity.finish() } }
-        val layout = rememberWindowLayout(settings.unfoldedLayout)
+        val layout = rememberWindowLayout()
         val layoutState = rememberUpdatedState(layout)
         val deps = remember(navigator, biometric, capture) { ShellDeps(locator, navigator, biometric, capture, layoutState) }
         val provider = remember(deps) { shellEntryProvider(deps) }
@@ -143,8 +154,16 @@ fun CivilightRoot(
             true
         }
         val paneSplits = remember(locator) {
-            PaneSplitSource(locator.settings) { module, split -> locator.appScope.launch { locator.stores.settings.setPaneSplit(module, split) } }
+            PaneSplitSource(
+                locator.settings,
+                { module, split -> locator.appScope.launch { locator.stores.settings.setPaneSplit(module, split) } },
+                // 0.2.3 (r3): each screen's side panel remembers closed / open (AppSettings.panelClosed).
+                { module, closed -> locator.appScope.launch { locator.stores.settings.update { it.withPanelClosed(module, closed) } } },
+            )
         }
+        // 0.2.3 `뒤로가기`: every layer that closes on back registers here (LocalBackHandler), so the root handler
+        // knows when to stay out of the way.
+        val backLayers = remember { BackLayers() }
 
         CompositionLocalProvider(
             LocalFeatureDeps provides deps,
@@ -152,7 +171,7 @@ fun CivilightRoot(
             LocalCaptureGuard provides capture,
             LocalToasts provides deps.toasts,
             LocalSheetRegistry provides deps.sheets,
-            LocalBackHandler provides { enabled, onBack -> BackHandler(enabled, onBack) },
+            LocalBackHandler provides { enabled, onBack -> LayeredBackHandler(backLayers, enabled, onBack) },
             LocalPaneSplits provides paneSplits,
             LocalBottomChrome provides bottomChrome,
             LocalWindowToasts provides true,
@@ -206,6 +225,15 @@ fun CivilightRoot(
             }
             val lockLevel = { if (lockMode != null) 1f else lockAmount.value }
             val showContent = lockMode == null || (lockMode == LockScreenMode.BLURRED_CONTENT && lockBlurAvailable())
+            // 0.2.3: the one root back handler, composed before NavDisplay so every screen, sheet and mode handler
+            // outranks it. It acts only for the keyboard and the bottom screen's two-press exit (BackPolicy).
+            RootBackHandler(
+                stackSize = backStack.size,
+                locked = lockMode != null,
+                layers = backLayers,
+                toasts = toasts,
+                onExit = { activity.finish() },
+            )
             val entryViewModels = rememberEntryViewModelDecorator<NavKey>()
             val saveable = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
             val rise = rememberSplashRise(splashDone, motion)
@@ -242,6 +270,61 @@ fun CivilightRoot(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * A layer's back handler (the shell's `LocalBackHandler`). It is registered only while [enabled] and anew each time
+ * it turns on, so the layer opened last is the one back closes first (a sheet opened during `고치기` closes before
+ * `고치기` ends). While on it counts in [layers], which keeps the root handler out of the way.
+ */
+@Composable
+private fun LayeredBackHandler(layers: BackLayers, enabled: Boolean, onBack: () -> Unit) {
+    val current by rememberUpdatedState(onBack)
+    if (!enabled) return
+    DisposableEffect(layers) {
+        layers.add()
+        onDispose { layers.remove() }
+    }
+    BackHandler(enabled = true) { current() }
+}
+
+/**
+ * 0.2.3 `뒤로가기` at the root ([BackPolicy]): with the keyboard up, back lowers it; on the bottom screen the first
+ * press shows `한 번 더 누르면 닫힘` for 2 s and a second press within that time (or while that toast is still shown)
+ * closes the app. Enabled only for those cases, so screens keep their own (predictive) back.
+ */
+@Composable
+private fun RootBackHandler(stackSize: Int, locked: Boolean, layers: BackLayers, toasts: ToastController, onExit: () -> Unit) {
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    val keyboard = LocalSoftwareKeyboardController.current
+    val armedAt = remember { mutableStateOf<Long?>(null) }
+    val hintId = remember { mutableStateOf<Long?>(null) }
+    fun snapshot() = BackSnapshot(
+        imeVisible = imeVisible,
+        openLayers = layers.open,
+        stackSize = stackSize,
+        locked = locked,
+        exitArmedAtMs = armedAt.value,
+        nowMs = SystemClock.uptimeMillis(),
+        hintShowing = hintId.value?.let(toasts::isShowing) ?: false,
+    )
+    BackHandler(enabled = BackPolicy.rootIntercepts(snapshot())) {
+        when (BackPolicy.decide(snapshot())) {
+            BackStep.HIDE_KEYBOARD -> keyboard?.hide()
+            BackStep.ARM_EXIT -> {
+                armedAt.value = SystemClock.uptimeMillis()
+                hintId.value = toasts.showBrief(BackCopy.EXIT_HINT, BackPolicy.EXIT_WINDOW_MS)
+            }
+            BackStep.EXIT -> {
+                armedAt.value = null
+                hintId.value = null
+                toasts.dismissNow()
+                onExit()
+            }
+            BackStep.NONE, BackStep.CLOSE_LAYER, BackStep.POP -> Unit
         }
     }
 }

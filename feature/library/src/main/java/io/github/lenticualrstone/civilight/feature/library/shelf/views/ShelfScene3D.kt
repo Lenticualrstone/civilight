@@ -130,9 +130,9 @@ internal class Sway {
 internal enum class Board { A, B, C }
 
 internal fun boardOf(style: LibraryStyle): Board = when (style) {
-    LibraryStyle.BOOKSHELF, LibraryStyle.COVER_SPIN, LibraryStyle.LIST -> Board.A
     LibraryStyle.MANUSCRIPT_STACK, LibraryStyle.ARCHIVE_HALL -> Board.B
     LibraryStyle.INDEX_DRAWER, LibraryStyle.CONSTELLATION -> Board.C
+    else -> Board.A
 }
 
 /** The idle sway of each board, pure (`t` in seconds), so the tests read the boards' numbers. */
@@ -180,6 +180,8 @@ internal class SceneArgs(
     val frameW: Float,
     val bounds: SceneBounds,
     val unhide: Unhide?,
+    /** (0.2.3) The frame's height in board units (≥ the board's 500): the scene runs on under the bottom bars. */
+    val frameH: Float = ShelfScene.STAGE_H,
 )
 
 /**
@@ -299,8 +301,9 @@ internal fun ShelfScene3D(style: LibraryStyle, input: ShelfViewInput) {
             position.drag.floatValue = (position.drag.floatValue - delta / (stepDp * density)).let { rubber(it, range) }
         }
     }
-    val tilt = rememberTilt(input.tilt && !reduced)
-    val sway = rememberSway(boardOf(style), tilt, run = !reduced, idle = motion.loops)
+    val tilt = rememberTilt(input.tilt && !reduced && !input.preview)
+    // (0.2.3) A picker preview draws a still board: no idle loop, no tilt.
+    val sway = rememberSway(boardOf(style), tilt, run = !reduced && !input.preview, idle = motion.loops && !input.preview)
     val bounds = remember { SceneBounds() }
     val bg = CivilightTheme.colors.bg
     // (0.2.2) The dock blurs the stage it floats over: its own source, a sibling (never its ancestor).
@@ -320,6 +323,16 @@ internal fun ShelfScene3D(style: LibraryStyle, input: ShelfViewInput) {
                             val hDp = size.height / density
                             val ft = ShelfScene.fadeTop(hDp) * density
                             val fb = ShelfScene.fadeBottom(hDp) * density
+                            // (0.2.3) 원고 더미 and 서고 회랑 also melt into `bg` at the sides: no coloured box.
+                            val fs = ShelfScene.sideFade(style, size.width / density) * density
+                            if (fs > 0f) {
+                                drawRect(Brush.horizontalGradient(0f to bg, 1f to bg.copy(alpha = 0f), startX = 0f, endX = fs), size = Size(fs, size.height))
+                                drawRect(
+                                    Brush.horizontalGradient(0f to bg.copy(alpha = 0f), 1f to bg, startX = size.width - fs, endX = size.width),
+                                    topLeft = Offset(size.width - fs, 0f),
+                                    size = Size(fs, size.height),
+                                )
+                            }
                             if (ft > 0f) drawRect(Brush.verticalGradient(0f to bg, 1f to bg.copy(alpha = 0f), startY = 0f, endY = ft), size = Size(size.width, ft))
                             if (fb > 0f) {
                                 drawRect(
@@ -331,11 +344,14 @@ internal fun ShelfScene3D(style: LibraryStyle, input: ShelfViewInput) {
                         }
                         // A short room shows the whole board scaled about its top centre (the plank and the
                         // corridor's floor stay in view).
+                        // (0.2.3) The stage box runs from the fit's top to the viewport's foot (under the glass dock
+                        // and the search field): `minHeight` carries the fit's height (the board's room), `maxHeight`
+                        // the whole run. The board keeps its fit scale and the frame grows to the foot.
                         .layout { m, c ->
                             val w = c.maxWidth
-                            val k = ShelfScene.stageScale(c.maxHeight / density)
+                            val k = ShelfScene.stageScale(c.minHeight / density)
                             val iw = (w / k).roundToInt()
-                            val ih = (ShelfScene.STAGE_H * density).roundToInt()
+                            val ih = (ShelfScene.frameH(c.maxHeight / density, k) * density).roundToInt()
                             val p = m.measure(Constraints.fixed(iw, ih))
                             layout(w, c.maxHeight) {
                                 p.placeWithLayer((w - iw) / 2, 0) {
@@ -372,15 +388,17 @@ internal fun ShelfScene3D(style: LibraryStyle, input: ShelfViewInput) {
                         ),
                 ) {
                     val frameW = maxWidth.value
+                    val frameH = maxHeight.value
                     // 별자리 places every star over all items (board C), so it composes them all, up to [STAR_CAP].
                     val window = if (style == LibraryStyle.CONSTELLATION) ShelfScene.window(front, count, SceneReach(STAR_CAP / 2, STAR_CAP - 1 - STAR_CAP / 2)) else ShelfScene.window(front, count, ShelfScene.reach(style, wide))
                     for (i in window) key(items[i].key) { ItemProtection(items[i]) }
                     if (reduced) {
-                        FlatFront(style, frontItem, input) { onTap(front) }
+                        // The board's own 500 at the top of the frame (the frame runs on under the bars).
+                        Box(Modifier.fillMaxWidth().height(ShelfScene.STAGE_H.dp)) { FlatFront(style, frontItem, input) { onTap(front) } }
                     } else {
                         val args = SceneArgs(
                             style, items, window, front, picked, opening, fanned || style != LibraryStyle.MANUSCRIPT_STACK,
-                            position, sway, spin, wide, frameW, bounds, input.unhide,
+                            position, sway, spin, wide, frameW, bounds, input.unhide, frameH,
                         )
                         when (style) {
                             LibraryStyle.BOOKSHELF -> BookcaseView(args, ::onTap)
@@ -389,15 +407,15 @@ internal fun ShelfScene3D(style: LibraryStyle, input: ShelfViewInput) {
                             LibraryStyle.ARCHIVE_HALL -> HallView(args, ::onTap)
                             LibraryStyle.INDEX_DRAWER -> DrawerView(args, ::onTap)
                             LibraryStyle.CONSTELLATION -> StarsView(args, ::onTap)
-                            LibraryStyle.LIST -> Unit
+                            else -> Unit
                         }
-                        ItemNodes(args, pair, ::onTap)
+                        if (!input.preview) ItemNodes(args, pair, ::onTap)
                     }
                 }
             },
             {
                 CompositionLocalProvider(LocalGlassSource provides sceneSource) {
-                    GlassDock(barBottom = input.barBottom, covered = input.covered, onRecents = input.onRecents) {
+                    GlassDock(barBottom = input.barBottom, covered = input.covered || input.preview, onRecents = input.onRecents, preview = input.preview) {
                         Controls(
                             style, frontItem, front, count, picked, pair, reduced, fanned, input,
                             goTo = { goTo(it, keepPick = style == LibraryStyle.BOOKSHELF && picked) },
@@ -413,7 +431,7 @@ internal fun ShelfScene3D(style: LibraryStyle, input: ShelfViewInput) {
                 }
             },
         ),
-        modifier = Modifier.fillMaxSize().background(bg),
+        modifier = Modifier.fillMaxSize().background(bg).then(if (input.preview) Modifier.previewInert() else Modifier),
     ) { (stageM, dockM), c ->
         val w = c.maxWidth
         val margin = DOCK_MARGIN.roundToPx()
@@ -429,7 +447,10 @@ internal fun ShelfScene3D(style: LibraryStyle, input: ShelfViewInput) {
         val gap = ShelfScene.DOCK_GAP.dp.roundToPx()
         val dockH = (dock.height + gap) / density
         val fit = ShelfScene.stageFit(viewport, input.barTop, input.barBottom, dockH)
-        val stage = stageM.first().measure(Constraints.fixed(w, (fit.height * density).roundToInt()))
+        // (0.2.3) The scene runs on under the dock and the search field to the viewport's foot (no plain band).
+        val fitH = (fit.height * density).roundToInt()
+        val runH = ((viewport - fit.top) * density).roundToInt().coerceAtLeast(fitH)
+        val stage = stageM.first().measure(Constraints(minWidth = w, maxWidth = w, minHeight = fitH, maxHeight = runH))
         layout(w, h) {
             stage.place(0, (fit.top * density).roundToInt())
             dock.place((w - dock.width) / 2, h - barBottom - gap - dock.height)
@@ -450,7 +471,7 @@ private val DOCK_SHAPE = RoundedCornerShape(22.dp)
  * its gaps stop here and never reach the stage under it.
  */
 @Composable
-private fun GlassDock(barBottom: Float, covered: Boolean, onRecents: (() -> Unit)?, content: @Composable () -> Unit) {
+private fun GlassDock(barBottom: Float, covered: Boolean, onRecents: (() -> Unit)?, preview: Boolean = false, content: @Composable () -> Unit) {
     val colors = CivilightTheme.colors
     // The window's toast and popovers keep above the dock (board B's toast sits over it), not on the peek row.
     // Not while a sheet covers the dock: the toast then keeps to the bars the sheet leaves.
@@ -459,7 +480,8 @@ private fun GlassDock(barBottom: Float, covered: Boolean, onRecents: (() -> Unit
     if (dockH > 0 && !covered) ReportBottomChrome(barBottom.dp + ShelfScene.DOCK_GAP.dp + dockDp - rememberSystemBottom())
     // The DockScrim fill only where the dock blurs (BLUR); the scrim and opaque modes keep their own, denser
     // fills. On API 31–32 (BLUR_COSTLY) the dock takes the scrim look: a third blur over a scene redrawn each frame.
-    val mode = CivilightTheme.glassMode.let { if (it == GlassMode.BLUR_COSTLY) GlassMode.SCRIM else it }
+    // A picker preview never blurs (several scenes at once): the scrim look.
+    val mode = CivilightTheme.glassMode.let { if (it == GlassMode.BLUR_COSTLY || preview) GlassMode.SCRIM else it }
     val fill = if (mode == GlassMode.BLUR) colors.glass.copy(alpha = if (colors.isDark) DockScrim.dark else DockScrim.light) else null
     Box(
         Modifier
@@ -561,16 +583,17 @@ internal fun dragStep(style: LibraryStyle): Float = when (style) {
     // Board B corridor: `cam = c0 − dd · 2.2` and one stop is 560 of camera, so about 255 dp of finger.
     LibraryStyle.ARCHIVE_HALL -> HallGeo.PHONE.d / 2.2f
     LibraryStyle.INDEX_DRAWER -> 170f
-    LibraryStyle.CONSTELLATION, LibraryStyle.LIST -> 100f
+    else -> 100f
 }
 
 private fun settleSpec(style: LibraryStyle): AnimationSpec<Float> = when (style) {
-    LibraryStyle.BOOKSHELF, LibraryStyle.COVER_SPIN, LibraryStyle.LIST ->
+    LibraryStyle.BOOKSHELF, LibraryStyle.COVER_SPIN ->
         spring(dampingRatio = CivilightMotion.libSpringDamping, stiffness = CivilightMotion.libPullStiffness)
     LibraryStyle.MANUSCRIPT_STACK -> spring(dampingRatio = CivilightMotion.libBoardBDamping, stiffness = CivilightMotion.libSheetStiffness)
     LibraryStyle.ARCHIVE_HALL -> spring(dampingRatio = CivilightMotion.libWalkDamping, stiffness = CivilightMotion.libWalkStiffness)
     LibraryStyle.INDEX_DRAWER -> spring(dampingRatio = CivilightMotion.libSpringDamping, stiffness = CivilightMotion.libFlipStiffness)
     LibraryStyle.CONSTELLATION -> spring(dampingRatio = CivilightMotion.libSpringDamping, stiffness = CivilightMotion.libStarFocusStiffness)
+    else -> spring(dampingRatio = CivilightMotion.libSpringDamping, stiffness = CivilightMotion.libPullStiffness)
 }
 
 /** The boards with an open move before the project screen (책장 펼치기, 표지 뒤집기, 원고 다가오기, 회랑 걸어 들어가기). */
@@ -636,6 +659,7 @@ internal fun BoxScope.SceneCanvas(args: SceneArgs, planes: PlaneBuffer, onTap: (
             },
     ) {
         planes.begin()
+        planes.frameH = args.frameH
         planes.build()
         planes.project()
         planes.draw(this)
@@ -714,7 +738,7 @@ private fun FlatFront(style: LibraryStyle, item: ShelfCardItem?, input: ShelfVie
 
 /** LIB-89 in every view: an open hidden project, or a picked cover of a `captureBlock` project, protects the window while drawn. */
 @Composable
-private fun ItemProtection(item: ShelfCardItem) {
+internal fun ItemProtection(item: ShelfCardItem) {
     val card = (item as? ShelfCardItem.Project)?.card ?: return
     if (card.hiddenOpen) {
         ProtectWindow(WindowProtection.forProject(card.row.protections))
@@ -794,7 +818,7 @@ private fun Controls(
                         CivilightButton(ShelfViewCopy.OPEN, openFront, Modifier.weight(if (desk) 1f else 1.6f).height(DOCK_BUTTON_H), variant = ButtonVariant.PRIMARY)
                         // LIB-02 from the item in front; the LIB-19 `프로젝트 숨기기` step points here.
                         // Only the incoming row registers the step (both rows are composed during the crossfade).
-                        val current = shown.key == item?.key && isPicked == picked && isFanned == fanned
+                        val current = shown.key == item?.key && isPicked == picked && isFanned == fanned && !input.preview
                         CivilightIconButton(
                             IconId.More,
                             ShelfCopy.MORE_LABEL,
@@ -811,3 +835,19 @@ private fun Controls(
         }
     }
 }
+
+/**
+ * (0.2.3) A view drawn as a picker preview: nothing in it is focusable, read or touchable (every pointer event
+ * is taken before the scene sees it), so the picker's own gestures and buttons are the only ones.
+ */
+internal fun Modifier.previewInert(): Modifier = this
+    .clearAndSetSemantics { }
+    .pointerInput(Unit) {
+        awaitEachGesture {
+            while (true) {
+                val e = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                e.changes.forEach { it.consume() }
+                if (e.changes.none { it.pressed }) break
+            }
+        }
+    }

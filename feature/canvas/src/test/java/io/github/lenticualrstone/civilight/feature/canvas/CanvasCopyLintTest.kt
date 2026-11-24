@@ -19,7 +19,7 @@ import java.lang.reflect.Modifier
 /** DECISIONS §3: every value of the canvas copy object passes the design-system copy lint. */
 class CanvasCopyLintTest {
     /** Every copy object of this module. */
-    private val objects = listOf(CanvasCopy::class.java, PageCopy::class.java, CardCopy::class.java, ImageCopy::class.java, HoloCopy::class.java, GalleryUiCopy::class.java, io.github.lenticualrstone.civilight.feature.canvas.image.GalleryCropChips::class.java)
+    private val objects = listOf(CanvasCopy::class.java, PageCopy::class.java, CardCopy::class.java, ImageCopy::class.java, HoloCopy::class.java, GalleryUiCopy::class.java, io.github.lenticualrstone.civilight.feature.canvas.gallery.GalleryStyleCopy::class.java, io.github.lenticualrstone.civilight.feature.canvas.image.GalleryCropChips::class.java)
 
     private fun values(): Map<String, List<String>> = objects.flatMap { type ->
         type.declaredFields
@@ -91,6 +91,23 @@ class CanvasCopyLintTest {
         add(GalleryUiCopy.originalLine(1200, 1600, null))
         add(GalleryUiCopy.addedOn("11-20"))
         add(GalleryUiCopy.offerSub(GalleryUiCopy.NOW_PORTRAIT, GalleryUiCopy.PHOTO))
+        // 0.2.3 r3 gallery views and the view picker.
+        run {
+            val c = io.github.lenticualrstone.civilight.feature.canvas.gallery.GalleryStyleCopy
+            io.github.lenticualrstone.civilight.feature.canvas.gallery.GalleryStyle.entries.forEach { add(c.tile(it)); add(c.viewButton(it.label)); add(c.now(it.label)); add(c.preview(it.label)) }
+            add(c.group(c.GROUP_NEW, 7))
+            add(c.count(3, 8))
+            add(c.hiddenCount(2))
+            add(c.wall(1, 3))
+            add(c.filmLabel(c.count(3, 8)))
+            add(c.exhibitTitle("리엔"))
+            add(c.lane(3))
+            add(c.tagRow("삽화", 4))
+            add(c.toneTab(c.WARM, 3))
+            add(c.monthDay(11, 2))
+            add(c.pixels(2400, 3200))
+            add(c.join(listOf("삽화", "1-3 씬 2", "1일째 저녁", c.HOLO)))
+        }
         HoloCopy.SAMPLE_STATS.forEach { add(it.first); add(it.second) }
         ImageSlots.all.forEach { add(it.name); add(it.usedIn); add(it.holoNote); add(it.pickTitle); addAll(it.chips) }
     }

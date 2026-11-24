@@ -2,9 +2,6 @@ package io.github.lenticualrstone.civilight.designsystem.component
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +19,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import io.github.lenticualrstone.civilight.designsystem.foundation.GestureRules
+import io.github.lenticualrstone.civilight.designsystem.foundation.horizontalSwipe
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -116,16 +115,18 @@ fun SwipeRevealBox(
             Modifier
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
                 .background(CivilightTheme.colors.bg)
-                .draggable(
-                    orientation = Orientation.Horizontal,
+                // 0.2.3: sideways only when clearly sideways and only toward where the block can go, so the list
+                // scrolls, a pager turns and a long press still fires (GestureRules).
+                .horizontalSwipe(
                     enabled = enabled,
-                    state = rememberDraggableState { delta ->
-                        scope.launch { offset.snapTo((offset.value + delta).coerceIn(-widthPx, 0f)) }
-                    },
-                    onDragStopped = {
-                        val open = offset.value < -widthPx / 2
-                        offset.animateTo(if (open) -widthPx else 0f, CivilightMotion.spec(CivilightMotion.swipe, reduced))
-                        if (open != revealed) onRevealedChange(open)
+                    canStart = { dx -> GestureRules.canMove(dx, offset.value, -widthPx, 0f) },
+                    onDelta = { delta -> scope.launch { offset.snapTo((offset.value + delta).coerceIn(-widthPx, 0f)) } },
+                    onStop = {
+                        scope.launch {
+                            val open = offset.value < -widthPx / 2
+                            offset.animateTo(if (open) -widthPx else 0f, CivilightMotion.spec(CivilightMotion.swipe, reduced))
+                            if (open != revealed) onRevealedChange(open)
+                        }
                     },
                 ),
         ) { content() }
@@ -288,18 +289,27 @@ fun TwoSidedSwipeRow(
             Modifier
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
                 .background(CivilightTheme.colors.bg)
-                .draggable(
-                    orientation = Orientation.Horizontal,
+                .horizontalSwipe(
                     enabled = referenceEnabled || editEnabled,
-                    state = rememberDraggableState { delta ->
+                    canStart = { dx ->
+                        GestureRules.canMove(
+                            dx,
+                            offset.value,
+                            if (refOn) -refPx else minOf(offset.value, 0f),
+                            if (editOn) editPx else maxOf(offset.value, 0f),
+                        )
+                    },
+                    onDelta = { delta ->
                         scope.launch {
                             offset.snapTo(SwipeReveal.clamp(offset.value + delta, refPx, editPx, referenceEnabled, editEnabled))
                         }
                     },
-                    onDragStopped = {
-                        val next = SwipeReveal.settle(offset.value, refPx, editPx, referenceEnabled, editEnabled)
-                        offset.animateTo(SwipeReveal.restOffset(next, refPx, editPx), motion.move(CivilightMotion.swipe))
-                        if (next != side) onSideChange(next)
+                    onStop = {
+                        scope.launch {
+                            val next = SwipeReveal.settle(offset.value, refPx, editPx, referenceEnabled, editEnabled)
+                            offset.animateTo(SwipeReveal.restOffset(next, refPx, editPx), motion.move(CivilightMotion.swipe))
+                            if (next != side) onSideChange(next)
+                        }
                     },
                 ),
         ) { content() }

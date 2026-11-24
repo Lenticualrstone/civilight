@@ -173,6 +173,8 @@ fun TimelineMapScreen(route: TimelineMap, deps: FeatureDeps) {
                                 .padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding(), end = 16.dp),
                         )
                     },
+                    // The screen's own top bar lies over the frame: the closed rail's `패널 열기` starts under it.
+                    railTop = padding.calculateTopPadding(),
                 )
             } else {
                 EventList(state, Modifier.fillMaxSize(), padding, onSelect, onOpen, header = { mapPanel(Modifier.fillMaxWidth()) })

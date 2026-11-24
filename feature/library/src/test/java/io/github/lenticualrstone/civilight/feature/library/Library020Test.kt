@@ -104,7 +104,7 @@ class Library020Test {
 
     @Test
     fun `LIB-93 every 3D style has a renderer, the list has none, and a style left out draws the list`() {
-        // Wave 3 (lane lib3d): the six 서재 views are registered; 목록 never is.
+        // Wave 3 (lane lib3d): the six 서재 views are registered; 목록 never is. (0.2.3) Plus the seven flat views.
         assertEquals(LibraryStyle.entries.filterNot { it.isList }.toSet(), ShelfViewRenderers.available)
         for (style in LibraryStyle.entries.filterNot { it.isList }) {
             val view = ShelfViews.of(AppSettings(libraryStyle = style))
@@ -148,8 +148,9 @@ class Library020Test {
         assertEquals(ui.tilt, ViewStyles.tiltShown(ui.tilt, reduced = false))
 
         val lib = ViewStyles.options(ViewKind.LIBRARY, AppSettings(), library = libAll)
-        assertEquals(listOf("3D 책장", "표지 회전", "원고 더미", "서고 회랑", "색인 카드 서랍", "별자리", "목록"), lib.map { it.title })
-        assertEquals(listOf(true, false, false, false, false, false, false), lib.map { it.selected })
+        // (0.2.3) The seven flat r3 views follow 목록 (enum order; the picker groups them, ViewPick).
+        assertEquals(listOf("3D 책장", "표지 회전", "원고 더미", "서고 회랑", "색인 카드 서랍", "별자리", "목록", "타임라인", "원고지", "편지함", "진행 칸", "표지 벽", "포스터", "표"), lib.map { it.title })
+        assertEquals(listOf(true) + List(13) { false }, lib.map { it.selected })
         val cards = ViewStyles.options(ViewKind.CARD, AppSettings(), cards = cardAll)
         assertEquals(listOf("부채꼴 덱", "회전 목마", "겹친 더미", "타로 펼침", "기울어진 벽", "롤로덱스", "목록"), cards.map { it.title })
         assertEquals(LibraryStyle.ARCHIVE_HALL, ViewStyles.libraryStyleOf(LibraryStyle.ARCHIVE_HALL.name))

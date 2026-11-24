@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -111,6 +112,14 @@ import io.github.lenticualrstone.civilight.feature.script.layers.LayersModel
 import io.github.lenticualrstone.civilight.feature.script.layers.LayersSheet
 import io.github.lenticualrstone.civilight.feature.script.layers.LayersSheetKey
 import io.github.lenticualrstone.civilight.feature.script.layout.ScriptLayout
+import io.github.lenticualrstone.civilight.feature.script.layout.panelToggleEnter
+import io.github.lenticualrstone.civilight.feature.script.layout.panelToggleExit
+import io.github.lenticualrstone.civilight.ui.window.PanelRail
+import io.github.lenticualrstone.civilight.ui.window.PanelSeamButton
+import io.github.lenticualrstone.civilight.ui.window.PanelSide
+import io.github.lenticualrstone.civilight.ui.window.rememberPanelCollapseState
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import io.github.lenticualrstone.civilight.feature.script.layout.TabletopLayout
 import io.github.lenticualrstone.civilight.feature.script.layout.foldInFrameDp
 import io.github.lenticualrstone.civilight.feature.script.layout.rememberTabletopFoldPx
@@ -499,7 +508,11 @@ private fun ScriptFrame(
     val draft by vm.draft.collectAsState()
     val fresh by vm.fresh.collectAsState()
     ScriptTourSteps.absent(c.readOnly).forEach { step -> key(step) { TourStepAbsent(step) } }
-    var panelOpen by rememberSaveable { mutableStateOf(true) }
+    // r3 (decision 0.2.3 · r3): the writer closes and reopens the panel with the shared seam button and rail; the
+    // choice is stored per screen (`AppSettings.panelClosed`, module `scriptPanel`) by the shell's collapse state.
+    val panelState = rememberPanelCollapseState(PaneSplit.Modules.SCRIPT_PANEL)
+    val panelOpen = !panelState.closed
+    fun setPanelByWriter(open: Boolean) = panelState.setClosed(!open)
     val panelTab by vm.panelTab.collectAsState()
     val panel by vm.panel.collectAsState()
     val select by vm.select.collectAsState()
@@ -517,10 +530,11 @@ private fun ScriptFrame(
     )
     val upperSettled = split == null && kotlin.math.abs(upperHeight - heightDp) < 0.5f
     val motion = CivilightTheme.motion
-    val panelWanted = panelOpen && !selecting && tabletop == null
-    val baseLayout = ScriptLayout.of(widthDp, panelWanted)
-    val paneSplit = rememberPaneSplitState(PaneSplit.Modules.SCRIPT_PANEL, widthDp, ScriptLayout.of(widthDp, panelOpen = true).areaWidth)
-    val targetLayout = if (baseLayout.panel && paneSplit.resizable) ScriptLayout.of(widthDp, true, area = paneSplit.leftDp) else baseLayout
+    // Select mode and tabletop put the panel out of the way for a while: no panel and no rail (the writer's choice stays).
+    val panelHidden = selecting || tabletop != null
+    val baseLayout = ScriptLayout.of(widthDp, panelOpen, height = heightDp, hidden = panelHidden)
+    val paneSplit = rememberPaneSplitState(PaneSplit.Modules.SCRIPT_PANEL, widthDp, ScriptLayout.of(widthDp, panelOpen = true, height = heightDp).areaWidth)
+    val targetLayout = if (baseLayout.panel && paneSplit.resizable) ScriptLayout.of(widthDp, true, area = paneSplit.leftDp, height = heightDp) else baseLayout
     var panelArrived by remember { mutableStateOf(targetLayout.panel) }
     LaunchedEffect(targetLayout.panel, motion) {
         if (!targetLayout.panel) {
@@ -530,7 +544,12 @@ private fun ScriptFrame(
             panelArrived = true
         }
     }
-    val layout = if (targetLayout.panel && !panelArrived && !motion.reduced) targetLayout.keepingAreaOf(ScriptLayout.of(widthDp, false)) else targetLayout
+    // The last layout without the panel (beside the rail, or full width) and the width it was for.
+    var noPanel by remember { mutableStateOf<Pair<Float, ScriptLayout>?>(null) }
+    SideEffect { if (!targetLayout.panel) noPanel = widthDp to targetLayout }
+    val beforePanel = ScriptLayout.beforePanel(noPanel?.second, noPanel?.first, widthDp, heightDp)
+    // Until the panel has arrived the manuscript keeps the width it had (SCR-66, one re-wrap).
+    val layout = if (targetLayout.panel && !panelArrived && !motion.reduced) targetLayout.keepingAreaOf(beforePanel) else targetLayout
     val preview = doc.app.view.script.preview
     val previewOnly = !LayersModel.isEditable(preview)
     // SCR-30: one row open at a time, on one side; scrolling closes it.
@@ -629,14 +648,15 @@ private fun ScriptFrame(
         vm.saveFoldState(c.unitKey, top, panelScroll.offsets())
     }
     PanelHandover(
-        sideLayout = tabletop != null || ScriptLayout.of(widthDp, panelOpen = true).panel,
+        sideLayout = tabletop != null || ScriptLayout.of(widthDp, panelOpen = true, height = heightDp).panel,
         sheetOpen = sheets.top is PanelSheetKey,
         panelOpen = panelOpen,
         editing = false,
         selecting = selecting,
     ) { handover ->
         if (handover.closeSheet && sheets.top is PanelSheetKey) sheets.close()
-        panelOpen = handover.panelOpen
+        // Unfold with the cover panel sheet open: the sheet becomes the side panel. Otherwise the stored choice stands.
+        if (handover.panelOpen && panelState.closed) panelState.setClosed(false)
         if (handover.openSheet) sheets.open(PanelSheetKey(route.projectKey))
     }
     LaunchedEffect(vm) { vm.scrollTo.collect { key -> pendingScroll = key } }
@@ -664,7 +684,7 @@ private fun ScriptFrame(
         vm.openPanelAt(blockKey, tab)
         when {
             split != null -> Unit
-            ScriptLayout.of(widthDp, panelOpen = true).panel -> panelOpen = true
+            ScriptLayout.of(widthDp, panelOpen = true, height = heightDp).panel -> if (!panelOpen) setPanelByWriter(true)
             else -> sheets.open(PanelSheetKey(route.projectKey))
         }
     }
@@ -924,18 +944,30 @@ private fun ScriptFrame(
                 }
             }
         }
-        val panelWidth = rememberLastNonNull(targetLayout.panelWidth.takeIf { targetLayout.panel }) ?: ScriptLayout.PANEL_WIDTH
+        val panelWidth = rememberLastNonNull(targetLayout.panelWidth.takeIf { targetLayout.panel }) ?: ScriptLayout.panelWidthFor(widthDp, heightDp)
+        // r3 closed state (`LScriptShut` / `PScriptShut`): the shared rail with `패널 열기`, fading in as the panel leaves.
+        // Not drawn while the panel is out of the way for a while (select mode, tabletop) or does not fit.
+        val seamShown = targetLayout.panel || targetLayout.rail
+        if (seamShown) {
+            PanelRail(
+                panelState,
+                PanelSide.END,
+                Modifier.align(Alignment.TopEnd),
+                topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+            )
+        }
         AnimatedVisibility(
             visible = targetLayout.panel,
             modifier = Modifier.align(Alignment.TopEnd),
-            enter = motion.panelEnter(),
-            exit = motion.panelExit(),
+            // To or from the rail (seam button, rail, a block's panel button) the panel slides out of the frame; any
+            // other arrival (unfold, select mode or tabletop ending) keeps the unfold entrance (CNV-34).
+            enter = if (ScriptLayout.slidesFromRail(beforePanel)) motion.panelToggleEnter() else motion.panelEnter(),
+            exit = if (ScriptLayout.slidesFromRail(targetLayout)) motion.panelToggleExit() else motion.panelExit(),
         ) {
             val actions = scriptPanelActions(route, deps, vm, gate.open, open = { sheets.open(it) }, leave = {})
             ScriptSidePanel(
                 tab = panelTab,
                 onSelectTab = vm::setPanelTab,
-                onClose = { panelOpen = false },
                 scrollOf = panelScroll::state,
                 width = panelWidth.dp,
             ) { tab ->
@@ -943,7 +975,20 @@ private fun ScriptFrame(
             }
         }
         if (targetLayout.panel) {
-            PaneSplitHandle(paneSplit, Modifier.align(Alignment.CenterStart).offset(x = (targetLayout.areaWidth - HANDLE_HALF).dp))
+            // CNV-47 ratio grip: kept, but below the r3 seam tab, which owns the seam's centre (the boards draw no grip).
+            PaneSplitHandle(
+                paneSplit,
+                Modifier.align(Alignment.CenterStart).offset(x = (targetLayout.areaWidth - HANDLE_HALF).dp, y = SPLIT_GRIP_DROP),
+            )
+        }
+        if (seamShown) {
+            // r3 `.tgb`: on the seam while open (the panel's width from the right edge), on the rail while closed.
+            PanelSeamButton(
+                panelState,
+                PanelSide.END,
+                panelDp = { panelWidth },
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxWidth(),
+            )
         }
         val lastSplit = rememberLastNonNull(split)
         AnimatedVisibility(
@@ -1032,6 +1077,9 @@ private suspend fun showAboveInput(listState: LazyListState, rows: List<ScriptRo
 private enum class BottomMode { INPUT, READ_ONLY, SELECT, NONE }
 
 private const val HANDLE_HALF = 22f
+
+/** CNV-47 grip under the seam tab: half the tab's 72 dp touch area + half the grip's 44 dp + 8 dp. */
+private val SPLIT_GRIP_DROP = 66.dp
 
 private val TABLETOP_RISE = 24.dp
 

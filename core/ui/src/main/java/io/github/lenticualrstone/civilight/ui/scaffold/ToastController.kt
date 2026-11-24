@@ -158,6 +158,18 @@ class ToastController(
         post(text, actionLabel.takeIf { onAction != null }, onAction, kind, projectKey)
     }
 
+    /**
+     * (0.2.3) A plain info toast shown for [baseMs] instead of the kind's time (the accessibility timeout can still
+     * lengthen it). Returns its id, so the caller can tell whether it is still the one shown ([isShowing]).
+     */
+    fun showBrief(text: String, baseMs: Long): Long {
+        post(text, null, null, NoticeKind.INFO, null, baseMs)
+        return nextId
+    }
+
+    /** Whether the toast [id] is the one on screen now. */
+    fun isShowing(id: Long): Boolean = _current.value?.id == id
+
     /** A failure that needs nothing from the user now (`IMPORT_FAILED`, `SAVE_FAILED`): 4 s, no action. */
     fun showError(text: String) = post(text, null, null, NoticeKind.ERROR, null)
 
@@ -167,12 +179,12 @@ class ToastController(
         return maxOf(base, recommendedTimeout(base, hasAction))
     }
 
-    private fun post(text: String, actionLabel: String?, onAction: (() -> Unit)?, kind: NoticeKind, projectKey: Key?) {
+    private fun post(text: String, actionLabel: String?, onAction: (() -> Unit)?, kind: NoticeKind, projectKey: Key?, baseMs: Long? = null) {
         val message = ToastMessage(++nextId, text, actionLabel, onAction, kind, projectKey ?: contextKey())
         timer?.cancel()
         timer = null
         _current.value = message
-        remainingMs = durationOf(kind, onAction != null)
+        remainingMs = if (baseMs != null) maxOf(baseMs, recommendedTimeout(baseMs, onAction != null)) else durationOf(kind, onAction != null)
         startTimer()
     }
 

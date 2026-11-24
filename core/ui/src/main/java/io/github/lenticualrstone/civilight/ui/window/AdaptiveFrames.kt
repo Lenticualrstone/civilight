@@ -20,26 +20,13 @@ import io.github.lenticualrstone.civilight.designsystem.glass.rememberGlassSourc
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 
 /**
- * `가운데 한 칸` (CNV-33): on an inner screen with that setting, [content] is one column at reading
- * width 560 centred on `bg`, with 1 dp `line` at both sides and the margins filled with `raise` at
- * 50 %. Elsewhere [content] fills the width.
+ * (0.2.3, r3) `가운데 한 칸` is retired: there is no centred-column layout any more, and [content] always fills the
+ * frame. Kept as a pass-through so screens that still wrap themselves in it compile unchanged; remove the call
+ * sites at leisure. On the inner screen a two-pane screen closes its side panel by the seam button instead.
  */
 @Composable
 fun CenterColumn(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val layout = LocalWindowLayout.current
-    if (!layout.centerColumn) {
-        Box(modifier.fillMaxSize()) { content() }
-        return
-    }
-    val colors = CivilightTheme.colors
-    BoxWithConstraints(modifier.fillMaxSize().background(colors.raise.copy(alpha = colors.raise.alpha * 0.5f))) {
-        val columnWidth = minOf(WindowLayout.MEASURE_DP.dp, maxWidth - 2.dp)
-        Row(Modifier.align(Alignment.Center).fillMaxHeight()) {
-            Spacer(Modifier.width(1.dp).fillMaxHeight().background(colors.line))
-            Box(Modifier.width(columnWidth).fillMaxHeight().background(colors.bg)) { content() }
-            Spacer(Modifier.width(1.dp).fillMaxHeight().background(colors.line))
-        }
-    }
+    Box(modifier.fillMaxSize()) { content() }
 }
 
 /** Copy of the `목록 + 상세` frame (CNV-33). */
@@ -62,12 +49,12 @@ fun EmptyDetailPane(modifier: Modifier = Modifier, text: String = ListDetailCopy
 }
 
 /**
- * `목록 + 상세` (CNV-33): [list] at 390 dp (or 50 % on narrow Medium windows, Q-LY-01), a 1 dp
- * `line` divider, [detail] in the rest. [detail] null shows [emptyDetail] centred in the right pane
+ * `목록 + 상세` (CNV-33, r3): [list] at 300 dp upright or 320 on its side (at most half of the frame, Q-LY-01), a
+ * 1 dp `line` divider, [detail] in the rest. [detail] null shows [emptyDetail] centred in the right pane
  * ([EmptyDetailPane], Q-LY-02: nothing selected yet; null leaves it blank on `bg`). With a [module] id
- * (`PaneSplit.Modules`) the frame carries the CNV-47 handle and uses that module's stored ratio
- * ([SplitPanes]); without one it keeps the fixed split. [bottomBar] is the frame's one bottom bar (DS-65),
- * drawn over both panes with the list pane's width.
+ * (`PaneSplit.Modules`) the frame is [SplitPanes]: the module's CNV-47 ratio and the r3 seam button that closes
+ * and reopens the list ([onListClosedChange] reports it); without one it keeps the fixed split. [bottomBar] is the
+ * frame's one bottom bar (DS-65), drawn over both panes with the list pane's width.
  */
 @Composable
 fun ListDetailPanes(
@@ -77,6 +64,8 @@ fun ListDetailPanes(
     module: String? = null,
     emptyDetail: String? = ListDetailCopy.NO_SELECTION,
     bottomBar: (@Composable (leftDp: () -> Float) -> Unit)? = null,
+    onListClosedChange: ((closed: Boolean) -> Unit)? = null,
+    hasDetail: Boolean = detail != null,
 ) {
     val right: @Composable () -> Unit = {
         when {
@@ -85,12 +74,21 @@ fun ListDetailPanes(
         }
     }
     if (module != null) {
-        SplitPanes(module, left = list, right = right, modifier = modifier, bottomBar = bottomBar)
+        SplitPanes(
+            module,
+            left = list,
+            right = right,
+            modifier = modifier,
+            bottomBar = bottomBar,
+            onPanelClosedChange = onListClosedChange,
+            hasDetail = hasDetail,
+        )
         return
     }
     val colors = CivilightTheme.colors
+    val landscape = LocalWindowLayout.current.isLandscape
     BoxWithConstraints(modifier.fillMaxSize().background(colors.bg)) {
-        val listWidth = PaneSplitRules.listDetailDefaultLeft(maxWidth.value).dp
+        val listWidth = PaneSplitRules.listDetailDefaultLeft(maxWidth.value, landscape).dp
         val source = rememberGlassSource()
         Row(Modifier.fillMaxSize().then(if (bottomBar != null) Modifier.glassSource(source) else Modifier)) {
             Box(Modifier.width(listWidth).fillMaxHeight()) { list() }

@@ -101,6 +101,8 @@ private class ListDetailScene(
                 detail = { DetailSwap(detail) },
                 module = ListDetailPairs.moduleOf(list.route),
                 bottomBar = if (frameHost != null) ({ left -> CommandFrameBar(frameHost, left, hideTitles = LocalRelocked.current) }) else null,
+                onListClosedChange = { closed -> host.listClosed = closed },
+                hasDetail = detail != null,
             )
         }
     }

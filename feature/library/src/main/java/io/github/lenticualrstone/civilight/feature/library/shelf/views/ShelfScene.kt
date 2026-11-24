@@ -102,13 +102,38 @@ object ShelfScene {
     /** The bottom fade band of a stage [stageH] dp tall: [FADE_BOTTOM], never more than a quarter of the stage. */
     fun fadeBottom(stageH: Float): Float = min(FADE_BOTTOM, stageH / 4f).coerceAtLeast(0f)
 
+    /** (0.2.3) The side fade band (dp) of 원고 더미 and 서고 회랑, never more than a sixth of the width. */
+    const val SIDE_FADE = 28f
+
+    fun sideFade(style: LibraryStyle, widthDp: Float): Float =
+        if (style == LibraryStyle.MANUSCRIPT_STACK || style == LibraryStyle.ARCHIVE_HALL) min(SIDE_FADE, widthDp / 6f).coerceAtLeast(0f) else 0f
+
+    /**
+     * (0.2.3) The frame's height in board units for a stage box [runDp] tall drawn at [scale]: the board's 500, or
+     * more where the box runs on under the dock and the search field (the views draw their backdrop to its foot).
+     */
+    fun frameH(runDp: Float, scale: Float): Float = max(STAGE_H, runDp / scale.coerceAtLeast(0.01f))
+
+    /** (0.2.3) The run of the stage box: from the fit's top to the viewport's foot (never shorter than the fit). */
+    fun runHeight(screenH: Float, fit: StageFit): Float = max(fit.height, screenH - fit.top)
+
     /** The board's scale in a stage [stageH] dp tall: the whole 390 × 500 board, scaled about its top centre. */
     fun stageScale(stageH: Float): Float = (stageH / STAGE_H).coerceIn(STAGE_MIN_H / STAGE_H, 1f)
 
     fun cap(wide: Boolean): Int = if (wide) WIDE_CAP else COVER_CAP
 
-    /** The styles that draw a 3D view (every [LibraryStyle] but `목록`). */
-    val styles: List<LibraryStyle> = LibraryStyle.entries.filterNot { it.isList }
+    /**
+     * The styles that draw a 3D view (the six U-16 boards). Explicit: the flat r3 views added in 0.2.3
+     * (`FlatViews`) are not 3D scenes and must never reach [ShelfScene3D].
+     */
+    val styles: List<LibraryStyle> = listOf(
+        LibraryStyle.BOOKSHELF,
+        LibraryStyle.COVER_SPIN,
+        LibraryStyle.MANUSCRIPT_STACK,
+        LibraryStyle.ARCHIVE_HALL,
+        LibraryStyle.INDEX_DRAWER,
+        LibraryStyle.CONSTELLATION,
+    )
 
     /**
      * The view's own pair for the picked item, or null when the view has none (a tap only brings the item
@@ -120,7 +145,7 @@ object ShelfScene {
         LibraryStyle.MANUSCRIPT_STACK -> PickPair(ShelfViewCopy.LIFT, ShelfViewCopy.PUT_DOWN)
         LibraryStyle.INDEX_DRAWER -> PickPair(ShelfViewCopy.PULL_OUT, ShelfViewCopy.PUT_BACK)
         LibraryStyle.CONSTELLATION -> PickPair(ShelfViewCopy.FORWARD, ShelfViewCopy.PUT_BACK)
-        LibraryStyle.COVER_SPIN, LibraryStyle.ARCHIVE_HALL, LibraryStyle.LIST -> null
+        else -> null
     }
 
     /**

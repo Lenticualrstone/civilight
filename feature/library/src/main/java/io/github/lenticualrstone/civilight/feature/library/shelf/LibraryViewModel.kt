@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -40,28 +41,8 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
     /** Documents by project key, for the ⋯ sheet and the delete dialog. */
     val documents: StateFlow<Map<Key, ProjectDoc?>> = libraryDocs.docs
 
-    val state: StateFlow<ShelfUi> = combine(
-        combine(stores.library.state, libraryDocs.docs) { library, docs -> library to docs },
-        combine(stores.recorder.state, stores.appState.recents.state) { recorder, recents -> recorder to recents },
-        stores.appState.onboarding.state,
-        deps.unlock.state,
-        deps.settings,
-    ) { (library, docs), (recorder, recents), onboarding, unlock, settings ->
-        ShelfState.build(
-            projects = library.live.map { ShelfProject(it, docs[it.key]) },
-            access = unlock.toAccess(),
-            relockPolicy = settings.relockPolicy,
-            recorder = recorder.library,
-            onboarding = onboarding,
-            now = deps.clock.now(),
-            zone = deps.clock.zone,
-            loaded = library.loaded,
-            // (0.2.0, LIB-93) A 3D view is drawn only when the shown style has a renderer (ShelfViews).
-            showCards = ShelfViews.of(settings).rendered != null,
-            recentItems = recents.items,
-            fileExists = stores.blobs::contains,
-        )
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, ShelfUi())
+    val state: StateFlow<ShelfUi> = shelfUiFlow(services, libraryDocs)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ShelfUi())
 
     private val recorder = RecentsRecorder(
         ports = object : RecentsRecorder.Ports {
@@ -125,6 +106,14 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
         viewModelScope.launch { stores.settings.setLibraryToggle(if (on) ViewMode.CARD else ViewMode.LIST) }
     }
 
+    /**
+     * (0.2.3) `이 보기로` in the view picker: the 서재 style (the store also turns the head toggle to it, so the
+     * picked view is what shows).
+     */
+    fun chooseStyle(style: io.github.lenticualrstone.civilight.model.app.LibraryStyle) {
+        deps.appScope.launch { stores.settings.setLibraryStyle(style) }
+    }
+
     /** `지문으로 보기` (LIB-32): one prompt opens the whole group; cancel or failure changes nothing. */
     fun unlockHiddenGroup() {
         viewModelScope.launch {
@@ -170,4 +159,40 @@ internal class LibraryViewModel(private val services: LibraryServices) : ViewMod
                 .onFailure { if (it !is ReadOnlyProjectException) throw it }
         }
     }
+}
+
+/**
+ * The masked [ShelfUi] of the 서재 (index, documents, recorder, recents, onboarding, unlock, settings). Shared by
+ * the 서재 and the view picker's preview (0.2.3), which shows the user's own projects without the 서재's side
+ * effects (recents recording, onboarding clean-up). [RowFacts] are cached per document instance.
+ */
+internal fun shelfUiFlow(services: LibraryServices, libraryDocs: LibraryDocs): kotlinx.coroutines.flow.Flow<ShelfUi> {
+    val deps = services.deps
+    val stores = deps.stores
+    val facts = io.github.lenticualrstone.civilight.feature.library.shelf.flat.RowFactsCache()
+    return combine(
+        combine(stores.library.state, libraryDocs.docs) { library, docs -> library to docs },
+        combine(stores.recorder.state, stores.appState.recents.state) { recorder, recents -> recorder to recents },
+        stores.appState.onboarding.state,
+        deps.unlock.state,
+        deps.settings,
+    ) { (library, docs), (recorder, recents), onboarding, unlock, settings ->
+        ShelfState.build(
+            projects = library.live.map { ShelfProject(it, docs[it.key]) },
+            access = unlock.toAccess(),
+            relockPolicy = settings.relockPolicy,
+            recorder = recorder.library,
+            onboarding = onboarding,
+            now = deps.clock.now(),
+            zone = deps.clock.zone,
+            loaded = library.loaded,
+            // (0.2.0, LIB-93) A 3D view is drawn only when the shown style has a renderer (ShelfViews).
+            showCards = ShelfViews.of(settings).rendered != null,
+            recentItems = recents.items,
+            fileExists = stores.blobs::contains,
+            facts = facts::of,
+        ).also { facts.sweep() }
+    }
+        // RowFacts walk every manuscript (overview, unit codes, character counts): never on the main thread.
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
 }

@@ -78,8 +78,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.LockRow
 import io.github.lenticualrstone.civilight.designsystem.component.RadioRow
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
-import io.github.lenticualrstone.civilight.designsystem.component.ViewToggle
-import io.github.lenticualrstone.civilight.designsystem.component.ViewToggleMode
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
@@ -196,19 +194,45 @@ fun GalleryScreen(route: Gallery, deps: FeatureDeps) {
         multiKeys = next.keys
     }
 
-    val viewKind = GalleryViewChoice.of(settings.viewByScreen, ownerKind)
+    // 0.2.3 (r3 `galviews`): the remembered view, one of the seven r3 views or `목록` · `격자` · `카드 진열`.
+    val style = GalleryStyleChoice.of(settings, ownerKind)
+    val viewKind = style.kind
+    var pickerOpen by rememberSaveable { mutableStateOf(false) }
+    /** The r3 views' picked lock bundle by its slot id (screen state only: it has no key, so `pickedKey` never holds it). */
+    var lockPicked by rememberSaveable { mutableStateOf<String?>(null) }
     val sort = GallerySort.entries.firstOrNull { it.name == sortName } ?: GallerySort.MANUAL
     val view = remember(ready?.doc, locked, filterId, sort) {
         ready?.let { GalleryRows.build(it.doc, ownerKind, route.ownerKey, locked, GalleryFilter.fromId(filterId), sort) }
     }
     val pick = PickState(pickedKey, expanded)
     val layout = GalleryLayout.of(inner, window.twoPanes, viewKind)
+    // The r3 views (and the picker's previews) draw from the masked view only.
+    val styleModel = remember(ready?.doc, view, locked, style.isNew || pickerOpen) {
+        val d = ready?.doc
+        if ((style.isNew || pickerOpen) && d != null && view != null && view.access == GalleryAccess.OPEN) GalleryStyleModels.build(d, view, locked, deps.clock.zone) else null
+    }
+    val styleSel = styleModel?.let { m -> GalleryStylePlans.selection(m.slots.size, m.indexOf(pickedKey), m.lockIndexOf(lockPicked)) } ?: -1
+    val styleExplicit = styleModel?.let { m -> GalleryStylePlans.isExplicit(m.slots.size, m.indexOf(pickedKey), m.lockIndexOf(lockPicked)) } ?: false
+    if (lockPicked != null && styleModel != null && styleModel.lockIndexOf(lockPicked) < 0) SideEffect { lockPicked = null }
 
     fun setPick(next: PickState) {
         if (next == PickState(pickedKey, expanded)) return
         pickedKey = next.pickedKey
         expanded = next.expanded
         vm.saveState(route.ownerKey) { GalleryPick.save(it, next) }
+    }
+
+    /** Moves the r3 pick to place [i] (never the multi set). */
+    fun selectStyleSlot(i: Int) {
+        when (val slot = styleModel?.slots?.getOrNull(i)) {
+            is StyleSlot.Item -> {
+                arriveKey = null
+                lockPicked = null
+                setPick(PickState(slot.entry.key, expanded = false))
+            }
+            is StyleSlot.Locked -> lockPicked = slot.id
+            null -> Unit
+        }
     }
 
     // Seed once from `_app` (returning restores the last pick), apply the route's item once, and drop a pick
@@ -406,10 +430,40 @@ fun GalleryScreen(route: Gallery, deps: FeatureDeps) {
                         filterId = f.id
                         arriveKey = null
                     },
-                    onView = { mode -> scope.launch { deps.stores.settings.setViewMode(GalleryViewChoice.screenOf(ownerKind), GalleryViewChoice.modeOf(mode)) } },
+                    style = style,
+                    onOpenPicker = { pickerOpen = true },
+                    styleModel = styleModel,
+                    styleSel = styleSel,
+                    styleExplicit = styleExplicit,
+                    onStylePick = { i ->
+                        val slot = styleModel?.slots?.getOrNull(i)
+                        // A tap in `여러 장 고르기` checks or unchecks; otherwise (and for the lock bundle) it picks.
+                        if (multi.active && slot is StyleSlot.Item) setMulti(multi.toggle(slot.entry.key))
+                        else if (!multi.active) selectStyleSlot(i)
+                    },
+                    onStyleMove = ::selectStyleSlot,
+                    onStyleOpen = { i ->
+                        when (val slot = styleModel?.slots?.getOrNull(i)) {
+                            is StyleSlot.Item -> viewerKey = slot.entry.key
+                            is StyleSlot.Locked -> gate.unlock()
+                            null -> Unit
+                        }
+                    },
                     onRelock = { deps.unlock.relockNow() },
                     multi = multi,
                     onMulti = ::setMulti,
+                )
+                GalleryStylePicker(
+                    open = pickerOpen,
+                    current = style,
+                    data = styleModel?.let { StylePreviewData(it, styleSel.coerceAtLeast(0)) },
+                    inner = inner,
+                    onApply = { chosen ->
+                        pickerOpen = false
+                        scope.launch { deps.stores.settings.update { GalleryStyleChoice.write(it, ownerKind, chosen) } }
+                        deps.toasts.show(GalleryStyleCopy.applied(chosen.label), actionLabel = null)
+                    },
+                    onClose = { pickerOpen = false },
                 )
             }
         }
@@ -462,7 +516,14 @@ private fun GalleryFrame(
     canAdd: Boolean,
     onAdd: () -> Unit,
     onFilter: (GalleryFilter) -> Unit,
-    onView: (GalleryViewKind) -> Unit,
+    style: GalleryStyle,
+    onOpenPicker: () -> Unit,
+    styleModel: StyleModel?,
+    styleSel: Int,
+    styleExplicit: Boolean,
+    onStylePick: (Int) -> Unit,
+    onStyleMove: (Int) -> Unit,
+    onStyleOpen: (Int) -> Unit,
     onRelock: () -> Unit,
     multi: MultiPick,
     onMulti: (MultiPick) -> Unit,
@@ -478,22 +539,8 @@ private fun GalleryFrame(
         actions = {
             if (open) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ViewToggle(
-                        mode = when (viewKind) {
-                            GalleryViewKind.LIST -> ViewToggleMode.LIST
-                            GalleryViewKind.GRID -> ViewToggleMode.GRID
-                            GalleryViewKind.CARD -> ViewToggleMode.CARD
-                        },
-                        onChange = { m ->
-                            onView(
-                                when (m) {
-                                    ViewToggleMode.LIST -> GalleryViewKind.LIST
-                                    ViewToggleMode.GRID -> GalleryViewKind.GRID
-                                    ViewToggleMode.CARD -> GalleryViewKind.CARD
-                                },
-                            )
-                        },
-                    )
+                    // `보기 ▾` (r3 `galviews` header): opens `보기 고르기` with the live preview.
+                    StyleViewButton(style, onOpenPicker)
                     if (canAdd) CivilightIconButton(IconId.Plus, GalleryUiCopy.ADD, onAdd)
                 }
             }
@@ -549,6 +596,23 @@ private fun GalleryFrame(
                 GalleryBody.EMPTY -> shown?.let { v -> ready?.let { EmptyGallery(deps, vm, v, it, locked, canAdd, onAdd, padding) } }
                 GalleryBody.ITEMS -> shown?.let { v ->
                     val doc = ready?.doc ?: return@let
+                    if (style.isNew && styleModel != null) {
+                        val s = StyleBodyState(
+                            style = style,
+                            model = styleModel,
+                            inner = layout != GalleryLayout.COVER,
+                            sel = styleSel,
+                            interactive = true,
+                            onPick = onStylePick,
+                            onOpen = onStyleOpen,
+                            multi = multi.keys.toSet().takeIf { multi.active },
+                            sharedImage = sharedImage,
+                            onMove = onStyleMove,
+                            explicit = styleExplicit,
+                        )
+                        StyleItemsBody(route, v, s, sort, sheets, padding, onFilter, onRelock, if (editable && handlers.menu != null || multi.active) onMulti else null, multi)
+                        return@let
+                    }
                     ItemsBody(route, doc, v, viewKind, layout, pick, locked, handlers, sharedImage, listState, mainRow, scrollRequest, scrollInstant, padding, sheets, onFilter, onRelock, multi, if (editable && handlers.menu != null || multi.active) onMulti else null)
                 }
             }
@@ -709,9 +773,62 @@ private fun ItemsBody(
             // One shared image per key: the right pane's image is the one that grows into `보기`.
             left = { column(GalleryBodyState(v, viewKind, layout, pick, panel, state.inner, handlers, { Modifier }, state.captionOf, multi), Modifier) },
             right = { GalleryDetailPane(state, clear) },
+            // Nothing picked: the list stays open (no rail beside an empty detail).
+            hasDetail = state.panel != null,
+            // The gallery's own top bar lies over the frame: the closed rail's `패널 열기` starts under it.
+            railTop = clear.calculateTopPadding(),
         )
         GalleryLayout.INNER_COLUMN -> CenterColumn { column(state, Modifier) }
         else -> column(state, Modifier)
+    }
+}
+
+/**
+ * An r3 view in the gallery (0.2.3): the filter chips, the order line and the unlocked bar stay on top (filter,
+ * sort, `여러 장 고르기` and `다시 잠그기` live there), and the view fills the rest between the bars with no scroll.
+ */
+@Composable
+private fun StyleItemsBody(
+    route: Gallery,
+    v: GalleryView,
+    s: StyleBodyState,
+    sort: GallerySort,
+    sheets: io.github.lenticualrstone.civilight.ui.scaffold.SheetHost,
+    padding: PaddingValues,
+    onFilter: (GalleryFilter) -> Unit,
+    onRelock: () -> Unit,
+    onMulti: ((MultiPick) -> Unit)?,
+    multi: MultiPick,
+) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val side = if (s.inner) 32.dp else 20.dp
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding() + GalleryCardFit.TOP_GAP_DP.dp, bottom = maxOf(padding.calculateBottomPadding(), navBottom))) {
+        ChipsRow(v, side, onFilter, Modifier)
+        Row(Modifier.fillMaxWidth().padding(horizontal = side).padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier
+                    .heightIn(min = 44.dp)
+                    .semantics { contentDescription = GalleryUiCopy.SORT_A11Y }
+                    .pressable(PressAction.Click({ sheets.open(GallerySortSheet(route.projectKey, route.ownerKey)) }), role = Role.Button),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                CivilightText(sort.label, type.label, color = colors.ink2, maxLines = 1)
+                CivilightIcon(IconId.Next, null, Modifier.rotate(90f), size = 14.dp, tint = colors.ink3)
+            }
+            FoldReveal(onMulti != null && !multi.active, horizontal = true, label = "styleMultiEntry") {
+                CivilightIconButton(IconButtonSpec.MULTI_SELECT, { onMulti?.invoke(MultiPick.start()) }, Modifier.padding(start = 8.dp))
+            }
+            Box(Modifier.weight(1f))
+            CivilightText(v.countLine, type.number, color = colors.ink3, maxLines = 1)
+        }
+        v.unlockedBar?.let { bar -> UnlockedBar(bar, side, onRelock, Modifier) }
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+            if (v.filteredEmpty) FilteredEmpty(side) { onFilter(GalleryFilter.All) }
+            else GalleryStyleBody(s, Modifier.fillMaxSize())
+        }
     }
 }
 

@@ -12,6 +12,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import io.github.lenticualrstone.civilight.designsystem.foundation.horizontalSwipe
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +47,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.Popover
@@ -67,20 +75,35 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * Where the CNV-47 ratios come from and go to: [settings] (`AppSettings.paneSplit`) and [write], which the
- * shell sends to `SettingsStore.setPaneSplit` (DECISIONS §1). Provided by the shell as [LocalPaneSplits].
+ * Where the CNV-47 ratios and the r3 panel state come from and go to: [settings] (`AppSettings.paneSplit`,
+ * `AppSettings.panelClosed`) and the writers, which the shell sends to the settings store (DECISIONS §1).
+ * Provided by the shell as [LocalPaneSplits].
  */
 class PaneSplitSource(
     val settings: StateFlow<AppSettings>,
     private val write: (module: String, split: PaneSplit) -> Unit,
+    private val writeClosed: (module: String, closed: Boolean) -> Unit = { _, _ -> },
 ) {
     fun set(module: String, split: PaneSplit) = write(module, split)
+
+    /** (0.2.3, r3) Whether [module]'s side panel is closed (with the `가운데 한 칸` migration, `AppSettings.panelClosedOf`). */
+    fun panelClosed(module: String): Boolean = settings.value.panelClosedOf(module)
+
+    /** (0.2.3, r3) The writer's own choice for [module], or null when it never toggled the panel. */
+    fun storedPanelClosed(module: String): Boolean? = settings.value.panelClosed[module]
+
+    /** (0.2.3, r3) Remembers [module]'s side panel as [closed] (per screen, `AppSettings.panelClosed`). */
+    fun setPanelClosed(module: String, closed: Boolean) = writeClosed(module, closed)
 
     companion object {
         /** In memory only: previews and tests outside the shell. */
         fun inMemory(): PaneSplitSource {
             val flow = MutableStateFlow(AppSettings())
-            return PaneSplitSource(flow) { m, s -> flow.value = flow.value.withPaneSplit(m, s) }
+            return PaneSplitSource(
+                flow,
+                { m, s -> flow.value = flow.value.withPaneSplit(m, s) },
+                { m, c -> flow.value = flow.value.withPanelClosed(m, c) },
+            )
         }
     }
 }
@@ -163,7 +186,7 @@ class PaneSplitState internal constructor(
 
     internal fun endDrag() {
         if (!dragging) return
-        choose(PaneSplitRules.settle(anim.value, totalDp))
+        choose(PaneSplitRules.settle(anim.value, totalDp, PaneSplitRules.clampLeft(defaultLeftDp, totalDp)))
     }
 
     /** Applies [value] at once (popover button or released drag) with the settle motion, and stores it. */
@@ -245,10 +268,17 @@ fun PaneSplitHandle(state: PaneSplitState, modifier: Modifier = Modifier) {
 }
 
 /**
- * A two-pane frame with the CNV-47 handle: [left] | 1 dp `line` | [right]. The split comes from [module]'s
- * stored ratio, [defaultLeft] gives the module's own left width for a total width (`기본`). On the cover
- * screen, or when two 280 dp panes do not fit, the frame keeps [defaultLeft] and shows no handle.
- * [bottomBar] (DS-65) is drawn once at the bottom over both panes, with the left pane's live width.
+ * A two-pane frame: [left] | 1 dp `line` | [right]. The split comes from [module]'s stored ratio (CNV-47);
+ * [defaultLeft] gives the module's own left width for a total width (`기본`; null = r3 list 300 upright, 320 on
+ * its side). On the inner screen the left pane closes and reopens by the seam button (0.2.3, r3 `Two*` / `L*`):
+ * closed, it slides out, a 56 dp rail keeps `패널 열기`, and [right] widens; the choice is remembered per
+ * [module]. Dragging the seam button sideways still resizes the open panes and settles to `1:2 · 1:1 · 2:1`
+ * (CNV-47; a drag ending nearest the module's own width settles to `기본`), and the ratios are also the button's
+ * accessibility actions. With no [hasDetail] the list stays open (the choice is kept). [railTop] is where the rail's
+ * `패널 열기` row starts (null = under the status bar; a screen with its own top bar over the frame passes that bar's
+ * height). On the cover screen, or when two 280 dp panes
+ * do not fit, the frame keeps [defaultLeft] and cannot be resized. [bottomBar] (DS-65) is drawn once at the
+ * bottom over both panes, with the left pane's live width (the rail's while closed).
  */
 @Composable
 fun SplitPanes(
@@ -256,31 +286,82 @@ fun SplitPanes(
     left: @Composable () -> Unit,
     right: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    defaultLeft: (totalDp: Float) -> Float = PaneSplitRules::listDetailDefaultLeft,
+    defaultLeft: ((totalDp: Float) -> Float)? = null,
     bottomBar: (@Composable (leftDp: () -> Float) -> Unit)? = null,
+    onPanelClosedChange: ((closed: Boolean) -> Unit)? = null,
+    hasDetail: Boolean = true,
+    railTop: Dp? = null,
 ) {
     val colors = CivilightTheme.colors
+    val window = LocalWindowLayout.current
     BoxWithConstraints(modifier.fillMaxSize().background(colors.bg)) {
         val total = maxWidth.value
-        val state = rememberPaneSplitState(module, total, defaultLeft(total))
+        val fallback = defaultLeft?.invoke(total) ?: PaneSplitRules.listDetailDefaultLeft(total, window.isLandscape)
+        val state = rememberPaneSplitState(module, total, fallback)
+        val panel = rememberPanelCollapseState(module)
+        val collapsible = PanelRules.canCollapse(window.isInner)
+        // A closed list only makes sense beside something: with nothing selected the list stays (the choice is kept
+        // and applies again with the next detail), so a screen never opens on a rail and an empty pane.
+        panel.available = collapsible && hasDetail
+        val open = { if (collapsible) panel.open else 1f }
+        val closed = panel.closed
+        val notify by rememberUpdatedState(onPanelClosedChange)
+        LaunchedEffect(closed) { notify?.invoke(closed) }
         // DS-65: the frame's one bottom bar spans both panes and blurs both, so the panes are its glass source.
         val source = rememberGlassSource()
         Box(Modifier.fillMaxSize().then(if (bottomBar != null) Modifier.glassSource(source) else Modifier)) {
-            SplitLayout(leftDp = { state.leftDp }, left = left, right = right, divider = {
-                Box(Modifier.fillMaxSize().background(colors.line))
-            })
+            SplitLayout(
+                leftDp = { state.leftDp },
+                open = open,
+                panelIn = { if (collapsible) panel.panelIn else 1f },
+                leftAlpha = { if (collapsible) panel.panelAlpha else 1f },
+                leftGone = { collapsible && panel.gone },
+                left = { Box(Modifier.collapsedPanel(closed)) { left() } },
+                right = right,
+                divider = { Box(Modifier.fillMaxSize().background(colors.line)) },
+            )
+            // Under the frame's bottom bar (which blurs it), above the panes.
+            if (collapsible) {
+                val top = railTop ?: WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+                PanelRail(panel, PanelSide.START, Modifier.align(Alignment.TopStart), topInset = top)
+            }
         }
         if (bottomBar != null) {
             Box(Modifier.align(Alignment.BottomCenter)) {
-                CompositionLocalProvider(LocalGlassSource provides source) { bottomBar { state.leftDp } }
+                CompositionLocalProvider(LocalGlassSource provides source) {
+                    bottomBar { PanelRules.mainInset(state.leftDp, open()) - PaneSplitRules.DIVIDER_DP }
+                }
             }
         }
-        PaneSplitHandle(
-            state,
-            Modifier
-                .align(Alignment.CenterStart)
-                .layoutOffset { (state.leftDp + PaneSplitRules.DIVIDER_DP / 2f - HANDLE_HIT.value / 2f) },
-        )
+        if (collapsible && hasDetail) {
+            val density = LocalDensity.current.density
+            val ratios = PaneSplitRules.CHOICES.map { choice ->
+                CustomAccessibilityAction("${PaneSplitCopy.HANDLE} ${PaneSplitRules.label(choice)}") {
+                    state.choose(choice)
+                    true
+                }
+            }
+            PanelSeamButton(
+                panel,
+                PanelSide.START,
+                panelDp = { state.leftDp },
+                modifier = Modifier.align(Alignment.CenterStart),
+                extraActions = if (!panel.closed && state.resizable) ratios else emptyList(),
+                dragModifier = Modifier.horizontalSwipe(
+                    enabled = !panel.closed && state.resizable,
+                    onStart = { state.startDrag() },
+                    onDelta = { px -> state.dragBy(px / density) },
+                    onStop = { state.endDrag() },
+                ),
+            )
+        } else {
+            PaneSplitHandle(
+                state,
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .layoutOffset { (state.leftDp + PaneSplitRules.DIVIDER_DP / 2f - HANDLE_HIT.value / 2f) },
+            )
+        }
     }
 }
 
@@ -290,30 +371,45 @@ private fun Modifier.layoutOffset(x: () -> Float): Modifier = layout { measurabl
     layout(p.width, p.height) { p.place(IntOffset((x() * density).roundToInt(), 0)) }
 }
 
-/** left | divider | right, with the left width read in the layout phase. */
+/**
+ * left | divider | right, with the left width and the open amount read in the layout phase. While the left pane
+ * closes it slides out past the start edge by [panelIn] (keeping its width, so it does not re-flow; with reduced
+ * motion it stays and fades) and the right pane starts at [PanelRules.mainInset] for [open]; once [leftGone] the
+ * left pane is not placed at all (no touches, no drawing).
+ */
 @Composable
 private fun SplitLayout(
     leftDp: () -> Float,
+    open: () -> Float,
+    panelIn: () -> Float,
+    leftAlpha: () -> Float,
+    leftGone: () -> Boolean,
     left: @Composable () -> Unit,
     right: @Composable () -> Unit,
     divider: @Composable () -> Unit,
 ) {
     Layout(
-        contents = listOf({ Box { left() } }, divider, { Box { right() } }),
+        contents = listOf({ Box(Modifier.graphicsLayer { alpha = leftAlpha() }) { left() } }, divider, { Box { right() } }),
         modifier = Modifier.fillMaxSize(),
     ) { (l, d, r), constraints ->
         val total = constraints.maxWidth
         val height = constraints.maxHeight
         val dividerPx = (PaneSplitRules.DIVIDER_DP * density).roundToInt().coerceAtLeast(1)
         val leftPx = (leftDp() * density).roundToInt().coerceIn(0, (total - dividerPx).coerceAtLeast(0))
-        val rightPx = (total - leftPx - dividerPx).coerceAtLeast(0)
+        val o = open()
+        val shiftPx = (PanelRules.panelShift(leftDp(), panelIn()) * density).roundToInt().coerceIn(0, leftPx)
+        val mainStart = (PanelRules.mainInset(leftDp(), o) * density).roundToInt().coerceIn(0, total)
+        val rightPx = (total - mainStart).coerceAtLeast(0)
         val lp = l.first().measure(Constraints.fixed(leftPx, height))
         val dp = d.first().measure(Constraints.fixed(dividerPx, height))
         val rp = r.first().measure(Constraints.fixed(rightPx, height))
+        val gone = leftGone()
         layout(total, height) {
-            lp.place(0, 0)
-            dp.place(leftPx, 0)
-            rp.place(leftPx + dividerPx, 0)
+            rp.place(mainStart, 0)
+            if (!gone) {
+                lp.place(-shiftPx, 0, zIndex = 1f)
+                dp.place(leftPx - shiftPx, 0, zIndex = 1f)
+            }
         }
     }
 }

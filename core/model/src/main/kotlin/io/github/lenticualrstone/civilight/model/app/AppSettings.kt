@@ -59,7 +59,29 @@ data class AppSettings(
     val castToggle: ViewMode? = null,
     /** (0.2.0, LIB-94) Tilt follow switch; see [Tilt.follows]. */
     val viewTilt: Boolean = true,
+    /**
+     * (0.2.3, r3 `패널 닫기`) Side panel closed per two-pane screen: module id (see [PaneSplit.Modules]) → closed.
+     * Absent reads [panelClosedOf]'s migrated default; not written while empty.
+     */
+    val panelClosed: Map<String, Boolean> = emptyMap(),
+    /**
+     * (0.2.3, r3 `galviews`) The r3 gallery view per gallery screen: [GALLERY_CHARACTER] / [GALLERY_PROJECT] → view id
+     * (feature:canvas `GalleryStyle`). Only the seven new views are stored here; `목록` · `격자` · `카드 진열` stay in
+     * [viewByScreen], which an r3 view also sets to [ViewMode.CARD] so an older build shows `카드`. Absent or an
+     * unknown id reads [viewByScreen]; not written while empty.
+     */
+    val galleryStyle: Map<String, String> = emptyMap(),
 ) {
+    /**
+     * Whether [module]'s side panel (list or script panel) is closed (0.2.3, r3). Without a choice of its own,
+     * the retired `가운데 한 칸` ([UnfoldedLayout.CENTER_COLUMN], kept stored and no longer offered) reads as
+     * closed: one wide main pane, the nearest thing to the old single column. Nothing is rewritten.
+     */
+    fun panelClosedOf(module: String): Boolean = panelClosed[module] ?: (unfoldedLayout == UnfoldedLayout.CENTER_COLUMN)
+
+    /** [module]'s side panel set to [closed] (stored explicitly, so it no longer follows the migrated default). */
+    fun withPanelClosed(module: String, closed: Boolean): AppSettings = copy(panelClosed = panelClosed + (module to closed))
+
     /** The remembered pane ratio of [module] (CNV-47); [PaneSplit.DEFAULT] when none was chosen. */
     fun paneSplitOf(module: String): PaneSplit = paneSplit[module] ?: PaneSplit.DEFAULT
 
@@ -98,7 +120,30 @@ enum class LibraryStyle {
     CONSTELLATION,
 
     /** `목록`. */
-    LIST;
+    LIST,
+
+    // (0.2.3, r3 `libviews`) Flat 서재 views, appended after LIST: stored by name, so 0.2.2 values read as before.
+
+    /** `타임라인` (띠). */
+    TIMELINE,
+
+    /** `원고지` (격자). */
+    MANUSCRIPT_GRID,
+
+    /** `편지함`. */
+    MAILBOX,
+
+    /** `진행 칸`. */
+    PROGRESS_CELLS,
+
+    /** `표지 벽`. */
+    COVER_WALL,
+
+    /** `포스터` (넘기기). */
+    POSTER,
+
+    /** `표`. */
+    TABLE;
 
     val isList: Boolean get() = this == LIST
 
@@ -236,6 +281,11 @@ enum class ThemeMode {
     object Codec : LowerCamelEnumSerializer<ThemeMode>("ThemeMode", entries, SYSTEM)
 }
 
+/**
+ * `펼친 화면 배치` (CNV-33). (0.2.3, r3) No longer offered or read for layout: two panes are always drawn and
+ * each screen's side panel closes by its own button ([AppSettings.panelClosed]). The stored value is kept and
+ * only seeds [AppSettings.panelClosedOf].
+ */
 @Serializable(with = UnfoldedLayout.Codec::class)
 enum class UnfoldedLayout {
     LIST_DETAIL, CENTER_COLUMN;

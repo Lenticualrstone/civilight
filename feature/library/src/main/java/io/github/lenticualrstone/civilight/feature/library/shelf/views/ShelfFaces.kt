@@ -316,8 +316,10 @@ internal class LookB(
     val far: Color, val glow: Color, val wsh: Color, val cone: Color, val bulb: Color, val edge: Color, val tint: Color, val ink: Color, val ink2: Color, val bg: Color,
 ) {
     companion object {
+        // (0.2.3) `wall` = the theme's `bg` (was 16110E / E6DFD2): the stage behind the desk no longer reads as a
+        // coloured box now that it runs on under the bars.
         val dark = LookB(
-            Color(0xFF16110E), Color(0xFF0B0C0E), Color(0xFF3B2A1F), Color(0xFF1B130E), Color(255, 226, 190).copy(alpha = .05f), Color(255, 196, 124).copy(alpha = .34f),
+            Color(0xFF0B0C0E), Color(0xFF0B0C0E), Color(0xFF3B2A1F), Color(0xFF1B130E), Color(255, 226, 190).copy(alpha = .05f), Color(255, 196, 124).copy(alpha = .34f),
             Color(0xFFECE5D6), Color(0xFFD5CBB8), Color(0xFFB9AE99), Color(0xFF22201C), Color(0xFF6A6358), Color.Black.copy(alpha = .62f), Color(0xFF1C1D20), Color(0xFF6A6E77),
             Color(0xFF241A14), Color(0xFF120D0A), Color(0xFF3E2C20), Color(0xFF0A0807),
             listOf(Color(0xFF4A3426), Color(0xFF2E3A4D), Color(0xFF5C4330), Color(0xFF3A2820), Color(0xFF2C3529)),
@@ -326,7 +328,7 @@ internal class LookB(
             Color.White.copy(alpha = .38f), Color.White.copy(alpha = .07f), Color(0xFFECECEF), Color(0xFFB4B6BD), Color(0xFF0B0C0E),
         )
         val light = LookB(
-            Color(0xFFE6DFD2), Color(0xFFF6F5F1), Color(0xFFD2BA9C), Color(0xFFA98B6C), Color(80, 50, 20).copy(alpha = .07f), Color(255, 250, 236).copy(alpha = .62f),
+            Color(0xFFF6F5F1), Color(0xFFF6F5F1), Color(0xFFD2BA9C), Color(0xFFA98B6C), Color(80, 50, 20).copy(alpha = .07f), Color(255, 250, 236).copy(alpha = .62f),
             Color(0xFFFFFDF7), Color(0xFFE8E1D3), Color(0xFFCFC6B4), Color(0xFF1C1B18), Color(0xFF5D574D), Color(70, 46, 24).copy(alpha = .30f), Color(0xFF2A2B2E), Color(0xFF8D9097),
             Color(0xFFD6C8B3), Color(0xFFB8A68C), Color(0xFF8E6E50), Color(0xFF5A4836),
             listOf(Color(0xFFA47A5C), Color(0xFF6E819A), Color(0xFFC29874), Color(0xFF8C6852), Color(0xFF7F8D74)),

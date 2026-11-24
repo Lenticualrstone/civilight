@@ -43,6 +43,13 @@ object ViewStyles {
         LibraryStyle.INDEX_DRAWER -> SettingsCopy.LIB_INDEX_DRAWER
         LibraryStyle.CONSTELLATION -> SettingsCopy.LIB_CONSTELLATION
         LibraryStyle.LIST -> SettingsCopy.VIEW_LIST
+        LibraryStyle.TIMELINE -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.TIMELINE
+        LibraryStyle.MANUSCRIPT_GRID -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.PAPER
+        LibraryStyle.MAILBOX -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.MAIL
+        LibraryStyle.PROGRESS_CELLS -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.CELLS
+        LibraryStyle.COVER_WALL -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.WALL
+        LibraryStyle.POSTER -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.POSTER
+        LibraryStyle.TABLE -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.TABLE
     }
 
     fun label(style: CardStyle): String = when (style) {

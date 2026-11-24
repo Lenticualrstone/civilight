@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -138,7 +137,8 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
         }
     }
 
-    BackHandler(enabled = state.stage != CaptureStage.IDLE) {
+    // 0.2.3: through the shell's layered back, so a layer opened later closes first.
+    io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler.current(state.stage != CaptureStage.IDLE) {
         if (state.stage == CaptureStage.RECORDING) leaveNow() else hub.launch { back() }
     }
 

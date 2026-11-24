@@ -138,6 +138,11 @@ object ScriptCopy {
     /** `닫기` (the command field while typing; the DS sheet header's default label). */
     const val CLOSE = "닫기"
 
+    // --- Side panel (decision 0.2.3 · r3, boards `LScript` / `PScript`; the seam and rail copy is core:ui `PanelCopy`) ---
+
+    /** The panel's accessibility name (board `aria-label`). */
+    const val PANEL_NAME = "사이드 패널 · 시간 · 참고 · 속성 · 모듈"
+
     // --- 표시 sheet (SCR-26 … SCR-29, board `Layers`) ---
 
     const val LAYERS_TITLE = "표시"
@@ -320,6 +325,7 @@ object ScriptCopy {
         ID_FORMAT, FORMAT_PATTERN, FORMAT_MANUAL, FIXED_ON_EXPORT, patternSub("HRT_0107_043"), MANUAL_SUB,
         RELINK, TRASH_RECORD, LINK_TO_BLOCK, RECORD_CHANGE_ROW, recordTrashed("◆ 관계 · 리엔 → 하르트"), blockRestored("#043"), UNDO_RELINK, MOD_TODAY, MOD_SCENE, MOD_CHECKS, MOD_MEMO, MODS_FOOTER,
         checkPreReveal(1), checkNoSpeaker(1), MODS_NO_CHECKS, MODS_SCENE_EMPTY, UNDO_TRASH_RECORD,
+        PANEL_NAME,
     )
 
     /** Buttons (linted with the button rules). */

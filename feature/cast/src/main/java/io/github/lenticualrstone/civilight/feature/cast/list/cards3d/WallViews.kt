@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import io.github.lenticualrstone.civilight.designsystem.foundation.horizontalSwipe
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
@@ -132,6 +132,8 @@ internal fun TiltedWallView(env: CardEnv) {
     val fromXf = remember { CardXform() }
     // The stage scale for the pulled card's drag (a plain holder: written while composing, read in input).
     val unitNow = remember { floatArrayOf(1f) }
+    /** The pulled card's horizontal drag so far, in board px. */
+    val pullRaw = remember { floatArrayOf(0f) }
     val measureFrom: (Int) -> Unit = { i ->
         val slotRow = CardPoses.wallRow(i) - row.value
         val cx = WALL_X + CardPoses.wallSlotX(i) + CardPoses.WALL_CW / 2
@@ -306,29 +308,24 @@ internal fun TiltedWallView(env: CardEnv) {
                                 transformOrigin = TransformOrigin.Center
                             }
                             .then(rememberCardShadow(pullShadow, 20f, unit))
-                            .pointerInput(item.key, env.reduced) {
-                                // Under reduced motion the card does not follow; the release still steps (board `fup`).
-                                var raw = 0f
-                                detectHorizontalDragGestures(
-                                    onDragStart = { raw = 0f },
-                                    onDragEnd = {
-                                        when {
-                                            raw < -CardPoses.PULL_STEP_PX -> stepPulled(1)
-                                            raw > CardPoses.PULL_STEP_PX -> stepPulled(-1)
-                                        }
-                                        raw = 0f
-                                        scope.launch { animate(dragX.floatValue, 0f, 0f, spring(CivilightMotion.wallPullDamping, CivilightMotion.wallPullStiffness)) { v, _ -> dragX.floatValue = v } }
-                                    },
-                                    onDragCancel = {
-                                        raw = 0f
-                                        dragX.floatValue = 0f
-                                    },
-                                ) { change, d ->
-                                    change.consume()
-                                    raw += d / unitNow[0]
-                                    if (!env.reduced) dragX.floatValue = raw
-                                }
-                            }
+                            // Under reduced motion the card does not follow; the release still steps (board `fup`). 0.2.3 gesture
+                            // rules: undecided inside the slop (tap and long press stay), a vertical drag is let go.
+                            .horizontalSwipe(
+                                onStart = { pullRaw[0] = 0f },
+                                onDelta = { d ->
+                                    pullRaw[0] += d / unitNow[0]
+                                    if (!env.reduced) dragX.floatValue = pullRaw[0]
+                                },
+                                onStop = {
+                                    val raw = pullRaw[0]
+                                    when {
+                                        raw < -CardPoses.PULL_STEP_PX -> stepPulled(1)
+                                        raw > CardPoses.PULL_STEP_PX -> stepPulled(-1)
+                                    }
+                                    pullRaw[0] = 0f
+                                    scope.launch { animate(dragX.floatValue, 0f, 0f, spring(CivilightMotion.wallPullDamping, CivilightMotion.wallPullStiffness)) { v, _ -> dragX.floatValue = v } }
+                                },
+                            )
                             .pressable(onClick = { env.activate(item) }, scaleOnPress = false, onClickLabel = itemLabel(item), shape = shape)
                             .cardLongPress(true, LongPressGate.label(item), env.longPress(item))
                             .clip(shape),

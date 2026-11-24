@@ -1,6 +1,5 @@
 package io.github.lenticualrstone.civilight.feature.story.bulk
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -86,7 +85,8 @@ fun BulkScreen(route: BulkPlaceTime, deps: FeatureDeps) {
         }
     }
 
-    BackHandler(enabled = suggesting) { suggesting = false }
+    // 0.2.3: through the shell's layered back, so a layer opened later closes first.
+    io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler.current(suggesting) { suggesting = false }
     val showSuggest = suggesting && doc != null && ui != null
     val actions = BulkActions(
         onToggle = { key -> selected = BulkModel.toggle(selected, key) },

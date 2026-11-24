@@ -6,7 +6,6 @@ import io.github.lenticualrstone.civilight.domain.cast.field.FieldTemplates
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.model.app.AnimationPref
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
-import io.github.lenticualrstone.civilight.model.app.UnfoldedLayout
 import io.github.lenticualrstone.civilight.model.app.ThemeMode
 import io.github.lenticualrstone.civilight.ui.security.AuthRequest
 import io.github.lenticualrstone.civilight.ui.security.AuthResult
@@ -51,10 +50,6 @@ internal class SettingsViewModel(private val services: LibraryServices) : ViewMo
         .map(SettingsState::textSize)
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsState.textSize(deps.settings.value))
 
-    val layout: StateFlow<LayoutSettingsUi> = deps.settings
-        .map(DisplaySettingsState::layout)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, DisplaySettingsState.layout(deps.settings.value))
-
     val motion: StateFlow<MotionSettingsUi> = deps.settings
         .map(DisplaySettingsState::motion)
         .stateIn(viewModelScope, SharingStarted.Eagerly, DisplaySettingsState.motion(deps.settings.value))
@@ -84,10 +79,6 @@ internal class SettingsViewModel(private val services: LibraryServices) : ViewMo
     /** (0.2.0, LIB-94) `TODO_COPY_LIB_VIEW_TILT`. */
     fun setViewTilt(on: Boolean) {
         viewModelScope.launch { settingsStore.setViewTilt(on) }
-    }
-
-    fun setLayout(layout: UnfoldedLayout) {
-        viewModelScope.launch { settingsStore.setUnfoldedLayout(layout) }
     }
 
     fun setAnimation(pref: AnimationPref) {

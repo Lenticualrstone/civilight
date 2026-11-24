@@ -48,6 +48,12 @@ data class ProjectRowUi(
     val thumb: CoverUi = CoverUi(null, null, null, "", holo = false),
     /** (0.2.0, LIB-93 별자리) The project's 형식; null while the document loads or for a value this version does not know. */
     val format: ProjectFormat? = null,
+    /** (0.2.3, flat views) Characters, cast, progress cells and the last place; null while the document loads. */
+    val facts: io.github.lenticualrstone.civilight.feature.library.shelf.flat.RowFacts? = null,
+    /** (0.2.3) `오늘 08:12`, `어제`, `3일 전` …: the last edit alone (the meta line carries it among others). */
+    val edited: String = "",
+    /** (0.2.3, 타임라인) Days since the last edit: whole calendar days plus the elapsed share of the day. */
+    val ageDays: Float = 0f,
 )
 
 /** The open hidden group (`LibUnlocked`): `숨긴 프로젝트 <M> · 열림`, the re-lock note, its rows. */
@@ -120,12 +126,14 @@ object ShelfState {
         recentItems: List<RecentItem> = emptyList(),
         /** Whether a cover original is on this device; a missing one draws the initial-letter card (U-08 LIB-88). */
         fileExists: (String) -> Boolean = { true },
+        /** (0.2.3) A row's facts from its document; the view model passes a cache ([RowFactsCache]). */
+        facts: (ProjectDoc) -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.RowFacts = io.github.lenticualrstone.civilight.feature.library.shelf.flat.RowFacts::of,
     ): ShelfUi {
         val live = projects.filter { it.entry.deletedAt == null }.sortedByDescending { it.entry.updatedAt }
         val byKey = live.associateBy { it.entry.key }
         val listing = LibraryListing.of(live.map(::profileOf), access)
         // A locked hidden project is neither in `rows` nor in `openGroup`, so its cover is never read (U-08 LIB-89).
-        fun row(profile: ProjectProfile) = rowOf(byKey.getValue(profile.key), now, zone, fileExists)
+        fun row(profile: ProjectProfile) = rowOf(byKey.getValue(profile.key), now, zone, fileExists, facts)
         val openGroup = listing.openGroup.takeIf { it.isNotEmpty() }?.let { hidden ->
             OpenGroupUi(
                 header = "${HiddenGroupRow(hidden.size).title} · ${ShelfCopy.GROUP_OPEN}",
@@ -187,7 +195,13 @@ object ShelfState {
      */
     fun coverProtects(protections: Protections, cover: CoverUi): Boolean = protections.captureBlock && cover.isImage
 
-    private fun rowOf(p: ShelfProject, now: Timestamp, zone: ZoneId, fileExists: (String) -> Boolean): ProjectRowUi {
+    private fun rowOf(
+        p: ShelfProject,
+        now: Timestamp,
+        zone: ZoneId,
+        fileExists: (String) -> Boolean,
+        facts: (ProjectDoc) -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.RowFacts,
+    ): ProjectRowUi {
         val doc = p.doc
         return ProjectRowUi(
             key = p.entry.key,
@@ -199,6 +213,21 @@ object ShelfState {
             readOnly = p.entry.readOnly || p.entry.isExample,
             thumb = ShelfCards.thumb(doc, doc?.project?.name ?: p.entry.name, fileExists),
             format = doc?.project?.format?.known,
+            facts = doc?.let(facts),
+            edited = TimeLabels.relative(p.entry.updatedAt, now, zone),
+            ageDays = ageDays(p.entry.updatedAt, now, zone),
         )
+    }
+
+    /**
+     * (0.2.3, 타임라인) Whole calendar days since [at] (as `TimeLabels.relative` counts them), plus where in its
+     * day the edit fell: a later edit of the same day reads younger. Always below the next whole day.
+     */
+    fun ageDays(at: Timestamp, now: Timestamp, zone: ZoneId): Float {
+        val days = TimeLabels.daysBetween(at, now, zone).coerceAtLeast(0L)
+        val t = java.time.Instant.ofEpochMilli(at).atZone(zone)
+        val start = t.toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
+        val share = ((at - start).toFloat() / 86_400_000f).coerceIn(0f, 1f)
+        return days + (1f - share) * .99f
     }
 }

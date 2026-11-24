@@ -113,6 +113,9 @@ data class CommandBarLayout(
 
 /** DS-65 geometry and the frame layout, pure. */
 object CommandBarRules {
+    /** (0.2.3) Whether a pane of [scope] takes part in the frame bar: never the list while it is closed. */
+    fun paneShown(scope: CommandScope, listClosed: Boolean): Boolean = !(listClosed && scope == CommandScope.LIST)
+
     const val BAR: Int = 130
     const val BAR_WITH_ROW: Int = 150
     const val ROW_MAX_INNER: Float = 720f
@@ -217,10 +220,19 @@ class CommandBarHost(initial: CommandScope = CommandScope.LIST) {
     /** True while a pane shows a sheet: the frame bar steps aside so the sheet and its scrim are never under it. */
     val anySheetOpen: Boolean get() = sheets.values.any { it }
 
-    internal fun active(scope: CommandScope): Registration? = registrations.lastOrNull { it.scope == scope && it.commandBar != null }
+    /**
+     * (0.2.3, r3) The list pane is closed by its seam button: it contributes no bar, no switch cell and no extra
+     * row while closed, so the frame bar never commands a pane that is not on screen.
+     */
+    var listClosed by mutableStateOf(false)
 
-    /** Any pane declares a command bar. */
-    val hasBar: Boolean get() = registrations.any { it.commandBar != null }
+    private fun shown(r: Registration): Boolean = CommandBarRules.paneShown(r.scope, listClosed)
+
+    internal fun active(scope: CommandScope): Registration? =
+        registrations.lastOrNull { it.scope == scope && it.commandBar != null && shown(it) }
+
+    /** Any pane on screen declares a command bar. */
+    val hasBar: Boolean get() = registrations.any { it.commandBar != null && shown(it) }
 
     /** The bottom padding every pane gets: the frame bar's height, or 0 with no bar. */
     val panePadding: Dp get() = if (hasBar) barHeight else 0.dp

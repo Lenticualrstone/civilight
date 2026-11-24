@@ -174,6 +174,9 @@ enum class IconId(val pathData: String) {
 
     /** `내려놓기` (원고 더미). */
     Drop("M4 17h16M4 20.5h16M7 8h10v5.5H7zM9.5 3L12 5l2.5-2"),
+
+    /** `패널 열기` on the closed side panel's rail (r3 `L*Shut` / `Two*Shut`). */
+    Panel("M4 5h16v14H4zM9 5v14"),
     ;
 
     companion object {

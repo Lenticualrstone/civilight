@@ -6,7 +6,6 @@ import android.hardware.SensorManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import io.github.lenticualrstone.civilight.designsystem.foundation.horizontalSwipe
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -200,31 +200,30 @@ internal fun BoardStage(boardH: Float, modifier: Modifier = Modifier, content: @
 /**
  * A horizontal or vertical drag of a stage, reporting px moved and, on release, the velocity in px/s. [key]
  * restarts the gesture when what the callbacks capture changes (the deck, the stage scale, reduced motion).
+ *
+ * 0.2.3 gesture rules (core `GestureRules`, shared `horizontalSwipe`): a horizontal stage stays undecided inside
+ * the touch slop (a card's tap and long press still work), and lets a drag that reads vertical go unconsumed, so the
+ * list column around a short stage scrolls instead of the deck jumping on a diagonal flick.
  */
+@Composable
 internal fun Modifier.stageDrag(
     key: Any,
     vertical: Boolean,
     onStart: () -> Unit = {},
     onDrag: (Float) -> Unit,
     onEnd: (velocity: Float) -> Unit,
-): Modifier = pointerInput(key, vertical) {
-    val tracker = VelocityTracker()
-    val start: (androidx.compose.ui.geometry.Offset) -> Unit = {
-        tracker.resetTracking()
-        onStart()
+): Modifier {
+    if (!vertical) {
+        return horizontalSwipe(onStart = onStart, onDelta = onDrag, onStop = onEnd)
     }
-    val end = {
-        val v = tracker.calculateVelocity()
-        onEnd(if (vertical) v.y else v.x)
-    }
-    if (vertical) {
-        detectVerticalDragGestures(onDragStart = start, onDragEnd = end, onDragCancel = { onEnd(0f) }) { change, d ->
-            change.consume()
-            tracker.addPosition(change.uptimeMillis, change.position)
-            onDrag(d)
+    return pointerInput(key, vertical) {
+        val tracker = VelocityTracker()
+        val start: (androidx.compose.ui.geometry.Offset) -> Unit = {
+            tracker.resetTracking()
+            onStart()
         }
-    } else {
-        detectHorizontalDragGestures(onDragStart = start, onDragEnd = end, onDragCancel = { onEnd(0f) }) { change, d ->
+        val end = { onEnd(tracker.calculateVelocity().y) }
+        detectVerticalDragGestures(onDragStart = start, onDragEnd = end, onDragCancel = { onEnd(0f) }) { change, d ->
             change.consume()
             tracker.addPosition(change.uptimeMillis, change.position)
             onDrag(d)

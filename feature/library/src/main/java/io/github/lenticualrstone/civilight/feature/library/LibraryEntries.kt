@@ -21,7 +21,6 @@ import io.github.lenticualrstone.civilight.feature.library.rating.RatingChangeCo
 import io.github.lenticualrstone.civilight.feature.library.rating.RatingDefaultsApplyScreen
 import io.github.lenticualrstone.civilight.feature.library.rating.RatingSettingsScreen
 import io.github.lenticualrstone.civilight.feature.library.settings.HidingSettingsScreen
-import io.github.lenticualrstone.civilight.feature.library.settings.LayoutSettingsScreen
 import io.github.lenticualrstone.civilight.feature.library.settings.MoreSettingsScreen
 import io.github.lenticualrstone.civilight.feature.library.settings.MotionSettingsScreen
 import io.github.lenticualrstone.civilight.feature.library.settings.SettingsScreen
@@ -73,7 +72,8 @@ fun EntryProviderScope<NavKey>.libraryEntries(deps: FeatureDeps) {
     }
     entry<SettingsHiding> { HidingSettingsScreen(services) }
     entry<SettingsTextSize> { TextSizeScreen(services) }
-    entry<SettingsLayout> { LayoutSettingsScreen(services) }
+    // (0.2.3, r3) `펼친 화면 배치` is gone. The route stays so a saved back stack still restores; it steps back at once.
+    entry<SettingsLayout> { androidx.compose.runtime.LaunchedEffect(Unit) { deps.navigator.pop() } }
     entry<SettingsMotion> { MotionSettingsScreen(services) }
     entry<SettingsMore> { MoreSettingsScreen(services) }
     entry<SettingsRating> { RatingSettingsScreen(services) }

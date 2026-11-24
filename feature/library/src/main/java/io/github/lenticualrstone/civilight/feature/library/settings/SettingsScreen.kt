@@ -1,6 +1,11 @@
 package io.github.lenticualrstone.civilight.feature.library.settings
 
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
+import kotlinx.coroutines.flow.stateIn
+import androidx.lifecycle.viewModelScope
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -22,7 +27,7 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 
 /**
  * 설정 (LIB-63, board `Settings`; head `Civilight` / `설정`). Sections `화면` (theme segmented, 글자
- * 크기, 펼친 화면 배치, 움직임 · 투명도, 지도 · 이미지 · 연표), `보관` (Drive, 복구 암호) and `보안` (앱
+ * 크기, 움직임 · 투명도, 지도 · 이미지 · 연표), `보관` (Drive, 복구 암호) and `보안` (앱
  * 잠금, 숨기기), then the rows the board does not draw (§6 Q27 `ED`): 휴지통, 라이프 레코더, 도움말 ·
  * 안내 다시 보기. Each row's route is [SettingsRoutes.routeOf] (CNV-18 row map).
  */
@@ -40,8 +45,8 @@ internal fun SettingsScreen(services: LibraryServices) {
         SettingsSection(SettingsCopy.SECTION_SCREEN, first = true)
         ThemeSegmented(ui.themeIndex, vm::setTheme, Modifier.padding(top = 4.dp, bottom = 6.dp))
         LinkRow(ui.textSize) { open(SettingsRootRow.TEXT_SIZE) }
-        LinkRow(ui.layout) { open(SettingsRootRow.LAYOUT) }
-        // (0.2.0, LIB-94) After `펼친 화면 배치`: `서재 보기`, `카드 보기`, then the tilt switch, each drawn
+        // (0.2.3, r3) `펼친 화면 배치` is gone: inner screens always draw two panes with a closable side panel.
+        // (0.2.0, LIB-94) After `글자 크기`: `서재 보기`, `카드 보기`, then the tilt switch, each drawn
         // only while a 3D view it would change has a renderer (no control that does nothing).
         ui.libraryView?.let { row -> LinkRow(row) { navigator.push(ViewKind.LIBRARY.route) } }
         ui.cardView?.let { row -> LinkRow(row) { navigator.push(ViewKind.CARD.route) } }
@@ -78,6 +83,15 @@ internal fun ViewStyleScreen(kind: ViewKind, services: LibraryServices) {
     val navigator = services.deps.navigator
     val vm = entryViewModel { SettingsViewModel(services) }
     val settings by services.deps.settings.collectAsState()
+    // (0.2.3, r3 `viewpick`) 서재 보기 is the view picker with its live preview, over the current view (inert).
+    // 카드 보기 keeps the radio list: the card views are drawn by feature:cast, which this module cannot preview.
+    if (kind == ViewKind.LIBRARY) {
+        LibraryViewPickScreen(services, io.github.lenticualrstone.civilight.model.app.ShownView.library(settings), onApply = { style ->
+            vm.chooseView(kind, style.name)
+            navigator.pop()
+        }, onCancel = { navigator.pop() })
+        return
+    }
     val options = remember(settings, kind) { ViewStyles.options(kind, settings) }
     SettingsFrame(
         title = ViewStyles.title(kind),
@@ -94,5 +108,36 @@ internal fun ViewStyleScreen(kind: ViewKind, services: LibraryServices) {
                 },
             )
         }
+    }
+}
+
+/** The picker's own masked 서재 (no recents recording, no onboarding clean-up: see [shelfUiFlow]). */
+internal class ViewPickViewModel(services: LibraryServices) : androidx.lifecycle.ViewModel() {
+    private val docs = io.github.lenticualrstone.civilight.feature.library.common.LibraryDocs(services.deps.stores.library, viewModelScope)
+    val state: kotlinx.coroutines.flow.StateFlow<io.github.lenticualrstone.civilight.feature.library.shelf.ShelfUi> =
+        io.github.lenticualrstone.civilight.feature.library.shelf.shelfUiFlow(services, docs)
+            .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, io.github.lenticualrstone.civilight.feature.library.shelf.ShelfUi())
+}
+
+@Composable
+private fun LibraryViewPickScreen(
+    services: LibraryServices,
+    stored: io.github.lenticualrstone.civilight.model.app.LibraryStyle,
+    onApply: (io.github.lenticualrstone.civilight.model.app.LibraryStyle) -> Unit,
+    onCancel: () -> Unit,
+) {
+    val pvm = entryViewModel { ViewPickViewModel(services) }
+    val ui by pvm.state.collectAsState()
+    val shown = remember(stored) {
+        val entries = io.github.lenticualrstone.civilight.feature.library.shelf.flat.ViewPick.entries()
+        entries[io.github.lenticualrstone.civilight.feature.library.shelf.flat.ViewPick.currentIndex(entries, stored)].style
+    }
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg)) {
+        // The screen behind keeps clear of the system bars; the picker pads its own sheet or dialog.
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding()) {
+            io.github.lenticualrstone.civilight.feature.library.shelf.flat.StylePreview(shown, ui, maxWidth, maxHeight)
+        }
+        // Until the stores answer, only the screen behind is drawn (the picker opens on the user's projects).
+        if (ui.loaded) io.github.lenticualrstone.civilight.feature.library.shelf.flat.LibraryViewPicker(ui, stored, onApply, onCancel)
     }
 }

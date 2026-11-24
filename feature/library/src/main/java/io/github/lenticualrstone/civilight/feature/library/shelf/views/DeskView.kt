@@ -149,8 +149,7 @@ internal fun BoxScope.DeskView(args: SceneArgs, onTap: (Int) -> Unit) {
         val tx = args.sway.x
         val ty = args.sway.y
         backdrop(args.frameW, paints.stage)
-        // The wall's gradient carries on under the dock (the stage is not clipped at its foot here).
-        add(args.frameW, ShelfScene.DOCK_H + 24f).also { it.m.translate(offX, offY + ShelfScene.STAGE_H); it.paint = paints.wallFill; it.bias = -999_999f }
+        // (0.2.3) The backdrop now runs to the frame's foot (under the dock and the search field).
         dm.reset()
         DeskGeo.desk(dm, tx, ty)
         // `.surf` (cut to the part that can reach the stage) and `.lampx`, then `.dim` while a sheet is up.
@@ -199,9 +198,6 @@ private class DeskPaints(private val look: LookB, private val dens: Float, priva
     val ring = PlanePaint { p -> drawRoundRect(acc, cornerRadius = CornerRadius(8f * density), style = Stroke(2f * density), alpha = p.alpha) }
 
     val dim = PlanePaint { p -> drawRect(look.wall2, alpha = p.alpha) }
-
-    /** Under the dock: the stage gradient's end colour. */
-    val wallFill = PlanePaint { drawRect(look.wall) }
 
     /** `.stage`: `linear-gradient(180deg, wall2 0%, wall 30%, wall 100%)` over the board (the frame shows 96 … 596). */
     private val stageB = SizedBrush { s -> Brush.verticalGradient(0f to look.wall2, .3f to look.wall, 1f to look.wall, startY = -96f * dens, endY = (844f - 96f) * dens) }

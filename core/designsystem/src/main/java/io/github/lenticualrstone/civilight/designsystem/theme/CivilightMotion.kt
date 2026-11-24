@@ -39,6 +39,12 @@ object CivilightMotion {
     val swipe: MotionToken = MotionToken(standardCurve, 260)
     val holoSweep: MotionToken = MotionToken(enterCurve, 480)
 
+    /**
+     * (0.2.3, r3) A side panel closing or opening: the panel slides out while the main pane widens (r3 `L*` /
+     * `Two*`: 320 ms, standard). Reduced: the geometry snaps and the panel fades 120 ms (`move` / `spec`).
+     */
+    val panelSlide: MotionToken = MotionToken(standardCurve, 320)
+
     const val reducedFadeMs: Int = 120
     const val foldOpenMs: Int = 360
     const val foldCloseMs: Int = 240

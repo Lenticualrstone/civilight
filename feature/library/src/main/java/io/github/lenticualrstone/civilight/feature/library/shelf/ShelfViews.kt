@@ -39,6 +39,13 @@ data class ShelfViewInput(
     val onRecents: (() -> Unit)? = null,
     /** LIB-06: the project shown in the detail pane (inner display); the view brings it to the front. */
     val selectedKey: io.github.lenticualrstone.civilight.model.Key? = null,
+    /**
+     * (0.2.3) Drawn as a live preview in the view picker: inert (no gestures, no semantics, no tour targets, no
+     * bottom-chrome report, no tilt or idle loop). Window protection still applies to what it draws.
+     */
+    val preview: Boolean = false,
+    /** (0.2.3) LIB-19 `프로젝트 숨기기`: the project whose `⋯` the tour points at (flat views). */
+    val tourMenuKey: io.github.lenticualrstone.civilight.model.Key? = null,
 )
 
 /** One 서재 3D view (U-16 boards `u16_lib_a` … `c`). Motion only through `CivilightMotion`. */
@@ -50,9 +57,16 @@ typealias ShelfViewRenderer = @Composable (ShelfViewInput) -> Unit
  * head toggle (a toggle between two identical lists would be a control that does nothing).
  */
 object ShelfViewRenderers {
-    val renderers: Map<LibraryStyle, ShelfViewRenderer> = ShelfScene.styles.associateWith { style ->
+    private val threeD: Map<LibraryStyle, ShelfViewRenderer> = ShelfScene.styles.associateWith { style ->
         { input: ShelfViewInput -> ShelfScene3D(style, input) }
     }
+
+    /** (0.2.3, r3 `libviews`) The seven flat views: one frame, one renderer each. */
+    private val flat: Map<LibraryStyle, ShelfViewRenderer> = io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViews.styles.associateWith { style ->
+        { input: ShelfViewInput -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatScene(style, input) }
+    }
+
+    val renderers: Map<LibraryStyle, ShelfViewRenderer> = threeD + flat
 
     fun of(style: LibraryStyle): ShelfViewRenderer? = renderers[style]
 

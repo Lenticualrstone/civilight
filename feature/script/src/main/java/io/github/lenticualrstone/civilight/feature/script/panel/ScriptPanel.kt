@@ -8,6 +8,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightTabs
+import io.github.lenticualrstone.civilight.designsystem.component.TabGap
+import io.github.lenticualrstone.civilight.designsystem.foundation.startHairline
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
+import io.github.lenticualrstone.civilight.designsystem.glass.OnGlass
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -16,7 +26,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,7 +45,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightTextF
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.SegmentedControl
 import io.github.lenticualrstone.civilight.designsystem.component.SheetTabsHeader
-import io.github.lenticualrstone.civilight.designsystem.component.SidePanel
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
@@ -44,7 +52,6 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
-import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.navigation.SheetKey
@@ -52,42 +59,45 @@ import io.github.lenticualrstone.civilight.ui.feature.SheetScope
 import kotlinx.serialization.Serializable
 
 /**
- * The inner side panel (SCR-03, SCR-31): DS `SidePanel` (290, glass, left hairline) with the built
- * tabs and `닫기`. System back does not close it (the screen's own back steps come first); a closed
- * panel comes back through the swipe buttons (SCR-30) or when the script is opened again.
+ * The inner side panel (SCR-03, SCR-31; r3 boards `LScript` / `PScript`): glass, full height, a 1 dp `line`
+ * on its start edge, padding 20 top and sides, the built tabs at the top (`시간 · 참고 · 속성 · 모듈`). It has no
+ * `닫기` of its own any more (decision 0.2.3 · r3): the seam tab and the rail close and reopen it
+ * (`layout/PanelSeam.kt`). System back does not close it (it is a pane, not a popup; the screen's own back
+ * steps come first).
  */
 @Composable
 fun ScriptSidePanel(
     tab: PanelTab,
     onSelectTab: (PanelTab) -> Unit,
-    onClose: () -> Unit,
     modifier: Modifier = Modifier,
     /** The tab's scroll, shared with the cover sheet (SCR-66); null = this panel's own. */
     scrollOf: ((PanelTab) -> ScrollState)? = null,
-    /** CNV-47: the panel's width; the writer's ratio of the manuscript and the panel. */
+    /** CNV-47 / r3: the panel's width (320 landscape, 272 portrait, or the writer's ratio). */
     width: Dp = CivilightTheme.sizes.sidePanel,
     content: @Composable ColumnScope.(PanelTab) -> Unit,
 ) {
     val tabs = PanelTab.BUILT
     val shown = tab.takeIf { it in tabs } ?: tabs.first()
     val motion = CivilightTheme.motion
-    CompositionLocalProvider(LocalBackHandler provides { _, _ -> }) {
-        SidePanel(
-            onClose = onClose,
-            modifier = modifier,
-            width = width,
-            tabs = tabs.map { it.label },
-            selectedTab = tabs.indexOf(shown),
-            onSelectTab = { onSelectTab(tabs[it]) },
-            closeLabel = ScriptCopy.CLOSE,
-        ) {
-            // SCR-67: a tab change crossfades over 200 ms (reduced motion 120 ms).
-            Crossfade(shown, animationSpec = motion.spec(CivilightMotion.standard), label = "panelTab") { t ->
-                val scroll = scrollOf?.invoke(t) ?: rememberScrollState()
-                Column(
-                    Modifier.fillMaxWidth().verticalScroll(scroll).padding(top = 18.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) { content(t) }
+    val colors = CivilightTheme.colors
+    Box(modifier.width(width).fillMaxHeight().semantics { paneTitle = ScriptCopy.PANEL_NAME }) {
+        GlassBackground(GlassSurface.PANEL, Modifier.matchParentSize())
+        OnGlass {
+            Column(
+                Modifier
+                    .fillMaxHeight()
+                    .startHairline(colors.line)
+                    .padding(top = 20.dp, start = 20.dp, end = 20.dp),
+            ) {
+                CivilightTabs(tabs.map { it.label }, tabs.indexOf(shown), { onSelectTab(tabs[it]) }, Modifier.fillMaxWidth(), gap = TabGap.Panel)
+                // SCR-67: a tab change crossfades over 200 ms (reduced motion 120 ms).
+                Crossfade(shown, animationSpec = motion.spec(CivilightMotion.standard), label = "panelTab") { t ->
+                    val scroll = scrollOf?.invoke(t) ?: rememberScrollState()
+                    Column(
+                        Modifier.fillMaxWidth().verticalScroll(scroll).padding(top = 18.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) { content(t) }
+                }
             }
         }
     }

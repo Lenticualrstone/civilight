@@ -3,7 +3,6 @@ package io.github.lenticualrstone.civilight.ui
 import io.github.lenticualrstone.civilight.designsystem.theme.TextScale
 import io.github.lenticualrstone.civilight.model.app.AnimationPref
 import io.github.lenticualrstone.civilight.model.app.AppSettings
-import io.github.lenticualrstone.civilight.model.app.UnfoldedLayout
 import io.github.lenticualrstone.civilight.model.project.Protections
 import io.github.lenticualrstone.civilight.navigation.CastList
 import io.github.lenticualrstone.civilight.navigation.CharacterProfile
@@ -41,11 +40,10 @@ class ShellRulesTest {
         assertEquals(WidthClass.MEDIUM, WindowLayout.classifyWidth(802))
         assertEquals(WidthClass.EXPANDED, WindowLayout.classifyWidth(840))
         assertFalse(WindowLayout.Cover.isInner)
+        // 0.2.3: `가운데 한 칸` is gone; the inner screen always draws two panes.
         assertTrue(WindowLayout.Inner.twoPanes)
-        val column = WindowLayout.Inner.copy(unfoldedLayout = UnfoldedLayout.CENTER_COLUMN)
-        assertTrue(column.centerColumn)
-        assertFalse(column.twoPanes)
-        assertFalse(WindowLayout.Cover.copy(unfoldedLayout = UnfoldedLayout.CENTER_COLUMN).centerColumn)
+        assertTrue(WindowLayout.InnerLandscape.twoPanes)
+        assertFalse(WindowLayout.Cover.twoPanes)
     }
 
     @Test

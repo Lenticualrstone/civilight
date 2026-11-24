@@ -1,17 +1,5 @@
 package io.github.lenticualrstone.civilight.feature.library.settings
 
-/** 설정 · 펼친 화면 배치 (LIB-66, board `LayoutSettings`). */
-object LayoutSettingsCopy {
-    const val SMALL = "설정 › 화면"
-    const val TITLE = "펼친 화면"
-    const val SECTION = "펼친 화면 배치"
-    const val LIST_DETAIL = "목록 + 상세"
-    const val LIST_DETAIL_SUB = "왼쪽 목록 · 오른쪽 고른 항목"
-    const val CENTER = "가운데 한 칸"
-    const val CENTER_SUB = "읽기 폭 유지 · 양옆 여백"
-    const val NOTE = "서재 · 홈 · 인물 · 세계 · 연표 · 기록함 · 점검에 적용 · 커버 화면은 그대로 · 스크립트는 옆 패널 방식 유지"
-}
-
 /** 설정 · 움직임 · 투명도 (LIB-67, boards `ReduceSettings`, `ReduceTransparency`). */
 object MotionSettingsCopy {
     const val SMALL = "설정"

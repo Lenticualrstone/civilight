@@ -127,6 +127,8 @@ internal fun LibraryScreen(services: LibraryServices) {
     val sheets = rememberSheetHost()
     val sheetRegistry = LocalSheetRegistry.current
     var deleting by rememberSaveable { mutableStateOf<String?>(null) }
+    // (0.2.3, r3 `viewpick`) `보기 ▾` opens the view picker over the 서재.
+    var picking by rememberSaveable { mutableStateOf(false) }
     val navigator = deps.navigator
     val entries by deps.stores.library.state.collectAsState()
     fun isExample(key: Key) = entries.entry(key)?.isExample == true
@@ -247,11 +249,16 @@ internal fun LibraryScreen(services: LibraryServices) {
     ModuleTourHost(TourModule.LIBRARY_HIDING, deps) {
     // Until the stores answered the rows are unknown: the tour waits instead of starting on the fallback.
     if (!ui.loaded) TourHold() else LibraryTourSteps.absent(tourMenuRow).forEach { step -> key(step) { TourStepAbsent(step) } }
+    // While the view picker is open the 서재 behind it leaves the accessibility tree (touch is already blocked by
+    // the scrim): TalkBack cannot open a project or push a screen under the picker.
     CenterColumn {
         CivilightScreen(
             title = ShelfCopy.TITLE,
             smallLine = ShelfCopy.SMALL,
+            modifier = if (picking) Modifier.clearAndSetSemantics { } else Modifier,
             actions = {
+                // (0.2.3, r3 `viewpick`) `보기 · <style> ▾`: the view picker with its live preview.
+                io.github.lenticualrstone.civilight.feature.library.shelf.flat.ViewChip(view.shown) { picking = true }
                 // (0.2.0, LIB-93) `목록` · <chosen 3D view> left of `+`; not drawn while the style is `목록` or has no
                 // renderer yet (ShelfViews), so the toggle never switches between two identical lists.
                 view.toggle?.let { toggle ->
@@ -373,6 +380,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                                         covered = sheets.top != null,
                                         selectedKey = selectedKey,
                                         onRecents = { sheets.open(RecentsSheet) },
+                                        tourMenuKey = tourMenuRow,
                                     ),
                                 )
                             }
@@ -473,6 +481,19 @@ internal fun LibraryScreen(services: LibraryServices) {
               }
             }
           }
+        }
+        // (0.2.3) The view picker over the whole 서재 (scrim, sheet or dialog); back and the scrim cancel.
+        if (picking) {
+            io.github.lenticualrstone.civilight.feature.library.shelf.flat.LibraryViewPicker(
+                ui = ui,
+                // `지금` is the view on screen: with the head toggle on 목록 that is 목록, not the stored 3D style.
+                stored = view.shown,
+                onApply = { style ->
+                    picking = false
+                    vm.chooseStyle(style)
+                },
+                onCancel = { picking = false },
+            )
         }
     }
     }
