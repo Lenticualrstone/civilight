@@ -38,7 +38,7 @@ class OnboardingGuideTest {
         assertEquals(TourModule.entries - TourModule.ROUTE_PLACE_TIME - TourModule.MAP, ModuleTours.offered)
         val script = ModuleTours.steps(TourModule.SCRIPT)
         assertEquals("명령 칸" to "이동 · 검색 · 블록 추가 · 마이크", script[0].title to script[0].sub)
-        assertEquals("블록을 왼쪽으로" to "시간 · 참고 · 속성 → 옆 패널 탭", script[1].title to script[1].sub)
+        assertEquals("블록을 오른쪽으로" to "시간 · 참고 · 속성 → 옆 패널 탭", script[1].title to script[1].sub)
         assertEquals("씬 머리" to "장소와 때 · 전환 문구 · ⋯ 메뉴", script[2].title to script[2].sub)
         assertTrue(script.none { it.title == "시점 렌즈" })
         assertEquals("연결", ModuleTours.steps(TourModule.RECORDER)[1].title)

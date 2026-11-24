@@ -86,8 +86,9 @@ private const val SWIPE_OPEN_MS = 2900
 private const val REVEAL_DP = 192f
 
 /**
- * `Walk1`: 하르트's block slides left and `◆ 시간` · `참고` · `속성` come in behind it. The slide takes `swipeMs`
- * on the `standard` curve and each tab follows [CivilightMotion.swipeStaggerMs] after the one before (CNV-37).
+ * `Walk1`: 하르트's block slides right and `◆ 시간` · `참고` · `속성` come in behind it at the left end (0.2.4: the
+ * script's reference side opens with a right swipe). The slide takes `swipeMs` on the `standard` curve and each tab
+ * follows [CivilightMotion.swipeStaggerMs] after the one before, nearest the block first (CNV-37).
  * Without loops (reduced motion, animator scale 0) it is the still end state: no clock runs.
  */
 @Composable
@@ -101,17 +102,17 @@ private fun BoxScope.SwipeDemo() {
                 keyframes {
                     durationMillis = SWIPE_LOOP_MS
                     0f at SWIPE_HOLD_MS using standard
-                    -REVEAL_DP at SWIPE_HOLD_MS + CivilightMotion.swipeMs
-                    -REVEAL_DP at SWIPE_OPEN_MS using standard
+                    REVEAL_DP at SWIPE_HOLD_MS + CivilightMotion.swipeMs
+                    REVEAL_DP at SWIPE_OPEN_MS using standard
                     0f at SWIPE_OPEN_MS + CivilightMotion.swipeMs
                 },
             ),
             label = "swipe",
         )
-        val tabs = List(3) { i -> tabProgress(transition, i * CivilightMotion.swipeStaggerMs) }
+        val tabs = List(3) { i -> tabProgress(transition, (2 - i) * CivilightMotion.swipeStaggerMs) }
         SwipeFrame(shift = { shift }, tab = { tabs[it] })
     } else {
-        SwipeFrame(shift = { -REVEAL_DP }, tab = { 1f })
+        SwipeFrame(shift = { REVEAL_DP }, tab = { 1f })
     }
 }
 
@@ -121,7 +122,7 @@ private fun BoxScope.SwipeFrame(shift: () -> Float, tab: (Int) -> Float) {
     val type = CivilightTheme.type
     val density = LocalDensity.current
     Box(Modifier.align(Alignment.TopStart).padding(top = 150.dp).fillMaxWidth().height(92.dp)) {
-        Row(Modifier.align(Alignment.CenterEnd).width(192.dp).fillMaxHeight().background(colors.bg)) {
+        Row(Modifier.align(Alignment.CenterStart).width(192.dp).fillMaxHeight().background(colors.bg)) {
             listOf("◆ " + OnboardingCopy.TAB_TIME, OnboardingCopy.TAB_REFERENCE, OnboardingCopy.TAB_PROPERTIES).forEachIndexed { i, label ->
                 Box(
                     Modifier
@@ -130,7 +131,7 @@ private fun BoxScope.SwipeFrame(shift: () -> Float, tab: (Int) -> Float) {
                         .graphicsLayer {
                             val p = tab(i)
                             alpha = p
-                            translationX = (1f - p) * with(density) { 16.dp.toPx() }
+                            translationX = -(1f - p) * with(density) { 16.dp.toPx() }
                         }
                         .startHairline(colors.line),
                     contentAlignment = Alignment.Center,

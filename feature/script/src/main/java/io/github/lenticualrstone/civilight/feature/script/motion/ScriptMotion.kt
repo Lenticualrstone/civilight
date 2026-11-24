@@ -31,21 +31,42 @@ object ScriptMotion {
     val buttonRunMs: Int get() = swipeMs - staggerMs * (SWIPE_BUTTONS - 1)
 
     /**
-     * Progress (0…1) of swipe button [index] when the row is [rowProgress] of the way open (0 = at
-     * rest, 1 = −192 dp). Button i starts 60 ms × i into the 260 ms slide and ends with it, so the
-     * same mapping works for the finger and for the settle. Reduced motion: all buttons fade with
-     * the row, no stagger.
+     * Progress (0…1) of swipe button [index] of [count] when the row is [rowProgress] of the way open (0 = at
+     * rest, 1 = fully open). Button i starts a stagger × i into the 260 ms slide and ends with it, so the
+     * same mapping works for the finger and for the settle. Reduced motion: all buttons fade with the row, no
+     * stagger.
+     *
+     * (0.2.4) The stagger is 60 ms while it leaves each button at least half the slide ([MIN_RUN_SHARE]); a
+     * longer row (the five edit buttons) shares the other half evenly. Either way every button is fully
+     * opaque once the row is open: the 0.2.3 row ran five buttons on the three-button run, so `지우기` rested
+     * at 14 % and looked off.
      */
-    fun buttonProgress(rowProgress: Float, index: Int, reduced: Boolean): Float {
+    fun buttonProgress(rowProgress: Float, index: Int, reduced: Boolean, count: Int = SWIPE_BUTTONS): Float {
         val p = rowProgress.coerceIn(0f, 1f)
-        if (reduced) return p
+        if (reduced || p >= 1f) return p
+        val (stagger, run) = stagger(count)
         val t = p * swipeMs
-        return ((t - staggerMs * index) / buttonRunMs).coerceIn(0f, 1f)
+        return ((t - stagger * index) / run).coerceIn(0f, 1f)
     }
 
-    /** Horizontal offset (dp) of a swipe button at [progress]; none with reduced motion. */
-    fun buttonShiftDp(progress: Float, reduced: Boolean): Float =
-        if (reduced) 0f else (1f - progress.coerceIn(0f, 1f)) * BUTTON_SHIFT_DP
+    /** (stagger, run) in ms for a row of [count] buttons; stagger × (count − 1) + run = 260 ms. */
+    fun stagger(count: Int): Pair<Float, Float> {
+        val gaps = (count - 1).coerceAtLeast(0)
+        if (gaps == 0) return 0f to swipeMs.toFloat()
+        val run = maxOf((swipeMs - staggerMs * gaps).toFloat(), swipeMs * MIN_RUN_SHARE)
+        return (swipeMs - run) / gaps to run
+    }
+
+    /** The least share of the slide one button's fade may take (0.2.4). */
+    const val MIN_RUN_SHARE: Float = 0.5f
+
+    /**
+     * Horizontal offset (dp) of a swipe button at [progress]; none with reduced motion. Buttons come in from
+     * the row's outer edge: from the right for a row at the right end, from the left ([fromStart]) for one at
+     * the left end.
+     */
+    fun buttonShiftDp(progress: Float, reduced: Boolean, fromStart: Boolean = false): Float =
+        if (reduced) 0f else (1f - progress.coerceIn(0f, 1f)) * BUTTON_SHIFT_DP * (if (fromStart) -1f else 1f)
 
     /**
      * The swipe row's settle (CNV-40): the 260 ms slide scaled by the distance left, never under the

@@ -241,6 +241,12 @@ object CivilightMotion {
     const val unhideStartAlpha: Float = 0.55f
     const val pressScale: Float = 0.94f
 
+    /**
+     * (0.2.4) A long-pressed item lifting out of its list while its menu is open (the script block menu): it
+     * grows to this scale on [enter] and settles back on [exit]. Reduced motion: no scale, the shadow only.
+     */
+    const val liftScale: Float = 1.02f
+
     /** Press feedback (scale or overlay): `pressMs` on the standard curve. */
     val press: MotionToken = MotionToken(standardCurve, pressMs)
 

@@ -92,6 +92,12 @@ object ScriptCopy {
 
     // --- Panel (SCR-03, SCR-31, SCR-34) ---
 
+    /**
+     * (0.2.4) The long-press menu of a block: TalkBack's long-click label, and the menu's own name. Its rows
+     * reuse the swipe and 속성 words (`고치기`, `복선 심기`, …).
+     */
+    const val BLOCK_MENU = "블록 메뉴"
+
     /** Panel tabs `시간 · 참고 · 속성 · 모듈` (SCR-31). */
     const val TAB_TIME = "시간"
     const val TAB_REF = "참고"
@@ -325,7 +331,7 @@ object ScriptCopy {
         ID_FORMAT, FORMAT_PATTERN, FORMAT_MANUAL, FIXED_ON_EXPORT, patternSub("HRT_0107_043"), MANUAL_SUB,
         RELINK, TRASH_RECORD, LINK_TO_BLOCK, RECORD_CHANGE_ROW, recordTrashed("◆ 관계 · 리엔 → 하르트"), blockRestored("#043"), UNDO_RELINK, MOD_TODAY, MOD_SCENE, MOD_CHECKS, MOD_MEMO, MODS_FOOTER,
         checkPreReveal(1), checkNoSpeaker(1), MODS_NO_CHECKS, MODS_SCENE_EMPTY, UNDO_TRASH_RECORD,
-        PANEL_NAME,
+        PANEL_NAME, BLOCK_MENU,
     )
 
     /** Buttons (linted with the button rules). */

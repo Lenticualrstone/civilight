@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
-import io.github.lenticualrstone.civilight.designsystem.component.SwipeReveal
 import io.github.lenticualrstone.civilight.designsystem.component.SwipeSide
 import io.github.lenticualrstone.civilight.designsystem.foundation.GestureRules
 import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
@@ -50,10 +49,12 @@ class SwipeButtonSpec(
 )
 
 /**
- * (0.2.0, SCR-30) A block row with two swipe sides. Swiping left reveals [reference] (`◆ 시간 · 참고 · 속성`,
- * 3 × 64 dp); swiping right reveals [edit] (`고치기 · 이 뒤에 · 종류 · 씬 나누기 · 지우기`, 5 × 60 dp). A swipe only
- * reveals; nothing runs until a button is tapped. Released past half a side stays open; [edit] empty turns
- * the right swipe off (read-only, during `고치기`). Buttons appear 60 ms apart; the slide is 260 ms.
+ * (0.2.0, SCR-30; sides swapped in 0.2.4) A block row with two swipe sides. Swiping **left** reveals [edit]
+ * (`고치기 · 이 뒤에 · 종류 · 씬 나누기 · 지우기`, 5 × 60 dp) at the row's **right** end, under the thumb, since those
+ * are the buttons used while writing; swiping **right** reveals [reference] (`◆ 시간 · 참고 · 속성`, 3 × 64 dp) at
+ * the left end ([BlockSwipe]). A swipe only reveals; nothing runs until a button is pressed. Released past
+ * half a side stays open; [edit] empty turns the left swipe off (read-only, during `고치기`). Buttons come in
+ * staggered over the 260 ms slide and are all fully opaque once the row is open.
  */
 @Composable
 fun TwoSidedSwipeRow(
@@ -77,8 +78,8 @@ fun TwoSidedSwipeRow(
     val drag = remember { TwoSideDrag() }
     LaunchedEffect(side, refPx, editPx, drag.releases, drag.dragging, editOn) {
         if (drag.dragging) return@LaunchedEffect
-        val wanted = if (side == SwipeSide.EDIT && !editOn) SwipeSide.CLOSED else side
-        val target = SwipeReveal.restOffset(wanted, refPx, editPx)
+        val wanted = BlockSwipe.wanted(side, refOn, editOn)
+        val target = BlockSwipe.restOffset(wanted, refPx, editPx)
         if (motion.reduced) {
             drag.place(target)
         } else if (drag.offset != target) {
@@ -88,14 +89,15 @@ fun TwoSidedSwipeRow(
     }
     LaunchedEffect(enabled) { if (!enabled) drag.cancel() }
     Box(modifier) {
-        if (SwipeReveal.showsReference(drag.offset, refOn)) {
-            Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
-                ButtonsRow(reference, refWidth, REF_BUTTON.dp, progress = (-drag.offset / refPx).coerceIn(0f, 1f), reduced = motion.reduced)
+        // Only the side being revealed is composed: the two layers overlap on a cover screen (192 + 300 > 390).
+        if (BlockSwipe.showsReference(drag.offset, refOn)) {
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterStart) {
+                ButtonsRow(reference, refWidth, REF_BUTTON.dp, progress = BlockSwipe.referenceProgress(drag.offset, refPx), reduced = motion.reduced, atStart = true)
             }
         }
-        if (SwipeReveal.showsEdit(drag.offset, editOn)) {
-            Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterStart) {
-                ButtonsRow(edit, editWidth, EDIT_BUTTON.dp, progress = (drag.offset / editPx).coerceIn(0f, 1f), reduced = motion.reduced)
+        if (BlockSwipe.showsEdit(drag.offset, editOn)) {
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+                ButtonsRow(edit, editWidth, EDIT_BUTTON.dp, progress = BlockSwipe.editProgress(drag.offset, editPx), reduced = motion.reduced, atStart = false)
             }
         }
         Box(
@@ -104,7 +106,7 @@ fun TwoSidedSwipeRow(
                 .background(colors.bg)
                 // 0.2.3 gesture rules (core `GestureRules`): undecided inside the slop (a tap or the block's long press stays
                 // possible), given up to the manuscript's scroll as soon as the drag reads vertical, and taken only in a
-                // direction this row can still move (a closed row with no edit side lets a rightward drag through).
+                // direction this row can still move (a closed row with no edit side lets a leftward drag through).
                 .horizontalSwipe(
                     enabled = enabled,
                     canStart = { dx -> drag.canStart(dx, refPx, editPx, refOn, editOn) },
@@ -119,19 +121,21 @@ fun TwoSidedSwipeRow(
 }
 
 @Composable
-private fun ButtonsRow(buttons: List<SwipeButtonSpec>, width: Dp, each: Dp, progress: Float, reduced: Boolean) {
+private fun ButtonsRow(buttons: List<SwipeButtonSpec>, width: Dp, each: Dp, progress: Float, reduced: Boolean, atStart: Boolean) {
     val colors = CivilightTheme.colors
     val density = LocalDensity.current
     Row(Modifier.width(width).fillMaxHeight().background(colors.raise)) {
         buttons.forEachIndexed { i, b ->
-            val p = if (reduced) progress else ScriptMotion.buttonProgress(progress, i, reduced = false)
+            // The button nearest the block comes in first; the outer edge's button last.
+            val order = if (atStart) buttons.size - 1 - i else i
+            val p = ScriptMotion.buttonProgress(progress, order, reduced, count = buttons.size)
             Column(
                 Modifier
                     .width(each)
                     .fillMaxHeight()
                     .graphicsLayer {
-                        alpha = if (b.enabled) p else p * DIM
-                        translationX = with(density) { ScriptMotion.buttonShiftDp(p, reduced).dp.toPx() }
+                        alpha = BlockSwipe.buttonAlpha(p, b.enabled)
+                        translationX = with(density) { ScriptMotion.buttonShiftDp(p, reduced, fromStart = atStart).dp.toPx() }
                     }
                     .startHairline(colors.line)
                     .pressable(onClick = b.onClick, enabled = b.enabled, hitTarget = HitTarget.BUTTON)
@@ -146,6 +150,63 @@ private fun ButtonsRow(buttons: List<SwipeButtonSpec>, width: Dp, each: Dp, prog
     }
 }
 
+/**
+ * (0.2.4) Pure side rules of the script's two-sided block row (JVM-tested). Offsets are px, negative = slid
+ * left. The edit side opens with a **left** swipe (the block slides left, the buttons sit at the right end,
+ * under the thumb); the reference side with a **right** swipe (buttons at the left end). The core
+ * [io.github.lenticualrstone.civilight.designsystem.component.SwipeReveal] keeps the 0.2.0 orientation for its
+ * own row; this row follows these rules instead.
+ */
+object BlockSwipe {
+    /** The side the row may rest on: a side without buttons closes it. */
+    fun wanted(side: SwipeSide, refOn: Boolean, editOn: Boolean): SwipeSide = when (side) {
+        SwipeSide.EDIT -> if (editOn) side else SwipeSide.CLOSED
+        SwipeSide.REFERENCE -> if (refOn) side else SwipeSide.CLOSED
+        SwipeSide.CLOSED -> side
+    }
+
+    /** Where the block rests for [side]. */
+    fun restOffset(side: SwipeSide, refPx: Float, editPx: Float): Float = when (side) {
+        SwipeSide.CLOSED -> 0f
+        SwipeSide.EDIT -> -editPx
+        SwipeSide.REFERENCE -> refPx
+    }
+
+    /** The farthest left the block may go (edit side open), px. */
+    fun min(editPx: Float, editOn: Boolean): Float = if (editOn) -editPx else 0f
+
+    /** The farthest right the block may go (reference side open), px. */
+    fun max(refPx: Float, refOn: Boolean): Float = if (refOn) refPx else 0f
+
+    /** A drag's offset kept inside the sides that may open. */
+    fun clamp(offset: Float, refPx: Float, editPx: Float, refOn: Boolean, editOn: Boolean): Float =
+        offset.coerceIn(min(editPx, editOn), max(refPx, refOn))
+
+    /** On release: past half a side's width the row stays open on that side; otherwise it closes. */
+    fun settle(offset: Float, refPx: Float, editPx: Float, refOn: Boolean, editOn: Boolean): SwipeSide = when {
+        editOn && offset < -editPx / 2f -> SwipeSide.EDIT
+        refOn && offset > refPx / 2f -> SwipeSide.REFERENCE
+        else -> SwipeSide.CLOSED
+    }
+
+    /** Whether the edit buttons (right end) are composed: only while the block sits left of rest. */
+    fun showsEdit(offset: Float, editOn: Boolean): Boolean = editOn && offset < -EDGE_PX
+
+    /** Whether `◆ 시간 · 참고 · 속성` (left end) are composed: only while the block sits right of rest. */
+    fun showsReference(offset: Float, refOn: Boolean): Boolean = refOn && offset > EDGE_PX
+
+    /** How far open (0…1) the edit side is. */
+    fun editProgress(offset: Float, editPx: Float): Float = if (editPx <= 0f) 0f else (-offset / editPx).coerceIn(0f, 1f)
+
+    /** How far open (0…1) the reference side is. */
+    fun referenceProgress(offset: Float, refPx: Float): Float = if (refPx <= 0f) 0f else (offset / refPx).coerceIn(0f, 1f)
+
+    /** A button's alpha at its own progress [p]: fully opaque once in; a disabled button stays dimmed. */
+    fun buttonAlpha(p: Float, enabled: Boolean): Float = if (enabled) p else p * DIM
+
+    private const val EDGE_PX = 0.5f
+}
+
 /** The finger state of a two-sided row (px; negative = slid left). Plain, so it is JVM-tested. */
 class TwoSideDrag {
     private val offsetState = mutableFloatStateOf(0f)
@@ -158,20 +219,20 @@ class TwoSideDrag {
 
     /**
      * Whether a drag starting toward [dx]'s sign can move this row (0.2.3 `GestureRules.canMove`): left down to the
-     * reference side, right up to the edit side, each only when that side has buttons.
+     * edit side, right up to the reference side, each only when that side has buttons.
      */
     fun canStart(dx: Float, refPx: Float, editPx: Float, refOn: Boolean, editOn: Boolean): Boolean =
-        GestureRules.canMove(dx, offset, min = if (refOn) -refPx else 0f, max = if (editOn) editPx else 0f)
+        GestureRules.canMove(dx, offset, min = BlockSwipe.min(editPx, editOn), max = BlockSwipe.max(refPx, refOn))
 
     fun onDelta(delta: Float, refPx: Float, editPx: Float, refOn: Boolean, editOn: Boolean) {
         draggingState.value = true
-        offsetState.floatValue = SwipeReveal.clamp(offset + delta, refPx, editPx, refOn, editOn)
+        offsetState.floatValue = BlockSwipe.clamp(offset + delta, refPx, editPx, refOn, editOn)
     }
 
     fun release(refPx: Float, editPx: Float, refOn: Boolean, editOn: Boolean): SwipeSide {
         draggingState.value = false
         releasesState.intValue++
-        return SwipeReveal.settle(offset, refPx, editPx, refOn, editOn)
+        return BlockSwipe.settle(offset, refPx, editPx, refOn, editOn)
     }
 
     fun cancel() {

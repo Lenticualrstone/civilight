@@ -57,7 +57,7 @@ object OnboardingCopy {
 
     // Walkthrough
     const val WALK_1_TITLE = "밀어서 탭 고르기"
-    const val WALK_1_SUB = "블록 왼쪽으로 → 시간 · 참고 · 속성"
+    const val WALK_1_SUB = "블록 오른쪽으로 → 시간 · 참고 · 속성"
     const val WALK_2_TITLE = "시점 렌즈"
     const val WALK_2_SUB = "고른 시점까지만 보기 · 앱 전체"
     const val WALK_3_TITLE = "떠오르면 말로"

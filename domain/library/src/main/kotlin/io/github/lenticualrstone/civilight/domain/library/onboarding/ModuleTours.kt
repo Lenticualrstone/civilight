@@ -45,7 +45,7 @@ object ModuleTours {
     fun steps(module: TourModule): List<TourStep> = when (module) {
         TourModule.SCRIPT -> listOf(
             TourStep("명령 칸", "이동 · 검색 · 블록 추가 · 마이크"),
-            TourStep("블록을 왼쪽으로", "시간 · 참고 · 속성 → 옆 패널 탭"),
+            TourStep("블록을 오른쪽으로", "시간 · 참고 · 속성 → 옆 패널 탭"),
             TourStep("씬 머리", "장소와 때 · 전환 문구 · ⋯ 메뉴"),
             // No `시점 렌즈` step: the script has no lens (STO-16; the lens lives in the shell), so that
             // card had nothing to point at.

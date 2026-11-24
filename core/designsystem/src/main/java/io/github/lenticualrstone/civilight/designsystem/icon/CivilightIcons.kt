@@ -103,16 +103,16 @@ enum class IconId(val pathData: String) {
     /** `다음 씬` (B2). */
     NextScene("M4 6h12M4 10h12M4 14h7M17 13v7M13.5 16.5h7"),
 
-    /** `고치기` pencil (right swipe, caption panels). */
+    /** `고치기` pencil (script block left swipe, caption panels). */
     Edit("M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"),
 
-    /** `이 뒤에` (right swipe). */
+    /** `이 뒤에` (script block left swipe). */
     InsertAfter("M5 6h14M5 11h14M12 14v6M9 17h6"),
 
-    /** `종류` (right swipe). */
+    /** `종류` (script block left swipe). */
     Kind("M4 7h10M4 12h16M4 17h7M17 4l3 3-3 3"),
 
-    /** `씬 나누기` (right swipe). */
+    /** `씬 나누기` (script block left swipe). */
     SceneCut("M4 5h16M4 19h16M4 12h3M10.5 12h3M17 12h3"),
 
     /** `복사` (block selection tools). */

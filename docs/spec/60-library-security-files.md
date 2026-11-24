@@ -290,7 +290,7 @@ Full-screen pages with a live demo card (radius 24, 420 high) and a 3-dot progre
 
 | Page | Title | Sub | Demo | Buttons |
 |---|---|---|---|---|
-| 1/3 (`Walk1`) | `밀어서 탭 고르기` | `블록 왼쪽으로 → 시간 · 참고 · 속성` | 하르트 block slides left revealing `◆ 시간` · `참고` · `속성` | `다음` |
+| 1/3 (`Walk1`) | `밀어서 탭 고르기` | `블록 오른쪽으로 → 시간 · 참고 · 속성` | 하르트 block slides right revealing `◆ 시간` · `참고` · `속성` | `다음` |
 | 2/3 (`Walk2`) | `시점 렌즈` | `고른 시점까지만 보기 · 앱 전체` | 리엔 with chip toggling `시점 · 1-7` ↔ `시점 · 1-2`; rows 나이 `17세`; 소속 `등불 결사 ◆` ↔ `없음`; 하르트와 `경계` ↔ `만나기 전` | `이전` · `다음` |
 | 3/3 (`Walk3`) | `떠오르면 말로` | `명령 칸 마이크 · 라이프 레코더` | recording glow + `듣는 중` + `2장 첫 장면은 비 오는 상층 관문에서` | `이전` · `예시 둘러보기` |
 
@@ -330,7 +330,7 @@ Framework this area owns; each module's step content is given below from the boa
 
 | Module | Steps | Drawn steps (title · sub) |
 |---|---|---|
-| 스크립트 | 4 | 1/4 `명령 칸` · `이동 · 검색 · 블록 추가 · 마이크` (`Tour1`); 2/4 `블록을 왼쪽으로` · `시간 · 참고 · 속성 → 옆 패널 탭` (`Tour2`); 4/4 `시점 렌즈` · `고른 시점까지의 인물 · 관계 · 용어`, button `마치기` (`Tour4`); 3/4 not drawn |
+| 스크립트 | 4 | 1/4 `명령 칸` · `이동 · 검색 · 블록 추가 · 마이크` (`Tour1`); 2/4 `블록을 오른쪽으로` · `시간 · 참고 · 속성 → 옆 패널 탭` (`Tour2`); 4/4 `시점 렌즈` · `고른 시점까지의 인물 · 관계 · 용어`, button `마치기` (`Tour4`); 3/4 not drawn |
 | 인물 | 3 | 1/3 label `인물 안내`: `시점 렌즈` · `이 시점까지의 필드 · 관계만` (`TourCast`) |
 | 세계 · 연표 | 3 | 1/3 label `세계 안내`: `공개 시점` · `앞에서 쓰이면 ▲ 점검 센터` (`TourWorld`) |
 | 라이프 레코더 | 3 | 2/3 label `레코더 안내`: `연결` · `보던 곳 · 넣기 전까지 내용은 그대로` (`TourLr`, `scr_decide.py`) |
@@ -2133,7 +2133,7 @@ Fixtures: 잿빛 (0.1.0, R-15, fixed voice IDs, no `gameTools`), 유리 정원 (
 | V-04 | 2 visible + 검은 서약 hidden, group locked | `libraryItems(BOOKSHELF)` | 2 project items + 1 lock item `숨긴 프로젝트 1`; no item names 검은 서약 |
 | V-05 | 0 projects | `libraryItems(any 3D style)` | empty state model (LIB-70), no 3D items |
 | V-06 | picking `표지 회전` in 설정 › 서재 보기 while the toggle is `목록` | settings write | `libraryStyle = COVER_SPIN`, `libraryToggle = CARD` |
-| T-01 | tours with S-3 and S-1 active | `TourSteps.visible(script)` | only the drawn step `블록을 왼쪽으로` (old 2/4; 3/4 has no copy), shown as `1/1`; map and route tours empty → no 도움말 rows for them |
+| T-01 | tours with S-3 and S-1 active | `TourSteps.visible(script)` | only the drawn step `블록을 오른쪽으로` (old 2/4; 3/4 has no copy), shown as `1/1`; map and route tours empty → no 도움말 rows for them |
 | E-01 | a project with 2 versions | `.civilight` export with default options | `versions/` present, manifest lists `versions`; row turned off → neither |
 | E-02 | same project | backup writer output | `versions/` present |
 | V-07 | `viewTilt = false` | `Tilt.follows(viewTilt, NEVER_REDUCE)` | false; no sensor listener registered |

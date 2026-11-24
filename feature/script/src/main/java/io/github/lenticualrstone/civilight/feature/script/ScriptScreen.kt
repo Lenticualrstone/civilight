@@ -56,6 +56,11 @@ import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputBar
 import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputEvent
 import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputReadOnlyRow
 import io.github.lenticualrstone.civilight.designsystem.component.SwipeSide
+import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenu
+import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuEntry
+import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuItem
+import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuOpen
+import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuOverlay
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.component.ToastHost
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
@@ -555,6 +560,8 @@ private fun ScriptFrame(
     // SCR-30: one row open at a time, on one side; scrolling closes it.
     var revealedRow by remember { mutableStateOf<String?>(null) }
     var revealedSide by remember { mutableStateOf(SwipeSide.CLOSED) }
+    // (0.2.4) The block whose long-press menu is open (one at a time).
+    var blockMenu by remember { mutableStateOf<BlockMenuOpen?>(null) }
     val wide = layout.wide
     val canUndo by vm.canUndo.collectAsState()
     val entered by vm.entered.collectAsState()
@@ -929,7 +936,24 @@ private fun ScriptFrame(
                                     else -> BlockLook()
                                 }
                             },
-                            editButtons = { row -> editButtons(row, c.readOnly || previewOnly || draft.editing, vm, sheets, route, doc, c.unitKey) },
+                            editButtons = { row ->
+                                val run = blockActions(row, vm, sheets, route, doc, c.unitKey) { tab -> openPanel(row.blockKey, tab) }
+                                editButtons(BlockMenu.items(row, off = c.readOnly || previewOnly || draft.editing), run, colors.warn)
+                            },
+                            menu = { row ->
+                                val run = blockActions(row, vm, sheets, route, doc, c.unitKey) { tab -> openPanel(row.blockKey, tab) }
+                                BlockMenu.items(row, off = c.readOnly || previewOnly || draft.editing).map { item ->
+                                    BlockMenuEntry(item, run(item), accent = item == BlockMenuItem.TIME && row.hasChange)
+                                }
+                            },
+                            onLongPress = { row, bounds ->
+                                keyboard?.hide()
+                                vm.clearFresh()
+                                blockMenu = BlockMenuOpen(row.key, row.blockKey, bounds)
+                            },
+                            onLiftedBounds = { key, bounds ->
+                                blockMenu?.let { if (it.rowKey == key && it.bounds != bounds) blockMenu = it.copy(bounds = bounds) }
+                            },
                             onSwipe = { key, side ->
                                 revealedRow = key
                                 revealedSide = side
@@ -940,6 +964,7 @@ private fun ScriptFrame(
                         previewOnly = previewOnly,
                         revealedRow = revealedRow,
                         revealedSide = revealedSide,
+                        liftedRow = blockMenu?.liftedRow,
                     )
                 }
             }
@@ -1009,38 +1034,75 @@ private fun ScriptFrame(
                 }
             }
         }
+        // (0.2.4) A block's long-press menu over the whole screen; it closes when its block leaves the manuscript or
+        // the screen changes mode (select, 고치기 starting elsewhere, a sheet on top).
+        blockMenu?.let { open ->
+            val row = rows.firstOrNull { it.key == open.rowKey } as? BlockRow
+            val gone = row == null || selecting || sheets.top != null
+            LaunchedEffect(gone) { if (gone) blockMenu = null }
+            if (row != null && !selecting && sheets.top == null) {
+                val run = blockActions(row, vm, sheets, route, doc, c.unitKey) { tab -> openPanel(row.blockKey, tab) }
+                val entries = BlockMenu.items(row, off = c.readOnly || previewOnly || draft.editing).map { item ->
+                    BlockMenuEntry(item, run(item), accent = item == BlockMenuItem.TIME && row.hasChange)
+                }
+                key(open.rowKey) {
+                    BlockMenuOverlay(
+                        open,
+                        entries,
+                        onClosing = { blockMenu?.let { if (it.rowKey == open.rowKey) blockMenu = it.copy(closing = true) } },
+                        onDismiss = { if (blockMenu?.rowKey == open.rowKey) blockMenu = null },
+                    )
+                }
+            }
+        }
     }
 }
 
-/** The right swipe's five buttons (SCR-30); none in read-only projects, `대사만` or during `고치기`. */
-private fun editButtons(
+/**
+ * What each block action does (SCR-30 swipe, 0.2.4 long-press menu): the swipe's edit side and the menu run the
+ * same code. `이 블록만 · 표시 이름` opens 속성, where that field is.
+ */
+private fun blockActions(
     row: BlockRow,
-    off: Boolean,
     vm: ScriptViewModel,
     sheets: SheetHost,
     route: Script,
     doc: ProjectDoc,
     unitKey: Key,
-): List<SwipeButtonSpec> {
-    if (off || row.kind == null) return emptyList()
+    openPanel: (PanelTab) -> Unit,
+): (BlockMenuItem) -> () -> Unit = { item ->
     val key = row.blockKey
-    return listOfNotNull(
-        // SCR-55: no `고치기` on a block whose text would show a locked hidden item in the field.
-        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.EDIT, { vm.swipeEdit(key) }) { SwipeIcon(IconId.Edit) }
-            .takeIf { !row.editLocked },
-        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.INSERT_AFTER, { vm.swipeAfter(key) }) { SwipeIcon(IconId.InsertAfter) },
-        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.KIND, { sheets.open(KindMenuSheetKey(route.projectKey, blockKey = key)) }) { SwipeIcon(IconId.Kind) },
-        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.SCENE_CUT, {
-            // SCR-49: not the last block → `씬 나누기` below it; the last → `다음 씬 만들기` after its scene.
-            sheets.open(ScriptOps.newSceneSheet(doc, route.projectKey, key, row.sceneKey, unitKey))
-        }) { SwipeIcon(IconId.SceneCut) },
-        SwipeButtonSpec(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy.DELETE, { vm.swipeDelete(key) }) { SwipeIcon(IconId.Trash) },
-    )
+    when (item) {
+        BlockMenuItem.EDIT -> ({ vm.swipeEdit(key) })
+        BlockMenuItem.INSERT_AFTER -> ({ vm.swipeAfter(key) })
+        BlockMenuItem.KIND -> ({ sheets.open(KindMenuSheetKey(route.projectKey, blockKey = key)) })
+        // SCR-49: not the last block → `씬 나누기` below it; the last → `다음 씬 만들기` after its scene.
+        BlockMenuItem.SCENE_CUT -> ({ sheets.open(ScriptOps.newSceneSheet(doc, route.projectKey, key, row.sceneKey, unitKey)) })
+        BlockMenuItem.PLANT -> ({ if (!vm.readOnly) sheets.open(io.github.lenticualrstone.civilight.feature.script.input.PlantSheetKey(route.projectKey, key)) })
+        BlockMenuItem.MENTION_OR_PAYOFF -> ({ if (!vm.readOnly) sheets.open(io.github.lenticualrstone.civilight.feature.script.input.MarkPickSheetKey(route.projectKey, key)) })
+        BlockMenuItem.DISPLAY_NAME, BlockMenuItem.PROPS -> ({ openPanel(PanelTab.PROPS) })
+        BlockMenuItem.TIME -> ({ openPanel(PanelTab.TIME) })
+        BlockMenuItem.REF -> ({ openPanel(PanelTab.REF) })
+        BlockMenuItem.DELETE -> ({ vm.swipeDelete(key) })
+    }
+}
+
+/**
+ * The edit side's five buttons (SCR-30; 0.2.4: a left swipe, at the right end); none in read-only projects,
+ * `대사만` or during `고치기` ([BlockMenu.items]). `지우기` is drawn in `warn`.
+ */
+private fun editButtons(items: List<BlockMenuItem>, run: (BlockMenuItem) -> () -> Unit, warn: androidx.compose.ui.graphics.Color): List<SwipeButtonSpec> {
+    return BlockMenu.swipeEdit(items).map { item ->
+        val icon = item.icon ?: IconId.Edit
+        SwipeButtonSpec(item.label, run(item), labelColor = if (item.warning) warn else null) {
+            SwipeIcon(icon, warning = item.warning)
+        }
+    }
 }
 
 @Composable
-private fun SwipeIcon(icon: IconId) {
-    CivilightIcon(icon, null, size = 18.dp, tint = CivilightTheme.colors.ink2)
+private fun SwipeIcon(icon: IconId, warning: Boolean = false) {
+    CivilightIcon(icon, null, size = 18.dp, tint = if (warning) CivilightTheme.colors.warn else CivilightTheme.colors.ink2)
 }
 
 /** Select mode: the scene of the first select row under the top bar. */

@@ -1,6 +1,16 @@
 package io.github.lenticualrstone.civilight.feature.script.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.zIndex
+import io.github.lenticualrstone.civilight.designsystem.foundation.tokenShadow
+import io.github.lenticualrstone.civilight.feature.script.motion.blockLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -127,8 +137,14 @@ class ManuscriptActions(
     val onMarginWarning: (() -> Unit)? = null,
     /** (0.2.0) The block's look beyond selection (`고치는 중`, new, `이 뒤에` target). */
     val look: (row: BlockRow) -> BlockLook = { BlockLook() },
-    /** (0.2.0, SCR-30) The right swipe's five buttons; empty turns the right swipe off. */
+    /** (0.2.0, SCR-30; 0.2.4 left swipe, right end) The edit side's five buttons; empty turns that swipe off. */
     val editButtons: (row: BlockRow) -> List<SwipeButtonSpec> = { emptyList() },
+    /** (0.2.4) The block's long-press menu rows ([BlockMenu]); also TalkBack's custom actions. Empty = no menu. */
+    val menu: (row: BlockRow) -> List<BlockMenuEntry> = { emptyList() },
+    /** (0.2.4) A long press on a block: open its menu; [bounds] = the row in window px. */
+    val onLongPress: (row: BlockRow, bounds: Rect) -> Unit = { _, _ -> },
+    /** (0.2.4) The lifted row moved while its menu is open (the keyboard went down, the list re-anchored). */
+    val onLiftedBounds: (rowKey: String, bounds: Rect) -> Unit = { _, _ -> },
     /** Which side of which row is open (one row at a time). */
     val onSwipe: (rowKey: String?, side: SwipeSide) -> Unit = { _, _ -> },
 )
@@ -155,6 +171,8 @@ fun Manuscript(
     /** The block row whose swipe buttons are open (SCR-30). */
     revealedRow: String? = null,
     revealedSide: SwipeSide = SwipeSide.REFERENCE,
+    /** (0.2.4) The block row whose long-press menu is open: it lifts above the scrim. */
+    liftedRow: String? = null,
 ) {
     val motion = CivilightTheme.motion
     val column = if (layout.wide) Modifier.padding(start = layout.columnStart.dp).width(layout.columnWidth.dp) else Modifier.fillMaxWidth()
@@ -230,7 +248,17 @@ fun Manuscript(
                 tourKeys?.second -> Modifier.tourTarget(ScriptTourSteps.HEAD)
                 else -> Modifier
             }
-            Box(place.then(reveal).then(tourMark)) {
+            // (0.2.4) Where a block row is on screen, read outside its lift (the lift's scale is drawn inside, so the
+            // bounds stay the row's own and do not change on every frame of the lift; the menu's hole adds the scale).
+            val bounds = remember { BoundsHolder() }
+            val track = if (row is BlockRow) {
+                Modifier.onGloballyPositioned {
+                    bounds.rect = it.boundsInWindow()
+                    // The open menu follows its block (the scrim's hole and the card), e.g. when the keyboard goes down.
+                    if (row.key == liftedRow) actions.onLiftedBounds(row.key, bounds.rect)
+                }
+            } else Modifier
+            Box(place.then(reveal).then(tourMark).then(track).lifted(row.key == liftedRow)) {
                 when (row) {
                     is HeadRow -> HeadView(
                         row,
@@ -255,7 +283,7 @@ fun Manuscript(
                             // CNV-40: no swipe while a block is being typed.
                             val side = if (revealedRow == row.key) revealedSide else SwipeSide.CLOSED
                             val look = actions.look(row).let { if (side != SwipeSide.CLOSED) it.copy(numbered = true) else it }
-                            SwipeBlock(row, side, actions, enter, enabled = !previewOnly) {
+                            SwipeBlock(row, side, actions, enter, enabled = !previewOnly, bounds = bounds, scrolling = { listState.isScrollInProgress }) {
                                 BlockView(
                                     row = row,
                                     selected = editor.selected == row.blockKey,
@@ -291,9 +319,11 @@ fun Manuscript(
 }
 
 /**
- * (0.2.0, SCR-30) A block row with both swipe sides: left `◆ 시간 · 참고 · 속성` (opens the panel at that tab,
- * also for reading), right `고치기 · 이 뒤에 · 종류 · 씬 나누기 · 지우기` ([ManuscriptActions.editButtons]). The swipe
- * only reveals; TalkBack gets every button as a custom action.
+ * (0.2.0, SCR-30; 0.2.4 sides swapped) A block row with both swipe sides: a left swipe shows `고치기 · 이 뒤에 · 종류 ·
+ * 씬 나누기 · 지우기` at the right end ([ManuscriptActions.editButtons]), a right swipe `◆ 시간 · 참고 · 속성` at the left
+ * end (opens the panel at that tab, also for reading). The swipe only reveals. (0.2.4) A long press opens the
+ * block menu ([ManuscriptActions.menu]); TalkBack gets it as the long click `블록 메뉴` and every menu row as a
+ * custom action.
  */
 @Composable
 private fun SwipeBlock(
@@ -302,6 +332,8 @@ private fun SwipeBlock(
     actions: ManuscriptActions,
     modifier: Modifier,
     enabled: Boolean,
+    bounds: BoundsHolder,
+    scrolling: () -> Boolean,
     content: @Composable () -> Unit,
 ) {
     val colors = CivilightTheme.colors
@@ -319,18 +351,58 @@ private fun SwipeBlock(
     val edit = actions.editButtons(row).map { b ->
         SwipeButtonSpec(b.label, { actions.onSwipe(null, SwipeSide.CLOSED); b.onClick() }, b.labelColor, b.enabled, b.icon)
     }
+    val menu = if (enabled) actions.menu(row) else emptyList()
+    fun openMenu() {
+        actions.onSwipe(null, SwipeSide.CLOSED)
+        actions.onLongPress(row, bounds.rect)
+    }
     TwoSidedSwipeRow(
         side = side,
         onSideChange = { actions.onSwipe(if (it == SwipeSide.CLOSED) null else row.key, it) },
         reference = reference,
         edit = edit,
         enabled = enabled,
-        modifier = modifier.semantics {
-            customActions = (reference + edit).filter { it.enabled }.map { b -> CustomAccessibilityAction(b.label) { b.onClick(); true } }
-        },
-        content = content,
-    )
+        modifier = modifier
+            .semantics {
+                val named = if (menu.isNotEmpty()) menu.map { it.label to it.onClick } else (reference + edit).filter { it.enabled }.map { it.label to it.onClick }
+                customActions = named.map { (label, run) -> CustomAccessibilityAction(label) { run(); true } }
+                if (menu.isNotEmpty()) onLongClick(ScriptCopy.BLOCK_MENU) { openMenu(); true }
+            },
+    ) {
+        Box(Modifier.blockLongPress(enabled = menu.isNotEmpty(), scrolling = scrolling) { openMenu() }) { content() }
+    }
 }
+
+/** The last window bounds of a block row (px; not state, so scrolling recomposes nothing). */
+private class BoundsHolder {
+    var rect: Rect = Rect.Zero
+}
+
+/**
+ * (0.2.4) The block whose long-press menu is open lifts: it grows to [CivilightMotion.liftScale] on `enter`
+ * (reduced motion: no scale), takes the popover shadow and sits above its neighbours; it settles on `exit`.
+ */
+@Composable
+private fun Modifier.lifted(on: Boolean): Modifier {
+    val motion = CivilightTheme.motion
+    val colors = CivilightTheme.colors
+    val lift by animateFloatAsState(if (on) 1f else 0f, motion.spec(if (on) CivilightMotion.enter else CivilightMotion.exit), label = "blockLift")
+    if (lift <= 0f) return this
+    val shadow = CivilightTheme.elevation.popover(colors).let { it.copy(color = it.color.copy(alpha = it.color.alpha * lift)) }
+    val scale = if (motion.reduced) 1f else 1f + (CivilightMotion.liftScale - 1f) * lift
+    // Keep `zIndex` (a layout node) before the scale layer: the row's bounds tracker sits just outside this modifier
+    // and reports through the next layout node, so it reads the row unscaled (0.2.4 review).
+    return this
+        .zIndex(1f)
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .tokenShadow(LIFT_SHAPE, shadow)
+        .background(colors.bg, LIFT_SHAPE)
+}
+
+private val LIFT_SHAPE = RoundedCornerShape(12.dp)
 
 /**
  * A block created by the writer enters from 8 dp below over 320 ms, decelerating (SCR-12, SCR-67);

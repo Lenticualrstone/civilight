@@ -11,7 +11,7 @@ object ScriptTourSteps {
     /** `명령 칸`: the command row at the bottom. */
     const val COMMAND: Int = 0
 
-    /** `블록을 왼쪽으로`: a block row. */
+    /** `블록을 오른쪽으로`: a block row. */
     const val BLOCK: Int = 1
 
     /** `씬 머리`: a scene head. */
@@ -25,7 +25,7 @@ object ScriptTourSteps {
     @Suppress("UNUSED_PARAMETER")
     fun absent(readOnly: Boolean): Set<Int> = setOf(COMMAND)
 
-    /** How many steps the script tour has (`명령 칸`, `블록을 왼쪽으로`, `씬 머리`). */
+    /** How many steps the script tour has (`명령 칸`, `블록을 오른쪽으로`, `씬 머리`). */
     const val COUNT: Int = 3
 
     /**
