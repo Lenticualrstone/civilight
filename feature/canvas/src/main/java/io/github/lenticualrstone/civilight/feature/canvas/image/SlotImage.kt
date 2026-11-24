@@ -5,6 +5,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -73,6 +75,8 @@ fun BoxScope.BlobImage(
     imageModifier: Modifier = Modifier,
     layerModifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
+    /** A fitted image (`보기`) gets these corners and its layer (the holo foil) on the image's own box. */
+    fitCorner: androidx.compose.ui.unit.Dp? = null,
     placeholder: @Composable BoxScope.() -> Unit,
 ) {
     val deps = LocalFeatureDeps.current
@@ -83,7 +87,18 @@ fun BoxScope.BlobImage(
     }
     val shown = bitmap
     if (shown == null) placeholder()
-    else Box(Modifier.matchParentSize().then(layerModifier)) {
+    else if (fitCorner != null && shown.width > 0 && shown.height > 0) {
+        Box(Modifier.matchParentSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Box(
+                Modifier
+                    .aspectRatio(shown.width.toFloat() / shown.height)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(fitCorner))
+                    .then(layerModifier),
+            ) {
+                Image(shown, contentDescription = contentDescription, modifier = imageModifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
+            }
+        }
+    } else Box(Modifier.matchParentSize().then(layerModifier)) {
         Image(shown, contentDescription = contentDescription, modifier = imageModifier.fillMaxSize(), contentScale = contentScale)
     }
 }

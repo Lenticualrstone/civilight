@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import io.github.lenticualrstone.civilight.designsystem.component.holoImage
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
@@ -172,7 +173,8 @@ fun CardImageContent(image: CardImageUi, name: String, targetWidth: Int, modifie
                     }
                 }
                 Crossfade(targetState = bitmap, modifier = modifier.fillMaxSize(), animationSpec = motion.spec(CivilightMotion.standard), label = "cardImage") { shown ->
-                    if (shown != null) Image(shown, contentDescription = name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    // Holo on (CNV-30): the reference image carries the live foil.
+                    if (shown != null) Image(shown, contentDescription = name, modifier = Modifier.fillMaxSize().holoImage(image.holo), contentScale = ContentScale.Crop)
                 }
             }
         }

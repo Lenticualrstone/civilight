@@ -41,6 +41,7 @@ fun BoxScope.GalleryImage(
     contentScale: ContentScale = ContentScale.Crop,
     contentDescription: String? = null,
     holoDragConsumes: Boolean = false,
+    fitCorner: androidx.compose.ui.unit.Dp? = null,
 ) {
     // One holder per place (not per item): the trigger only rises, so an item swap here never fires the sweep.
     val edge = remember { HoloToggleEdge(item.key, item.holo) }
@@ -56,7 +57,7 @@ fun BoxScope.GalleryImage(
     when {
         item.isPreset && preset != null -> Box(Modifier.matchParentSize().then(holo)) { PresetArt(preset, imageModifier) }
         item.isPreset -> ImagePlaceholder(name, onPick = null, compact = true)
-        else -> BlobImage(item.blobHash, ratio?.let(item::cropFor), maxSide, contentDescription, imageModifier, holo, contentScale) {
+        else -> BlobImage(item.blobHash, ratio?.let(item::cropFor), maxSide, contentDescription, imageModifier, holo, contentScale, fitCorner) {
             ImagePlaceholder(name, onPick = null, compact = true)
         }
     }

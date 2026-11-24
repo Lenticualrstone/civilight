@@ -359,7 +359,7 @@ fun GalleryScreen(route: Gallery, deps: FeatureDeps) {
                     val entry = v.entry(current)!!
                     val panels = remember(doc, locked) { GalleryPanels(doc, locked) }
                     val shown = remember(entry, v.count) {
-                        ViewerItem(entry.item, panels.panel(entry.item, entry.position, v.count, entry.hiddenTag), facts(doc, entry.item, deps))
+                        ViewerItem(entry.item, panels.panel(entry.item, entry.position, v.count, entry.hiddenTag), facts(doc, entry.item, deps), entry.chip)
                     }
                     GalleryViewer(
                         nav = nav,

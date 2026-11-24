@@ -19,12 +19,12 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.domain.cast.list.CastCard
 import io.github.lenticualrstone.civilight.domain.cast.list.LockRow
 import io.github.lenticualrstone.civilight.model.Key
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sign
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /** One item of a card view: a character card, or the lock card that ends the view. */
 internal sealed interface DeckItem {
@@ -55,12 +55,21 @@ internal sealed interface DeckItem {
  * that the next drag, settle or snap cancels, carrying the spring's velocity into the next settle.
  */
 @Stable
-internal class Deck(val loop: Boolean, private val scope: CoroutineScope, size: Int, start: Int) {
+internal class Deck(
+    val loop: Boolean,
+    private val scope: CoroutineScope,
+    size: Int,
+    start: Int,
+    private val stiffness: Float = CivilightMotion.cardDeckStiffness,
+    private val damping: Float = CivilightMotion.cardDeckDamping,
+) {
     private val posState = mutableFloatStateOf(start.toFloat())
     private val targetState = mutableFloatStateOf(start.toFloat())
     var size by mutableIntStateOf(size)
     var reduced by mutableStateOf(false)
     private var dragged = 0f
+    private var dragRaw = Float.NaN
+    private var dragStart = 0f
     private var settleJob: Job? = null
     private var velocity = 0f
 
@@ -90,31 +99,51 @@ internal class Deck(val loop: Boolean, private val scope: CoroutineScope, size: 
         settle(CardPoses.nearestPos(pos, i, size, loop))
     }
 
-    /** Moves by [cards] while a finger drags (snaps nothing under reduced motion; the release steps once). */
+    /**
+     * Moves by [cards] while a finger drags; a clamped view follows at a third past its ends (board rubber
+     * band). Under reduced motion nothing moves until the release, which steps one card.
+     */
     fun dragBy(cards: Float) {
         if (size == 0) return
         if (reduced) {
             dragged += cards
             return
         }
-        stopSettle()
-        velocity = 0f
-        val v = pos + cards
-        val p = if (loop) v else v.coerceIn(-DRAG_OVER, size - 1 + DRAG_OVER)
+        if (dragRaw.isNaN()) {
+            stopSettle()
+            velocity = 0f
+            dragRaw = pos
+            dragStart = pos
+        }
+        dragRaw += cards
+        val p = if (loop) dragRaw else CardPoses.rubber(dragRaw, size)
         posState.floatValue = p
         targetState.floatValue = p
     }
 
-    /** Releases a drag that last moved in [direction]: settles on the card it was heading for. */
-    fun endDrag(direction: Float) {
+    /**
+     * Releases a drag moving at [velocity] cards/s: settles on `round(pos + v · 0.16)` within two cards (board
+     * `up`), carrying the finger's speed into the spring. With [stepAt] (롤로덱스) a drag of at least that many
+     * cards turns exactly one card, and a shorter one goes back.
+     */
+    fun endDrag(velocity: Float, stepAt: Float? = null) {
         if (size == 0) return
+        val start = dragStart
+        dragRaw = Float.NaN
         if (reduced) {
             val d = dragged
             dragged = 0f
-            if (abs(d) > DRAG_STEP) step(d.sign.toInt())
+            if (abs(d) > (stepAt ?: DRAG_STEP)) step(d.sign.toInt())
             return
         }
-        val t = (pos + DRAG_BIAS * direction.sign).roundToInt()
+        val t = if (stepAt != null) {
+            val moved = pos - start
+            val base = start.roundToInt()
+            if (abs(moved) >= stepAt) base + moved.sign.toInt() else base
+        } else {
+            CardPoses.flingTarget(pos, velocity, size, loop)
+        }
+        this.velocity = velocity
         settle(if (loop) t.toFloat() else t.coerceIn(0, size - 1).toFloat())
     }
 
@@ -135,6 +164,7 @@ internal class Deck(val loop: Boolean, private val scope: CoroutineScope, size: 
 
     fun snap(i: Int) {
         stopSettle()
+        dragRaw = Float.NaN
         velocity = 0f
         posState.floatValue = i.toFloat()
         targetState.floatValue = i.toFloat()
@@ -156,7 +186,7 @@ internal class Deck(val loop: Boolean, private val scope: CoroutineScope, size: 
         val from = pos
         val v0 = velocity
         settleJob = scope.launch {
-            animate(from, target, v0, spring(CivilightMotion.viewSettleDamping, CivilightMotion.viewSettleStiffness)) { value, v ->
+            animate(from, target, v0, spring(damping, stiffness)) { value, v ->
                 posState.floatValue = value
                 velocity = v
             }
@@ -165,12 +195,6 @@ internal class Deck(val loop: Boolean, private val scope: CoroutineScope, size: 
     }
 
     companion object {
-        /** How far a clamped view follows a drag past its end, in cards. */
-        const val DRAG_OVER = 0.4f
-
-        /** A released drag carries on this far in its direction before rounding, so a short flick still turns a card. */
-        const val DRAG_BIAS = 0.35f
-
         /** Under reduced motion a drag of this many cards steps one. */
         const val DRAG_STEP = 0.25f
     }
@@ -182,12 +206,19 @@ internal class Deck(val loop: Boolean, private val scope: CoroutineScope, size: 
  * while it is still highlighted leaves the focus where the reader put it.
  */
 @Composable
-internal fun rememberDeck(items: List<DeckItem>, loop: Boolean, reduced: Boolean, focusKey: Key?): Deck {
+internal fun rememberDeck(
+    items: List<DeckItem>,
+    loop: Boolean,
+    reduced: Boolean,
+    focusKey: Key?,
+    stiffness: Float = CivilightMotion.cardDeckStiffness,
+    damping: Float = CivilightMotion.cardDeckDamping,
+): Deck {
     val scope = rememberCoroutineScope()
     var savedKey by rememberSaveable { mutableStateOf<String?>(null) }
-    val deck = remember(loop) {
+    val deck = remember(loop, stiffness, damping) {
         val start = savedKey?.let { k -> items.indexOfFirst { it.key == k } }?.takeIf { it >= 0 } ?: 0
-        Deck(loop, scope, items.size, start)
+        Deck(loop, scope, items.size, start, stiffness, damping)
     }
     deck.reduced = reduced
     LaunchedEffect(deck, items) {

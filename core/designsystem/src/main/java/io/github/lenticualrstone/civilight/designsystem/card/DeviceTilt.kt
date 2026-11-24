@@ -100,7 +100,7 @@ class DeviceTilt internal constructor() {
  * The rotation-vector listener behind [rememberTilt]: no allocation per event (one matrix, two floats of
  * base), relative to the pose at the first event after registering; a display rotation takes a new base.
  */
-private class TiltListener(context: Context, private val tilt: DeviceTilt) : SensorEventListener {
+internal class TiltListener(context: Context, private val tilt: DeviceTilt) : SensorEventListener {
     private val manager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
     private val displays = context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
     private val sensor: Sensor? = manager?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)

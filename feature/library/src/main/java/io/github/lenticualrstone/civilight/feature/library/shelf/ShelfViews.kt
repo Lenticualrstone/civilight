@@ -27,6 +27,10 @@ data class ShelfViewInput(
     val tilt: Boolean = false,
     /** CNV-43: the open hidden group's items come out of the blur with the list's unhide. */
     val unhide: Unhide? = null,
+    /** The list pane's visible height (dp) under the screen header and above the command bar; null = unknown. */
+    val viewportHeight: Float? = null,
+    /** LIB-06: the project shown in the detail pane (inner display); the view brings it to the front. */
+    val selectedKey: io.github.lenticualrstone.civilight.model.Key? = null,
 )
 
 /** One 서재 3D view (U-16 boards `u16_lib_a` … `c`). Motion only through `CivilightMotion`. */

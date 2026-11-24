@@ -15,12 +15,14 @@ data class CardBackField(val label: String, val value: String)
 
 /**
  * The back of a flipped card (부채꼴 덱, CST-67): the title as on the front, then the `한 줄 소개` (or, while a
- * display name hides the name, the front's `하르트 · 이름 공개 1-9` line), then up to two public fields.
+ * display name hides the name, the front's `하르트 · 이름 공개 1-9` line), then up to three public fields (the turned deck card shows two).
  */
 data class CardBack(val title: String, val line: String?, val fields: List<CardBackField>)
 
 internal object CardBackModel {
-    const val FIELDS = 2
+    /** The 롤로덱스 index card shows three rows (board `rcard`); the turned 부채꼴 덱 card two ([DECK_FIELDS]). */
+    const val FIELDS = 3
+    const val DECK_FIELDS = 2
 
     /**
      * The back of [characterKey] at [lens]. Only public fields (never a secret field, so the 비밀 tab lock

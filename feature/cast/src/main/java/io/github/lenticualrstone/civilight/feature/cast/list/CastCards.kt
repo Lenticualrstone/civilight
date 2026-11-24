@@ -21,6 +21,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.lenticualrstone.civilight.designsystem.component.HoloSurface
 import io.github.lenticualrstone.civilight.designsystem.card.CardKind
 import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
 import io.github.lenticualrstone.civilight.designsystem.card.SnapCardRow
@@ -114,7 +115,10 @@ private fun CastCardView(
     Column(modifier.width(width).pressable(onClick = onClick, scaleOnPress = false, onClickLabel = card.title)) {
         Box(Modifier.size(width, width * 5 / 4).then(portraitShare).clip(shape).background(colors.tint)) {
             if (painter != null) {
-                Image(painter, contentDescription = null, modifier = imageModifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                // `홀로` (chip below) always comes with the foil itself (CNV-30).
+                HoloSurface(on = card.holo, modifier = Modifier.matchParentSize()) {
+                    Image(painter, contentDescription = null, modifier = imageModifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                }
             } else {
                 CivilightText(card.initial, type.display, Modifier.align(Alignment.Center), color = colors.ink3)
                 if (onPickImage != null) {

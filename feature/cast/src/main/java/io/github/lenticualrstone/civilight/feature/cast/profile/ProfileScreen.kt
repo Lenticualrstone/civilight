@@ -85,6 +85,7 @@ import io.github.lenticualrstone.civilight.feature.cast.gametext.VoiceLineSheet
 import io.github.lenticualrstone.civilight.navigation.ArchiveDocEdit
 import io.github.lenticualrstone.civilight.navigation.ImagePickSheet
 import io.github.lenticualrstone.civilight.feature.cast.image.CharacterImages
+import io.github.lenticualrstone.civilight.feature.cast.image.ImagePlace
 import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.model.Key
@@ -378,6 +379,8 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
             },
         ) { padding ->
             val art = remember(doc, c, wide) { CharacterImages.background(doc, c, inner = wide) }
+            // No background: the portrait is the record's hero, in the holo board's tilting card when holo is on.
+            val portrait = remember(doc, c, art) { if (art == null) CharacterImages.image(doc, c, ImagePlace.CARD) else null }
             val gallery = remember(doc, c, gate.open) { CastGallery.section(doc, c, gate.open) }
             val secret = SecretTabExtras(
                 summaryEdit = if (editable) ({ sheets.open(SpeechSummarySheet(p, c)) }) else null,
@@ -411,6 +414,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                 contentPadding = PaddingValues(start = PROFILE_SIDE, end = PROFILE_SIDE, top = topPad, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
                 item(key = "art") { FoldRevealValue(art) { image -> RecordArt(image, inner = wide, sidePadding = PROFILE_SIDE) } }
+                item(key = "portrait") { FoldRevealValue(portrait) { image -> PortraitHero(image) } }
                 item(key = "head") { RecordHead(state, editable, actions) }
                 item(key = "table") { HeaderTable(doc, state, fullState, ui.headerExpanded, actions) { headerExpanded = true } }
                 // One item for the tab body: the tabs swap their content in place (row 3).

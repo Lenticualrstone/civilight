@@ -89,6 +89,8 @@ data class CastCard(
     /** The portrait uses the holo effect (`홀로` badge). */
     val holo: Boolean,
     val initial: String,
+    /** (0.2.1, U-16 cards) The character's live tag names in tag order ([CastList.groupTags]), for the card chips. */
+    val tags: List<String> = emptyList(),
 )
 
 /** One horizontally scrolling row of cards: `<tag> · <count>`. */
@@ -220,7 +222,7 @@ object CastList {
                 .filterNot { it.isEmpty }.take(2).map { it.text } + c.oneLiner,
         )
         val holo = doc.index.imageUse(ImageOwnerKind.CHARACTER, c.key, ImageSlot.CHARACTER_PORTRAIT)?.holo == true
-        return CastCard(c.key, title, subtitle, FirstAppearance.label(doc, c.key), holo, c.name.take(1))
+        return CastCard(c.key, title, subtitle, FirstAppearance.label(doc, c.key), holo, c.name.take(1), groupTags(doc, c).map { it.name })
     }
 
     /** One card row per tag group, header `주연 · 3`. */

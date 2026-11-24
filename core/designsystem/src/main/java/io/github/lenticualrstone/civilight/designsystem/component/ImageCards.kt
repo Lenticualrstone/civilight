@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,7 +46,8 @@ import kotlin.math.sin
 /**
  * DS-51 image card (`.cv`): radius 20, clipped; [image] fills it; a bottom shade over the lower 62 %;
  * text 16 dp from the sides, 14 dp from the bottom in on-image colours: rating badge, title 800 22 / 28
- * (16 / 21 single line when [compactTitle]), meta 400 12 / 17. Optional status chip at 12 / 12 and a `⋯`
+ * (16 / 21 single line when [compactTitle]; [titleStyle], [metaStyle] and [textPadding] override, e.g. the
+ * gallery card's 20 / 26 and small 15 / 20), meta 400 12 / 17. Optional status chip at 12 / 12 and a `⋯`
  * button at the top-right (44, icon 18 `onImage`). Sizes and content are CNV-22 / CNV-23.
  */
 @Composable
@@ -58,6 +60,9 @@ fun ImageCard(
     more: IconAction? = null,
     onClick: (() -> Unit)? = null,
     compactTitle: Boolean = false,
+    titleStyle: TextStyle? = null,
+    metaStyle: TextStyle? = null,
+    textPadding: PaddingValues? = null,
     image: @Composable BoxScope.() -> Unit,
 ) {
     val type = CivilightTheme.type
@@ -88,17 +93,17 @@ fun ImageCard(
             Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
+                .padding(textPadding ?: PaddingValues(start = 16.dp, end = 16.dp, bottom = 14.dp)),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (rating != null) RatingBadge(rating, surface = BadgeSurface.ON_IMAGE)
             CivilightText(
                 title,
-                if (compactTitle) type.title.merge(TextStyle(fontSize = 16.sp, lineHeight = 21.sp)) else type.title,
+                titleStyle ?: if (compactTitle) type.title.merge(TextStyle(fontSize = 16.sp, lineHeight = 21.sp)) else type.title,
                 color = FixedColors.onImage,
                 maxLines = if (compactTitle) 1 else 2,
             )
-            if (meta != null) CivilightText(meta, type.small, color = FixedColors.onImage2, maxLines = 1)
+            if (meta != null) CivilightText(meta, metaStyle ?: type.small, color = FixedColors.onImage2, maxLines = 1)
         }
     }
 }

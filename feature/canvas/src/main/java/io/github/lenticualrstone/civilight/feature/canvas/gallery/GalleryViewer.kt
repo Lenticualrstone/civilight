@@ -53,7 +53,7 @@ import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.gallery.GalleryItem
 
 /** What the viewer shows for the current item. */
-class ViewerItem(val item: GalleryItem, val panel: PanelModel, val facts: List<String>)
+class ViewerItem(val item: GalleryItem, val panel: PanelModel, val facts: List<String>, val chip: String? = null)
 
 /**
  * 보기 (GAL-09): the whole original, fitted (a preset at its own art), with holo when on; pinch zooms and two
@@ -141,13 +141,13 @@ private fun ViewerImage(nav: ViewerNav, shown: ViewerItem, sharedImage: @Composa
         modifier = modifier.clip(androidx.compose.ui.graphics.RectangleShape),
         label = "viewerImage",
     ) { s ->
-        ZoomableImage(s.item, sharedImage)
+        ZoomableImage(s.item, sharedImage, s.chip)
     }
 }
 
 /** Pinch zoom 1…4 and two-finger pan (viewing only, GAL-09); one finger does nothing. */
 @Composable
-private fun ZoomableImage(item: GalleryItem, sharedImage: @Composable (Key) -> Modifier) {
+private fun ZoomableImage(item: GalleryItem, sharedImage: @Composable (Key) -> Modifier, chip: String?) {
     BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
         val w = constraints.maxWidth.toFloat()
         val h = constraints.maxHeight.toFloat()
@@ -180,11 +180,29 @@ private fun ZoomableImage(item: GalleryItem, sharedImage: @Composable (Key) -> M
                 },
         ) {
             Box(Modifier.matchParentSize().then(sharedImage(item.key))) {
-                GalleryImage(item, ratio = null, maxSide = GalleryImageSizes.VIEWER, contentScale = ContentScale.Fit, contentDescription = item.title.ifBlank { null }, holoDragConsumes = true)
+                GalleryImage(item, ratio = null, maxSide = GalleryImageSizes.VIEWER, contentScale = ContentScale.Fit, contentDescription = item.title.ifBlank { null }, holoDragConsumes = true, fitCorner = VIEWER_CORNER)
             }
+        }
+        // Board `.hchip`: `초상 · 홀로` over the image's corner (not zoomed with it).
+        if (chip != null) {
+            CivilightText(
+                chip,
+                CivilightTheme.type.small,
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(10.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(io.github.lenticualrstone.civilight.designsystem.theme.FixedColors.imageChipFill)
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                color = io.github.lenticualrstone.civilight.designsystem.theme.FixedColors.onImage,
+                maxLines = 1,
+            )
         }
     }
 }
+
+/** Board viewer image corners (6 px). */
+private val VIEWER_CORNER = 6.dp
 
 /** `이전` · `설명` · `다음` (secondary, primary when on, secondary). */
 @Composable

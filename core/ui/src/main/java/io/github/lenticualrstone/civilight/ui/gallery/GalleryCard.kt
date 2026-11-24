@@ -23,6 +23,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.layout.PaddingValues
 import io.github.lenticualrstone.civilight.designsystem.card.CardSize
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
@@ -60,6 +63,12 @@ object GalleryCardRules {
     fun pitch(inner: Boolean): Float = if (inner) 252f else 236f
 
     const val RADIUS_DP: Float = 20f
+
+    /** `gcard` `big = w >= 190`: below it the small text (15 / 20 title, 11 / 15 meta, 12 · 10 dp insets). */
+    const val SMALL_BELOW_DP: Float = 190f
+
+    /** Whether a card [widthDp] wide uses the small text (group rows 162, the profile row 132). */
+    fun small(widthDp: Float): Boolean = widthDp < SMALL_BELOW_DP
 
     /** How far the picked card lifts (GAL-07). */
     const val LIFT_DP: Float = 10f
@@ -113,6 +122,7 @@ fun GalleryCard(
     modifier: Modifier = Modifier,
     onMenu: (() -> Unit)? = null,
     picked: Boolean = false,
+    small: Boolean = false,
     image: @Composable BoxScope.() -> Unit,
 ) {
     val colors = CivilightTheme.colors
@@ -142,7 +152,15 @@ fun GalleryCard(
         }
     val more = onMenu?.let { IconAction(GalleryCardCopy.MENU, it) }
     if (shown != null) {
-        ImageCard(title = shown, modifier = frame, meta = meta, statusChip = chip, more = more, onClick = onClick, image = image)
+        // scr_gallery `gcard`: title 800 20 / 26 on a big card, 15 / 20 with meta 11 / 15 and 12 · 10 dp insets on a small one.
+        val type = CivilightTheme.type
+        ImageCard(
+            title = shown, modifier = frame, meta = meta, statusChip = chip, more = more, onClick = onClick,
+            titleStyle = type.title.merge(if (small) TextStyle(fontSize = 15.sp, lineHeight = 20.sp) else TextStyle(fontSize = 20.sp, lineHeight = 26.sp)),
+            metaStyle = if (small) type.small.merge(TextStyle(fontSize = 11.sp, lineHeight = 15.sp)) else null,
+            textPadding = if (small) PaddingValues(start = 12.dp, end = 12.dp, bottom = 10.dp) else null,
+            image = image,
+        )
         return
     }
     val shape = RoundedCornerShape(radius.dp)

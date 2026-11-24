@@ -195,18 +195,29 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
                                     .onGloballyPositioned { bounds[tile.source] = it.boundsInWindow() },
                                 aspectRatio = TILE_ASPECT,
                             ) {
-                                // The holo row previews on the selected tile; switching it on sweeps once (CNV-45).
-                                Box(Modifier.matchParentSize().holoSurface(holo && selected == tile.source, sweepTrigger = holoSweep)) {
+                                // The holo row previews on the selected tile; switching it on sweeps once (CNV-45). A gallery
+                                // tile whose item has holo (its chip says `홀로`) shows the foil too, so the label never
+                                // stands without the effect.
+                                val isSelected = selected == tile.source
+                                val foilOn = if (isSelected) holo else tile.item?.holo == true
+                                // This tile's own sweep count: it rises only when the switch is turned on while this
+                                // tile is the selected one, so picking another tile never sweeps.
+                                val sweepCount = remember(tile.source) { intArrayOf(0, holoSweep) }
+                                if (holoSweep != sweepCount[1]) {
+                                    if (isSelected) sweepCount[0]++
+                                    sweepCount[1] = holoSweep
+                                }
+                                Box(Modifier.matchParentSize().holoSurface(foilOn, sweepTrigger = sweepCount[0], consumeDrag = false)) {
                                     tile.preset?.let { PresetArt(it) }
                                     val item = tile.item
                                     if (item != null) {
                                         // A gallery tile shows the item's own `카드 3:4` crop (LIB-85).
                                         tile.blob?.let { blob -> BlobImage(blob.hash, item.cropFor(Ratio.R3X4), GALLERY_TILE_SIDE, null) { } }
-                                        tile.chip?.let { ImageStatusChip(it, Modifier.align(Alignment.TopStart).padding(6.dp)) }
                                     } else {
                                         tile.blob?.let { blob -> MineThumb(blob.hash) { thumbs[tile.source] = it } }
                                     }
                                 }
+                                if (tile.item != null) tile.chip?.let { ImageStatusChip(it, Modifier.align(Alignment.TopStart).padding(6.dp)) }
                             }
                         }
                         repeat(COLUMNS - row.size) { Box(Modifier.weight(1f)) }

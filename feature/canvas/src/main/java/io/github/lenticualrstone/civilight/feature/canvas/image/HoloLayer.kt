@@ -34,7 +34,11 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import io.github.lenticualrstone.civilight.designsystem.component.HoloStrength
+import io.github.lenticualrstone.civilight.designsystem.component.HoloMath
+import io.github.lenticualrstone.civilight.designsystem.component.HoloPose
 import io.github.lenticualrstone.civilight.designsystem.component.holoFoil
+import io.github.lenticualrstone.civilight.designsystem.component.holoImage
+import io.github.lenticualrstone.civilight.designsystem.component.holoImageFoil
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
@@ -219,6 +223,10 @@ fun Modifier.holoDrag(tilt: HoloTilt, consume: Boolean = true): Modifier = when 
 fun Modifier.holoFoilAt(tilt: Tilt, theme: ResolvedTheme, strength: Float = HoloStrength.of(theme)): Modifier =
     holoFoil(Offset(tilt.x, tilt.y), theme, strength)
 
+/** The DS image foil (board `.hfoil`: silver, iridescent tint, sheen, grain, glints) at [tilt]'s current value. */
+fun Modifier.holoImageFoilAt(tilt: Tilt, intensity: Float = 1f): Modifier =
+    holoImageFoil(HoloPose(tilt.x, tilt.y), intensity)
+
 /** [tilt] followed through a critically damped spring, so a noisy sensor reads smoothly (audit §4 canvas 11). */
 @Composable
 fun rememberSpringTilt(target: Tilt): Tilt {
@@ -228,37 +236,21 @@ fun rememberSpringTilt(target: Tilt): Tilt {
 }
 
 /**
- * The holo foil of a surface while [on] (CNV-30): DS `holoFoil` driven by the device tilt; without a
- * rotation sensor the surface is dragged to tilt and sways back on release. The whole foil fades in and out on
- * `standard` when [on] changes. The turn-on sweep (one pass left → right, 480 ms decelerate) plays on the
- * edge of [sweepTrigger]: the caller raises it when the user switches holo on, so it does not replay on a
- * restore or when another tile becomes the shown one. Reduced motion: a still foil, no sweep, no sensor. The
- * sensor is registered only while a holo surface is composed (on screen), T-CNV-55. [strength] defaults to
- * the theme's tint strength. The tilt is read in the draw phase (no recomposition per sensor event), and the
- * foil keeps to the drawn image, never the empty box around a fitted one. [consumeDrag]: see [holoDrag]
- * (false for surfaces inside a scrolling row or column).
+ * The holo foil of a surface while [on] (CNV-30): the DS [holoImage] (AGSL foil on API 33+, gradient foil
+ * below; the board's tint, silver, sheen and grain; one shared tilt listener; drag; the 7 s idle sway without a
+ * gyro; the 480 ms turn-on sweep on the edge of [sweepTrigger]; a still foil under reduced motion). [strength]
+ * is the tint alpha of the old API (the board's .5 = intensity 1). The foil keeps to the drawn image, never
+ * the empty box around a fitted one. [consumeDrag]: false for surfaces inside a scrolling row or column.
  */
 @Composable
-fun Modifier.holoSurface(on: Boolean, sweepTrigger: Int = 0, strength: Float? = null, consumeDrag: Boolean = true): Modifier {
-    val amount = animatedFraction(on, label = "holoFoil")
-    val gate = remember { SweepGate(sweepTrigger) }
-    val fire = HoloRules.sweepEdge(gate.seenTrigger, sweepTrigger, on)
-    SideEffect {
-        gate.seenTrigger = sweepTrigger
-        if (fire) gate.stamp++
-    }
-    if (!on && amount.value <= 0f) return this
-    val theme = if (CivilightTheme.colors.isDark) ResolvedTheme.DARK else ResolvedTheme.LIGHT
-    val tilt = rememberHoloTilt(gate)
-    val tint = strength ?: HoloStrength.of(theme)
-    return holoDrag(tilt, consumeDrag).holoFoil(
-        tilt = { tilt.value.let { Offset(it.x, it.y) } },
-        theme = theme,
-        strength = { tint },
+fun Modifier.holoSurface(on: Boolean, sweepTrigger: Int = 0, strength: Float? = null, consumeDrag: Boolean = true): Modifier =
+    holoImage(
+        on = on,
+        intensity = strength?.let { it / HoloMath.TINT_ALPHA } ?: 1f,
+        sweepTrigger = sweepTrigger,
+        consumeDrag = consumeDrag,
         maskToContent = true,
-        fade = { amount.value },
     )
-}
 
 /** Drag-to-tilt without a gyro: follows the finger, then sways back to rest on a damped spring ([HoloRules.SWAY_DAMPING]). */
 internal class DragTilt {

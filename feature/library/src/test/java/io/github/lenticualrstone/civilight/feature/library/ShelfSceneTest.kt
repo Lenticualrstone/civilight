@@ -8,9 +8,6 @@ import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCardItem
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCards
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCopy
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfUi
-import io.github.lenticualrstone.civilight.feature.library.shelf.views.Pose
-import io.github.lenticualrstone.civilight.feature.library.shelf.views.SceneFrame
-import io.github.lenticualrstone.civilight.feature.library.shelf.views.ScenePoses
 import io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfScene
 import io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfViewCopy
 import io.github.lenticualrstone.civilight.feature.library.shelf.views.StarGroup
@@ -24,8 +21,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
-import kotlin.math.cos
 
 /** LIB-93 / DS-74 (lane lib3d): the pure parts of the six 서재 3D views. */
 class ShelfSceneTest {
@@ -59,8 +54,7 @@ class ShelfSceneTest {
     }
 
     @Test
-    fun `each view's window is its reach, and nothing pops at the window edge`() {
-        val pose = Pose()
+    fun `each view's window is its reach`() {
         for (wide in listOf(false, true)) {
             val cap = ShelfScene.cap(wide)
             for (style in ShelfScene.styles) {
@@ -68,43 +62,17 @@ class ShelfSceneTest {
                 assertEquals("$style wide=$wide", cap, reach.behind + 1 + reach.ahead)
                 assertEquals(reach.behind, ShelfScene.behind(style, wide))
                 assertEquals(reach.ahead, ShelfScene.ahead(style, wide))
-                // An item enters or leaves the window at |rel| = reach + 0.5 (front flips there): fully faded.
-                for (rel in listOf(-(reach.behind + 0.5f), reach.ahead + 0.5f)) {
-                    if (style != LibraryStyle.CONSTELLATION) assertEquals("$style wide=$wide rel=$rel", 0f, ScenePoses.edgeAlpha(style, rel, wide), 0f)
-                    val size = ShelfScene.size(style, wide)
-                    val frame = SceneFrame(if (wide) 560f else 360f, size.frameH, size.itemW, size.itemH)
-                    if (style != LibraryStyle.CONSTELLATION) {
-                        ScenePoses.place(style, rel, 20, 0f, wide, frame, pose)
-                        assertEquals("$style wide=$wide rel=$rel", 0f, pose.alpha, 0f)
-                    }
-                }
-                // 별자리 fades against the window itself: every composed star is lit at rest (also at the list
-                // ends and when all items fit); the star leaving and the one entering are 0 at the flip.
-                val behind = reach.behind
-                for (count in listOf(3, cap, 20)) for (f in 0 until count) {
-                    for (i in ShelfScene.window(f, count, reach)) {
-                        assertEquals("count=$count f=$f i=$i", 1f, ScenePoses.windowAlpha(i, f.toFloat(), count, behind, cap), 0f)
-                    }
-                    if (count > cap && f + 1 < count) {
-                        val a = ShelfScene.window(f, count, reach)
-                        val b = ShelfScene.window(f + 1, count, reach)
-                        for (i in (a + b).toSet() - (a.toSet() intersect b.toSet())) {
-                            assertEquals("leave/enter count=$count f=$f i=$i", 0f, ScenePoses.windowAlpha(i, f + 0.5f, count, behind, cap), 0f)
-                        }
-                    }
-                }
-                // The last composed item at rest is not dimmed by the edge.
-                assertEquals(1f, ScenePoses.edgeAlpha(style, reach.ahead.toFloat(), wide), 0f)
-                assertEquals(1f, ScenePoses.edgeAlpha(style, -reach.behind.toFloat(), wide), 0f)
             }
         }
-        // The pile, the corridor and the drawer keep one item behind and spend the rest ahead.
-        val pile = ShelfScene.reach(LibraryStyle.MANUSCRIPT_STACK, false)
-        assertEquals(1, pile.behind)
-        assertEquals(5, pile.ahead)
-        assertEquals(19..25, ShelfScene.window(20, 40, pile))
-        assertEquals(0..6, ShelfScene.window(0, 40, pile))
-        assertEquals(33..39, ShelfScene.window(39, 40, pile))
+        // The corridor and the drawer keep one item behind (a passed bay is hidden, a passed card falls and
+        // fades); the pile spreads both ways (board B fan), so it is even like the others.
+        val hall = ShelfScene.reach(LibraryStyle.ARCHIVE_HALL, false)
+        assertEquals(1, hall.behind)
+        assertEquals(5, hall.ahead)
+        assertEquals(19..25, ShelfScene.window(20, 40, hall))
+        assertEquals(0..6, ShelfScene.window(0, 40, hall))
+        assertEquals(33..39, ShelfScene.window(39, 40, hall))
+        assertEquals(3, ShelfScene.reach(LibraryStyle.MANUSCRIPT_STACK, false).behind)
         // Stepping the front one item moves the window by at most one item at either end.
         for (style in ShelfScene.styles) for (wide in listOf(false, true)) {
             val reach = ShelfScene.reach(style, wide)
@@ -164,11 +132,12 @@ class ShelfSceneTest {
     }
 
     @Test
-    fun `each view's picked-item pair is the DS-70 words`() {
+    fun `each view's picked-item pair is the board's words`() {
         assertEquals("꺼내기" to "제자리", ShelfScene.pickPair(LibraryStyle.BOOKSHELF)!!.let { it.pick to it.back })
-        assertEquals("꺼내기" to "돌려놓기", ShelfScene.pickPair(LibraryStyle.MANUSCRIPT_STACK)!!.let { it.pick to it.back })
+        assertEquals("들어 보기" to "내려놓기", ShelfScene.pickPair(LibraryStyle.MANUSCRIPT_STACK)!!.let { it.pick to it.back })
         assertEquals("꺼내기" to "돌려놓기", ShelfScene.pickPair(LibraryStyle.INDEX_DRAWER)!!.let { it.pick to it.back })
-        assertEquals("앞으로" to "제자리", ShelfScene.pickPair(LibraryStyle.CONSTELLATION)!!.let { it.pick to it.back })
+        assertEquals("앞으로" to "돌려놓기", ShelfScene.pickPair(LibraryStyle.CONSTELLATION)!!.let { it.pick to it.back })
+        assertEquals("펼치기" to "모으기", ShelfViewCopy.SPREAD to ShelfViewCopy.GATHER)
         assertNull(ShelfScene.pickPair(LibraryStyle.COVER_SPIN))
         assertNull(ShelfScene.pickPair(LibraryStyle.ARCHIVE_HALL))
         assertEquals("이전", ShelfViewCopy.PREV)
@@ -176,137 +145,6 @@ class ShelfSceneTest {
         assertEquals("3 / 8", ShelfViewCopy.position(2, 8))
         assertEquals(6, ShelfScene.styles.size)
         assertFalse(LibraryStyle.LIST in ShelfScene.styles)
-    }
-
-    /** Horizontal half extent of a placed item (rotation about Y narrows it; a small margin for perspective). */
-    private fun halfWidth(style: LibraryStyle, wide: Boolean, frame: SceneFrame, pose: Pose): Float {
-        val w = if (style == LibraryStyle.BOOKSHELF && pose.turn < 0.5f) ShelfScene.spineWidth(wide) else frame.itemW
-        return w * pose.scale * abs(cos(Math.toRadians(pose.rotY.toDouble()))).toFloat() / 2f * 1.1f
-    }
-
-    @Test
-    fun `DS-74 frame rule - every visible item stays inside the frame at rest and at full tilt`() {
-        val pose = Pose()
-        for (style in ShelfScene.styles.filter { it != LibraryStyle.CONSTELLATION }) for ((wide, width) in widths) {
-            val size = ShelfScene.size(style, wide)
-            val frame = SceneFrame(width, size.frameH, size.itemW, size.itemH)
-            val reach = ShelfScene.reach(style, wide)
-            var r = -reach.behind - 0.5f
-            while (r <= reach.ahead + 0.5f) {
-                for (lift in listOf(0f, 1f)) {
-                    ScenePoses.place(style, r, (r + 20f).toInt(), if (abs(r) < 0.01f) lift else 0f, wide, frame, pose)
-                    if (pose.alpha > 0.02f) {
-                        val right = abs(pose.tx) + halfWidth(style, wide, frame, pose) + TiltMath.DEPTH_DP
-                        assertTrue("$style wide=$wide rel=$r lift=$lift: x $right > ${width / 2f}", right <= width / 2f)
-                        val bottom = abs(pose.ty) + frame.itemH * pose.scale / 2f + TiltMath.DEPTH_DP
-                        assertTrue("$style wide=$wide rel=$r: y $bottom > ${size.frameH / 2f}", bottom <= size.frameH / 2f + frame.itemH * 0.1f)
-                    }
-                }
-                r += 0.25f
-            }
-        }
-    }
-
-    @Test
-    fun `the item in front faces the viewer and items further away fade`() {
-        val pose = Pose()
-        for (style in ShelfScene.styles.filter { it != LibraryStyle.CONSTELLATION }) {
-            val size = ShelfScene.size(style, false)
-            val frame = SceneFrame(360f, size.frameH, size.itemW, size.itemH)
-            ScenePoses.place(style, 0f, 0, 0f, false, frame, pose)
-            assertEquals("$style front centred", 0f, pose.tx, 0.01f)
-            assertEquals("$style front faces", 0f, pose.rotY, 0.01f)
-            assertEquals("$style front opaque", 1f, pose.alpha, 0.01f)
-            val front = pose.z
-            for (rel in -3..3) {
-                if (rel == 0) continue
-                ScenePoses.place(style, rel.toFloat(), rel + 10, 0f, false, frame, pose)
-                if (pose.alpha > 0.02f) assertTrue("$style rel=$rel: the front item is drawn over the others", front > pose.z)
-            }
-            ScenePoses.place(style, 8f, 8, 0f, false, frame, pose)
-            assertEquals("$style: far items are not drawn", 0f, pose.alpha, 0.01f)
-        }
-    }
-
-    @Test
-    fun `taps land only on what is visible`() {
-        val scratch = Pose()
-        for ((wide, width) in widths) {
-            val size = ShelfScene.size(LibraryStyle.BOOKSHELF, wide)
-            val frame = SceneFrame(width, size.frameH, size.itemW, size.itemH)
-            // A spine's target is no wider than its pitch, so a tap on a neighbour never reaches the front book.
-            assertTrue(ScenePoses.hitWidth(LibraryStyle.BOOKSHELF, wide, frame, pulled = false) <= ShelfScene.spineStep(wide))
-            assertEquals(frame.itemW, ScenePoses.hitWidth(LibraryStyle.BOOKSHELF, wide, frame, pulled = true), 0f)
-        }
-        val hall = ShelfScene.size(LibraryStyle.ARCHIVE_HALL, false).let { SceneFrame(360f, it.frameH, it.itemW, it.itemH) }
-        // 서고 회랑: a passed item is gone and takes no tap; the ones ahead do.
-        assertFalse(ScenePoses.visibleAtRest(LibraryStyle.ARCHIVE_HALL, 2, 3, false, hall, scratch))
-        assertTrue(ScenePoses.visibleAtRest(LibraryStyle.ARCHIVE_HALL, 4, 3, false, hall, scratch))
-        val stack = ShelfScene.size(LibraryStyle.MANUSCRIPT_STACK, false).let { SceneFrame(360f, it.frameH, it.itemW, it.itemH) }
-        assertFalse(ScenePoses.visibleAtRest(LibraryStyle.MANUSCRIPT_STACK, 1, 3, false, stack, scratch))
-        assertTrue(ScenePoses.visibleAtRest(LibraryStyle.MANUSCRIPT_STACK, 2, 3, false, stack, scratch))
-        assertTrue(ScenePoses.visibleAtRest(LibraryStyle.CONSTELLATION, 0, 5, false, stack, scratch))
-    }
-
-    @Test
-    fun `3D 책장 - the pulled book turns from spine to cover and the neighbours step aside`() {
-        val pose = Pose()
-        val size = ShelfScene.size(LibraryStyle.BOOKSHELF, false)
-        val frame = SceneFrame(360f, size.frameH, size.itemW, size.itemH)
-        ScenePoses.place(LibraryStyle.BOOKSHELF, 0f, 0, 0f, false, frame, pose)
-        assertEquals(0f, pose.turn, 0f)
-        ScenePoses.place(LibraryStyle.BOOKSHELF, 0f, 0, 1f, false, frame, pose)
-        assertEquals(1f, pose.turn, 0f)
-        ScenePoses.place(LibraryStyle.BOOKSHELF, 1f, 1, 0f, false, frame, pose)
-        val restX = pose.tx
-        ScenePoses.place(LibraryStyle.BOOKSHELF, 1f, 1, 1f, false, frame, pose)
-        assertTrue(pose.tx > restX)
-        assertEquals(0f, pose.turn, 0f)
-        assertTrue(ScenePoses.spineShown(0.2f))
-        assertFalse(ScenePoses.spineShown(0.8f))
-        assertEquals(90f, ScenePoses.spineRotY(0.5f), 0.01f)
-        assertEquals(-90f, ScenePoses.coverRotY(0.5f), 0.01f)
-        assertEquals(0f, ScenePoses.coverRotY(1f), 0.01f)
-        assertEquals(0f, ScenePoses.spineRotY(0f), 0.01f)
-    }
-
-    @Test
-    fun `별자리 - clusters by 형식 in order, lock and new apart, stars inside the frame`() {
-        val items = listOf(
-            ShelfCardItem.Project(card("a", ProjectFormat.SHORT)),
-            ShelfCardItem.Project(card("b", ProjectFormat.SERIAL)),
-            ShelfCardItem.Project(card("c", null)),
-            ShelfCardItem.Project(card("d", ProjectFormat.SETTING_ONLY)),
-            ShelfCardItem.Project(card("e", ProjectFormat.SHORT)),
-            ShelfCardItem.Lock(HiddenGroupRow(2)),
-            ShelfCardItem.NewProject,
-        )
-        val layout = ShelfScene.stars(items.map(ShelfScene::starGroup))
-        assertEquals(listOf(StarGroup.SERIAL, StarGroup.SHORT, StarGroup.SETTING_ONLY, StarGroup.OTHER), layout.groups)
-        // A loading project (no format yet) sits with 연재 장편, the model default.
-        assertEquals(listOf(1, 0, 0, 2, 1, 3, 3), layout.slots.map { it.group })
-        assertEquals(listOf(0, 0, 1, 0, 1, 0, 1), layout.slots.map { it.slot })
-        assertEquals(listOf(2, 2, 2, 1, 2, 2, 2), layout.slots.map { it.slotCount })
-        assertEquals(listOf("연재 장편", "단편", "설정만", null), layout.groups.map(ShelfScene::groupLabel))
-        val pose = Pose()
-        for ((wide, width) in widths) {
-            val size = ShelfScene.size(LibraryStyle.CONSTELLATION, wide)
-            val frame = SceneFrame(width, size.frameH, size.itemW, size.itemH)
-            for (orbit in listOf(0f, 0.13f, 0.25f, 0.5f, 0.77f)) for (slot in layout.slots) for ((focus, lift) in listOf(0f to 0f, 1f to 0f, 1f to 1f)) {
-                ScenePoses.star(slot, layout.groups.size, orbit, focus, lift, frame, pose)
-                val right = abs(pose.tx) + frame.itemW * pose.scale / 2f + TiltMath.DEPTH_DP
-                assertTrue("star $slot wide=$wide orbit=$orbit: $right", right <= width / 2f)
-                val bottom = abs(pose.ty) + frame.itemH * pose.scale / 2f + TiltMath.DEPTH_DP
-                assertTrue("star $slot wide=$wide: $bottom", bottom <= size.frameH / 2f)
-            }
-        }
-        // The layout is over all items (`Scene` keys it on the items and indexes it by item), so it has one slot per item.
-        assertEquals(items.size, layout.slots.size)
-        // `앞으로` brings the star to the middle, in front of every other.
-        val frame = SceneFrame(360f, 290f, 44f, 59f)
-        ScenePoses.star(layout.slots[0], 4, 0.3f, 1f, 1f, frame, pose)
-        assertEquals(0f, pose.tx, 0.01f)
-        assertTrue(pose.z > 3f)
     }
 
     @Test

@@ -174,6 +174,7 @@ private fun CardRowSection(
                         modifier = Modifier.size(cardSize.width.dp, cardSize.height.dp),
                         onMenu = s.handlers.menu?.takeIf { !s.multi.active }?.let { m -> { m(e.key) } },
                         picked = e.key == pickedKey,
+                        small = GalleryCardRules.small(cardSize.width),
                     ) {
                         Box(Modifier.matchParentSize().then(s.sharedImage(e.key))) {
                             GalleryImage(e.item, Ratio.R3X4, GalleryImageSizes.CARD, imageModifier)

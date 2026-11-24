@@ -27,13 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.card.CardViewMotion
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
-import io.github.lenticualrstone.civilight.designsystem.component.HoloDefaultTilt
-import io.github.lenticualrstone.civilight.designsystem.component.HoloStrength
-import io.github.lenticualrstone.civilight.designsystem.component.holoFoil
+import io.github.lenticualrstone.civilight.designsystem.component.holoImage
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.FixedColors
-import io.github.lenticualrstone.civilight.designsystem.theme.ResolvedTheme
 import io.github.lenticualrstone.civilight.model.asset.Crop
 import io.github.lenticualrstone.civilight.model.asset.ImageOwnerKind
 import io.github.lenticualrstone.civilight.model.asset.ImageSlot
@@ -181,13 +178,13 @@ enum class CoverInitialStyle {
 
 /**
  * A 3:4 cover filling its box (서재 card LIB-04, home head LIB-83): the picture, the preset's real
- * picture, or the initial-letter card; the static holo foil when on. No text over a picture.
+ * picture, or the initial-letter card; the holo foil when on. No text over a picture.
  */
 @Composable
 fun BoxScope.CoverArt(cover: CoverUi, targetWidth: Int, initialStyle: CoverInitialStyle = CoverInitialStyle.CARD) {
     val colors = CivilightTheme.colors
-    val theme = if (colors.isDark) ResolvedTheme.DARK else ResolvedTheme.LIGHT
-    val foil = if (cover.holo && (cover.hash != null || cover.presetId != null)) Modifier.holoFoil(HoloDefaultTilt, theme, HoloStrength.CARD_FOIL) else Modifier
+    // The live foil (tilt, drag, idle sway; still under reduced motion), never on the initial-letter card.
+    val foil = Modifier.holoImage(cover.holo && (cover.hash != null || cover.presetId != null))
     val fill = if (cover.hash == null && cover.presetId == null && initialStyle == CoverInitialStyle.HEAD) colors.tint else colors.chip
     Box(Modifier.matchParentSize().then(foil).background(fill)) {
         when {

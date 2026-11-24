@@ -5,6 +5,13 @@ package io.github.lenticualrstone.civilight.feature.cast.list
 import io.github.lenticualrstone.civilight.designsystem.component.createdHighlight
 import io.github.lenticualrstone.civilight.feature.cast.common.castLens
 import io.github.lenticualrstone.civilight.feature.cast.common.CastViewModeRow
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.saveable.Saver
@@ -221,6 +228,7 @@ fun CastListScreen(route: CastList, deps: FeatureDeps) {
                     onTag = { selectedTag = it },
                     onMap = { deps.navigator.push(RelationMap(route.projectKey)) },
                     onFilters = { filtersJson = FilterStateCodec.encode(it) },
+                    minStage = io.github.lenticualrstone.civilight.feature.cast.list.cards3d.CardPoses.stageMin(style),
                 ) {
                     val stageInput = remember(shownCards, state.view.lockRow, state.readOnly, hiddenKeys, stageImageOf, stageBackOf, settings.viewTilt, highlighted) {
                         CastCardViewInput(
@@ -337,10 +345,18 @@ private fun CastCardViewHost(
     onTag: (String?) -> Unit,
     onMap: () -> Unit,
     onFilters: (FieldFilterState) -> Unit,
+    minStage: Float = io.github.lenticualrstone.civilight.feature.cast.list.cards3d.CardPoses.STAGE_MIN_H,
     content: @Composable () -> Unit,
 ) {
     val side = Modifier.padding(horizontal = CAST_SIDE)
-    Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())) {
+    // The 3D cards keep the boards' dp sizes (QA 0.2.1): when the pane is shorter than the stage needs (the inner
+    // display's list pane), the stage keeps its minimum and the whole column scrolls instead of shrinking the cards.
+    BoxWithConstraints(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())) {
+    var headH by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val stageH = maxOf(maxHeight - with(density) { headH.toDp() } - 8.dp, minStage.dp)
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxWidth().onSizeChanged { headH = it.height }) {
         CastViewModeRow(0, { if (it == 1) onMap() }, side.padding(bottom = 12.dp))
         ChipFlow(side) {
             for (chip in state.view.chips) FilterChip(chip.label, chip.selected, { onTag(chip.tagKey) })
@@ -350,13 +366,15 @@ private fun CastCardViewHost(
                 for (f in state.activeFilters) RemovableChip(f.label, { onFilters(f.without) }, CastUiCopy.BTN_REMOVE)
             }
         }
-        Box(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp)) {
+        }
+        Box(Modifier.height(stageH).fillMaxWidth().padding(top = 8.dp)) {
             if (noCards || (state.view.rows.isEmpty() && state.view.lockRow == null)) {
                 NoResults(CastUiCopy.NO_RESULTS, side.padding(top = 16.dp))
             } else {
                 content()
             }
         }
+    }
     }
 }
 

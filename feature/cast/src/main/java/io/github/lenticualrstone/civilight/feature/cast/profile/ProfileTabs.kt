@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import io.github.lenticualrstone.civilight.designsystem.component.HoloSurface
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 
 import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
@@ -272,9 +273,13 @@ private fun GallerySectionView(section: GallerySection, inner: Boolean, actions:
                         inner = inner,
                         onClick = { actions.onGalleryCard(card.itemKey) },
                         modifier = Modifier.size(GALLERY_CARD_W, GALLERY_CARD_H),
+                        small = true,
                     ) {
                         if (painter != null) {
-                            Image(painter, contentDescription = null, modifier = imageModifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            // The chip's `홀로` always comes with the foil itself (CNV-30).
+                            HoloSurface(on = card.image.holo, modifier = Modifier.matchParentSize()) {
+                                Image(painter, contentDescription = null, modifier = imageModifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            }
                         } else {
                             Box(Modifier.fillMaxSize().background(colors.tint))
                         }

@@ -50,6 +50,7 @@ import io.github.lenticualrstone.civilight.feature.canvas.image.ProvideHoloTilt
 import io.github.lenticualrstone.civilight.feature.canvas.image.Tilt
 import io.github.lenticualrstone.civilight.feature.canvas.image.holoDrag
 import io.github.lenticualrstone.civilight.feature.canvas.image.holoFoilAt
+import io.github.lenticualrstone.civilight.feature.canvas.image.holoImageFoilAt
 import io.github.lenticualrstone.civilight.feature.canvas.image.rememberSpringTilt
 import io.github.lenticualrstone.civilight.feature.canvas.image.rememberHoloTilt
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
@@ -131,10 +132,10 @@ private fun ColumnScope.HoloCardPanel(tilt: HoloTilt) {
                 cameraDistance = 12f * density
             }
             .clip(shape)
-            .holoDrag(tilt)
-            .holoFoilAt(t, theme(), HoloStrength.CARD_FOIL),
+            .holoDrag(tilt),
     ) {
-        PresetImages.byId("ash-dawn")?.let { PresetArt(it) }
+        // The board's card: art, then foil · grain · sheen, then the text above them (gen_holo `.card`).
+        Box(Modifier.matchParentSize().holoImageFoilAt(t)) { PresetImages.byId("ash-dawn")?.let { PresetArt(it) } }
         Column(Modifier.align(Alignment.BottomStart).padding(20.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             CivilightText(HoloCopy.SAMPLE_RECORD_NO, type.number, color = FixedColors.onImage2)
             CivilightText(HoloCopy.SAMPLE_NAME, type.title.merge(TextStyle(fontSize = 28.sp, lineHeight = 34.sp)), color = FixedColors.onImage)

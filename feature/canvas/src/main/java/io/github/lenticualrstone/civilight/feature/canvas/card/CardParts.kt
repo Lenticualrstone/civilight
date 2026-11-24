@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.card
 
+import io.github.lenticualrstone.civilight.designsystem.component.holoImage
 import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -123,7 +124,8 @@ fun ProjectCard(
         statusChip = CardCopy.statusChip(status, holo),
         more = more,
         onClick = onClick,
-        image = image,
+        // `홀로` in the chip always comes with the foil itself (CNV-30).
+        image = { Box(Modifier.matchParentSize().holoImage(holo), content = image) },
     )
 }
 
@@ -222,7 +224,7 @@ fun PortraitCard(
     val shape = RoundedCornerShape(CardMetrics.radius(CardKind.PORTRAIT).dp)
     Column(modifier.width(size.width.dp).pressable(PressAction.Click(onClick), role = Role.Button, shape = shape)) {
         Box(Modifier.size(size.width.dp, size.height.dp).clip(shape).background(colors.raise)) {
-            Box(Modifier.fillMaxSize(), content = image)
+            Box(Modifier.fillMaxSize().holoImage(holo), content = image)
             if (holo) ImageStatusChip(CardCopy.HOLO, Modifier.align(Alignment.TopStart).padding(12.dp))
         }
         Row(Modifier.padding(top = 10.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

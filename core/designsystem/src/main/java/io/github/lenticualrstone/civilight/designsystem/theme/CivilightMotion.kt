@@ -97,6 +97,13 @@ object CivilightMotion {
     /** Damping ratio of the tilt follow: critically damped (no bounce). */
     const val holoTiltDamping: Float = Spring.DampingRatioNoBouncy
 
+    /**
+     * Holo idle sway (board `Holo` `.card.auto`: `hSway` / `hFoil` / `hSheen 7s ease-in-out infinite`): with no
+     * gyro and no finger the foil drifts across and back once per 7 s, each half on CSS `ease-in-out`.
+     */
+    const val holoIdleMs: Int = 7000
+    val holoIdle: MotionToken = MotionToken(easeInOutCurve, holoIdleMs)
+
     // 0.2.0 (U-16, DS-74): the 3D 서재 views and character card views.
     /**
      * A 3D view's focus settling after a drag, a step or a pick (서재 views, card views). Critically damped
@@ -107,8 +114,107 @@ object CivilightMotion {
     /** Damping ratio of [viewSettleStiffness]: no bounce. */
     const val viewSettleDamping: Float = Spring.DampingRatioNoBouncy
 
+    // 0.2.1 (U-16 cards boards `scr_u16_cards_a/b/c.py`): the springs as the boards run them. Board springs
+    // given as (k, c) are stiffness k, damping ratio c / (2√k); (k, ζ) are used as is; (ζ, ω) give k = ω².
+    /** 부채꼴 덱 · 회전 목마 focus (board `sp(st.cur, 180, 24)`). */
+    const val cardDeckStiffness: Float = 180f
+    const val cardDeckDamping: Float = 0.894f
+
+    /** 부채꼴 덱 card turn (board `sp(st.flip, 210, 22)`). */
+    const val cardFlipStiffness: Float = 210f
+    const val cardFlipDamping: Float = 0.759f
+
+    /** 겹친 더미: a card sliding back in under the pile (board `to(slot, 170, 0.82)`). */
+    const val cardPileStiffness: Float = 170f
+    const val cardPileDamping: Float = 0.82f
+
+    /** 겹친 더미: a dragged card let go short of a throw springs back (board `settle`: 230, 0.72). */
+    const val cardPileBackStiffness: Float = 230f
+    const val cardPileBackDamping: Float = 0.72f
+
+    /** 타로: a card dealt to its place (150, 0.78), lifted (220, 0.9) and laid down (170, 0.72). */
+    const val tarotDealStiffness: Float = 150f
+    const val tarotDealDamping: Float = 0.78f
+    const val tarotLiftStiffness: Float = 220f
+    const val tarotLiftDamping: Float = 0.9f
+    const val tarotDropStiffness: Float = 170f
+    const val tarotDropDamping: Float = 0.72f
+
+    /** 타로: the focus card rising (240, 0.66) and a card turning over (160, 0.6). */
+    const val tarotFocusStiffness: Float = 240f
+    const val tarotFocusDamping: Float = 0.66f
+    const val tarotTurnStiffness: Float = 160f
+    const val tarotTurnDamping: Float = 0.6f
+
+    /** 타로: one card dealt after another, and the lift before a card lays down again. */
+    const val tarotDealStaggerMs: Int = 110
+    const val tarotDropDelayMs: Int = 180
+    const val tarotTurnDropMs: Int = 190
+
+    /** 기울어진 벽: a card pulled out of the wall (board `SP_MOVE`, ζ 0.74, ω 12). */
+    const val wallPullStiffness: Float = 144f
+    const val wallPullDamping: Float = 0.74f
+
+    /** 롤로덱스: the drum settling on a card (board `SP_BNC`, ζ 0.56, ω 13). */
+    const val rolodexStiffness: Float = 169f
+    const val rolodexDamping: Float = 0.56f
+
+    /** Idle sway of a card stage while nothing tilts it (boards: `0.45 sin(2πt / 9 s)`, `0.3 sin(2πt / 6.5 s)`). */
+    const val cardSwayPeriodXMs: Int = 9000
+    const val cardSwayPeriodYMs: Int = 6500
+    const val cardSwayX: Float = 0.45f
+    const val cardSwayY: Float = 0.3f
+
     /** One slow turn of the 별자리 view's idle orbit (LIB-93); no orbit under reduced motion. */
     const val starOrbitPeriodMs: Long = 90_000L
+
+    // 0.2.1 (U-16 boards `scr_u16_lib_a` … `c`): the 서재 3D view springs. The boards sample a damped spring
+    // into CSS `linear()` that settles at the transition's end: ω = 6.9 / (ζ · duration) (board A) or
+    // ω = 10 / duration (board C); stiffness = ω² (mass 1). Board B's `cubic-bezier(.32,1.28,.52,1)` is read as
+    // ζ 0.65 settling in its duration.
+    /** Board A `spr` (ζ 0.62): a book's slot pulling out (680 ms), a cover-flow step (680 ms). */
+    const val libPullStiffness: Float = 268f
+    const val libSpringDamping: Float = 0.62f
+
+    /** Board A `spr` 600 ms: the book turning from spine to cover (`.bk`). */
+    const val libTurnStiffness: Float = 344f
+
+    /** Board A `soft` (ζ 0.84) 640 ms: the opened book zooming to fill the stage; 700 ms for the flipped cover. */
+    const val libOpenStiffness: Float = 165f
+    const val libOpenFlowStiffness: Float = 138f
+    const val libSoftDamping: Float = 0.84f
+
+    /** Board A delays: the turn starts 160 ms after the pull, the slot returns 140 ms after the turn back. */
+    const val libTurnDelayMs: Long = 160L
+    const val libReturnDelayMs: Long = 140L
+
+    /** Board A / B: the opened project takes over (home fade) this long after `열기` starts the open move. */
+    const val libOpenHandoffMs: Long = 520L
+
+    /** Board B sheets (720 ms) and corridor bays (800 ms), ζ 0.65. */
+    const val libSheetStiffness: Float = 217f
+    const val libBayStiffness: Float = 176f
+    const val libBoardBDamping: Float = 0.65f
+
+    /** Board B: the fan opens one sheet after another 45 ms apart; the pile gathers 30 ms apart. */
+    const val libFanStaggerMs: Long = 45L
+    const val libPileStaggerMs: Long = 30L
+
+    /** Board B corridor camera: `a = 140 · (target − cam) − 21 · v`, so stiffness 140, ζ = 21 / (2√140). */
+    const val libWalkStiffness: Float = 140f
+    const val libWalkDamping: Float = 0.887f
+
+    /** Board C: a drawer card flipping (560 ms, ζ 0.62) and pulled out (680 ms, ζ 0.8). */
+    const val libFlipStiffness: Float = 319f
+    const val libDrawerPullStiffness: Float = 216f
+    const val libDrawerPullDamping: Float = 0.8f
+
+    /** Board C: a star book coming forward (900 ms, ζ 0.62) and going back (700 ms, ζ 0.8). */
+    const val libStarFocusStiffness: Float = 123f
+    const val libStarReturnStiffness: Float = 204f
+
+    /** Board C idle sway (`lcIdle 11s ease-in-out infinite`): rotateY ±2.2°, rotateX ±0.8°, sheen ±18 %. */
+    const val libIdleSwayMs: Long = 11_000L
 
     /** Fold pane shift (CNV-34): the second pane comes in from 48 dp to the right. */
     val foldPaneShift: Dp = 48.dp

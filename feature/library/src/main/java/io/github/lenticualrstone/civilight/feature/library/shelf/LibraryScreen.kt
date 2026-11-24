@@ -359,6 +359,8 @@ internal fun LibraryScreen(services: LibraryServices) {
                                             onNewProject = { services.startNewProject() },
                                             tilt = view.viewTilt && !motion.reduced,
                                             unhide = unhide,
+                                            viewportHeight = (maxHeight - padding.calculateTopPadding() - padding.calculateBottomPadding() - 24.dp).value,
+                                            selectedKey = selectedKey,
                                         ),
                                     )
                                 }
