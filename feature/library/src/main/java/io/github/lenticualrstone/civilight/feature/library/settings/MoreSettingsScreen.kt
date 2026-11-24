@@ -53,9 +53,7 @@ internal fun MoreSettingsScreen(services: LibraryServices) {
         LinkRow(ui.presets) { navigator.push(PresetImages) }
 
         SettingsSection(MoreSettingsCopy.SECTION_MAP)
-        ValueRow(ui.mapStyle, pick)
-        ValueRow(ui.terrain, pick)
-        ValueRow(ui.largeExport, pick)
+        for (row in ui.mapRows) ValueRow(row, pick)
 
         SettingsSection(MoreSettingsCopy.SECTION_TIME)
         ValueRow(ui.notation, pick)

@@ -309,6 +309,10 @@ object CastUiCopy {
     /** `이 탭 잠그기` (CST-73): the 비밀 tab head switch. */
     const val SECRET_LOCK = "이 탭 잠그기"
 
+    /** The 비밀 tab is locked but the device has no screen lock any more (CST-73, 0.2.0 QA N-43): the toast and its action. */
+    const val SECRET_NO_DEVICE_LOCK = "기기 잠금 필요"
+    const val SECRET_NO_DEVICE_LOCK_ACTION = "설정"
+
     /** `마지막 등장` (CST-71). */
     const val LAST_SEEN = "마지막 등장"
 

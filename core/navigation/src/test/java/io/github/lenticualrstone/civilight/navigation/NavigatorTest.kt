@@ -79,4 +79,31 @@ class NavigatorTest {
         override fun add(index: Int, element: NavKey) = inner.add(index, element)
         override fun removeAt(index: Int): NavKey = inner.removeAt(index).also { check(inner.isNotEmpty()) { "stack became empty" } }
     }
+
+    @Test
+    fun `a recording route from outside returns to the open recorder instead of stacking a second one`() {
+        nav.push(ProjectHome("P"))
+        nav.push(Recording(projectKey = "P"))
+        // The ongoing notification's route names the surface, so it is not equal to the mic's route (M-08).
+        nav.openFromOutside(Recording(surface = "projectHome", projectKey = "P"))
+        assertEquals(listOf(Library, ProjectHome("P"), Recording(projectKey = "P")), stack)
+        // The recorder closes with the take: nothing of it stays behind for the next mic tap.
+        assertTrue(nav.pop())
+        assertEquals(listOf(Library, ProjectHome("P")), stack)
+        nav.push(Recording(projectKey = "P"))
+        assertEquals(Recording(projectKey = "P"), nav.current)
+    }
+
+    @Test
+    fun `a recording route from outside drops screens opened over the recorder, other routes push`() {
+        nav.push(Recording(projectKey = "P"))
+        nav.push(Settings)
+        nav.openFromOutside(Recording(surface = "widget"))
+        assertEquals(listOf(Library, Recording(projectKey = "P")), stack)
+        nav.pop()
+        nav.openFromOutside(Recording(surface = "widget"))
+        assertEquals(listOf(Library, Recording(surface = "widget")), stack)
+        nav.openFromOutside(ProjectHome("P"))
+        assertEquals(ProjectHome("P"), nav.current)
+    }
 }

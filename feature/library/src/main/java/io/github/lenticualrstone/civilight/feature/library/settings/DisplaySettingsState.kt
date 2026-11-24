@@ -44,7 +44,15 @@ data class MoreSettingsUi(
     val notation: MoreValueRow,
     val checkTravel: SettingsSwitchRow,
     val checkNoPlace: SettingsSwitchRow,
-)
+) {
+    /**
+     * The 지도 section's rows as drawn in 0.2.0: `새 지도 그림` and `지형 만들기 · 글로 설명` are hidden with the
+     * generated and sketch maps they set (scope S-3), so no visible row stores a value nothing reads.
+     * Their stored values are kept.
+     */
+    val mapRows: List<MoreValueRow>
+        get() = listOf(mapStyle, terrain, largeExport).filter { it.value !in DisplaySettingsState.HIDDEN_MAP_VALUES }
+}
 
 /**
  * Pure builders and the one reducer of the three display screens of 설정 (LIB-66 … LIB-68). Every
@@ -52,6 +60,9 @@ data class MoreSettingsUi(
  * and glass, CNV-30 holo, the map area, STO-17 and the travel check).
  */
 object DisplaySettingsState {
+    /** (0.2.0, S-3) Value rows not drawn: generated and sketch maps are hidden ([MoreSettingsUi.mapRows]). */
+    val HIDDEN_MAP_VALUES: Set<MoreValue> = setOf(MoreValue.MAP_STYLE, MoreValue.TERRAIN_ENGINE)
+
     fun layout(settings: AppSettings): LayoutSettingsUi = LayoutSettingsUi(
         options = listOf(
             LayoutOption(UnfoldedLayout.LIST_DETAIL, LayoutSettingsCopy.LIST_DETAIL, LayoutSettingsCopy.LIST_DETAIL_SUB, settings.unfoldedLayout == UnfoldedLayout.LIST_DETAIL),

@@ -115,3 +115,18 @@ class BackStackNavigator(
         while (stack.size > index) stack.removeAt(stack.lastIndex)
     }
 }
+
+/**
+ * Opens a route that came from outside the app (the ongoing recording notification, a widget, a file,
+ * a start-up hook). There is only one capture at a time, so a [Recording] route returns to the
+ * recorder already in the stack instead of stacking a second one over it: the second entry would
+ * close with the take and leave the first behind as an empty overlay that swallows the next mic tap
+ * (0.2.0 QA M-08). Everything else is [Navigator.push].
+ */
+fun Navigator.openFromOutside(route: Route) {
+    if (route is Recording && backStack.any { it is Recording }) {
+        popToType<Recording>()
+    } else {
+        push(route)
+    }
+}

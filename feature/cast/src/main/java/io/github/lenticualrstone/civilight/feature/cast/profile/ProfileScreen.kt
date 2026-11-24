@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
 import io.github.lenticualrstone.civilight.ui.project.EditResult
@@ -169,6 +172,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     val p = route.projectKey
     val c = route.characterKey
     val gate = rememberHiddenGate(p)
+    val context = LocalContext.current
     // CST-74: 4 tabs while `게임 제작 도구` is off. CST-73: the 비밀 tab behind the device lock while locked.
     val gameTools = GameTools.on(doc)
     val storedLocked = doc.index.character(c)?.secretTabLocked == true
@@ -186,7 +190,12 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     LaunchedEffect(prompting) {
         if (!prompting) return@LaunchedEffect
         val result = deps.biometric.authenticate(AuthRequest(ProfileTabs.label(ProfileTab.SECRET)))
-        vm.updateTabs { if (result == AuthResult.SUCCESS) SecretTabGate.confirm(it) else SecretTabGate.cancel(it) }
+        vm.updateTabs { SecretTabGate.answered(it, result) }
+        if (SecretTabGate.needsDeviceLock(result)) {
+            deps.toasts.show(CastUiCopy.SECRET_NO_DEVICE_LOCK, CastUiCopy.SECRET_NO_DEVICE_LOCK_ACTION) {
+                runCatching { context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
+        }
     }
     var lastStored by remember(c) { mutableStateOf(storedLocked) }
     LaunchedEffect(storedLocked) {

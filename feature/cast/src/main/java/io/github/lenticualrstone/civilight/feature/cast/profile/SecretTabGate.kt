@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.cast.profile
 
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.navigation.ProfileTab
+import io.github.lenticualrstone.civilight.ui.security.AuthResult
 
 /**
  * (0.2.0, CST-74) The record's tabs: `개요 · 말투 · 관계 · 게임 텍스트 · 비밀`, or `개요 · 말투 · 관계 · 비밀`
@@ -69,6 +70,17 @@ object SecretTabGate {
     /** The prompt succeeded. */
     fun confirm(state: TabGateState): TabGateState =
         if (state.gate == SecretGate.PROMPTING) state.copy(gate = SecretGate.OPEN) else state
+
+    /**
+     * The opening prompt answered [result]. Only [AuthResult.SUCCESS] opens the tab. [AuthResult.UNAVAILABLE]
+     * (the screen lock was removed after the tab was locked) also keeps the previous tab, and
+     * [needsDeviceLock] tells the screen to say why and offer the system settings, so the tap is never silent.
+     */
+    fun answered(state: TabGateState, result: AuthResult): TabGateState =
+        if (result == AuthResult.SUCCESS) confirm(state) else cancel(state)
+
+    /** The device cannot ask for a lock at all: the screen shows `기기 잠금 필요 · 설정` (0.2.0 QA N-43). */
+    fun needsDeviceLock(result: AuthResult): Boolean = result == AuthResult.UNAVAILABLE
 
     /** The prompt was cancelled or failed: back to the previous tab. */
     fun cancel(state: TabGateState): TabGateState =

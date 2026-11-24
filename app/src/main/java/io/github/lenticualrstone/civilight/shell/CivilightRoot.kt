@@ -53,6 +53,7 @@ import io.github.lenticualrstone.civilight.navigation.HiddenProjectLock
 import io.github.lenticualrstone.civilight.navigation.ProjectRoute
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.navigation.Script
+import io.github.lenticualrstone.civilight.navigation.openFromOutside
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps
 import io.github.lenticualrstone.civilight.ui.lens.ScriptLensEffect
@@ -160,7 +161,7 @@ fun CivilightRoot(
             val unlock by deps.unlock.state.collectAsState()
             LaunchedEffect(pendingRoute, unlock.appLocked) {
                 if (pendingRoute != null && !unlock.appLocked) {
-                    navigator.push(pendingRoute)
+                    navigator.openFromOutside(pendingRoute)
                     onPendingRouteHandled()
                 }
             }
@@ -168,7 +169,7 @@ fun CivilightRoot(
             LaunchedEffect(deps, unlock.appLocked) {
                 if (!unlock.appLocked) {
                     deps.startup.runPending(deps) { id, e -> Log.w("Civilight", "start-up hook $id failed", e) }
-                        .forEach { navigator.push(it) }
+                        .forEach { navigator.openFromOutside(it) }
                 }
             }
             // `연 지 5분 뒤` is checked on the clock while in the foreground (LIB-33).

@@ -121,6 +121,12 @@ class SettingsBatch6Test {
     }
 
     @Test
+    fun `S-3 the map section draws only the large export row, generated-map settings are hidden`() {
+        val ui = DisplaySettingsState.more(AppSettings())
+        assertEquals(listOf(MoreValue.LARGE_EXPORT), ui.mapRows.map { it.value })
+    }
+
+    @Test
     fun `LIB-68 CNV-19 WLD-67 the SettingsMore rows with the factory values`() {
         val ui = DisplaySettingsState.more(AppSettings())
         assertEquals("홀로그램 효과 기본", ui.holo.title)

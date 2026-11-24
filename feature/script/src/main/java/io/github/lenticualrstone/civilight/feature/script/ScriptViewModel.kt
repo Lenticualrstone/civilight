@@ -260,44 +260,6 @@ class ScriptViewModel(
     private val ops = Channel<suspend () -> Unit>(Channel.UNLIMITED)
     private var busy = false
 
-    init {
-        viewModelScope.launch {
-            for (op in ops) {
-                busy = true
-                try {
-                    op()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: ReadOnlyProjectException) {
-                    // The example project: nothing changes.
-                } finally {
-                    busy = false
-                    reconcile()
-                }
-            }
-        }
-        viewModelScope.launch {
-            doc.filterNotNull().collect { d ->
-                if (_target.value == null) open(d)
-                if (!busy) reconcile(d)
-            }
-        }
-        viewModelScope.launch { content.filterNotNull().collect(::dropHiddenPosition) }
-        // The draft follows the gate too: on re-lock a 고치기 of a now-locked block leaves the field (T-U14-25).
-        viewModelScope.launch {
-            unlocked.collect {
-                gateOpen = it
-                content.value?.let { c -> reconcileDraft(c.doc, c.unitKey) }
-            }
-        }
-        viewModelScope.launch { content.filterNotNull().collect { c -> reconcileDraft(c.doc, c.unitKey) } }
-        // (0.2.0, U-14) The unsent draft survives process death: `_app/view.json › script.draft`, no undo step.
-        viewModelScope.launch {
-            draftFlow.drop(1).debounce(DRAFT_SAVE_MS).collect { d -> if (draftOpened) saveDraft(d) }
-        }
-
-    }
-
     /**
      * A layer or `대사만` can take the selected block (or the empty scene's line) out of the drawn
      * rows: the caret leaves it and the selection goes, so no field edits a row that is not there.
@@ -372,14 +334,6 @@ class ScriptViewModel(
             .map { it?.takeIf { e -> e.projectKey == route.projectKey } }
             .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    init {
-        // Checked blocks that are gone or no longer drawn drop out after every rebuild (SCR-36).
-        viewModelScope.launch {
-            content.filterNotNull().collect { c ->
-                selectFlow.update { SelectRules.reconcile(it, SelectRules.drawnKeys(c.rows)) }
-            }
-        }
-    }
 
     /** The pending `씬 메모` write (SCR-35, [editSceneMemo]). */
     internal var memoJob: Job? = null
@@ -1150,6 +1104,55 @@ class ScriptViewModel(
             }
         }
         super.onCleared()
+    }
+
+    /*
+     * Kept last in the class body: Kotlin runs property initialisers and `init` blocks in textual
+     * order, and viewModelScope (Dispatchers.Main.immediate) runs each launch body inside the
+     * constructor. Every field these collectors touch (`draftFlow`, `gateOpen`, `selectFlow`, …)
+     * must already hold its value, and no later `= false` may reset what they set (0.2.0 UP-05).
+     */
+    init {
+        viewModelScope.launch {
+            for (op in ops) {
+                busy = true
+                try {
+                    op()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: ReadOnlyProjectException) {
+                    // The example project: nothing changes.
+                } finally {
+                    busy = false
+                    reconcile()
+                }
+            }
+        }
+        viewModelScope.launch {
+            doc.filterNotNull().collect { d ->
+                if (_target.value == null) open(d)
+                if (!busy) reconcile(d)
+            }
+        }
+        viewModelScope.launch { content.filterNotNull().collect(::dropHiddenPosition) }
+        // The draft follows the gate too: on re-lock a 고치기 of a now-locked block leaves the field (T-U14-25).
+        viewModelScope.launch {
+            unlocked.collect {
+                gateOpen = it
+                content.value?.let { c -> reconcileDraft(c.doc, c.unitKey) }
+            }
+        }
+        viewModelScope.launch { content.filterNotNull().collect { c -> reconcileDraft(c.doc, c.unitKey) } }
+        // (0.2.0, U-14) The unsent draft survives process death: `_app/view.json › script.draft`, no undo step.
+        viewModelScope.launch {
+            draftFlow.drop(1).debounce(DRAFT_SAVE_MS).collect { d -> if (draftOpened) saveDraft(d) }
+        }
+        // Checked blocks that are gone or no longer drawn drop out after every rebuild (SCR-36).
+        viewModelScope.launch {
+            content.filterNotNull().collect { c ->
+                selectFlow.update { SelectRules.reconcile(it, SelectRules.drawnKeys(c.rows)) }
+            }
+        }
     }
 
     companion object {
