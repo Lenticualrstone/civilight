@@ -195,8 +195,10 @@ object GalleryRows {
         }
         val ownerName = ownerName(doc, ownerKind, ownerKey)
         val labels = EntryLabels(doc, locked)
-        val tagNames = doc.project.tags.associate { it.key to it.name }
-        val tagOrder = doc.project.tags.sortedBy { it.order }.map { it.key }
+        // Live tags only (N-44): a trashed tag's key stays on images but shows nowhere until restored.
+        val liveTags = doc.project.tags.filter { it.isLive }
+        val tagNames = liveTags.associate { it.key to it.name }
+        val tagOrder = liveTags.sortedBy { it.order }.map { it.key }
 
         // Groups after masking: one for a character gallery; project + characters for the project gallery.
         data class Group(val id: String, val ownerKind: GalleryOwnerKind, val ownerKey: Key, val name: String, val list: MaskedList<GalleryItem>)

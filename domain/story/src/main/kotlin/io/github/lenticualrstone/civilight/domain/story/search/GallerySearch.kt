@@ -39,7 +39,8 @@ data class GalleryHit(
 class GallerySearch(private val doc: ProjectDoc, private val locked: Boolean, private val onlyOwnerKey: Key? = null) {
     fun search(q: TextQuery): List<GalleryHit> {
         if (q.isEmpty || doc.gallery.isEmpty()) return emptyList()
-        val tagNames = doc.project.tags.associate { it.key to it.name }
+        // Live tags only (N-44): a trashed tag's name finds nothing.
+        val tagNames = doc.project.tags.filter { it.isLive }.associate { it.key to it.name }
         val out = mutableListOf<GalleryHit>()
         for ((kind, ownerKey) in owners()) {
             val ownerName = ownerName(kind, ownerKey) ?: continue

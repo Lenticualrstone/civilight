@@ -55,4 +55,16 @@ class FixedFieldEditsTest {
         assertEquals("회상 인물", next.index.tag(tags[1])!!.name)
         assertEquals(doc.project.tags.size + 1, next.project.tags.size)
     }
+
+    @Test
+    fun `a tag made from the sheet joins the save baseline, so untapping it enables save`() {
+        val initial = FixedFieldEdits.picks(doc, K.RIEN)
+        // `＋ 새 태그` wrote the tag and checked it on the character; picks and baseline both gain it.
+        val picks = FixedFieldEdits.created(initial, "NEWTAG", "조연")
+        val baseline = FixedFieldEdits.created(initial, "NEWTAG", "조연")
+        assertEquals(picks, baseline)
+        assertEquals(picks, FixedFieldEdits.created(picks, "NEWTAG", "조연"))
+        val untapped = FixedFieldEdits.toggle(picks, "NEWTAG", "조연")
+        assertTrue(untapped != baseline)
+    }
 }

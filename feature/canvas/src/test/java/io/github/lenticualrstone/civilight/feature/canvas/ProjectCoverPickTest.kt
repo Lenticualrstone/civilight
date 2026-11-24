@@ -232,6 +232,27 @@ class ProjectCoverPickTest {
     }
 
     @Test
+    fun `CV-15 the toast's 되돌리기 puts back exactly the removed row, and only into an empty slot`() {
+        val doc = withCoverOf(g, h1, p1Crops, holo = true)
+        val index = doc.assets.imageUses.indexOfFirst(cover::matches)
+        val removed = doc.assets.imageUses[index]
+        val cleared = ImageEdits.clear(doc, cover, CanvasFx.ctx())
+        // A later, unrelated edit must survive the restore (no generic undo of the last step).
+        val later = cleared.copy(project = cleared.project.copy(name = "다른 이름"))
+        val restored = ImageEdits.restoreUse(later, removed, index)
+        assertEquals(removed, ImageEdits.use(restored, cover))
+        assertEquals(doc.assets.imageUses, restored.assets.imageUses)
+        assertEquals("다른 이름", restored.project.name)
+        // Pressed twice, or after the row came back another way: unchanged.
+        assertEquals(restored, ImageEdits.restoreUse(restored, removed, index))
+        // The user placed another image in the slot since: that one stays.
+        val replaced = ImageEdits.placePreset(cleared, cover, "lantern", false, CanvasFx.ctx())
+        assertEquals(replaced, ImageEdits.restoreUse(replaced, removed, index))
+        // An index past the end (rows removed meanwhile) is clamped.
+        assertEquals(removed, ImageEdits.use(ImageEdits.restoreUse(cleared, removed, 99), cover))
+    }
+
+    @Test
     fun `CV-16 a cover-only original leaves BlobRefs after 빼기, CV-17 deleting P1 keeps the cover`() {
         val only = "4".repeat(64)
         val doc = withCoverOf(ImageEdits.addBlob(g, blob(only)), only)

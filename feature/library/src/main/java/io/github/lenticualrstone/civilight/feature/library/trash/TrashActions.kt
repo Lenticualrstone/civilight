@@ -144,7 +144,11 @@ class TrashActions(private val ports: TrashPorts) {
             }
             is RestoreOutcome.NeedsSceneChoice -> TrashOutcome.NeedsSceneChoice(projectKey, row.key, blockKeys ?: outcome.blockKeys)
             RestoreOutcome.NeedsAuth -> TrashOutcome.Cancelled
-            RestoreOutcome.NotFound -> TrashOutcome.NothingDone
+            RestoreOutcome.NotFound -> {
+                // Refused with a reason (a tag whose name a live tag has): the tap says why (CST-75).
+                r.refused?.let(ports::toast)
+                TrashOutcome.NothingDone
+            }
         }
     }
 

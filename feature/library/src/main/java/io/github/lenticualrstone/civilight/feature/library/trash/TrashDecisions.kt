@@ -11,13 +11,20 @@ import io.github.lenticualrstone.civilight.domain.trash.PurgeResult
 import io.github.lenticualrstone.civilight.domain.trash.RestoreOps
 import io.github.lenticualrstone.civilight.domain.trash.RestoreOutcome
 import io.github.lenticualrstone.civilight.domain.trash.SceneChoice
+import io.github.lenticualrstone.civilight.domain.trash.TagRestore
+import io.github.lenticualrstone.civilight.domain.trash.TagTrash
+import io.github.lenticualrstone.civilight.domain.trash.TrashCopy
+import io.github.lenticualrstone.civilight.domain.trash.TrashGates
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
 import io.github.lenticualrstone.civilight.model.trash.TrashKind
 
-/** What `되살리기` of one entry inside a project did, and the toast it shows (null: none). */
-data class ItemRestore(val outcome: RestoreOutcome, val toast: String?)
+/**
+ * What `되살리기` of one entry inside a project did, and the toast it shows (null: none). [refused] is
+ * why nothing was restored when the row can say so (a tag whose name a live tag has, CST-75).
+ */
+data class ItemRestore(val outcome: RestoreOutcome, val toast: String?, val refused: String? = null)
 
 /**
  * What `영구 삭제` / `비우기` / the 30-day purge did inside one project: the document to write, and
@@ -58,6 +65,15 @@ object TrashDecisions {
                 val key = entry.targetKeys.singleOrNull() ?: return ItemRestore(RestoreOutcome.NotFound, null)
                 val result = CharacterActions.restore(doc, key, ctx, authenticated)
                 ItemRestore(result.outcome, result.toast?.message)
+            }
+            // (0.2.0, CST-75) A tag whose name a live tag has stays in the trash and says why (never a dead button).
+            TrashKind.TAG -> {
+                if (!authenticated && TrashGates.needsAuth(doc, entry)) return ItemRestore(RestoreOutcome.NeedsAuth, null)
+                if (TagTrash.restore(doc, entryKey, ctx.trash) is TagRestore.NameTaken) {
+                    return ItemRestore(RestoreOutcome.NotFound, null, TrashCopy.TAG_NAME_TAKEN)
+                }
+                val outcome = RestoreOps.restore(doc, entryKey, ctx.trash, authenticated)
+                ItemRestore(outcome, (outcome as? RestoreOutcome.Restored)?.let { toastOf(it) })
             }
             // A gallery image goes back through its own action (DECISIONS §1; hidden image or hidden owner needs auth).
             TrashKind.GALLERY_ITEM -> {

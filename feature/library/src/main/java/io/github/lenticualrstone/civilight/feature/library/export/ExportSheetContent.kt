@@ -158,7 +158,7 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
                     if (ready.plan != null || ready.versionPlan != null) {
                         val ctx = deps.stores.actionContext()
                         // No undo step (0.2.0): undo would otherwise drop the record of what was exported.
-                        services.writer.editWithoutUndo(key, carry = ExportRunner::carryAfterSave) { doc, _ -> ExportRunner.afterSave(doc, ready, ctx) ?: doc }
+                        services.writer.editWithoutUndo(key, carry = ExportRunner.carrier()) { doc, _ -> ExportRunner.afterSave(doc, ready, ctx) ?: doc }
                     }
                     services.exports.clear(key)
                     deps.toasts.show(ExportCopy.DONE, actionLabel = null)

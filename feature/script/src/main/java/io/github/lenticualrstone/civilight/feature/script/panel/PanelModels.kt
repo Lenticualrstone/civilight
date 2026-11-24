@@ -174,7 +174,10 @@ data class PropsModel(
                 sourceRecordKey = block.recorderSource?.recordKey.takeIf { source != null },
                 readOnly = readOnly,
                 blockDisplayName = if (dialogue) block.displayNameOverride.orEmpty() else null,
-                marks = io.github.lenticualrstone.civilight.model.marks.Marks.on(doc, block.key).map { m ->
+                // Rule 19: a foreshadowing planted in a locked hidden scene is never named here (as in the pick sheet).
+                marks = io.github.lenticualrstone.civilight.model.marks.Marks.on(doc, block.key)
+                    .filter { m -> unlocked || !plantHidden(doc, m.foreshadow) }
+                    .map { m ->
                     io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.markLine(
                         m.foreshadow.name,
                         if (m.foreshadow.payoff == null) io.github.lenticualrstone.civilight.feature.script.input.WriteCopy.OPEN
@@ -185,6 +188,18 @@ data class PropsModel(
                 todo = if (kind == BlockKind.MEMO) block.todo != null else null,
                 todoDone = block.todo?.done == true,
             )
+        }
+
+        /**
+         * The foreshadowing's plant sits in a hidden scene (or under a hidden episode): the block it is drawn on
+         * now, else the stored one.
+         */
+        internal fun plantHidden(doc: ProjectDoc, f: io.github.lenticualrstone.civilight.model.marks.Foreshadow): Boolean {
+            val marks = io.github.lenticualrstone.civilight.model.marks.Marks
+            val blockKey = marks.resolve(doc, f.plant).blockKey ?: f.plant.blockKey
+            val sceneKey = (doc.index.block(blockKey) ?: doc.index.block(f.plant.blockKey))?.sceneKey ?: return false
+            val unit = doc.index.unit(sceneKey) ?: return false
+            return unit.hidden || doc.index.ancestors(unit).any { it.hidden }
         }
 
         /** Options with an ID (a speaker and a voice code, or a fixed ID), in option order. */

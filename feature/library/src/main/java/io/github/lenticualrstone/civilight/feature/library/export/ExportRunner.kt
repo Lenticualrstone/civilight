@@ -22,6 +22,7 @@ import io.github.lenticualrstone.civilight.model.app.ExportFormat
 import io.github.lenticualrstone.civilight.model.app.ExportOptions
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.recorder.RecorderLibrary
+import io.github.lenticualrstone.civilight.model.script.Block
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
@@ -143,7 +144,37 @@ object ExportRunner {
      * never takes it back): the `내보낸 판` rows it added (they hold the text as exported, never the step's) and
      * the voice states it fixed, by block and option key. Blocks the step does not have are left alone.
      */
-    fun carryAfterSave(step: ProjectDoc, before: ProjectDoc, after: ProjectDoc): ProjectDoc {
+    fun carryAfterSave(step: ProjectDoc, before: ProjectDoc, after: ProjectDoc): ProjectDoc =
+        carry(step, before, after, changedVoices(before, after))
+
+    /**
+     * [carryAfterSave] for one save: the store runs the carry once per kept undo step (up to 100) with
+     * the same `before`/`after`, so what changed is worked out once per save instead of once per step.
+     */
+    fun carrier(): (ProjectDoc, ProjectDoc, ProjectDoc) -> ProjectDoc {
+        var seenBefore: ProjectDoc? = null
+        var seenAfter: ProjectDoc? = null
+        var memo: Map<Key, Block> = emptyMap()
+        return { step, before, after ->
+            if (seenBefore !== before || seenAfter !== after) {
+                memo = changedVoices(before, after)
+                seenBefore = before
+                seenAfter = after
+            }
+            carry(step, before, after, memo)
+        }
+    }
+
+    /** Blocks of [after] whose voice state differs from [before] (or that [before] does not have), by key. */
+    private fun changedVoices(before: ProjectDoc, after: ProjectDoc): Map<Key, Block> {
+        val beforeBlocks = before.episodes.values.flatMap { it.blocks }.associateBy { it.key }
+        return after.episodes.values.flatMap { it.blocks }.filter { b ->
+            val old = beforeBlocks[b.key]
+            old == null || (old !== b && (old.voice != b.voice || old.options.map { it.voice } != b.options.map { it.voice }))
+        }.associateBy { it.key }
+    }
+
+    private fun carry(step: ProjectDoc, before: ProjectDoc, after: ProjectDoc, changed: Map<Key, Block>): ProjectDoc {
         var out = step
         for ((unit, file) in after.versions) {
             val had = before.versions[unit]?.versions?.map { it.key }?.toSet().orEmpty()
@@ -153,19 +184,18 @@ object ExportRunner {
             val known = target.versions.map { it.key }.toSet()
             out = out.copy(versions = out.versions + (unit to target.copy(versions = target.versions + added.filter { it.key !in known })))
         }
-        val beforeBlocks = before.episodes.values.flatMap { it.blocks }.associateBy { it.key }
-        val changed = after.episodes.values.flatMap { it.blocks }.filter { b ->
-            val old = beforeBlocks[b.key]
-            old == null || old.voice != b.voice || old.options.map { it.voice } != b.options.map { it.voice }
-        }.associateBy { it.key }
         if (changed.isEmpty()) return out
+        // Only episode files holding a changed block are copied, and a block already carrying the voices
+        // stays the same object, so undo snapshots keep sharing what the save did not touch.
         return out.copy(
             episodes = out.episodes.mapValues { (_, file) ->
+                if (file.blocks.none { it.key in changed }) return@mapValues file
                 file.copy(
                     blocks = file.blocks.map { b ->
                         val a = changed[b.key] ?: return@map b
                         val optionVoice = a.options.associate { it.key to it.voice }
-                        b.copy(voice = a.voice, options = b.options.map { o -> if (o.key in optionVoice) o.copy(voice = optionVoice.getValue(o.key)) else o })
+                        val next = b.copy(voice = a.voice, options = b.options.map { o -> if (o.key in optionVoice) o.copy(voice = optionVoice.getValue(o.key)) else o })
+                        if (next == b) b else next
                     },
                 )
             },

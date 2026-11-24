@@ -127,6 +127,20 @@ class Library020Test {
         assertNull(ExportSheets.build(versioned, ExportDefaults.initial(versioned, ExportFormat.PDF, LibFxNow, java.time.ZoneOffset.UTC)).row<ExportRow.IncludeVersions>())
     }
 
+    @Test
+    fun `E-01 versions of a trashed unit show the row only with 휴지통도 포함`() {
+        val file = ExportDefaults.initial(glass, ExportFormat.PROJECT_FILE, LibFxNow, java.time.ZoneOffset.UTC)
+        val unit = glass.story.units.first { it.level == 1 }.key
+        val trashed = glass.copy(
+            story = glass.story.copy(units = glass.story.units.map { if (it.key == unit) it.copy(deletedAt = LibFxNow) else it }),
+            versions = mapOf(unit to EpisodeVersionsFile(unitKey = unit, versions = listOf(EpisodeVersion(key = Fixtures.keys(3)(), name = "11월 23일 · 초고", createdAt = LibFxNow)))),
+        )
+        assertFalse(ExportSheets.hasVersions(trashed, includeTrash = false))
+        assertTrue(ExportSheets.hasVersions(trashed, includeTrash = true))
+        assertNull("the file would carry no version", ExportSheets.build(trashed, file.copy(includeTrash = false)).row<ExportRow.IncludeVersions>())
+        assertEquals(ExportRow.IncludeVersions(true), ExportSheets.build(trashed, file.copy(includeTrash = true)).row<ExportRow.IncludeVersions>())
+    }
+
     private companion object {
         val LibFxNow: Long = Fixtures.at("2026-11-24T10:00:00Z")
     }

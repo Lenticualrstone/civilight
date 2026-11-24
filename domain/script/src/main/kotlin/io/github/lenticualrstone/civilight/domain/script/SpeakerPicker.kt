@@ -53,7 +53,7 @@ object SpeakerPicker {
 
     private fun row(doc: ProjectDoc, c: Character, block: Block): Row {
         val display = Manuscript.displayNameAt(doc, c.key, block.key)
-        val tags = c.tagKeys.mapNotNull { doc.index.tag(it)?.name }
+        val tags = c.tagKeys.mapNotNull { doc.index.tag(it)?.takeIf { t -> t.isLive }?.name }
         val sub = if (display != null && display != c.name) "표시 이름 $display" else tags.joinToString(" · ")
         return Row(c.key, c.name, c.name.take(1), sub)
     }

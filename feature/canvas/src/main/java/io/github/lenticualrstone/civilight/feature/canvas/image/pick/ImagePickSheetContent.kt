@@ -47,7 +47,9 @@ import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.feature.canvas.common.CanvasWrites
 import io.github.lenticualrstone.civilight.feature.canvas.common.canvasEditContext
+import io.github.lenticualrstone.civilight.feature.canvas.image.ImageEdits
 import io.github.lenticualrstone.civilight.feature.canvas.image.CropHandOff
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageCopy
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageOwner
@@ -124,12 +126,23 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
     /** `빼기` (U-08 LIB-87): no confirm, the sheet closes, `표지 뺌` · `되돌리기` follows. */
     fun clearSlot() {
         if (readOnly) return sayReadOnly()
-        vm.clear(owner) { r ->
+        vm.clear(owner) { r, removed, index ->
             if (r == EditResult.READ_ONLY) {
                 sayReadOnly()
             } else {
                 closeSheet()
-                deps.toasts.show(ImageCopy.TOAST_COVER_CLEARED, actionLabel = ImageCopy.UNDO, onAction = { vm.undoLast() })
+                // `되돌리기` runs on the app scope and puts back exactly the removed row: the sheet's entry (for
+                // example 프로젝트 설정) may be popped while the toast is still up, which cancels the view model.
+                val projectKey = sheet.projectKey
+                deps.toasts.show(
+                    ImageCopy.TOAST_COVER_CLEARED,
+                    actionLabel = ImageCopy.UNDO,
+                    onAction = {
+                        removed?.let { use ->
+                            CanvasWrites.launch(deps, projectKey, ImageCopy.UNDO) { d, _ -> ImageEdits.restoreUse(d, use, index) }
+                        }
+                    },
+                )
             }
         }
     }

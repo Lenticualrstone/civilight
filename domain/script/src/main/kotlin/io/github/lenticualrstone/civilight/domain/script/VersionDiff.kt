@@ -54,7 +54,10 @@ object VersionDiff {
         val hiddenCounts = linkedMapOf<Key, Int>()
         val hiddenRowAt = mutableMapOf<Key, Int>()
         for ((vb, b) in ordered) {
-            val hiddenKey = listOfNotNull(b?.sceneKey, vb?.sceneKey).firstOrNull { lockedScene(it) }
+            // A version block no longer in this episode is checked where it sits now too (moved into a locked
+            // hidden scene of another episode, live or in the trash), not only where it was kept (T-U14-25).
+            val nowAt = b?.sceneKey ?: vb?.let { doc.index.block(it.key)?.sceneKey }
+            val hiddenKey = listOfNotNull(nowAt, vb?.sceneKey).firstOrNull { lockedScene(it) }
             if (hiddenKey != null) {
                 hiddenCounts[hiddenKey] = (hiddenCounts[hiddenKey] ?: 0) + 1
                 if (hiddenKey !in hiddenRowAt) {

@@ -96,8 +96,15 @@ object TrashListing {
             val masked = projectMasked || (hiddenItem && locks.itemsLocked)
             val (title, sub) = when {
                 // (0.2.0, N-44) A tag row: its name; sub `TODO_COPY_CAST_TAG_TRASH_SUB` is the cast lane's copy.
-                entry.kind.known == TrashKind.TAG ->
-                    (doc.project.tags.firstOrNull { it.key == key }?.name ?: "") to location
+                // Masked like every other kind while its hidden project is locked (R19 §3).
+                entry.kind.known == TrashKind.TAG && masked ->
+                    TrashCopy.HIDDEN_ITEM to TrashCopy.join(location, TrashCopy.RESTORE_NEEDS_AUTH)
+                // While a live tag has its name, the sub says why `되살리기` does nothing (CST-75).
+                entry.kind.known == TrashKind.TAG -> {
+                    val tag = doc.project.tags.firstOrNull { it.key == key }
+                    val taken = tag != null && !tag.isLive && !TagTrash.nameFree(doc, tag.name, except = tag.key)
+                    (tag?.name ?: "") to (if (taken) TrashCopy.join(location, TrashCopy.TAG_NAME_TAKEN) else location)
+                }
                 kind == null || item == null -> "" to location
                 kind == ItemKind.BLOCK -> blockGroupCopy(doc, entry, codes, location, ctx)
                 masked && kind != ItemKind.UNIT -> TrashCopy.hiddenKind(kind) to

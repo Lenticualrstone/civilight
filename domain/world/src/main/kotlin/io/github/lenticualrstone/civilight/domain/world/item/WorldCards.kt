@@ -146,13 +146,16 @@ class WorldCards(private val doc: ProjectDoc, private val hiddenUnlocked: Boolea
 
     private fun liveFactions(): List<Faction> = doc.world.factions.filter { it.deletedAt == null }.sortedWith(compareBy({ it.order }, { it.key }))
 
-    /** Live characters whose `연결` field (at the lens) points to [key], with the field name. */
+    /**
+     * Live characters whose `연결` field (at the lens) points to [key], with the field name. (CST-73) A secret
+     * field of a character whose 비밀 tab is locked is left out: the link shows only inside the confirmed tab.
+     */
     fun linkedCharacters(key: Key, lens: LensPoint = LensPoint.Latest): List<LinkedCharacter> {
         val defs = doc.index.fieldDefs(EntityKind.CHARACTER).filter { it.deletedAt == null }
         return doc.cast.characters.filter { it.deletedAt == null && (!it.hidden || hiddenUnlocked) }
             .sortedWith(compareBy({ it.order }, { it.key }))
             .flatMap { c ->
-                defs.mapNotNull { def ->
+                defs.filterNot { it.isSecret && c.secretTabLocked }.mapNotNull { def ->
                     val value = valueAt(EntityKind.CHARACTER, c.key, def.key, c.fields[def.key], lens)
                     val link = value?.payload as? FieldPayload.Link ?: return@mapNotNull null
                     if (key in link.targetKeys) LinkedCharacter(c.key, "${c.name}${Copy.SEP}${def.name}") else null

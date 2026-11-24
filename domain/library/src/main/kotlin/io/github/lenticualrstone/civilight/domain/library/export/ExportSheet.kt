@@ -156,7 +156,7 @@ object ExportSheets {
             val slice = RecorderSlice.select(recorder, doc.key, doc.project.protections.hidden, options.encrypt)
             if (slice.linkedCount > 0) rows += ExportRow.RecorderRecords(slice.linkedCount, options.includeRecorderAudio, slice.excludedHidden)
             rows += ExportRow.IncludeTrash(options.includeTrash)
-            if (hasVersions(doc)) rows += ExportRow.IncludeVersions(options.includeVersions)
+            if (hasVersions(doc, options.includeTrash)) rows += ExportRow.IncludeVersions(options.includeVersions)
         }
         return ExportSheet(
             // (0.2.0, LIB-92) No rating badge in the sub.
@@ -173,8 +173,17 @@ object ExportSheets {
         )
     }
 
-    /** (0.2.0, LIB-97) Whether [doc] holds at least one episode version (the versions row shows only then). */
-    fun hasVersions(doc: ProjectDoc): Boolean = doc.versions.values.any { it.versions.isNotEmpty() }
+    /**
+     * (0.2.0, LIB-97) Whether [doc] holds at least one episode version the file would carry (the versions row
+     * shows only then). Without `휴지통도 포함` the versions of trashed units are left out of the file
+     * (ProjectPackageWriter.withoutTrashed020), so they do not count.
+     */
+    fun hasVersions(doc: ProjectDoc, includeTrash: Boolean = true): Boolean {
+        val l = doc.liveness
+        return doc.versions.any { (key, file) ->
+            file.versions.isNotEmpty() && (includeTrash || key == doc.key || l.isUnitLive(key))
+        }
+    }
 
     /**
      * `범위` value: a top-level unit reads `<n><level> 전체` (`1장 전체`); a deeper one

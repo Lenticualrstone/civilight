@@ -378,4 +378,18 @@ class GalleryScreenRulesTest {
         assertEquals("1 KB", GalleryFacts.size(14L))
         assertEquals("11-20", GalleryFacts.monthDay(1_763_629_200_000L, java.time.ZoneId.of("Asia/Seoul")))
     }
+
+    @Test
+    fun `N-44 a trashed tag leaves the chips and the card meta, and a chosen one falls back to 전체`() {
+        val trashed = g0.copy(
+            project = g0.project.copy(tags = g0.project.tags.map { if (it.key == ExampleGallery.TAG_SETTING) it.copy(deletedAt = 1L) else it }),
+        )
+        val v = view(doc = trashed)
+        assertEquals(listOf("전체 8", "삽화 4", "소품 1"), v.chips.map { it.text })
+        assertNull("the image keeps the key but shows no trashed tag", v.entry(ITEM_2)?.meta)
+        assertTrue(panel(ITEM_2, trashed).tags.isEmpty())
+        val chosen = view(doc = trashed, filter = GalleryFilter.Tag(ExampleGallery.TAG_SETTING))
+        assertEquals(GalleryFilter.All, chosen.filter)
+        assertEquals(8, chosen.keys.size)
+    }
 }

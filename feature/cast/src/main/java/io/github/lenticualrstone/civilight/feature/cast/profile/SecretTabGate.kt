@@ -103,6 +103,14 @@ object SecretTabGate {
     fun lockedFromInside(state: TabGateState): TabGateState =
         if (state.tab == ProfileTab.SECRET) state.copy(gate = SecretGate.OPEN) else state
 
+    /**
+     * Whether the tab body [slot] is composed now (the outgoing body of a tab swap included). The body of a
+     * locked 비밀 tab is composed only while the gate shows it: a relock (the app going to the background,
+     * leaving the tab) drops it at once instead of fading it out under the prompt.
+     */
+    fun composesBody(slot: ProfileTab, state: TabGateState, locked: Boolean): Boolean =
+        slot != ProfileTab.SECRET || !locked || state.shown(locked) == ProfileTab.SECRET
+
     /** `게임 제작 도구` switched off while `게임 텍스트` was selected. */
     fun gameToolsChanged(state: TabGateState, gameTools: Boolean): TabGateState =
         if (state.tab in ProfileTabs.shown(gameTools)) state else TabGateState(ProfileTab.OVERVIEW)

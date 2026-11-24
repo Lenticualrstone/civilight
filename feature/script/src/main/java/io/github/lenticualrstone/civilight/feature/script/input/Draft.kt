@@ -5,10 +5,13 @@ import io.github.lenticualrstone.civilight.designsystem.component.InputMark
 import io.github.lenticualrstone.civilight.designsystem.component.InputSpeaker
 import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputState
 import io.github.lenticualrstone.civilight.domain.script.Labels
+import io.github.lenticualrstone.civilight.domain.script.Links
 import io.github.lenticualrstone.civilight.domain.script.Runs
 import io.github.lenticualrstone.civilight.domain.script.ScriptWrite
 import io.github.lenticualrstone.civilight.domain.script.WriteDraft
+import io.github.lenticualrstone.civilight.feature.script.editor.LinkLook
 import io.github.lenticualrstone.civilight.feature.script.editor.RunEdit
+import io.github.lenticualrstone.civilight.feature.script.editor.SpanKind
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.script.Block
@@ -244,12 +247,43 @@ object Drafts {
         if (aside?.mark is DraftMark.After && state((aside.mark as DraftMark.After).blockKey) != null) {
             out = out.copy(aside = afterTargetGone(aside))
         }
+        return scrub(out, doc, unlocked)
+    }
+
+    /**
+     * Rule 19 / T-U14-25 on every draft, whatever its mark, and on the set-aside one: while locked, a link to a
+     * hidden item leaves the draft (its text never stays in the field, the saved state or `view.json`; it is
+     * not turned into plain text, which a send would write into the manuscript), and a chip speaker that went to
+     * the trash or is hidden resets to `화자 없음` (SCR-18).
+     */
+    fun scrub(d: Draft, doc: ProjectDoc, unlocked: Boolean): Draft {
+        var out = d
+        if (Runs.hidesLink(doc, d.runs, unlocked)) {
+            val runs = Runs.normalize(d.runs.filterNot { it is TextRun.Link && Links.state(doc, it, unlocked) is Links.State.Hidden })
+            val len = rawText(runs).length
+            out = out.copy(
+                runs = runs, selStart = d.selStart.coerceIn(0, len), selEnd = d.selEnd.coerceIn(0, len),
+                parenOpen = false, pendingParenAt = null,
+            )
+        }
         out.speakerKey?.let { key ->
             val c = doc.index.character(key)
             if (c == null || c.deletedAt != null || (c.hidden && !unlocked)) out = out.copy(speakerKey = null)
         }
+        val aside = out.aside
+        if (aside != null) {
+            val clean = scrub(aside, doc, unlocked)
+            if (clean != aside) out = out.copy(aside = clean)
+        }
         return out
     }
+
+    /**
+     * What may be kept outside the process (`view.json`, the screen's saved state): the draft as a locked gate
+     * leaves it, since the gate is shut after process death. A `고치기` of a hidden block gives back the set-aside
+     * draft; hidden links and a hidden chip speaker are gone. [unitKey] null: no episode check.
+     */
+    fun forStorage(d: Draft, doc: ProjectDoc): Draft = reconcile(d, doc, null, unlocked = false)
 
     private enum class Gone { REMOVED, LOCKED }
 
@@ -320,3 +354,14 @@ object Drafts {
 }
 
 private fun ProjectDoc.numberingUnitOfSceneOrNull(sceneKey: Key): Key? = index.numberingUnitKeyOfScene(sceneKey)
+
+/** How the input field draws a link run of the draft (SCR-55): live, masked when locked hidden, deleted. */
+object DraftLooks {
+    fun of(doc: ProjectDoc, link: TextRun.Link, unlocked: Boolean): LinkLook =
+        when (val state = Links.state(doc, link, unlocked)) {
+            Links.State.Live -> LinkLook(SpanKind.LINK)
+            is Links.State.Hidden -> LinkLook(SpanKind.HIDDEN_LINK, state.text)
+            is Links.State.Deleted, is Links.State.Purged ->
+                LinkLook(SpanKind.DELETED_LINK)
+        }
+}

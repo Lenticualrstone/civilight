@@ -32,6 +32,9 @@ object TrashCopy {
     const val HIDDEN_PROJECT = "숨긴 프로젝트"
     const val HIDDEN_ITEM = "숨긴 항목"
 
+    /** (0.2.0, CST-75) A trashed tag whose name a live tag has: `되살리기` refused (sub line and toast). */
+    const val TAG_NAME_TAKEN = "◇ 같은 이름 태그 있음"
+
     /** Gallery (55): the area word, an untitled image, and the hidden count form of the order line. */
     const val GALLERY = "갤러리"
     const val UNTITLED_IMAGE = "제목 없음"

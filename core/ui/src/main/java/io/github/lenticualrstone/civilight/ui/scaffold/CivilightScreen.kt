@@ -140,8 +140,16 @@ private fun ScreenFrame(
         bottomBar = {
             when {
                 // A pane's own action bar (wizard buttons, record buttons) sits on the frame bar's top (DS-65 §6).
-                bottomBar != null && paneHost != null && paneHost.panePadding > 0.dp ->
-                    Box(Modifier.padding(bottom = (paneHost.panePadding - systemBottomWithoutKeyboard()).coerceAtLeast(0.dp))) { bottomBar() }
+                // One call site in a pane whatever the padding: the bar keeps its state, focus and animations
+                // when the frame bar is measured or comes and goes (a padding of 0 dp until then).
+                bottomBar != null && paneHost != null -> {
+                    val lift = if (paneHost.panePadding > 0.dp) {
+                        (paneHost.panePadding - systemBottomWithoutKeyboard()).coerceAtLeast(0.dp)
+                    } else {
+                        0.dp
+                    }
+                    Box(Modifier.padding(bottom = lift)) { bottomBar() }
+                }
                 bottomBar != null -> bottomBar()
                 // In a pane: no bar of its own, only the frame bar's height, so both panes get the same padding.
                 // Until the frame bar is measured, its standard height (no reflow when it first appears).

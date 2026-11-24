@@ -35,6 +35,13 @@ object FixedFieldEdits {
     fun toggle(picks: List<TagPick>, key: Key, name: String): List<TagPick> =
         if (picks.any { it.key == key }) picks.filterNot { it.key == key } else picks + TagPick(key, name)
 
+    /**
+     * A tag created from the sheet's `＋ 새 태그` card: that write already checked it on the character, so it
+     * joins both the picks and the baseline `저장` compares against (untapping it then enables `저장`).
+     */
+    fun created(picks: List<TagPick>, key: Key, name: String): List<TagPick> =
+        if (picks.any { it.key == key }) picks else picks + TagPick(key, name)
+
     /** `넣기` under the name line: an existing tag of that name is picked, else a new name is queued. */
     fun addName(doc: ProjectDoc, picks: List<TagPick>, name: String): List<TagPick> {
         val n = name.trim().nfc()

@@ -213,7 +213,11 @@ fun ScriptScreen(route: Script, deps: FeatureDeps) {
     // Read once, before the effect below overwrites it with the live draft.
     val restoredDraft = remember { savedDraft }
     LaunchedEffect(Unit) { vm.restoreSavedDraft(restoredDraft) }
-    LaunchedEffect(draft) { savedDraft = Drafts.encode(draft) }
+    // The project's draft is shared by its script screens: the one shown (or resumed) checks it against its episode.
+    LaunchedEffect(vm) { vm.claimDraft() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.claimDraft() }
+    // Hidden text never goes into the saved state (Drafts.forStorage); before the document loads the last one stays.
+    LaunchedEffect(draft, content?.doc) { vm.savableDraft(draft)?.let { savedDraft = it } }
     val c = content
     val panelScroll = remember(c != null) { PanelScrollMemory(c?.doc?.app?.view?.script?.panel?.scroll.orEmpty()) }
     val gate = rememberHiddenGate(route.projectKey)
@@ -709,10 +713,12 @@ private fun ScriptFrame(
     val mergeReason = editKey?.let { MergeCheck.reason(doc, it, draft.kind, draft.speakerKey) }?.let(WriteCopy::mergeReason)
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val runLayout = remember(draft.runs, draft.pendingParenAt, draft.parenOpen, draft.selEnd) {
+    val runLayout = remember(draft.runs, draft.pendingParenAt, draft.parenOpen, draft.selEnd, doc, gate.open) {
         io.github.lenticualrstone.civilight.feature.script.editor.RunLayout.of(
             draft.runs, showParens = true, pendingParenAt = draft.pendingParenAt,
             openParenEndAt = draft.selEnd.takeIf { draft.parenOpen && draft.pendingParenAt == null },
+            // SCR-55: a link to a locked hidden item is drawn as its mask (the draft drops it on lock as well).
+            linkLook = { link -> io.github.lenticualrstone.civilight.feature.script.input.DraftLooks.of(doc, link, gate.open) },
         )
     }
     val transformation = remember(runLayout, colors, type) { DraftTransformation(runLayout, colors, type) }

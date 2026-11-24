@@ -203,5 +203,8 @@ class SettingsBatch6Test {
         assertNull(row.value)
         assertEquals(TagSettings(ashen.key), routeOf(ProjectSettingsTarget.TAGS, ashen.key))
         assertNull("no tag: no sub", ProjectSettingsRows.tags(LibFx.glass()).sub)
+        // N-44: a trashed tag leaves the summary.
+        val trashed = ashen.copy(project = ashen.project.copy(tags = ashen.project.tags.map { if (it.name == "등불 결사") it.copy(deletedAt = 1L) else it }))
+        assertEquals("주연 · 하층 구역 · 상층", ProjectSettingsRows.tags(trashed).sub)
     }
 }

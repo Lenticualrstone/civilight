@@ -171,6 +171,40 @@ class MicReleaseTest {
     }
 
     @Test
+    fun U13_aNotificationTapWhileTheLeftTakeIsSavingStartsNoNewTake() = runTest {
+        val r = Rig(this)
+        r.start()
+        r.f.engine.say("말하는 중")
+        testScheduler.advanceTimeBy(2_000)
+        // Hold the inbox write: the library write made once the hub is already IDLE (keepInInbox after close).
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        r.f.recorder.beforeUpdate = { if (r.f.hub.state.value.stage == CaptureStage.IDLE) gate.await() }
+
+        val save = r.f.hub.leave()!!
+        testScheduler.runCurrent()
+        assertEquals("the hub is already idle while the save runs", CaptureStage.IDLE, r.f.hub.state.value.stage)
+        assertTrue(r.f.hub.leaving!!.isActive)
+        val opens = r.takes.opens
+
+        // The still-visible `녹음 중` notification is tapped: a fresh Recording route calls begin.
+        r.start()
+        assertEquals("no new take", opens, r.takes.opens)
+        assertFalse(r.takes.micOpen)
+        assertEquals(CaptureStage.IDLE, r.f.hub.state.value.stage)
+
+        gate.complete(Unit)
+        save.join()
+        assertEquals(1, r.f.recorder.library.records.size)
+        assertTrue(r.released())
+        assertTrue(r.balanced())
+
+        // Once the save is done, a mic tap records again.
+        r.start()
+        assertTrue(r.takes.micOpen)
+        r.f.hub.leave()!!.join()
+    }
+
+    @Test
     fun U13_leavingTwiceSavesOnceAndLeavingWithNoTakeDoesNothing() = runTest {
         val r = Rig(this)
         assertNull(r.f.hub.leave())

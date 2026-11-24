@@ -24,6 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -72,7 +75,9 @@ fun ReadAloudPlayer(
     val motion = CivilightTheme.motion
     val step = steps.getOrNull(index)
     val hash = step?.background?.let { doc.index.scriptAsset(it)?.fileHash }
-    Box(Modifier.fillMaxSize().background(colors.bg)) {
+    // Over the whole screen: every touch the buttons and the box leave is consumed here, so nothing reaches
+    // the manuscript, header or input bar drawn underneath (taps, swipes, the disabled box on the last step).
+    Box(Modifier.fillMaxSize().background(colors.bg).pointerInput(Unit) { consumeAllPointers() }) {
         if (hash != null) {
             val image = rememberBlobImage(hash)
             if (image != null) Image(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -117,6 +122,15 @@ fun ReadAloudPlayer(
                 CivilightButton(WriteCopy.CLOSE, { onClose(step?.blockKey) }, Modifier.weight(1f), ButtonVariant.COMPACT_GHOST)
                 CivilightButton(WriteCopy.NEXT, { onIndex(ReadAloudNav.next(index, steps.size)) }, Modifier.weight(1f), ButtonVariant.COMPACT_PRIMARY, enabled = ReadAloudNav.canNext(index, steps.size))
             }
+        }
+    }
+}
+
+/** Swallows every pointer change after the children had it (Main pass), so siblings below see none. */
+private suspend fun PointerInputScope.consumeAllPointers() {
+    awaitPointerEventScope {
+        while (true) {
+            awaitPointerEvent(PointerEventPass.Main).changes.forEach { it.consume() }
         }
     }
 }

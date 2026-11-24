@@ -136,4 +136,13 @@ class GallerySearchTest {
             assertEquals(q.lowercase(), hit.match.boxed.single().lowercase())
         }
     }
+
+    @Test
+    fun aTrashedTagNameFindsNothing() {
+        assertTrue(hits("소품").isNotEmpty())
+        val trashed = g0.copy(
+            project = g0.project.copy(tags = g0.project.tags.map { if (it.key == ExampleGallery.TAG_PROP) it.copy(deletedAt = 1L) else it }),
+        )
+        assertTrue("N-44: a trashed tag shows nowhere, search included", hits("소품", trashed).isEmpty())
+    }
 }

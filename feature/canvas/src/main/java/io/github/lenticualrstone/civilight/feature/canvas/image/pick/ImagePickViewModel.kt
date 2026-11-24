@@ -10,6 +10,7 @@ import io.github.lenticualrstone.civilight.feature.canvas.image.ImageEdits
 import io.github.lenticualrstone.civilight.feature.canvas.image.ImageOwner
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.asset.BlobSource
+import io.github.lenticualrstone.civilight.model.asset.ImageUse
 import io.github.lenticualrstone.civilight.store.blob.BlobStore
 import io.github.lenticualrstone.civilight.store.blob.import
 import io.github.lenticualrstone.civilight.ui.project.EditResult
@@ -41,18 +42,23 @@ class ImagePickViewModel(
     fun placePreset(owner: ImageOwner, presetId: String, holo: Boolean, then: (EditResult) -> Unit) =
         act(ImageCopy.BTN_PICK, then = then) { doc, ctx -> ImageEdits.placePreset(doc, owner, presetId, holo, ctx) }
 
-    /** `빼기` (U-08 LIB-87): the slot's row goes, as one undo step named `빼기`; the original stays for the blob sweep. */
-    fun clear(owner: ImageOwner, then: (EditResult) -> Unit) =
-        act(ImageCopy.BTN_CLEAR, then = then) { doc, ctx -> ImageEdits.clear(doc, owner, ctx) }
+    /**
+     * `빼기` (U-08 LIB-87): the slot's row goes, as one undo step named `빼기`; the original stays for the blob sweep.
+     * [then] also gets the removed row and its index, so the toast's `되돌리기` can put exactly that row back.
+     */
+    fun clear(owner: ImageOwner, then: (EditResult, ImageUse?, Int) -> Unit) {
+        var removed: ImageUse? = null
+        var index = -1
+        act(ImageCopy.BTN_CLEAR, then = { r -> then(r, removed, index) }) { doc, ctx ->
+            index = doc.assets.imageUses.indexOfFirst(owner::matches)
+            removed = doc.assets.imageUses.getOrNull(index)
+            ImageEdits.clear(doc, owner, ctx)
+        }
+    }
 
     /** The holo row with the cover kept (LIB-84 `[PROPOSED]`): written at once, one undo step. */
     fun setHolo(owner: ImageOwner, holo: Boolean, then: (EditResult) -> Unit = {}) =
         act(ImageCopy.HOLO, then = then) { doc, ctx -> ImageEdits.setHolo(doc, owner, holo, ctx) }
-
-    /** `되돌리기` of the `표지 뺌` toast. */
-    fun undoLast() {
-        viewModelScope.launch { undo() }
-    }
 
     /**
      * Copies the picked image into the blob store (stored once by content hash) and lists it under

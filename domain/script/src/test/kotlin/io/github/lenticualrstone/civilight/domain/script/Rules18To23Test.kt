@@ -167,6 +167,21 @@ class Rules18To23Test {
     }
 
     @Test
+    fun `N-44 picker sublines leave trashed tags out`() {
+        val base = F1.build()
+        val live = io.github.lenticualrstone.civilight.model.cast.Tag("01KTESTTAGLIVE000000000001", "조연", "a")
+        val gone = io.github.lenticualrstone.civilight.model.cast.Tag("01KTESTTAGGONE000000000001", "악역", "b", deletedAt = 1L)
+        val doc = base.copy(
+            project = base.project.copy(tags = base.project.tags + live + gone),
+            cast = base.cast.copy(characters = base.cast.characters.map { it.copy(tagKeys = it.tagKeys + live.key + gone.key) }),
+        )
+        val sheet = SpeakerPicker.sheet(doc, doc.block(F1.b(42)), recentSpeakers = emptyList())
+        val rows = sheet.inScene + sheet.recent + sheet.all
+        assertTrue(rows.any { "조연" in it.subline })
+        assertTrue(rows.none { "악역" in it.subline })
+    }
+
+    @Test
     fun `T-19-04 export of hidden content`() {
         val doc = hiddenS4With12Blocks()
         val json = ExportScope.json(listOf(K.CHAPTER_1))

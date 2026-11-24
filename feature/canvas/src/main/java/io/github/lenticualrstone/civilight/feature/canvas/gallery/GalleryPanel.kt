@@ -70,7 +70,7 @@ class GalleryPanels(private val doc: ProjectDoc, private val locked: Boolean) {
     private val labels = EntryLabels(doc, locked)
     private val times by lazy { TimeLabels(SceneTimes(doc)) }
     private val hidden by lazy { HiddenItems(doc) }
-    private val tagNames by lazy { doc.project.tags.associate { it.key to it.name } }
+    private val tagNames by lazy { doc.project.tags.filter { it.isLive }.associate { it.key to it.name } }
 
     fun panel(view: GalleryView, key: Key?): PanelModel? {
         val entry = view.entry(key) ?: return null

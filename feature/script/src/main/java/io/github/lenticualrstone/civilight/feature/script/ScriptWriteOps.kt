@@ -8,6 +8,7 @@ import io.github.lenticualrstone.civilight.domain.script.BlockOps
 import io.github.lenticualrstone.civilight.domain.script.BlockPosition
 import io.github.lenticualrstone.civilight.domain.script.KindChange
 import io.github.lenticualrstone.civilight.domain.script.Labels
+import io.github.lenticualrstone.civilight.domain.script.Manuscript
 import io.github.lenticualrstone.civilight.domain.script.Replace
 import io.github.lenticualrstone.civilight.domain.script.Runs
 import io.github.lenticualrstone.civilight.domain.script.ScriptWrite
@@ -26,12 +27,15 @@ import io.github.lenticualrstone.civilight.model.OpenEnum
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.game.GameTools
 import io.github.lenticualrstone.civilight.model.script.BlockKind
+import io.github.lenticualrstone.civilight.model.script.ScriptPreview
+import io.github.lenticualrstone.civilight.model.script.ScriptViewState
 import io.github.lenticualrstone.civilight.model.text.LinkTarget
 import io.github.lenticualrstone.civilight.model.text.LinkTargetKind
 import io.github.lenticualrstone.civilight.model.text.TextRun
 import io.github.lenticualrstone.civilight.model.text.plainText
 import io.github.lenticualrstone.civilight.model.version.VersionOrigin
 import io.github.lenticualrstone.civilight.ui.picker.PickKind
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.concurrent.ConcurrentHashMap
 
@@ -42,22 +46,51 @@ import java.util.concurrent.ConcurrentHashMap
  */
 
 /**
- * The draft of each project while the process lives (leaving and reopening the script, fold). Process death
- * is covered by `_app/view.json › script.draft` inside the project store ([persistedDraft], written by the
- * view model) and by the screen's saved state ([restoreSavedDraft]). Never written outside the project store.
+ * The draft of each project while the process lives: one flow per project, and every script screen of that
+ * project (two can be on the back stack, e.g. `Script(p)` under `Script(p, blockKey)`) uses it as its own
+ * draft, so a screen coming back shows what the other typed and never writes an older draft over it. Process
+ * death is covered by `_app/view.json › script.draft` inside the project store ([persistedDraft], written by
+ * the view model) and by the screen's saved state ([restoreSavedDraft]), both as [Drafts.forStorage] leaves it.
  */
 internal object DraftMemory {
-    private val drafts = ConcurrentHashMap<Key, Draft>()
+    private class Slot {
+        val flow = MutableStateFlow(Draft())
 
-    fun get(projectKey: Key): Draft? = drafts[projectKey]
+        /** A draft was opened or put (the process memory holds this project's draft). */
+        @Volatile var opened = false
+
+        /** The screen in front ([claim]): only it checks the draft against its own episode. */
+        @Volatile var owner: Any? = null
+    }
+
+    private val slots = ConcurrentHashMap<Key, Slot>()
+
+    private fun slot(projectKey: Key): Slot = slots.getOrPut(projectKey) { Slot() }
+
+    /** The shared draft flow of [projectKey]. */
+    fun flow(projectKey: Key): MutableStateFlow<Draft> = slot(projectKey).flow
+
+    fun get(projectKey: Key): Draft? = slots[projectKey]?.takeIf { it.opened }?.flow?.value
 
     fun put(projectKey: Key, draft: Draft) {
-        drafts[projectKey] = draft
+        val s = slot(projectKey)
+        s.flow.value = draft
+        s.opened = true
     }
+
+    /** [owner] is the screen in front; the last claim wins (a screen claims on show and on resume). */
+    fun claim(projectKey: Key, owner: Any) {
+        slot(projectKey).owner = owner
+    }
+
+    /** Another screen of this project is in front. */
+    fun ownedByOther(projectKey: Key, owner: Any): Boolean = slots[projectKey]?.owner.let { it != null && it !== owner }
+
+    /** Tests: forget every project's draft. */
+    fun clear() = slots.clear()
 }
 
 internal fun ScriptViewModel.setDraft(d: Draft) {
-    draftFlow.value = d
     DraftMemory.put(projectKey, d)
 }
 
@@ -65,32 +98,51 @@ internal fun ScriptViewModel.setDraft(d: Draft) {
 internal fun ScriptViewModel.openDraft(d: ProjectDoc, t: OpenTarget) {
     if (draftOpened) return
     draftOpened = true
-    val stored = DraftMemory.get(projectKey) ?: Drafts.decode(d.app.view.script.draft)
+    if (DraftMemory.get(projectKey) != null) return
+    val stored = Drafts.decode(d.app.view.script.draft)
     if (stored != null) {
-        draftFlow.value = stored
         DraftMemory.put(projectKey, stored)
         return
     }
+    // An untouched default is not remembered: the next open inherits its own scene's speaker, and a saved state
+    // restored after this still comes back. (The content collector reconciles once the gate is known.)
     val speaker = t.sceneKey?.takeIf { d.manuscript.isLiveUnit(it) }?.let { BlockOps.inheritedSpeaker(d, BlockPosition.SceneEnd(it)) }
     draftFlow.value = Draft(kind = BlockKind.DIALOGUE, speakerKey = speaker)
 }
 
-/** What `_app/view.json` keeps for [d]: null for an empty draft (the next open starts fresh). */
-internal fun persistedDraft(d: Draft): String? =
-    if (d.runs.isEmpty() && d.cues.isEmpty() && d.mark == DraftMark.None && d.aside == null) null else Drafts.encode(d)
+/** What `_app/view.json` keeps for [d]: null for an empty draft (the next open starts fresh); hidden text never. */
+internal fun persistedDraft(d: Draft, doc: ProjectDoc): String? = Drafts.forStorage(d, doc).let { s ->
+    if (s.runs.isEmpty() && s.cues.isEmpty() && s.mark == DraftMark.None && s.aside == null) null else Drafts.encode(s)
+}
+
+/** The screen's saved state for [d] ([Drafts.forStorage]); null while no document is loaded (keep the last). */
+fun ScriptViewModel.savableDraft(d: Draft): String? = latestDoc?.let { Drafts.encode(Drafts.forStorage(d, it)) }
 
 /** The screen's saved draft after process death (the process memory is empty then). */
 fun ScriptViewModel.restoreSavedDraft(encoded: String?) {
     if (DraftMemory.get(projectKey) != null) return
     val saved = Drafts.decode(encoded) ?: return
     setDraft(saved)
+    content.value?.let { reconcileDraft(it.doc, it.unitKey) } ?: latestDoc?.let { reconcileDraftWith(it, null) }
 }
 
-/** The draft follows the document (SCR-72, SCR-73, SCR-18). */
-internal fun ScriptViewModel.reconcileDraft(doc: ProjectDoc, unitKey: Key) {
+/**
+ * The draft follows the document (SCR-72, SCR-73, SCR-18) and the gate. While another screen of this project
+ * is in front, the episode check is left to it ([unitKey] not applied), so its `이 뒤에` or `고치기` mark stays.
+ */
+internal fun ScriptViewModel.reconcileDraft(doc: ProjectDoc, unitKey: Key) =
+    reconcileDraftWith(doc, unitKey.takeUnless { DraftMemory.ownedByOther(projectKey, draftOwner) })
+
+private fun ScriptViewModel.reconcileDraftWith(doc: ProjectDoc, unitKey: Key?) {
     val before = draftFlow.value
     val after = Drafts.reconcile(before, doc, unitKey, gateOpen)
     if (after != before) setDraft(after)
+}
+
+/** The screen is shown or resumed: it is in front for this project's draft and checks it now. */
+fun ScriptViewModel.claimDraft() {
+    DraftMemory.claim(projectKey, draftOwner)
+    content.value?.let { reconcileDraft(it.doc, it.unitKey) }
 }
 
 /** A change of the field's text or caret; returns what the screen opens (the `@` picker). */
@@ -132,6 +184,24 @@ fun ScriptViewModel.removeDraftCue(cueKey: Key) = setDraft(Drafts.removeCue(draf
 /** `✕` of the mark (SCR-72, SCR-73). */
 fun ScriptViewModel.closeMark() = setDraft(Drafts.close(draftFlow.value))
 
+// --- SCR-26: a written block of a kind whose layer is off turns that layer on ---
+
+/**
+ * The view after writing a [kind] block: unchanged (null) while that kind is drawn; else its layer on and the
+ * `쓰기` preview, as [ScriptViewModel.addBlock] does, so a sent, converted, split or merged block never
+ * vanishes from the manuscript.
+ */
+internal fun revealedView(script: ScriptViewState, kind: BlockKind): ScriptViewState? =
+    if (Manuscript.isShown(kind, script.layers, script.preview)) null
+    else script.copy(layers = Manuscript.layersAfterInsert(script.layers, kind), preview = ScriptPreview.WRITE)
+
+/** Before the write (no row snapshot holds the block with its layer still off; see `addBlock`). */
+internal suspend fun ScriptViewModel.revealKind(kind: BlockKind) {
+    val doc = latestDoc ?: return
+    if (revealedView(doc.app.view.script, kind) == null) return
+    updateApp { app -> revealedView(app.view.script, kind)?.let { app.copy(view = app.view.copy(script = it)) } ?: app }
+}
+
 // --- Swipe buttons (SCR-30) ---
 
 /** Right swipe `고치기` (SCR-72): the block's text, speaker and kind move into the input. */
@@ -160,6 +230,10 @@ fun ScriptViewModel.convertKind(blockKey: Key, kind: BlockKind) {
     if (readOnly) return
     clearFresh()
     enqueue {
+        // SCR-26: a block converted to a kind whose layer is off would leave the manuscript; that layer turns on.
+        val doc = latestDoc ?: return@enqueue
+        if (KindChange.apply(doc, blockKey, kind, ctx()) === doc) return@enqueue
+        revealKind(kind)
         apply(runOp(ScriptCopy.UNDO_KIND) { d -> KindChange.apply(d, blockKey, kind, ctx()).takeIf { it !== d }?.let { ScriptOps.Outcome(it, select = blockKey) } })
     }
 }
@@ -197,6 +271,7 @@ fun ScriptViewModel.sendDraft(targetScene: Key?) {
                     ScriptWrite.EditResult.Refused -> return@enqueue
                     is ScriptWrite.EditResult.Changed -> Unit
                 }
+                revealKind(draft.kind)
                 val out = runOp(WriteCopy.UNDO_EDIT) { d ->
                     (ScriptWrite.editResult(d, m.blockKey, write, ctx()) as? ScriptWrite.EditResult.Changed)?.let { ScriptOps.Outcome(it.doc) }
                 } ?: return@enqueue
@@ -210,6 +285,8 @@ fun ScriptViewModel.sendDraft(targetScene: Key?) {
             else -> {
                 val position = (m as? DraftMark.After)?.let { BlockPosition.After(it.blockKey) }
                     ?: targetScene?.let { BlockPosition.SceneEnd(it) } ?: return@enqueue
+                if (ScriptWrite.send(doc, position, Drafts.toWrite(draft, game), game, ctx()) == null) return@enqueue
+                revealKind(draft.kind)
                 var created: Key? = null
                 runOp(WriteCopy.UNDO_SEND) { d ->
                     ScriptWrite.send(d, position, Drafts.toWrite(draft, game), game, ctx())?.let {
@@ -241,6 +318,8 @@ fun ScriptViewModel.splitDraft() {
         val doc = latestDoc ?: return@enqueue
         val game = GameTools.on(doc)
         val (front, back) = Drafts.splitParts(draft)
+        if (ScriptWrite.split(doc, m.blockKey, Drafts.toWrite(draft, game).copy(runs = front), back, ctx()) == null) return@enqueue
+        revealKind(draft.kind)
         var result: ScriptWrite.Split? = null
         runOp(ScriptCopy.UNDO_SPLIT) { d ->
             ScriptWrite.split(d, m.blockKey, Drafts.toWrite(draft, game).copy(runs = front), back, ctx())?.let {
@@ -268,6 +347,8 @@ fun ScriptViewModel.mergeDraft() {
         if (!Drafts.stillPending(draft, draftFlow.value)) return@enqueue
         val doc = latestDoc ?: return@enqueue
         val game = GameTools.on(doc)
+        if (ScriptWrite.merge(doc, m.blockKey, Drafts.toWrite(draft, game), ctx()) == null) return@enqueue
+        revealKind(draft.kind)
         var result: ScriptWrite.Merged? = null
         runOp(ScriptCopy.UNDO_MERGE) { d ->
             ScriptWrite.merge(d, m.blockKey, Drafts.toWrite(draft, game), ctx())?.let {

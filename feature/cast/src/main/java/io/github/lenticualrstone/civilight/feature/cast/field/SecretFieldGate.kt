@@ -8,6 +8,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -39,7 +40,9 @@ fun SheetScope.SecretFieldGate(kind: EntityKind, entityKey: Key, defKey: Key, co
  * (CST-73) The gate of every sheet that shows secret text of [characterKey] ([needsLock]: that text and a locked
  * 비밀 tab). It observes the open tab ([CastAuth.openSecretFlow]) and the app's background, so a relock hides
  * the sheet at once: a sheet opened from the open tab closes, one that asked on its own asks again. The
- * confirmation is plain `remember`: a restored sheet asks again.
+ * confirmation is plain `remember`: a restored sheet asks again. The sheet's saveable state (a typed draft) is
+ * kept by a holder above the gate while the sheet waits or asks again, and is back once confirmed: only the
+ * state is kept, nothing of the sheet is composed before the confirmation.
  */
 @Composable
 fun SheetScope.SecretSheetGate(characterKey: Key, needsLock: Boolean, content: @Composable SheetScope.() -> Unit) {
@@ -51,8 +54,10 @@ fun SheetScope.SecretSheetGate(characterKey: Key, needsLock: Boolean, content: @
     var authed by remember(characterKey, stops) { mutableStateOf(false) }
     var viaTab by remember(characterKey) { mutableStateOf(false) }
     if (needsLock && tab == SecretGate.OPEN && !viaTab) SideEffect { viaTab = true }
+    // Held above the gate: a relock removes the content, and its saveable state is saved here, not dropped.
+    val kept = rememberSaveableStateHolder()
     when (CastAuth.sheetGate(needsLock, tab, authed, viaTab)) {
-        SheetGate.SHOW -> content()
+        SheetGate.SHOW -> kept.SaveableStateProvider(characterKey) { content() }
         SheetGate.WAIT -> Unit
         SheetGate.CLOSE -> LaunchedEffect(Unit) { close() }
         SheetGate.PROMPT -> LaunchedEffect(characterKey, stops) {

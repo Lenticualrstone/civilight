@@ -106,4 +106,42 @@ class ScriptViewModelConstructTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun `two script screens of one project share one draft, and the lower one never writes an older one back`() = runTest {
+        val main = UnconfinedTestDispatcher(testScheduler)
+        Dispatchers.setMain(main)
+        val scope = CoroutineScope(SupervisorJob() + main)
+        val dataScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val lowerOwner = ViewModelStore()
+        val upperOwner = ViewModelStore()
+        try {
+            val env = StoreEnvironment(scope, main, ManualClock.at("2026-11-24T00:00:00Z"), DeviceId.fixed("test-device"))
+            val stores = StoreContainer(
+                tmp.root,
+                PreferenceDataStoreFactory.create(scope = dataScope, produceFile = { File(tmp.root, "datastore/settings.preferences_pb") }),
+                env,
+            )
+            val project = stores.library.create("새 작품")
+            val deps = Deps(stores, ProjectSessions(scope, stores.library, closeDelayMs = 0), scope)
+            val lower = ViewModelProvider.create(lowerOwner, viewModelFactory { initializer { ScriptViewModel(Script(project.key), deps) } })[ScriptViewModel::class]
+            lower.setDraft(io.github.lenticualrstone.civilight.feature.script.input.Draft(runs = listOf(io.github.lenticualrstone.civilight.model.text.TextRun.Plain("준비"))))
+            val upper = ViewModelProvider.create(upperOwner, viewModelFactory { initializer { ScriptViewModel(Script(project.key, blockKey = "01JZ000000BLCK000000000001"), deps) } })[ScriptViewModel::class]
+            runCurrent()
+            assertEquals("준비", upper.draft.value.text)
+            upper.setDraft(io.github.lenticualrstone.civilight.feature.script.input.Draft(runs = listOf(io.github.lenticualrstone.civilight.model.text.TextRun.Plain("준비된 문장 하나 더"))))
+            // Back on the lower screen: it shows the newer draft, and leaving the upper one keeps it.
+            assertEquals("준비된 문장 하나 더", lower.draft.value.text)
+            upperOwner.clear()
+            runCurrent()
+            assertEquals("준비된 문장 하나 더", lower.draft.value.text)
+            assertEquals("준비된 문장 하나 더", DraftMemory.get(project.key)?.text)
+        } finally {
+            lowerOwner.clear()
+            upperOwner.clear()
+            scope.cancel()
+            dataScope.cancel()
+            Dispatchers.resetMain()
+        }
+    }
 }

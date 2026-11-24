@@ -243,4 +243,30 @@ class Library020Test {
         // Carrying twice adds nothing more.
         assertEquals(carried, ExportRunner.carryAfterSave(carried, doc, after))
     }
+
+    @Test
+    fun `export carry works once per save and copies only episodes it changes`() {
+        val doc = LibFx.ashen()
+        assertTrue("the fixture has episodes the save leaves alone", doc.episodes.size > 1)
+        val (episodeKey, file) = doc.episodes.entries.first { it.value.blocks.isNotEmpty() }
+        val blockKey = file.blocks.first().key
+        val fixed = io.github.lenticualrstone.civilight.model.script.VoiceState(fixedId = "VO_0001", fixedAt = LibFx.NOW)
+        // As VoiceFixation writes it: every episode file is a new object, only one block's voice differs.
+        val after = doc.copy(
+            episodes = doc.episodes.mapValues { (_, f) -> f.copy(blocks = f.blocks.map { if (it.key == blockKey) it.copy(voice = fixed) else it }) },
+        )
+        val carry = ExportRunner.carrier()
+        val steps = listOf(doc, doc.copy(project = doc.project.copy(name = "옛 이름")))
+        steps.forEach { step ->
+            val carried = carry(step, doc, after)
+            assertEquals(ExportRunner.carryAfterSave(step, doc, after), carried)
+            assertEquals(fixed, carried.episodes.getValue(episodeKey).blocks.first { it.key == blockKey }.voice)
+            doc.episodes.keys.filter { it != episodeKey }.forEach { k ->
+                assertTrue("an untouched episode stays shared with the step", carried.episodes.getValue(k) === step.episodes.getValue(k))
+            }
+        }
+        // A step that already has the voice keeps its block object.
+        val already = carry(after, doc, after)
+        assertTrue(already.episodes.getValue(episodeKey).blocks.first { it.key == blockKey } === after.episodes.getValue(episodeKey).blocks.first { it.key == blockKey })
+    }
 }

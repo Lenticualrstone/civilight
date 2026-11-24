@@ -83,7 +83,7 @@ object ProjectSettingsRows {
      * names in their order, no value word, no sub while there is no tag).
      */
     fun tags(doc: ProjectDoc): ProjectLinkRow {
-        val names = doc.project.tags.sortedBy { it.order }.joinToString(" · ") { it.name }
+        val names = doc.project.tags.filter { it.isLive }.sortedBy { it.order }.joinToString(" · ") { it.name }
         return ProjectLinkRow(ProjectSettingsTarget.TAGS, ProjectSettingsCopy.TAGS, names.ifEmpty { null }, null)
     }
 

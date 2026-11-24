@@ -69,9 +69,11 @@ internal class SettingsViewModel(private val services: LibraryServices) : ViewMo
     /**
      * (0.2.0, LIB-94) A `서재 보기` or `카드 보기` pick applies at once. The store's setter also turns that
      * screen's head toggle to the 3D view (a `목록` pick leaves it), so the choice is visible on return.
+     * Runs on the app scope: the pick pops this screen at once, which cancels [viewModelScope] and would
+     * drop a write still waiting for the settings store.
      */
     fun chooseView(kind: ViewKind, id: String) {
-        viewModelScope.launch {
+        deps.appScope.launch {
             when (kind) {
                 ViewKind.LIBRARY -> ViewStyles.libraryStyleOf(id)?.let { settingsStore.setLibraryStyle(it) }
                 ViewKind.CARD -> ViewStyles.cardStyleOf(id)?.let { settingsStore.setCastCardStyle(it) }

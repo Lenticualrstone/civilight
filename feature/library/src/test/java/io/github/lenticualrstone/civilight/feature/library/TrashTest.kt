@@ -351,4 +351,47 @@ class TrashTest {
         actions.restore(blocks)
         assertEquals("asked again after a lock change", 3, ports.prompts)
     }
+
+    // ---- 0.2.0 tags (N-44, CST-75) ----
+
+    private fun trashedTag(doc: ProjectDoc): Triple<ProjectDoc, io.github.lenticualrstone.civilight.model.cast.Tag, Key> {
+        val tag = doc.project.tags.first { it.isLive }
+        val (trashed, entry) = io.github.lenticualrstone.civilight.domain.actions.TagActions.trash(doc, tag.key, ctx)!!
+        return Triple(trashed, tag, entry.key)
+    }
+
+    @Test
+    fun `a trashed tag of a locked hidden project is masked and named once open`() {
+        val hidden = ashen.copy(project = ashen.project.copy(protections = ashen.project.protections.copy(hidden = true)))
+        val (doc, tag, entryKey) = trashedTag(hidden)
+        val locked = build(liveDocs = listOf(doc)).rows.single { it.key == entryKey }
+        assertTrue(locked.row.masked)
+        assertEquals("숨긴 항목", locked.row.title)
+        assertFalse(tag.name in locked.row.title || tag.name in locked.row.sub)
+        assertFalse("잿빛" in locked.row.sub)
+        assertTrue(locked.row.restoreNeedsAuth)
+
+        val open = build(UnlockState(hiddenGroupUnlockedAt = LibFx.NOW), liveDocs = listOf(doc)).rows.single { it.key == entryKey }
+        assertFalse(open.row.masked)
+        assertEquals(tag.name, open.row.title)
+    }
+
+    @Test
+    fun `restoring a tag whose name a live tag has says why and changes nothing`() = runTest {
+        val (trashed, tag, entryKey) = trashedTag(ashen)
+        val (taken, _) = io.github.lenticualrstone.civilight.domain.actions.TagActions.create(trashed, tag.name, null, ctx)!!
+        val ports = FakePorts(listOf(taken), ctx = ctx)
+        val row = rowsOf(ports).rows.single { it.key == entryKey }
+        assertEquals("the row says why before the tap", "잿빛 새벽의 등불 · ◇ 같은 이름 태그 있음", row.row.sub)
+        assertEquals(TrashOutcome.NothingDone, TrashActions(ports).restore(row))
+        assertEquals(listOf("◇ 같은 이름 태그 있음"), ports.toasts)
+        assertEquals(taken, ports.docs.getValue(taken.key))
+
+        // With the name free again the same row restores the tag.
+        val free = FakePorts(listOf(trashed), ctx = ctx)
+        val freeRow = rowsOf(free).rows.single { it.key == entryKey }
+        assertEquals("잿빛 새벽의 등불", freeRow.row.sub)
+        assertEquals(TrashOutcome.Done, TrashActions(free).restore(freeRow))
+        assertTrue(free.docs.getValue(ashen.key).project.tags.single { it.key == tag.key }.isLive)
+    }
 }

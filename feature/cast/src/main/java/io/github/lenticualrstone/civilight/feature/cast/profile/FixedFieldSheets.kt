@@ -138,7 +138,7 @@ fun SheetScope.TagsSheetContent(sheet: TagsEditSheet) {
         LaunchedEffect(Unit) { close() }
         return
     }
-    val initial = remember(sheet) { FixedFieldEdits.picks(doc, sheet.characterKey) }
+    var initial by remember(sheet) { mutableStateOf(FixedFieldEdits.picks(doc, sheet.characterKey)) }
     var picks by rememberSaveable(stateSaver = PicksSaver) { mutableStateOf(initial) }
     var creating by rememberSaveable(stateSaver = TagFieldCardSaver) { mutableStateOf<CreateCardState?>(null) }
     val editable = !store.readOnly
@@ -171,7 +171,10 @@ fun SheetScope.TagsSheetContent(sheet: TagsEditSheet) {
                     tagBusy = false
                     if (result == EditResult.APPLIED) {
                         creating = null
-                        created?.let { k -> picks = picks + TagPick(k, made.name.trim()) }
+                        created?.let { k ->
+                            picks = FixedFieldEdits.created(picks, k, made.name.trim())
+                            initial = FixedFieldEdits.created(initial, k, made.name.trim())
+                        }
                     }
                 }) { d, ctx -> CastCreate.createTagOn(d, sheet.characterKey, made, ctx.toAction())?.let { (next, k) -> created = k; next } ?: d }
             },

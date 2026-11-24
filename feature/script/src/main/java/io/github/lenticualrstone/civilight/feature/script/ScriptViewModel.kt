@@ -343,8 +343,14 @@ class ScriptViewModel(
 
     // --- (0.2.0, U-14) The input bar's draft (SCR-70) and its view state ---
 
-    /** The draft: runs, chips, mark. Mirrored into [DraftMemory] at every change (SCR-70 persistence). */
-    internal val draftFlow = MutableStateFlow(io.github.lenticualrstone.civilight.feature.script.input.Draft())
+    /**
+     * The draft: runs, chips, mark. The project's one shared flow in [DraftMemory] (SCR-70 persistence), so two
+     * script screens of one project always show and keep the same draft.
+     */
+    internal val draftFlow: MutableStateFlow<io.github.lenticualrstone.civilight.feature.script.input.Draft> = DraftMemory.flow(route.projectKey)
+
+    /** This screen's identity for [DraftMemory.claim]. */
+    internal val draftOwner = Any()
     val draft: StateFlow<io.github.lenticualrstone.civilight.feature.script.input.Draft> = draftFlow.asStateFlow()
 
     /** The scene the last `다음 씬` tap made (double-tap guard, `NextScene.emptyAfter`). */
@@ -1072,15 +1078,17 @@ class ScriptViewModel(
 
     private suspend fun saveDraft(d: io.github.lenticualrstone.civilight.feature.script.input.Draft) {
         if (isReadOnly) return
-        val encoded = persistedDraft(d)
+        val encoded = persistedDraft(d, latestDoc ?: return)
         updateApp { app -> app.copy(view = app.view.copy(script = app.view.script.copy(draft = encoded))) }
     }
 
     override fun onCleared() {
         val p = pending
         val store = projectStore
-        if (draftOpened && store != null && !store.readOnly) {
-            val encoded = persistedDraft(draftFlow.value)
+        val draftDoc = latestDoc
+        if (draftOpened && store != null && !store.readOnly && draftDoc != null) {
+            // The shared draft as it is now (another screen of this project may have changed it since).
+            val encoded = persistedDraft(draftFlow.value, draftDoc)
             deps.appScope.launch {
                 runCatching { store.updateApp { app -> app.copy(view = app.view.copy(script = app.view.script.copy(draft = encoded))) } }
             }

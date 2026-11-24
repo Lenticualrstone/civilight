@@ -148,6 +148,10 @@ class CaptureHub(
             now.stage == CaptureStage.TYPING && now.voiceFromMemo -> memoToVoice(micGranted)
             now.stage == CaptureStage.TYPING && startTyped -> showMemo(entry)
             startTyped -> openMemo(entry)
+            // A left take is still being saved (U-13): the hub is already IDLE, but the `녹음 중` notification
+            // stays up until the save ends. Its tap must not start a new take with the microphone on; the
+            // route it opened sees IDLE and closes.
+            leaving?.isActive == true -> return
             else -> when (Recording.micTap(micGranted, null, entry.onLockScreen, settings().recorder)) {
                 MicAction.SHOW_MIC_ERROR -> _state.update {
                     it.copy(stage = if (micDenied) CaptureStage.MIC_OFF else CaptureStage.MIC_REASON, entry = entry, memo = null, voiceFromMemo = false)

@@ -324,6 +324,10 @@ internal fun LibraryScreen(services: LibraryServices) {
             // (0.2.0, LIB-93) The chosen 3D view when it has a renderer and there are projects; else the list.
             val renderer = view.rendered?.let(ShelfViewRenderers::of)
             val cardsOn = renderer != null && ShelfViews.drawsView(view, ui)
+            // The last 3D view drawn: the outgoing cards branch keeps drawing it while `목록` comes in (CNV-45),
+            // instead of blanking the moment `rendered` turns null. A plain holder: [renderer] changes recompose anyway.
+            val lastRenderer = remember { mutableListOf<ShelfViewRenderer?>(null) }
+            renderer?.let { lastRenderer[0] = it }
             // Loading → content (audit row 7): nothing is drawn until the stores answered, then it fades in.
             ContentSwap(ui.loaded, Modifier.fillMaxSize(), label = "shelfLoaded") { loaded ->
               if (loaded) {
@@ -345,7 +349,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                             if (showCards) {
                                 item(key = "cards") {
                                     // The extension point (ShelfViewRenderers): wave 3 draws each 3D view from the masked ShelfUi.
-                                    renderer?.invoke(
+                                    (renderer ?: lastRenderer[0])?.invoke(
                                         ShelfViewInput(
                                             ui = ui,
                                             wide = wide,

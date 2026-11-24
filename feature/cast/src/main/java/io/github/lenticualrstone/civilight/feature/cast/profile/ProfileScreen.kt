@@ -229,12 +229,17 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
             }
         }
     }
+    // Re-read when the app comes back: a screen lock set or removed in the system settings meanwhile.
+    var canAuthenticate by remember { mutableStateOf(deps.biometric.availability() != AuthAvailability.NONE) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, vm, secretLocked) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> vm.updateTabs { SecretTabGate.background(it, ownPrompt = CastAuth.inFlight) }
-                Lifecycle.Event.ON_START -> vm.updateTabs { SecretTabGate.foreground(it, secretLocked) }
+                Lifecycle.Event.ON_START -> {
+                    canAuthenticate = deps.biometric.availability() != AuthAvailability.NONE
+                    vm.updateTabs { SecretTabGate.foreground(it, secretLocked) }
+                }
                 else -> Unit
             }
         }
@@ -374,7 +379,6 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
         ) { padding ->
             val art = remember(doc, c, wide) { CharacterImages.background(doc, c, inner = wide) }
             val gallery = remember(doc, c, gate.open) { CastGallery.section(doc, c, gate.open) }
-            val canAuthenticate = remember { deps.biometric.availability() != AuthAvailability.NONE }
             val secret = SecretTabExtras(
                 summaryEdit = if (editable) ({ sheets.open(SpeechSummarySheet(p, c)) }) else null,
                 locked = secretLocked,
@@ -413,7 +417,8 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                 item(key = "tab") {
                     // No clip: the gallery row runs past the list's side padding and must not be cut while the tabs swap.
                     AnimatedContent(ui.tab, transitionSpec = { motion.swap(clip = false) }, label = "recordTab") { shown ->
-                        TabBody(doc, c, state, fullState, ui.copy(tab = shown), gate.open, gallery, wide, actions, recorderLink, secret)
+                        // CST-73: the outgoing body of a relocked 비밀 tab is not kept composed through the fade.
+                        if (SecretTabGate.composesBody(shown, tabState, secretLocked)) TabBody(doc, c, state, fullState, ui.copy(tab = shown), gate.open, gallery, wide, actions, recorderLink, secret)
                     }
                 }
             }

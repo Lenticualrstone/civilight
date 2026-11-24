@@ -58,6 +58,21 @@ object ImageEdits {
         return doc.copy(assets = doc.assets.copy(imageUses = doc.assets.imageUses.filterNot(owner::matches)))
     }
 
+    /**
+     * `되돌리기` of the `표지 뺌` toast: puts the [removed] row back into its owner's slot, at [index] in the
+     * list (clamped). Aimed at that row only, never a generic undo, so a later edit is never reverted. If
+     * the slot holds an image again (the user placed one since), [doc] is returned unchanged.
+     */
+    fun restoreUse(doc: ProjectDoc, removed: ImageUse, index: Int): ProjectDoc {
+        val uses = doc.assets.imageUses
+        if (uses.any { it.key == removed.key || sameSlot(it, removed) }) return doc
+        val at = index.coerceIn(0, uses.size)
+        return doc.copy(assets = doc.assets.copy(imageUses = uses.toMutableList().apply { add(at, removed) }))
+    }
+
+    private fun sameSlot(a: ImageUse, b: ImageUse): Boolean =
+        a.ownerKind.raw == b.ownerKind.raw && a.ownerKey == b.ownerKey && a.slot.raw == b.slot.raw
+
     /** The holo flag of the slot's image; always false where holo is not allowed (T-CNV-34). */
     fun setHolo(doc: ProjectDoc, owner: ImageOwner, holo: Boolean, ctx: EditContext): ProjectDoc {
         val old = use(doc, owner) ?: return doc

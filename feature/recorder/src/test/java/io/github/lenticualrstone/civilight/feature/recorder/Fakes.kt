@@ -79,7 +79,14 @@ class FakeRecorder(library: RecorderLibrary = RecorderLibrary(), var trash: List
 
     override suspend fun ensureLoaded() = Unit
 
-    override suspend fun update(transform: (RecorderLibrary) -> RecorderLibrary): RecorderLibrary = transform(library).also { library = it }
+    /** Runs before each [update] (index from 1): a test can hold a write to look at the state in between. */
+    var beforeUpdate: (suspend (Int) -> Unit)? = null
+    private var updates = 0
+
+    override suspend fun update(transform: (RecorderLibrary) -> RecorderLibrary): RecorderLibrary {
+        beforeUpdate?.invoke(++updates)
+        return transform(library).also { library = it }
+    }
 
     override fun observe(): Flow<RecorderLibrary> = flow
 

@@ -16,9 +16,9 @@ import org.junit.Test
 class DraftPersistTest {
     @Test
     fun `an empty draft is not kept, a typed one round-trips through view json`() {
-        assertNull(persistedDraft(Draft(kind = BlockKind.DIALOGUE)))
-        val typed = Draft(runs = listOf(TextRun.Plain("비가 온다")), selStart = 5, selEnd = 5, kind = BlockKind.DIRECTION, mark = DraftMark.After("B1"))
-        val stored = persistedDraft(typed)
+        assertNull(persistedDraft(Draft(kind = BlockKind.DIALOGUE), Fx.example))
+        val typed = Draft(runs = listOf(TextRun.Plain("비가 온다")), selStart = 5, selEnd = 5, kind = BlockKind.DIRECTION, mark = DraftMark.After(io.github.lenticualrstone.civilight.model.sample.ExampleKeys.BLOCK_047))
+        val stored = persistedDraft(typed, Fx.example)
         val file = ProjectViewFile(script = ScriptViewState(draft = stored))
         val json = CivilightJson.json.encodeToString(ProjectViewFile.serializer(), file)
         val back = CivilightJson.json.decodeFromString(ProjectViewFile.serializer(), json)
