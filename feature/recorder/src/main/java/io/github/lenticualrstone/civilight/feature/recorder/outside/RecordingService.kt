@@ -30,6 +30,8 @@ import kotlinx.coroutines.launch
  * Not run on a device yet (APK builds are on hold).
  */
 class RecordingService : Service() {
+    private var inForeground = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -41,9 +43,16 @@ class RecordingService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (inForeground) {
+            // Already promoted: only the text changed (pause or resume). Updating the posted notification
+            // never re-promotes the microphone service from the background, so it can never stop the take.
+            runCatching { getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID, notification(title, text, channel, route)) }
+            return START_NOT_STICKY
+        }
         try {
             val type = if (Build.VERSION.SDK_INT >= 30) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
             ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(title, text, channel, route), type)
+            inForeground = true
         } catch (e: Exception) {
             stopSelf()
         }
@@ -128,7 +137,8 @@ object KeepAlive {
         val app = context.applicationContext
         scope.launch {
             hub.state.map { state -> RecordingNotices.of(state)?.let { it to state.entry } }
-                .distinctUntilChanged { a, b -> (a == null) == (b == null) }
+                // The notice text follows pause and resume (`녹음 중` · `일시정지`), so a change of notice re-sends it.
+                .distinctUntilChanged { a, b -> a?.first == b?.first }
                 .collect { pair ->
                     if (pair == null) {
                         // A leave (in-app, the activity finishing or the task removed) is written before the service goes.

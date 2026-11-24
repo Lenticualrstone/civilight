@@ -4,6 +4,7 @@ import io.github.lenticualrstone.civilight.domain.recorder.RecorderCopy
 import io.github.lenticualrstone.civilight.domain.recorder.ShownCopy
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureStage
 import io.github.lenticualrstone.civilight.feature.recorder.capture.CaptureState
+import io.github.lenticualrstone.civilight.model.recorder.RecordingPhase
 
 /**
  * The ongoing notification while a recording runs (LRC-09). It never carries the transcript or a
@@ -17,5 +18,9 @@ object RecordingNotices {
     fun keepsAlive(state: CaptureState): Boolean = state.stage == CaptureStage.RECORDING && state.session != null
 
     fun of(state: CaptureState): RecordingNotice? =
-        if (keepsAlive(state)) RecordingNotice(RecorderCopy.APP_NAME, ShownCopy.RECORDING, RecorderCopy.APP_NAME) else null
+        if (keepsAlive(state)) RecordingNotice(RecorderCopy.APP_NAME, text(state.session?.phase), RecorderCopy.APP_NAME) else null
+
+    /** (0.2.0) `녹음 중` while the microphone is open; a paused take reads `일시정지` (the microphone is closed). */
+    fun text(phase: RecordingPhase?): String =
+        if (phase == RecordingPhase.PAUSED) RecorderCopy.PAUSED else ShownCopy.RECORDING
 }

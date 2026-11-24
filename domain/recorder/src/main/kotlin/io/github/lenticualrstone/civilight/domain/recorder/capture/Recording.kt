@@ -130,7 +130,14 @@ object Recording {
         if (s.phase == RecordingPhase.PROCESSING) s else s.copy(confirmedRuns = Transcripts.appendFinal(s.confirmedRuns, text), partialText = "")
 
     fun transcript(s: RecordingSession): TranscriptView =
-        TranscriptView(RecorderCopy.LISTENING, Runs.text(s.confirmedRuns), s.partialText)
+        TranscriptView(stateLabel(s.phase), Runs.text(s.confirmedRuns), s.partialText)
+
+    /**
+     * (0.2.0) The capture state label: `듣는 중` only while the microphone is open; a paused take
+     * (the microphone closed and released) reads `일시정지`, never `듣는 중`.
+     */
+    fun stateLabel(phase: RecordingPhase): String =
+        if (phase == RecordingPhase.PAUSED) RecorderCopy.PAUSED else RecorderCopy.LISTENING
 
     // --- Links on the capture screens ---
 

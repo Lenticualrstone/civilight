@@ -106,6 +106,10 @@ class OutsideAndRecoveryTest {
         }
         f.hub.togglePause()
         assertTrue(RecordingNotices.keepsAlive(f.hub.state.value))
+        // (0.2.0) QA: paused = microphone closed, so the notice reads `일시정지`, not `녹음 중`.
+        assertEquals("일시정지", RecordingNotices.of(f.hub.state.value)!!.text)
+        f.hub.togglePause()
+        assertEquals(ShownCopy.RECORDING, RecordingNotices.of(f.hub.state.value)!!.text)
         f.hub.stopAndSave()
         assertFalse(RecordingNotices.keepsAlive(f.hub.state.value))
     }

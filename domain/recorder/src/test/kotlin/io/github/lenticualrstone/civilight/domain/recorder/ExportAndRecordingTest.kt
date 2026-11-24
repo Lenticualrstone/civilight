@@ -198,10 +198,20 @@ class ExportAndRecordingTest {
         assertEquals(2_000L, s.elapsedMs)
         assertFalse(Recording.recordingScreen(s, env).live)
         assertEquals("TODO_COPY_LRC_02", Recording.recordingScreen(s, env).pauseLabel)
+        assertEquals(RecorderCopy.PAUSED, Recording.recordingScreen(s, env).transcript.label)
         s = Recording.resume(s)
         assertEquals("일시정지", Recording.recordingScreen(s, env).pauseLabel)
+        assertEquals(RecorderCopy.LISTENING, Recording.recordingScreen(s, env).transcript.label)
         assertEquals(io.github.lenticualrstone.civilight.domain.recorder.capture.BackAction.MINIMISE, Recording.back(s))
         assertEquals(MicAction.OPEN_RUNNING, Recording.micTap(true, s, false, RecorderSettings()))
         assertEquals(MicAction.SHOW_MIC_ERROR, Recording.micTap(false, null, false, RecorderSettings()))
+    }
+
+    /** (0.2.0) QA: a paused take (microphone closed) never reads `듣는 중`. */
+    @Test
+    fun pausedStateLabelIsNeverListening() {
+        assertEquals("듣는 중", Recording.stateLabel(io.github.lenticualrstone.civilight.model.recorder.RecordingPhase.RECORDING))
+        assertEquals("일시정지", Recording.stateLabel(io.github.lenticualrstone.civilight.model.recorder.RecordingPhase.PAUSED))
+        assertEquals(RecorderCopy.PAUSED, Recording.stateLabel(io.github.lenticualrstone.civilight.model.recorder.RecordingPhase.PAUSED))
     }
 }

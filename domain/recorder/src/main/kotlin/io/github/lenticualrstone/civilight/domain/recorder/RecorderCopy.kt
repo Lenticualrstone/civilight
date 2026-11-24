@@ -11,6 +11,9 @@ object RecorderCopy {
 
     // Capture screens.
     const val LISTENING = "듣는 중"
+
+    /** (0.2.0) The state label while a take is paused: the microphone is closed, so never `듣는 중`. */
+    const val PAUSED = "일시정지"
     const val FINALISING = "받아쓰는 중 · 문장 나누기"
     const val CANCEL = "취소"
     const val TO_TEXT = "글로 쓰기"
