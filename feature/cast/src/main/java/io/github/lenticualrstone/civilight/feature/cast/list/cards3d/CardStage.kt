@@ -116,6 +116,9 @@ internal class CardEnv(
 ) {
     val cardCount: Int get() = input.cards.size
 
+    /** A long press on any card: opens that character, or (the lock card) asks for the fingerprint, as a tap does. */
+    fun longPress(item: DeckItem): () -> Unit = { activate(item) }
+
     fun activate(item: DeckItem) {
         when (item) {
             is DeckItem.Lock -> actions.unlock()
@@ -256,8 +259,9 @@ internal object Shadows {
  * A card drawn at the pose [place] writes (board px, read in the layer and draw blocks, so a moving focus
  * redraws without recomposing). It rests with its pivot at ([pivotX], [pivotY]) of the stage ([originX],
  * [originY]: the pivot as a fraction of the card). The draw order follows the solved depth; [content] gets
- * whether the card's back faces the viewer (drawn mirrored back). While the card is faded out it can be
- * neither tapped nor read by TalkBack; it recomposes only when such a flag flips.
+ * whether the card's back faces the viewer (drawn mirrored back). [onLongPress] (held still, see [cardLongPress])
+ * opens the card directly, read by TalkBack as [longPressLabel]. While the card is faded out it can be neither
+ * tapped nor read by TalkBack; it recomposes only when such a flag flips.
  */
 @Composable
 internal fun BoxScope.PosedCard(
@@ -273,6 +277,8 @@ internal fun BoxScope.PosedCard(
     place: (CardXform) -> Unit,
     onTap: (() -> Unit)?,
     clickLabel: String,
+    onLongPress: (() -> Unit)? = null,
+    longPressLabel: String = "",
     originX: Float = 0.5f,
     originY: Float = 0.5f,
     dimColor: Color = CivilightTheme.colors.bg,
@@ -281,6 +287,7 @@ internal fun BoxScope.PosedCard(
 ) {
     val placeNow by rememberUpdatedState(place)
     // One pose each for the layer, the draw block and the flags: no allocation per frame.
+    val xt = remember { CardXform() }
     val xf = remember { CardXform() }
     val xd = remember { CardXform() }
     val xs = remember { CardXform() }
@@ -300,6 +307,16 @@ internal fun BoxScope.PosedCard(
             .zIndex(order + orderBias)
             .offset { IntOffset(left, top) }
             .size(bp.dp(w), bp.dp(h))
+            // The move on a layer of its own, the turn on the next one. Compose hit-tests a layer with its own
+            // matrix (`Matrix.resetToPivotedTransform`), which applies the translation before the turns: on a card
+            // turned past 90° (the fan's turned centre card, a face-up 타로 card: rotationX ≈ 180) the translation
+            // comes out mirrored, so taps landed tens of dp away from what was drawn and the back's `열기` could
+            // not be hit. A pure translation layer maps the same way as it draws.
+            .graphicsLayer {
+                placeNow(xt)
+                translationX = xt.translationX * unit
+                translationY = xt.translationY * unit
+            }
             .graphicsLayer {
                 placeNow(xf)
                 if (xf.alpha <= 0f) {
@@ -307,8 +324,6 @@ internal fun BoxScope.PosedCard(
                     return@graphicsLayer
                 }
                 transformOrigin = origin
-                translationX = xf.translationX * unit
-                translationY = xf.translationY * unit
                 scaleX = xf.scale
                 scaleY = xf.scale
                 rotationX = xf.rotationX
@@ -326,6 +341,7 @@ internal fun BoxScope.PosedCard(
                     Modifier
                 },
             )
+            .then(if (onLongPress != null) Modifier.cardLongPress(shown, longPressLabel, onLongPress) else Modifier)
             .clip(shape)
             .drawWithContent {
                 drawContent()

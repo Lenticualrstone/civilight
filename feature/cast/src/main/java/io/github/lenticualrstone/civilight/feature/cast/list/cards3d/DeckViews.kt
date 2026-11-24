@@ -140,6 +140,8 @@ internal fun FanDeckView(env: CardEnv) {
                                 },
                                 onTap = { if (centre) (if (item is DeckItem.Lock) env.actions.unlock() else toggle()) else deck.goTo(i) },
                                 clickLabel = itemLabel(item),
+                                onLongPress = env.longPress(item),
+                                longPressLabel = LongPressGate.label(item),
                             ) { back ->
                                 val showBack = item is DeckItem.Character && centre && (back || (env.reduced && frame.flipped))
                                 when {
@@ -237,6 +239,8 @@ internal fun CarouselView(env: CardEnv) {
                                 },
                                 onTap = { if (front) env.activate(item) else deck.goTo(i) },
                                 clickLabel = itemLabel(item),
+                                onLongPress = env.longPress(item),
+                                longPressLabel = LongPressGate.label(item),
                             ) { back ->
                                 when {
                                     back -> PatternBackFace(bp, 16f)
@@ -352,6 +356,8 @@ internal fun PileView(env: CardEnv) {
                                 },
                                 onTap = if (top) ({ env.activate(item) }) else null,
                                 clickLabel = itemLabel(item),
+                                onLongPress = env.longPress(item),
+                                longPressLabel = LongPressGate.label(item),
                             ) { _ ->
                                 when (item) {
                                     is DeckItem.Lock -> LockCardFace(item.row, bp, compact = false, onUnlock = env.actions.unlock)

@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.cast.list.cards3d
 
 import androidx.compose.ui.graphics.Color
+import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy
 
 /** Copy of the 3D card views that the shared copy objects do not hold yet (U-16 cards boards). */
 internal object Cards3dCopy {
@@ -29,6 +30,10 @@ internal object Cards3dCopy {
     /** 타로 panel: the focus card among all the cards (`3 / 7`), and which spread is dealt (`펼침 1 / 2`). */
     fun position(index: Int, total: Int): String = "${index + 1} / $total"
     fun spread(hand: Int, hands: Int): String = "펼침 ${hand + 1} / $hands"
+
+    /** TalkBack's name of a card's long press: open the character, or (the lock card) the tap's unlock path. */
+    const val LONG_PRESS_OPEN = IconButtonCopy.OPEN
+    const val LONG_PRESS_UNLOCK = IconButtonCopy.SHOW_WITH_FINGERPRINT
 
     /** `03 / 11`: two digits, as the pile counter and number chip read. */
     fun twoDigits(n: Int): String = n.toString().padStart(2, '0')

@@ -154,7 +154,7 @@ private fun NewProjectCard(onClick: () -> Unit, modifier: Modifier) {
  * the window; a masked `R-18 프로젝트` card does not (S-12).
  */
 @Composable
-internal fun RecentsBlock(recents: List<RecentCardUi>, wide: Boolean, side: Dp, onOpen: (RecentItem) -> Unit) {
+internal fun RecentsBlock(recents: List<RecentCardUi>, wide: Boolean, side: Dp, label: Boolean = true, onOpen: (RecentItem) -> Unit) {
     val shown = recents.take(ShelfCards.recentLimit(wide))
     if (shown.isEmpty()) return
     val w = if (wide) ShelfCards.WIDE_RECENT_W.dp else ShelfCards.COVER_RECENT_W.dp
@@ -163,10 +163,10 @@ internal fun RecentsBlock(recents: List<RecentCardUi>, wide: Boolean, side: Dp, 
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val targetPx = with(LocalDensity.current) { w.roundToPx() }
-    Column(Modifier.fillMaxWidth().padding(top = if (wide) 26.dp else 24.dp)) {
-        SectionLabel(ShelfCopy.RECENTS, Modifier.padding(horizontal = side))
+    Column(Modifier.fillMaxWidth().padding(top = if (!label) 0.dp else if (wide) 26.dp else 24.dp)) {
+        if (label) SectionLabel(ShelfCopy.RECENTS, Modifier.padding(horizontal = side))
         LazyRow(
-            modifier = Modifier.padding(top = 10.dp),
+            modifier = Modifier.padding(top = if (label) 10.dp else 0.dp),
             contentPadding = PaddingValues(horizontal = side),
             horizontalArrangement = Arrangement.spacedBy(gap),
         ) {

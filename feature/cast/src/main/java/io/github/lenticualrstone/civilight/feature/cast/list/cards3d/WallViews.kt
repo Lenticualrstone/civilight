@@ -257,6 +257,7 @@ internal fun TiltedWallView(env: CardEnv) {
                                     }
                                     .then(if (out) Modifier.border(1.5.dp, colors.edge.copy(alpha = 0.6f), shape) else slotShadow)
                                     .pressable(onClick = { if (out) putBack() else pick(i) }, scaleOnPress = false, onClickLabel = itemLabel(item), shape = shape)
+                                    .cardLongPress(!out, LongPressGate.label(item), env.longPress(item))
                                     .clip(shape),
                             ) {
                                 if (!out) {
@@ -329,6 +330,7 @@ internal fun TiltedWallView(env: CardEnv) {
                                 }
                             }
                             .pressable(onClick = { env.activate(item) }, scaleOnPress = false, onClickLabel = itemLabel(item), shape = shape)
+                            .cardLongPress(true, LongPressGate.label(item), env.longPress(item))
                             .clip(shape),
                     ) {
                         when (item) {
@@ -469,6 +471,8 @@ internal fun RolodexView(env: CardEnv) {
                                 },
                                 onTap = if (front) ({ env.activate(item) }) else ({ deck.goTo(i) }),
                                 clickLabel = itemLabel(item),
+                                onLongPress = env.longPress(item),
+                                longPressLabel = LongPressGate.label(item),
                             ) { _ ->
                                 Box(Modifier.fillMaxSize()) {
                                     val letter = (item as? DeckItem.Character)?.let { CardPoses.indexLetter(it.card.title) } ?: "#"

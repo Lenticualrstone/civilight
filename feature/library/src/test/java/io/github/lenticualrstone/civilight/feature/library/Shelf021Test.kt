@@ -12,24 +12,12 @@ import org.junit.Test
 /** 0.2.1 QA fixes of the 서재 3D views: the stage fits the pane, spines differ, spine text keeps its spaces. */
 class Shelf021Test {
     @Test
-    fun stageKeepsTheBoardWhenItFits() {
-        assertEquals(500f, ShelfScene.stageHeight(null), 0f)
-        assertEquals(500f, ShelfScene.stageHeight(900f), 0f)
+    fun stageScaleKeepsTheBoardOrScalesItDownToTheMinimum() {
+        // (0.2.2) The stage height itself is [ShelfScene.stageFit] (Shelf022Test); the scale stays as in 0.2.1.
         assertEquals(1f, ShelfScene.stageScale(500f), 0f)
-    }
-
-    @Test
-    fun aShortPaneScalesTheWholeBoardSoTheDockStaysOnScreen() {
-        // A pane 560 dp tall under the header and above the command bar.
-        val h = ShelfScene.stageHeight(560f)
-        assertEquals(560f - ShelfScene.LABEL_H - ShelfScene.DOCK_H, h, 0f)
-        assertTrue(h + ShelfScene.LABEL_H + ShelfScene.DOCK_H <= 560f)
-        // The inner display's list pane (about 440 dp): the minimum stage, the board at 0.6.
-        assertEquals(ShelfScene.STAGE_MIN_H, ShelfScene.stageHeight(440f), 0f)
-        assertEquals(0.6f, ShelfScene.stageScale(ShelfScene.stageHeight(440f)), 1e-6f)
-        assertEquals(h / 500f, ShelfScene.stageScale(h), 1e-6f)
-        // Never below the minimum (the list scrolls instead).
-        assertEquals(ShelfScene.STAGE_MIN_H, ShelfScene.stageHeight(100f), 0f)
+        assertEquals(0.6f, ShelfScene.stageScale(ShelfScene.STAGE_MIN_H), 1e-6f)
+        assertEquals(400f / 500f, ShelfScene.stageScale(400f), 1e-6f)
+        assertEquals(0.6f, ShelfScene.stageScale(100f), 1e-6f)
     }
 
     @Test

@@ -280,6 +280,8 @@ internal fun TarotView(env: CardEnv) {
                             },
                             // Face-down, a card says only what tapping does: who is under it stays a surprise until it turns.
                             clickLabel = if (up) itemLabel(item) else IconButtonCopy.FLIP,
+                            onLongPress = env.longPress(item),
+                            longPressLabel = LongPressGate.label(item),
                         ) { back ->
                             Box(Modifier.fillMaxSize().then(if (focused && dealt) Modifier.border(2.dp, colors.acc, RoundedCornerShape(bp.dp(10f))) else Modifier)) {
                                 // The board's front sits turned 180° on the flip layer: it shows once the card's back faces us.

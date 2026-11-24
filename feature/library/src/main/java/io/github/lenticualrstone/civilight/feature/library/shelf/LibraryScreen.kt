@@ -51,7 +51,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
 import io.github.lenticualrstone.civilight.designsystem.card.CardViewMotion
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
@@ -297,6 +296,19 @@ internal fun LibraryScreen(services: LibraryServices) {
                     is RenameSheet -> sheetBody {
                         docs[key.projectKey]?.takeIf { ui.shows(key.projectKey) }?.let { doc -> RenameContent(doc.project.name) { vm.rename(key.projectKey, it) } }
                     }
+                    // (0.2.2) Pulled up from the 3D views' peek row; live, masked recents.
+                    RecentsSheet -> sheetBody {
+                        RecentsSheetContent(
+                            recents = ui.recents,
+                            wide = inner,
+                            recorderSub = ui.recorderSub,
+                            onOpen = { item ->
+                                openProject(item.projectKey)
+                                navigator.push(RecentsModel.routeOf(item))
+                            },
+                            onRecorder = { navigator.push(RecorderInbox()) },
+                        )
+                    }
                     MultiExportSheet -> sheetBody {
                         MultiExportContent(ui.exportable.mapNotNull { docs[it] }, services)
                     }
@@ -320,7 +332,6 @@ internal fun LibraryScreen(services: LibraryServices) {
         ) { padding ->
           BoxWithConstraints(Modifier.fillMaxSize()) {
             val wide = ShelfCards.isWide(maxWidth.value.toInt())
-            val inset = CardMetrics.inset(wide).dp
             // (0.2.0, LIB-93) The chosen 3D view when it has a renderer and there are projects; else the list.
             val renderer = view.rendered?.let(ShelfViewRenderers::of)
             val cardsOn = renderer != null && ShelfViews.drawsView(view, ui)
@@ -339,6 +350,33 @@ internal fun LibraryScreen(services: LibraryServices) {
                     val transition = this
                     AnimatedContent(cardsOn, transitionSpec = { CardViewMotion.transform(motion) }, label = "shelfView") { showCards ->
                         val covers = SharedCovers.of(transition, this, motion)
+                        if (showCards) {
+                            // (0.2.2) The 3D view is the whole screen: the scene under the glass header and search
+                            // field, its dock floating above them; 최근 연 파일 and the 라이프 레코더 row are in the
+                            // sheet the dock's peek row pulls up.
+                            // Never scrolled: the bars float over the viewport, so the dock stays pinned between them
+                            // (a short window caps the dock instead, ShelfScene.dockMaxH).
+                            Box(Modifier.fillMaxSize()) {
+                                // The extension point (ShelfViewRenderers): each 3D view draws from the masked ShelfUi.
+                                (renderer ?: lastRenderer[0])?.invoke(
+                                    ShelfViewInput(
+                                        ui = ui,
+                                        wide = wide,
+                                        onOpen = ::openProject,
+                                        onMenu = { sheets.open(ShelfMenuSheet(it)) },
+                                        onUnlock = vm::unlockHiddenGroup,
+                                        onNewProject = { services.startNewProject() },
+                                        tilt = view.viewTilt && !motion.reduced,
+                                        unhide = unhide,
+                                        barTop = padding.calculateTopPadding().value,
+                                        barBottom = padding.calculateBottomPadding().value,
+                                        covered = sheets.top != null,
+                                        selectedKey = selectedKey,
+                                        onRecents = { sheets.open(RecentsSheet) },
+                                    ),
+                                )
+                            }
+                        } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
@@ -346,31 +384,6 @@ internal fun LibraryScreen(services: LibraryServices) {
                                 bottom = padding.calculateBottomPadding() + 16.dp,
                             ),
                         ) {
-                            if (showCards) {
-                                item(key = "cards") {
-                                    // The extension point (ShelfViewRenderers): wave 3 draws each 3D view from the masked ShelfUi.
-                                    (renderer ?: lastRenderer[0])?.invoke(
-                                        ShelfViewInput(
-                                            ui = ui,
-                                            wide = wide,
-                                            onOpen = ::openProject,
-                                            onMenu = { sheets.open(ShelfMenuSheet(it)) },
-                                            onUnlock = vm::unlockHiddenGroup,
-                                            onNewProject = { services.startNewProject() },
-                                            tilt = view.viewTilt && !motion.reduced,
-                                            unhide = unhide,
-                                            viewportHeight = (maxHeight - padding.calculateTopPadding() - padding.calculateBottomPadding() - 24.dp).value,
-                                            selectedKey = selectedKey,
-                                        ),
-                                    )
-                                }
-                                item(key = "recents") {
-                                    RecentsBlock(ui.recents, wide, inset) { item ->
-                                        openProject(item.projectKey)
-                                        navigator.push(RecentsModel.routeOf(item))
-                                    }
-                                }
-                            } else {
                                 item(key = "section") { SectionLabel(ui.sectionLabel, civilightItem().padding(horizontal = SIDE)) }
                                 items(ui.rows, key = { it.key }) { row ->
                                     ProjectRow(
@@ -440,8 +453,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                                         }
                                     }
                                 }
-                            }
-                            // Both views end with the library section (LIB-01, board `LibCards`).
+                            // The list ends with the library section (LIB-01); the 3D views keep it in the 최근 연 파일 sheet.
                             item(key = "librarySection") { SectionLabel(ShelfCopy.LIBRARY_SECTION, civilightItem().padding(top = 30.dp, start = SIDE, end = SIDE)) }
                             item(key = "recorder") {
                                 ListRow(
@@ -453,6 +465,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                                     modifier = civilightItem().padding(top = 8.dp, start = SIDE, end = SIDE),
                                 )
                             }
+                        }
                         }
                     }
                 }
@@ -477,15 +490,6 @@ internal fun LibraryScreen(services: LibraryServices) {
             },
             onDismiss = { deleting = null },
         )
-    }
-}
-
-/** The mic tile of the 라이프 레코더 row: 44 × 44, radius 14, `pri` fill. */
-@Composable
-private fun RecorderTile() {
-    val colors = CivilightTheme.colors
-    Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(colors.pri), contentAlignment = Alignment.Center) {
-        CivilightIcon(IconId.Mic, contentDescription = null, tint = colors.onpri)
     }
 }
 

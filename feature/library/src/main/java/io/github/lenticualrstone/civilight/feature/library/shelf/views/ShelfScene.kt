@@ -23,6 +23,11 @@ import kotlin.math.sin
 /** Behind and ahead of the item in front: `behind + 1 + ahead` items are composed. */
 data class SceneReach(val behind: Int, val ahead: Int)
 
+/** (0.2.2) Where the stage sits on the full-screen scene, dp from the content box's top. */
+data class StageFit(val top: Float, val height: Float, val scale: Float, val fadeTop: Float, val fadeBottom: Float) {
+    val bottom: Float get() = top + height
+}
+
 /** The picked item's own pair of text buttons (DS-70 c-class, LIB-93 `열기` and the view's pair). */
 data class PickPair(val pick: String, val back: String)
 
@@ -41,24 +46,61 @@ object ShelfScene {
     /** A fling adds velocity × this many seconds before the settle picks the nearest item. */
     const val FLING_SECONDS = 0.14f
 
-    /** Above the stage: the section label and its gap (dp). */
-    const val LABEL_H = 30f
-
-    /** Under the stage: the board dock (caption row + one 48 dp button row + gaps), dp. */
+    /** Under the stage in 0.2.1: the board dock's height (dp); 원고 더미 still runs its wall this far past the stage. */
     const val DOCK_H = 132f
 
-    /** The smallest stage a short pane gets before the list scrolls instead (dp). */
+    /** The smallest stage (dp): a shorter pane runs the stage on under the glass dock instead of shrinking it further. */
     const val STAGE_MIN_H = 300f
 
+    /** (0.2.2) The stage may reach this far up under the top bar's faded foot (dp). */
+    const val HEAD_OVERLAP = 20f
+
+    /** (0.2.2) The stage may reach this far down under the glass dock's top edge (dp). */
+    const val DOCK_OVERLAP = 12f
+
+    /** (0.2.2) The gap between the glass dock and the bottom bar (the search field), dp. */
+    const val DOCK_GAP = 8f
+
+    /** (0.2.2) The fade bands that melt the stage into the screen's `bg` (no hard top or bottom line), dp. */
+    const val FADE_TOP = 36f
+    const val FADE_BOTTOM = 48f
+
     /**
-     * The stage height in a pane [viewport] dp tall (under the header, above the command bar): the board's 500
-     * when it fits with the label and the dock, else what is left (never under [STAGE_MIN_H]). The dock stays
-     * on screen above the command bar (the inner display's list pane is about 700 dp tall).
+     * (0.2.2) The stage on the full-screen scene: the board's 390 × 500 between the top bar and the glass dock
+     * ([dockH] = the dock with its gap), a little under each so its faded edges meet the bars' translucent edges.
+     * The board keeps 500 when it fits and is centred in the room; a shorter room scales it down to [STAGE_MIN_H],
+     * and below that the stage keeps [STAGE_MIN_H] from the top and runs on under the dock (glass over the scene).
+     * All values in dp of the content box ([screenH] tall, bars as its [barTop] / [barBottom] padding); the scene
+     * is the viewport itself, never taller, so these are on-screen positions.
      */
-    fun stageHeight(viewport: Float?): Float {
-        if (viewport == null || viewport <= 0f) return STAGE_H
-        return (viewport - LABEL_H - DOCK_H).coerceIn(STAGE_MIN_H, STAGE_H)
+    fun stageFit(screenH: Float, barTop: Float, barBottom: Float, dockH: Float): StageFit {
+        val from = (barTop - HEAD_OVERLAP).coerceAtLeast(0f)
+        val to = screenH - barBottom - dockH + DOCK_OVERLAP
+        val room = to - from
+        val h = room.coerceIn(STAGE_MIN_H, STAGE_H)
+        val top = from + ((room - h) / 2f).coerceAtLeast(0f)
+        return StageFit(top = top, height = h, scale = stageScale(h), fadeTop = fadeTop(h), fadeBottom = fadeBottom(h))
     }
+
+    /**
+     * (0.2.2) The tallest the glass dock may be in a content box [viewport] dp tall: the room between the top
+     * bar ([barTop]) and the bottom bar ([barBottom]) less [DOCK_GAP]. The scene never scrolls (the glass bars
+     * float over the viewport, so a scrolled scene only hides the dock): the dock stays pinned above the search
+     * field and below the header, and a taller dock (a landscape phone, a large font) scrolls its own caption
+     * while its buttons and the peek row stay in view. The stage gets what is left and runs on under the glass.
+     */
+    fun dockMaxH(viewport: Float, barTop: Float, barBottom: Float): Float =
+        (viewport - barTop - barBottom - DOCK_GAP).coerceAtLeast(0f)
+
+    /** (0.2.2) The dock's top edge on screen (dp) for a dock [dockH] tall (its gap included), capped by [dockMaxH]. */
+    fun dockTop(viewport: Float, barTop: Float, barBottom: Float, dockH: Float): Float =
+        viewport - barBottom - min(dockH, dockMaxH(viewport, barTop, barBottom) + DOCK_GAP)
+
+    /** The top fade band of a stage [stageH] dp tall: [FADE_TOP], never more than a quarter of the stage. */
+    fun fadeTop(stageH: Float): Float = min(FADE_TOP, stageH / 4f).coerceAtLeast(0f)
+
+    /** The bottom fade band of a stage [stageH] dp tall: [FADE_BOTTOM], never more than a quarter of the stage. */
+    fun fadeBottom(stageH: Float): Float = min(FADE_BOTTOM, stageH / 4f).coerceAtLeast(0f)
 
     /** The board's scale in a stage [stageH] dp tall: the whole 390 × 500 board, scaled about its top centre. */
     fun stageScale(stageH: Float): Float = (stageH / STAGE_H).coerceIn(STAGE_MIN_H / STAGE_H, 1f)

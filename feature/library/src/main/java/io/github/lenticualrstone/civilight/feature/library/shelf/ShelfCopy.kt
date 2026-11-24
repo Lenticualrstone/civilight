@@ -20,6 +20,9 @@ object ShelfCopy {
     const val HOLO = "홀로"
     const val RECENTS = "최근 연 파일"
 
+    /** (0.2.2) The 최근 연 파일 sheet with nothing opened yet. */
+    const val RECENTS_NONE = "최근 연 파일 없음"
+
     /**
      * `ED` (no board draws the way into 설정): a 설정 icon button in the 서재 header. Its label is
      * the screen's own title (LIB-63).

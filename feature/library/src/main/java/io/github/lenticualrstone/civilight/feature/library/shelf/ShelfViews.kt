@@ -27,8 +27,16 @@ data class ShelfViewInput(
     val tilt: Boolean = false,
     /** CNV-43: the open hidden group's items come out of the blur with the list's unhide. */
     val unhide: Unhide? = null,
-    /** The list pane's visible height (dp) under the screen header and above the command bar; null = unknown. */
-    val viewportHeight: Float? = null,
+    /**
+     * (0.2.2) The scene fills the whole content box, under the glass bars: the top bar's height (dp) and the
+     * bottom bar's (the search field; in a pane the frame bar's). The stage sits between them and the glass dock.
+     */
+    val barTop: Float = 0f,
+    val barBottom: Float = 0f,
+    /** (0.2.2) A sheet covers the scene: its dock stops counting as bottom chrome (the toast keeps to the bars). */
+    val covered: Boolean = false,
+    /** (0.2.2) The dock's peek row `최근 연 파일 ⌃` opens the 최근 연 파일 sheet; null draws no peek row. */
+    val onRecents: (() -> Unit)? = null,
     /** LIB-06: the project shown in the detail pane (inner display); the view brings it to the front. */
     val selectedKey: io.github.lenticualrstone.civilight.model.Key? = null,
 )

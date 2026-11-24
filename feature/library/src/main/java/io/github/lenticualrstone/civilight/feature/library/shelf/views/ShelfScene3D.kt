@@ -1,6 +1,31 @@
 package io.github.lenticualrstone.civilight.feature.library.shelf.views
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.Layout
+import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
+import io.github.lenticualrstone.civilight.designsystem.component.ReportBottomChrome
+import io.github.lenticualrstone.civilight.designsystem.component.rememberSystemBottom
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.layout.onSizeChanged
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassMode
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
+import io.github.lenticualrstone.civilight.designsystem.glass.LocalGlassSource
+import io.github.lenticualrstone.civilight.designsystem.glass.OnGlass
+import io.github.lenticualrstone.civilight.designsystem.glass.glassSource
+import io.github.lenticualrstone.civilight.designsystem.glass.rememberGlassSource
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
@@ -36,7 +61,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.TransformOrigin
@@ -50,16 +74,13 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.github.lenticualrstone.civilight.designsystem.card.CardMetrics
 import io.github.lenticualrstone.civilight.designsystem.card.DeviceTilt
 import io.github.lenticualrstone.civilight.designsystem.card.rememberTilt
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
-import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
@@ -162,8 +183,10 @@ internal class SceneArgs(
 )
 
 /**
- * One 서재 3D view (LIB-93, U-16 boards `scr_u16_lib_a` … `c`): the board's 390 × 500 stage, then the caption
- * and the buttons of the item in front (◀ ▶ · `열기` · the board's own buttons · ⋯). Every gesture has a
+ * One 서재 3D view (LIB-93, U-16 boards `scr_u16_lib_a` … `c`). (0.2.2) The scene is the whole screen: the
+ * board's 390 × 500 stage between the top bar and the dock, its edges faded into `bg`, with the caption and the
+ * buttons of the item in front (◀ ▶ · `열기` · the board's own buttons · ⋯) on a glass dock floating above the
+ * search field, and the peek row `최근 연 파일 ⌃` under them. No `프로젝트 · N` label. Every gesture has a
  * button. Under reduced motion the item in front is drawn flat and a change is the DS-14 fade (the boards'
  * `rmc` card): no 3D, no tilt, no idle motion. Draws from the masked [ShelfViewInput.ui] only.
  */
@@ -279,103 +302,239 @@ internal fun ShelfScene3D(style: LibraryStyle, input: ShelfViewInput) {
     val tilt = rememberTilt(input.tilt && !reduced)
     val sway = rememberSway(boardOf(style), tilt, run = !reduced, idle = motion.loops)
     val bounds = remember { SceneBounds() }
-    val side = CardMetrics.inset(wide).dp
+    val bg = CivilightTheme.colors.bg
+    // (0.2.2) The dock blurs the stage it floats over: its own source, a sibling (never its ancestor).
+    val sceneSource = rememberGlassSource()
 
-    Column(Modifier.fillMaxWidth()) {
-        SectionLabel(ui.cardSectionLabel, Modifier.padding(horizontal = side))
-        val stageH = ShelfScene.stageHeight(input.viewportHeight)
-        val stageK = ShelfScene.stageScale(stageH)
-        BoxWithConstraints(
-            Modifier
-                .padding(top = 10.dp)
-                .fillMaxWidth()
-                .height(stageH.dp)
-                // 원고 더미: the desk runs on under the dock (board B draws the wood full-bleed behind it), so the
-                // stage is clipped only at its top; the others keep the stage band.
-                .then(
-                    if (style == LibraryStyle.MANUSCRIPT_STACK && !reduced) {
-                        Modifier.drawWithContent { clipRect(0f, 0f, size.width, size.height + ShelfScene.DOCK_H.dp.toPx() + 24.dp.toPx()) { this@drawWithContent.drawContent() } }
+    // (0.2.2) The scene is the whole screen: the content box is `bg`, the stage sits between the top bar and
+    // the glass dock with its edges faded into `bg`, and the dock floats on top above the search field.
+    Layout(
+        contents = listOf(
+            {
+                BoxWithConstraints(
+                    Modifier
+                        .glassSource(sceneSource)
+                        // Edges melt into `bg` (no hard top or bottom line); the stage itself stays clipped.
+                        .drawWithContent {
+                            clipRect { this@drawWithContent.drawContent() }
+                            val hDp = size.height / density
+                            val ft = ShelfScene.fadeTop(hDp) * density
+                            val fb = ShelfScene.fadeBottom(hDp) * density
+                            if (ft > 0f) drawRect(Brush.verticalGradient(0f to bg, 1f to bg.copy(alpha = 0f), startY = 0f, endY = ft), size = Size(size.width, ft))
+                            if (fb > 0f) {
+                                drawRect(
+                                    Brush.verticalGradient(0f to bg.copy(alpha = 0f), 1f to bg, startY = size.height - fb, endY = size.height),
+                                    topLeft = Offset(0f, size.height - fb),
+                                    size = Size(size.width, fb),
+                                )
+                            }
+                        }
+                        // A short room shows the whole board scaled about its top centre (the plank and the
+                        // corridor's floor stay in view).
+                        .layout { m, c ->
+                            val w = c.maxWidth
+                            val k = ShelfScene.stageScale(c.maxHeight / density)
+                            val iw = (w / k).roundToInt()
+                            val ih = (ShelfScene.STAGE_H * density).roundToInt()
+                            val p = m.measure(Constraints.fixed(iw, ih))
+                            layout(w, c.maxHeight) {
+                                p.placeWithLayer((w - iw) / 2, 0) {
+                                    scaleX = k
+                                    scaleY = k
+                                    transformOrigin = TransformOrigin(0.5f, 0f)
+                                }
+                            }
+                        }
+                        .draggable(
+                            state = dragState,
+                            orientation = Orientation.Horizontal,
+                            enabled = !reduced && !opening && (count > 1 || style == LibraryStyle.CONSTELLATION),
+                            onDragStarted = {
+                                if (style != LibraryStyle.CONSTELLATION) {
+                                    position.anim.stop()
+                                    position.drag.floatValue = position.anim.value
+                                    position.dragging.value = true
+                                    if (style != LibraryStyle.BOOKSHELF) pickedKey = null
+                                    if (style == LibraryStyle.MANUSCRIPT_STACK) fanned = true
+                                }
+                            },
+                            onDragStopped = { velocity ->
+                                if (style == LibraryStyle.CONSTELLATION) return@draggable
+                                val from = position.drag.floatValue
+                                val target = ShelfScene.settle(from, -velocity / (stepDp * density), countState.value)
+                                position.anim.snapTo(from)
+                                position.dragging.value = false
+                                if (style == LibraryStyle.BOOKSHELF && pickedKey != null) {
+                                    (items.getOrNull(target) as? ShelfCardItem.Project)?.let { pickedKey = it.key.toString() }
+                                }
+                                position.anim.animateTo(target.toFloat(), settleSpec)
+                            },
+                        ),
+                ) {
+                    val frameW = maxWidth.value
+                    // 별자리 places every star over all items (board C), so it composes them all, up to [STAR_CAP].
+                    val window = if (style == LibraryStyle.CONSTELLATION) ShelfScene.window(front, count, SceneReach(STAR_CAP / 2, STAR_CAP - 1 - STAR_CAP / 2)) else ShelfScene.window(front, count, ShelfScene.reach(style, wide))
+                    for (i in window) key(items[i].key) { ItemProtection(items[i]) }
+                    if (reduced) {
+                        FlatFront(style, frontItem, input) { onTap(front) }
                     } else {
-                        Modifier.clipToBounds()
-                    },
-                )
-                // A short pane (the inner display) shows the whole board scaled about its top centre, so the
-                // shelf's plank and the corridor's floor stay in view and the dock stays above the command bar.
-                .layout { m, c ->
-                    val w = c.maxWidth
-                    val iw = (w / stageK).roundToInt()
-                    val ih = (ShelfScene.STAGE_H * density).roundToInt()
-                    val p = m.measure(Constraints.fixed(iw, ih))
-                    layout(w, c.maxHeight) {
-                        p.placeWithLayer((w - iw) / 2, 0) {
-                            scaleX = stageK
-                            scaleY = stageK
-                            transformOrigin = TransformOrigin(0.5f, 0f)
+                        val args = SceneArgs(
+                            style, items, window, front, picked, opening, fanned || style != LibraryStyle.MANUSCRIPT_STACK,
+                            position, sway, spin, wide, frameW, bounds, input.unhide,
+                        )
+                        when (style) {
+                            LibraryStyle.BOOKSHELF -> BookcaseView(args, ::onTap)
+                            LibraryStyle.COVER_SPIN -> CoverFlowView(args, ::onTap)
+                            LibraryStyle.MANUSCRIPT_STACK -> DeskView(args, ::onTap)
+                            LibraryStyle.ARCHIVE_HALL -> HallView(args, ::onTap)
+                            LibraryStyle.INDEX_DRAWER -> DrawerView(args, ::onTap)
+                            LibraryStyle.CONSTELLATION -> StarsView(args, ::onTap)
+                            LibraryStyle.LIST -> Unit
+                        }
+                        ItemNodes(args, pair, ::onTap)
+                    }
+                }
+            },
+            {
+                CompositionLocalProvider(LocalGlassSource provides sceneSource) {
+                    GlassDock(barBottom = input.barBottom, covered = input.covered, onRecents = input.onRecents) {
+                        Controls(
+                            style, frontItem, front, count, picked, pair, reduced, fanned, input,
+                            goTo = { goTo(it, keepPick = style == LibraryStyle.BOOKSHELF && picked) },
+                            openFront = ::openFront,
+                            togglePick = ::togglePick,
+                            toggleFan = {
+                                fanned = !fanned
+                                pickedKey = null
+                                if (!fanned) goTo(0)
+                            },
+                        )
+                    }
+                }
+            },
+        ),
+        modifier = Modifier.fillMaxSize().background(bg),
+    ) { (stageM, dockM), c ->
+        val w = c.maxWidth
+        val margin = DOCK_MARGIN.roundToPx()
+        val dockW = minOf(w - 2 * margin, DOCK_MAX_W.roundToPx()).coerceAtLeast(0)
+        // The scene is the viewport, never taller: the glass bars float over the viewport, so a scrolled scene
+        // would only slide the dock under them. A short window (landscape, a large font) caps the dock between
+        // the bars instead; the dock scrolls its own caption (GlassDock) and the stage runs on under the glass.
+        val h = c.maxHeight
+        val viewport = h / density
+        val dockMax = (ShelfScene.dockMaxH(viewport, input.barTop, input.barBottom) * density).roundToInt()
+        val dock = dockM.first().measure(Constraints(minWidth = dockW, maxWidth = dockW, maxHeight = dockMax))
+        val barBottom = input.barBottom.dp.roundToPx()
+        val gap = ShelfScene.DOCK_GAP.dp.roundToPx()
+        val dockH = (dock.height + gap) / density
+        val fit = ShelfScene.stageFit(viewport, input.barTop, input.barBottom, dockH)
+        val stage = stageM.first().measure(Constraints.fixed(w, (fit.height * density).roundToInt()))
+        layout(w, h) {
+            stage.place(0, (fit.top * density).roundToInt())
+            dock.place((w - dock.width) / 2, h - barBottom - gap - dock.height)
+        }
+    }
+}
+
+/** (0.2.2) The glass dock's side margin and widest width (a wide pane keeps it a dock, not a bar). */
+private val DOCK_MARGIN = 12.dp
+private val DOCK_MAX_W = 560.dp
+private val DOCK_SHAPE = RoundedCornerShape(22.dp)
+
+/**
+ * (0.2.2) The floating glass dock over the scene: the item's caption and buttons ([content]), then the peek row
+ * `최근 연 파일 ⌃` that opens the 최근 연 파일 sheet (a tap; an upward pull does the same). The fill is the
+ * [DockScrim] alpha so its text keeps 4.5:1 over any cover (the scrim and opaque modes keep their denser fills).
+ * It reports itself as bottom chrome, so the toast appears above it. Touches on
+ * its gaps stop here and never reach the stage under it.
+ */
+@Composable
+private fun GlassDock(barBottom: Float, covered: Boolean, onRecents: (() -> Unit)?, content: @Composable () -> Unit) {
+    val colors = CivilightTheme.colors
+    // The window's toast and popovers keep above the dock (board B's toast sits over it), not on the peek row.
+    // Not while a sheet covers the dock: the toast then keeps to the bars the sheet leaves.
+    var dockH by remember { mutableIntStateOf(0) }
+    val dockDp = with(LocalDensity.current) { dockH.toDp() }
+    if (dockH > 0 && !covered) ReportBottomChrome(barBottom.dp + ShelfScene.DOCK_GAP.dp + dockDp - rememberSystemBottom())
+    // The DockScrim fill only where the dock blurs (BLUR); the scrim and opaque modes keep their own, denser
+    // fills. On API 31–32 (BLUR_COSTLY) the dock takes the scrim look: a third blur over a scene redrawn each frame.
+    val mode = CivilightTheme.glassMode.let { if (it == GlassMode.BLUR_COSTLY) GlassMode.SCRIM else it }
+    val fill = if (mode == GlassMode.BLUR) colors.glass.copy(alpha = if (colors.isDark) DockScrim.dark else DockScrim.light) else null
+    Box(
+        Modifier
+            .onSizeChanged { dockH = it.height }
+            .clip(DOCK_SHAPE)
+            .pointerInput(Unit) { detectTapGestures { } },
+    ) {
+        // A floating bar, not a sheet: it never takes the one costly sheet blur of API 31–32 (GlassBudget).
+        GlassBackground(GlassSurface.BANNER, Modifier.matchParentSize(), shape = DOCK_SHAPE, mode = mode, fill = fill)
+        OnGlass {
+            Column(Modifier.fillMaxWidth().insetOutline(colors.line, 1.dp, DOCK_SHAPE)) {
+                // Capped between the bars (ShelfScene.dockMaxH): a too-tall dock scrolls its caption here, opening
+                // on the buttons (reverse scrolling keeps the bottom in view); the peek row below always shows.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState(), reverseScrolling = true)
+                        .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (onRecents != null) 4.dp else 12.dp),
+                ) { content() }
+                if (onRecents != null) PeekRow(onRecents)
+            }
+        }
+    }
+}
+
+/** `최근 연 파일 ⌃`: a visible button (label + `up`); an upward drag on it opens the sheet as well. */
+@Composable
+private fun PeekRow(onOpen: () -> Unit) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val open by rememberUpdatedState(onOpen)
+    val threshold = with(LocalDensity.current) { PEEK_DRAG.toPx() }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(PEEK_H)
+            .pointerInput(Unit) {
+                // Claims only an upward pull (past [PEEK_DRAG]); a downward or sideways drag is left to whatever
+                // is under or around the row, so the peek row never swallows a gesture it does not use.
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    var pulled = 0f
+                    while (true) {
+                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+                        pulled += change.position.y - change.previousPosition.y
+                        if (pulled > viewConfiguration.touchSlop) break
+                        if (pulled < -threshold) {
+                            change.consume()
+                            open()
+                            // Swallow the rest of this pull so the tap below does not fire as well.
+                            while (true) {
+                                val rest = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                rest.consume()
+                                if (!rest.pressed) break
+                            }
+                            break
                         }
                     }
                 }
-                .draggable(
-                    state = dragState,
-                    orientation = Orientation.Horizontal,
-                    enabled = !reduced && !opening && (count > 1 || style == LibraryStyle.CONSTELLATION),
-                    onDragStarted = {
-                        if (style != LibraryStyle.CONSTELLATION) {
-                            position.anim.stop()
-                            position.drag.floatValue = position.anim.value
-                            position.dragging.value = true
-                            if (style != LibraryStyle.BOOKSHELF) pickedKey = null
-                            if (style == LibraryStyle.MANUSCRIPT_STACK) fanned = true
-                        }
-                    },
-                    onDragStopped = { velocity ->
-                        if (style == LibraryStyle.CONSTELLATION) return@draggable
-                        val from = position.drag.floatValue
-                        val target = ShelfScene.settle(from, -velocity / (stepDp * density), countState.value)
-                        position.anim.snapTo(from)
-                        position.dragging.value = false
-                        if (style == LibraryStyle.BOOKSHELF && pickedKey != null) {
-                            (items.getOrNull(target) as? ShelfCardItem.Project)?.let { pickedKey = it.key.toString() }
-                        }
-                        position.anim.animateTo(target.toFloat(), settleSpec)
-                    },
-                ),
-        ) {
-            val frameW = maxWidth.value
-            // 별자리 places every star over all items (board C), so it composes them all, up to [STAR_CAP].
-            val window = if (style == LibraryStyle.CONSTELLATION) ShelfScene.window(front, count, SceneReach(STAR_CAP / 2, STAR_CAP - 1 - STAR_CAP / 2)) else ShelfScene.window(front, count, ShelfScene.reach(style, wide))
-            for (i in window) key(items[i].key) { ItemProtection(items[i]) }
-            if (reduced) {
-                FlatFront(style, frontItem, input) { onTap(front) }
-            } else {
-                val args = SceneArgs(
-                    style, items, window, front, picked, opening, fanned || style != LibraryStyle.MANUSCRIPT_STACK,
-                    position, sway, spin, wide, frameW, bounds, input.unhide,
-                )
-                when (style) {
-                    LibraryStyle.BOOKSHELF -> BookcaseView(args, ::onTap)
-                    LibraryStyle.COVER_SPIN -> CoverFlowView(args, ::onTap)
-                    LibraryStyle.MANUSCRIPT_STACK -> DeskView(args, ::onTap)
-                    LibraryStyle.ARCHIVE_HALL -> HallView(args, ::onTap)
-                    LibraryStyle.INDEX_DRAWER -> DrawerView(args, ::onTap)
-                    LibraryStyle.CONSTELLATION -> StarsView(args, ::onTap)
-                    LibraryStyle.LIST -> Unit
-                }
-                ItemNodes(args, pair, ::onTap)
             }
-        }
-        Controls(
-            style, frontItem, front, count, picked, pair, reduced, fanned, side, input,
-            goTo = { goTo(it, keepPick = style == LibraryStyle.BOOKSHELF && picked) },
-            openFront = ::openFront,
-            togglePick = ::togglePick,
-            toggleFan = {
-                fanned = !fanned
-                pickedKey = null
-                if (!fanned) goTo(0)
-            },
-        )
+            .pressable(onClick = onOpen, role = Role.Button, scaleOnPress = false, onClickLabel = ShelfCopy.RECENTS)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+    ) {
+        CivilightText(ShelfCopy.RECENTS, type.small, color = colors.ink2, maxLines = 1)
+        CivilightIcon(IconId.Up, contentDescription = null, size = 16.dp, tint = colors.ink2)
     }
 }
+
+/** The peek row's height (a 44 dp touch target) and how far up a drag must pull to open the sheet. */
+private val PEEK_H = 44.dp
+private val PEEK_DRAG = 24.dp
 
 /** 별자리: the stars composed at once (each is six small planes). */
 private const val STAR_CAP = 16
@@ -568,7 +727,8 @@ private fun ItemProtection(item: ShelfCardItem) {
 private val DOCK_BUTTON_H = 48.dp
 
 /**
- * Under the stage, each board's own dock (every gesture has a button):
+ * Each board's own dock (every gesture has a button), drawn on the glass dock over the scene (0.2.2); meta and
+ * counter in `ink2` so they keep 4.5:1 on the [DockScrim] fill:
  * - board A (책장, 표지 회전) and C (서랍, 별자리): title and meta on the left, `n / N` on the right; then
  *   ◀ · the view's pair (`꺼내기` · `제자리` …) · a wide `열기` · ⋯ · ▶, all 48 dp tall;
  * - board B 원고 더미: the accent `n / N` above a left-aligned title; then two full-width pills
@@ -584,7 +744,6 @@ private fun Controls(
     pair: PickPair?,
     reduced: Boolean,
     fanned: Boolean,
-    side: Dp,
     input: ShelfViewInput,
     goTo: (Int) -> Unit,
     openFront: () -> Unit,
@@ -594,7 +753,7 @@ private fun Controls(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val desk = style == LibraryStyle.MANUSCRIPT_STACK && !reduced
-    Column(Modifier.fillMaxWidth().padding(horizontal = side).padding(top = 8.dp)) {
+    Column(Modifier.fillMaxWidth()) {
         ContentSwap(item, Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart, contentKey = { it?.key }, label = "shelfCaption") { shown ->
             val (title, meta) = when (shown) {
                 is ShelfCardItem.Project -> shown.card.row.title to shown.card.row.meta
@@ -608,15 +767,15 @@ private fun Controls(
                 Column(Modifier.fillMaxWidth()) {
                     if (counter != null) CivilightText(counter, type.number, color = colors.acc, maxLines = 1)
                     CivilightText(title, type.itemTitleCompact, color = colors.ink, maxLines = 1)
-                    if (meta != null) CivilightText(meta, type.small, color = colors.ink3, maxLines = 1)
+                    if (meta != null) CivilightText(meta, type.small, color = colors.ink2, maxLines = 1)
                 }
             } else {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f)) {
                         CivilightText(title, type.itemTitleCompact, color = colors.ink, maxLines = 1)
-                        if (meta != null) CivilightText(meta, type.small, color = colors.ink3, maxLines = 1)
+                        if (meta != null) CivilightText(meta, type.small, color = colors.ink2, maxLines = 1)
                     }
-                    if (counter != null) CivilightText(counter, type.number, color = colors.ink3, maxLines = 1)
+                    if (counter != null) CivilightText(counter, type.number, color = colors.ink2, maxLines = 1)
                 }
             }
         }
