@@ -19,6 +19,7 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
@@ -117,6 +118,17 @@ class Motion(
     /** Placement spec for `animateItem`: null (no move) when reduced. */
     fun placement(token: MotionToken = CivilightMotion.standard): FiniteAnimationSpec<IntOffset>? =
         if (reduced) null else tween(token.durationMs, easing = token.easing)
+
+    /**
+     * Mechanical hinge-tension spring (0.3.3): high stiffness with crisp detent settle (no underwater lag,
+     * preserves release velocity); snaps immediately when reduced.
+     */
+    fun <T> hingeTension(): FiniteAnimationSpec<T> =
+        if (reduced) snap() else spring(dampingRatio = 0.74f, stiffness = 920f)
+
+    /** Crisp tactile spring for physical object articulation (CD lid hinge, floppy insertion); snaps when reduced. */
+    fun <T> crispSpring(): FiniteAnimationSpec<T> =
+        if (reduced) snap() else spring(dampingRatio = 0.80f, stiffness = 620f)
 
     /**
      * Appear: a fade on [token], plus (full motion only) a slide from [rise] (positive = from below) and an

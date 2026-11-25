@@ -72,61 +72,61 @@ import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfViewInput
 import kotlin.math.abs
 
 // ---------------------------------------------------------------------------
-// 6. 탄성 덱 (KINETIC_DECK) — Spring-Physics Staggered Fanning Card Deck
+// 6. 탄성 덱 (KINETIC_DECK) — Mechanical Hinge-Tension Fanning Card Deck
+//    (1:1 zero-lag tracking + mechanical detent notch + crisp velocity-preserving hinge snap)
 // ---------------------------------------------------------------------------
 @Composable
 internal fun KineticDeckView(input: ShelfViewInput) {
     val items = remember(input.ui) { atelierItems(input) }
     val track = rememberAtelierTrack(items, input.selectedKey, input.preview)
     val density = LocalDensity.current
-    val reduced = CivilightTheme.motion.reduced
 
     AtelierStageFrame(input, items, track.activeIndex) { tilt ->
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
                 .padding(top = input.barTop.dp, bottom = (input.barBottom + 126f).dp)
-                .atelierHorizontalDrag(!input.preview, items.size, with(density) { 150.dp.toPx() }, track),
+                .atelierHorizontalDrag(!input.preview, items.size, with(density) { 155.dp.toPx() }, track),
             contentAlignment = Alignment.Center,
         ) {
             val cardW = (maxWidth * 0.58f).coerceIn(176.dp, 264.dp)
             val cardH = (cardW * 1.34f).coerceAtMost(maxHeight * 0.82f)
             val targetPx = with(density) { cardW.roundToPx() }
             val pos = track.position.value
+            val impulse = track.dragImpulse.floatValue
+            // Subtle mechanical detent notch curve: pulls firmly into each integer stop (like a physical hinge detent).
+            val frac = pos - kotlin.math.floor(pos)
+            val detentPull = kotlin.math.sin(frac * 2f * kotlin.math.PI.toFloat()) * 0.055f
 
-            val motion = CivilightTheme.motion
             val visible = items.indices.filter { abs(it - pos) <= 3.5f }
             visible.forEach { i ->
-                val rawD = i - pos
-                val depth = abs(rawD).coerceIn(0f, 3.5f)
-                // Staggered follow using CivilightMotion tokens (slower token for deeper cards).
-                val spec = if (depth > 1.2f) motion.move<Float>(CivilightMotion.enterLong) else motion.move<Float>(CivilightMotion.standard)
-                val springD by animateFloatAsState(
-                    targetValue = rawD,
-                    animationSpec = spec,
-                    label = "deckWhip_$i",
-                )
+                // 1:1 immediate position tracking (zero underwater lag!) + live velocity torsion lean.
+                val d = (i - pos) + detentPull
+                val depth = abs(d).coerceIn(0f, 3.5f)
                 val focused = i == track.activeIndex
                 AtelierCoverCard(
                     item = items[i],
                     tilt = tilt,
                     focused = focused,
-                    sheenBias = springD * 0.8f,
+                    sheenBias = d * 0.75f + impulse * 0.35f,
                     targetWidthPx = targetPx,
                     input = input,
                     modifier = Modifier
                         .size(cardW, cardH)
-                        .zIndex(15f - abs(springD))
+                        .zIndex(15f - depth)
                         .graphicsLayer {
-                            cameraDistance = 14f * density.density
-                            translationX = springD * (cardW.toPx() * 0.42f) + tilt.x * (10f / (1f + abs(springD)))
-                            translationY = abs(springD) * 26.dp.toPx() + tilt.y * (7f / (1f + abs(springD)))
-                            rotationZ = (springD * 9.5f).coerceIn(-26f, 26f)
-                            rotationY = (-springD * 8f).coerceIn(-22f, 22f) + tilt.x * 5f
-                            val s = (1f - abs(springD) * 0.09f).coerceIn(0.68f, 1.02f)
+                            cameraDistance = 15f * density.density
+                            // Immediate 1:1 translation + crisp velocity-coupled torsion on trailing cards
+                            val torsion = impulse * (1f + depth * 0.45f)
+                            translationX = d * (cardW.toPx() * 0.44f) + tilt.x * (10f / (1f + depth))
+                            translationY = depth * 22.dp.toPx() + tilt.y * (7f / (1f + depth))
+                            rotationZ = (d * 8.5f + torsion * 5.5f).coerceIn(-28f, 28f)
+                            rotationY = (-d * 10f - torsion * 8f).coerceIn(-32f, 32f) + tilt.x * 6f
+                            rotationX = -tilt.y * 4f
+                            val s = (1f - depth * 0.085f).coerceIn(0.70f, 1.02f)
                             scaleX = s
                             scaleY = s
-                            alpha = (1f - abs(springD) * 0.22f).coerceIn(0.18f, 1f)
+                            alpha = (1f - depth * 0.21f).coerceIn(0.20f, 1f)
                         },
                     onClick = {
                         if (focused) items[i].trigger(input) else track.animateTo(i, items.size)

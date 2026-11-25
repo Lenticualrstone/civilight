@@ -5,17 +5,14 @@ import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfViewRender
 import io.github.lenticualrstone.civilight.model.app.LibraryStyle
 
 /**
- * Single registry for all 10 handcrafted Atelier library views:
- * 5 Spatial 3D views + 5 Kinetic workspace views.
- * Replaces all legacy 0.2.x 3D and flat shelf views.
+ * Single registry for all 7 handcrafted Atelier library views:
+ * 2 hyper-detailed 3D physical object views (CD Jewel Case, 3.5" Floppy + CRT)
+ * + 5 tactile kinetic workspace views.
  */
 object AtelierRegistry {
     val spatialStyles: List<LibraryStyle> = listOf(
-        LibraryStyle.GLASS_PRISM,
-        LibraryStyle.ARCHIVE_VAULT,
-        LibraryStyle.BOOK_SPINE_3D,
-        LibraryStyle.ORBIT_STAGE,
-        LibraryStyle.FOLIO_SPREAD,
+        LibraryStyle.CD_JEWEL_CASE,
+        LibraryStyle.FLOPPY_CRT,
     )
 
     val kineticStyles: List<LibraryStyle> = listOf(
@@ -29,11 +26,8 @@ object AtelierRegistry {
     val allStyles: List<LibraryStyle> = spatialStyles + kineticStyles
 
     val renderers: Map<LibraryStyle, ShelfViewRenderer> = mapOf(
-        LibraryStyle.GLASS_PRISM to { input: ShelfViewInput -> GlassPrismView(input) },
-        LibraryStyle.ARCHIVE_VAULT to { input: ShelfViewInput -> ArchiveVaultView(input) },
-        LibraryStyle.BOOK_SPINE_3D to { input: ShelfViewInput -> BookSpine3dView(input) },
-        LibraryStyle.ORBIT_STAGE to { input: ShelfViewInput -> OrbitStageView(input) },
-        LibraryStyle.FOLIO_SPREAD to { input: ShelfViewInput -> FolioSpreadView(input) },
+        LibraryStyle.CD_JEWEL_CASE to { input: ShelfViewInput -> CdJewelCaseView(input) },
+        LibraryStyle.FLOPPY_CRT to { input: ShelfViewInput -> FloppyCrtView(input) },
         LibraryStyle.KINETIC_DECK to { input: ShelfViewInput -> KineticDeckView(input) },
         LibraryStyle.BENTO_MOSAIC to { input: ShelfViewInput -> BentoMosaicView(input) },
         LibraryStyle.FILM_REEL to { input: ShelfViewInput -> FilmReelView(input) },
@@ -43,11 +37,10 @@ object AtelierRegistry {
 
     /** 24x24 outline stroke SVG path for each Atelier view. */
     fun glyph(style: LibraryStyle): String = when (style) {
-        LibraryStyle.GLASS_PRISM -> "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 3v18M4 7.5l8 4.5 8-4.5"
-        LibraryStyle.ARCHIVE_VAULT -> "M3 4l5 4v8l-5 4M21 4l-5 4v8l5 4M8 8h8v8H8z"
-        LibraryStyle.BOOK_SPINE_3D -> "M5 4v16M9.5 4v16M14 5.5l4.5 14.5M3 20h18"
-        LibraryStyle.ORBIT_STAGE -> "M12 12m-9 0a9 4.5 0 1 0 18 0a9 4.5 0 1 0 -18 0M12 7v10"
-        LibraryStyle.FOLIO_SPREAD -> "M4 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4zM20 5h-7a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h7z"
+        // Jewel case + disc peeking on the right
+        LibraryStyle.CD_JEWEL_CASE -> "M3 5h12v14H3zM6 5v14M15 7a5 5 0 1 1 0 10M15 10.5a1.5 1.5 0 1 1 0 3"
+        // CRT monitor + 3.5" floppy slot
+        LibraryStyle.FLOPPY_CRT -> "M3 4h18v12H3zM6 7h12v6H6zM7 19h10M12 16v3"
         LibraryStyle.KINETIC_DECK -> "M7 6h10v13H7zM4 8.5l3-1v10l-3-1zM20 8.5l-3-1v10l3-1z"
         LibraryStyle.BENTO_MOSAIC -> "M4 4h16v6H4zM4 12h7v8H4zM13 12h7v8h-7z"
         LibraryStyle.FILM_REEL -> "M4 5h16v14H4zM4 8h16M4 16h16M9 8v8M15 8v8"

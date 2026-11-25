@@ -82,30 +82,24 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Terse Korean copy for all 10 Atelier library views (CopyLint-verified). */
+/** Terse Korean copy for all 7 Atelier library views (CopyLint-verified). */
 object AtelierCopy {
-    const val GROUP_SPATIAL = "공간 · 3D"
+    const val GROUP_SPATIAL = "오브젝트 · 3D"
     const val GROUP_SPATIAL_SHORT = "3D"
     const val GROUP_KINETIC = "모션 · 작업"
     const val GROUP_KINETIC_SHORT = "작업"
 
-    const val GLASS_PRISM = "유리 프리즘"
-    const val ARCHIVE_VAULT = "깊이 서고"
-    const val BOOK_SPINE_3D = "양장 서가"
-    const val ORBIT_STAGE = "궤도 무대"
-    const val FOLIO_SPREAD = "화첩 펼침"
+    const val CD_JEWEL_CASE = "CD 케이스"
+    const val FLOPPY_CRT = "플로피 · CRT"
     const val KINETIC_DECK = "탄성 덱"
     const val BENTO_MOSAIC = "모자이크"
     const val FILM_REEL = "필름 릴"
     const val PULSE_TIMELINE = "시간 축"
     const val STUDIO_LIST = "스튜디오 목록"
 
-    const val FRAG_GLASS_PRISM = "3D 굴절 · 회전 프리즘"
-    const val FRAG_ARCHIVE_VAULT = "3D 원근 통로 · 깊이 이동"
-    const val FRAG_BOOK_SPINE_3D = "3D 양장 책등 · 꺼내 펼침"
-    const val FRAG_ORBIT_STAGE = "3D 타원 궤도 · 스포트라이트"
-    const val FRAG_FOLIO_SPREAD = "3D 제본 축 · 표지 젖힘"
-    const val FRAG_KINETIC_DECK = "스프링 물리 · 부채꼴 덱"
+    const val FRAG_CD_JEWEL_CASE = "3D 주얼 케이스 · 홀로그램 CD"
+    const val FRAG_FLOPPY_CRT = "3.5인치 플로피 · CRT 삽입"
+    const val FRAG_KINETIC_DECK = "기계식 힌지 텐션 · 부채꼴 덱"
     const val FRAG_BENTO_MOSAIC = "에디토리얼 격자 · 포커스"
     const val FRAG_FILM_REEL = "35mm 필름 · 내부 패럴랙스"
     const val FRAG_PULSE_TIMELINE = "맥동 노드 · 작업 연대기"
@@ -120,23 +114,23 @@ object AtelierCopy {
     const val FORMAT_SERIAL = "연재"
     const val FORMAT_SHORT = "단편"
     const val FORMAT_SETTING = "설정"
+    const val CD_OPEN_LID = "케이스 열기"
+    const val CRT_INSERT = "디스크 넣기"
+    const val CRT_READY = "준비됨"
 
     val all: List<String> = listOf(
         GROUP_SPATIAL, GROUP_SPATIAL_SHORT, GROUP_KINETIC, GROUP_KINETIC_SHORT,
-        GLASS_PRISM, ARCHIVE_VAULT, BOOK_SPINE_3D, ORBIT_STAGE, FOLIO_SPREAD,
+        CD_JEWEL_CASE, FLOPPY_CRT,
         KINETIC_DECK, BENTO_MOSAIC, FILM_REEL, PULSE_TIMELINE, STUDIO_LIST,
-        FRAG_GLASS_PRISM, FRAG_ARCHIVE_VAULT, FRAG_BOOK_SPINE_3D, FRAG_ORBIT_STAGE, FRAG_FOLIO_SPREAD,
+        FRAG_CD_JEWEL_CASE, FRAG_FLOPPY_CRT,
         FRAG_KINETIC_DECK, FRAG_BENTO_MOSAIC, FRAG_FILM_REEL, FRAG_PULSE_TIMELINE, FRAG_STUDIO_LIST,
         OPEN, UNLOCK, NEW_PROJECT, LOCKED_PROJECT, RECENT_FILES, MENU,
-        FORMAT_SERIAL, FORMAT_SHORT, FORMAT_SETTING,
+        FORMAT_SERIAL, FORMAT_SHORT, FORMAT_SETTING, CD_OPEN_LID, CRT_INSERT, CRT_READY,
     )
 
     fun label(style: LibraryStyle): String = when (style) {
-        LibraryStyle.GLASS_PRISM -> GLASS_PRISM
-        LibraryStyle.ARCHIVE_VAULT -> ARCHIVE_VAULT
-        LibraryStyle.BOOK_SPINE_3D -> BOOK_SPINE_3D
-        LibraryStyle.ORBIT_STAGE -> ORBIT_STAGE
-        LibraryStyle.FOLIO_SPREAD -> FOLIO_SPREAD
+        LibraryStyle.CD_JEWEL_CASE -> CD_JEWEL_CASE
+        LibraryStyle.FLOPPY_CRT -> FLOPPY_CRT
         LibraryStyle.KINETIC_DECK -> KINETIC_DECK
         LibraryStyle.BENTO_MOSAIC -> BENTO_MOSAIC
         LibraryStyle.FILM_REEL -> FILM_REEL
@@ -145,11 +139,8 @@ object AtelierCopy {
     }
 
     fun frag(style: LibraryStyle): String = when (style) {
-        LibraryStyle.GLASS_PRISM -> FRAG_GLASS_PRISM
-        LibraryStyle.ARCHIVE_VAULT -> FRAG_ARCHIVE_VAULT
-        LibraryStyle.BOOK_SPINE_3D -> FRAG_BOOK_SPINE_3D
-        LibraryStyle.ORBIT_STAGE -> FRAG_ORBIT_STAGE
-        LibraryStyle.FOLIO_SPREAD -> FRAG_FOLIO_SPREAD
+        LibraryStyle.CD_JEWEL_CASE -> FRAG_CD_JEWEL_CASE
+        LibraryStyle.FLOPPY_CRT -> FRAG_FLOPPY_CRT
         LibraryStyle.KINETIC_DECK -> FRAG_KINETIC_DECK
         LibraryStyle.BENTO_MOSAIC -> FRAG_BENTO_MOSAIC
         LibraryStyle.FILM_REEL -> FRAG_FILM_REEL
@@ -173,12 +164,15 @@ object AtelierCopy {
 internal class AtelierTrackState(
     initialIndex: Int,
     private val scope: CoroutineScope,
-    private val reduced: Boolean,
+    private val motion: io.github.lenticualrstone.civilight.designsystem.theme.Motion,
     private val onTick: () -> Unit,
 ) {
     val position = Animatable(initialIndex.toFloat())
     var lastHapticIndex by mutableIntStateOf(initialIndex)
         private set
+
+    /** Live normalized drag velocity (-1f..1f) for immediate zero-lag mechanical lean while dragging. */
+    val dragImpulse = androidx.compose.runtime.mutableFloatStateOf(0f)
 
     val activeIndex: Int
         get() = position.value.roundToInt()
@@ -186,7 +180,14 @@ internal class AtelierTrackState(
     fun dragBy(deltaItems: Float, count: Int) {
         if (count <= 0) return
         val max = (count - 1).toFloat()
-        val next = (position.value + deltaItems).coerceIn(-0.35f, max + 0.35f)
+        // Rubber-band resistance past ends so you feel mechanical tension at boundaries.
+        val raw = position.value + deltaItems
+        val next = when {
+            raw < 0f -> (position.value + deltaItems * 0.35f).coerceAtLeast(-0.32f)
+            raw > max -> (position.value + deltaItems * 0.35f).coerceAtMost(max + 0.32f)
+            else -> raw
+        }
+        dragImpulse.floatValue = (deltaItems * 14f).coerceIn(-1f, 1f)
         scope.launch { position.snapTo(next) }
         val crossed = next.roundToInt().coerceIn(0, count - 1)
         if (crossed != lastHapticIndex) {
@@ -195,23 +196,27 @@ internal class AtelierTrackState(
         }
     }
 
-    fun settle(count: Int, velocityBias: Float = 0f) {
+    fun settle(count: Int, velocityItemsPerSec: Float = 0f) {
+        dragImpulse.floatValue = 0f
         if (count <= 0) return
-        val target = (position.value + velocityBias).roundToInt().coerceIn(0, count - 1)
-        animateTo(target, count)
+        val bias = (velocityItemsPerSec * 0.12f).coerceIn(-0.9f, 0.9f)
+        val target = (position.value + bias).roundToInt().coerceIn(0, count - 1)
+        animateTo(target, count, initialVelocity = velocityItemsPerSec.coerceIn(-8f, 8f))
     }
 
-    fun animateTo(index: Int, count: Int) {
+    fun animateTo(index: Int, count: Int, initialVelocity: Float = 0f) {
+        dragImpulse.floatValue = 0f
         if (count <= 0) return
         val target = index.coerceIn(0, count - 1)
         lastHapticIndex = target
         scope.launch {
-            if (reduced) {
+            if (motion.reduced) {
                 position.snapTo(target.toFloat())
             } else {
                 position.animateTo(
-                    target.toFloat(),
-                    CivilightMotion.spec(CivilightMotion.swipe, reduced = false),
+                    targetValue = target.toFloat(),
+                    animationSpec = motion.hingeTension(),
+                    initialVelocity = initialVelocity,
                 )
             }
         }
@@ -225,13 +230,13 @@ internal fun rememberAtelierTrack(
     preview: Boolean,
 ): AtelierTrackState {
     val scope = rememberCoroutineScope()
-    val reduced = CivilightTheme.motion.reduced
+    val motion = CivilightTheme.motion
     val haptics = rememberHaptics()
     val initial = remember(items.size) {
         selectedKey?.let { key -> items.indexOfFirst { (it as? ShelfCardItem.Project)?.card?.row?.key == key }.takeIf { it >= 0 } } ?: 0
     }
-    val state = remember(reduced, preview) {
-        AtelierTrackState(initial, scope, reduced) {
+    val state = remember(motion.reduced, preview) {
+        AtelierTrackState(initial, scope, motion) {
             if (!preview) haptics.perform(HapticToken.TICK)
         }
     }
@@ -257,8 +262,8 @@ internal fun Modifier.atelierHorizontalDrag(
         var lastDelta = 0f
         detectHorizontalDragGestures(
             onDragEnd = {
-                val bias = (-lastDelta / pxPerItem.coerceAtLeast(1f) * 2.2f).coerceIn(-0.85f, 0.85f)
-                track.settle(count, bias)
+                val vel = (-lastDelta / pxPerItem.coerceAtLeast(1f) * 32f)
+                track.settle(count, vel)
                 lastDelta = 0f
             },
             onDragCancel = {

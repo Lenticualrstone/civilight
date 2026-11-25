@@ -13,7 +13,7 @@
 ![Android 10+](https://img.shields.io/badge/Android-10%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
-![version](https://img.shields.io/badge/version-0.3.2(Antigravity)-blue)
+![version](https://img.shields.io/badge/version-0.3.3(Antigravity)-blue)
 ![font license](https://img.shields.io/badge/font-Pretendard%20OFL%201.1-lightgrey)
 
 </div>
@@ -50,9 +50,9 @@ Civilight는 **원고(스크립트) · 인물 · 세계 · 연표 · 지도 · �
 * 지도 만들기 (지형 생성 · 이미지 가져오기 · 스케치 촬영 · 노드 지도), 핀 · 영역 · 경로 · 축척 · 인물 동선
 
 ### 서재 · 캔버스 · 페이지 · 보호
-* **Atelier 서재 보기 10종** (실시간 미리보기 선택기 지원)
-  * 공간 · 3D: `유리 프리즘` · `깊이 서고` · `양장 서가` · `궤도 무대` · `화첩 펼침`
-  * 모션 · 작업: `탄성 덱` · `모자이크` · `필름 릴` · `시간 축` · `스튜디오 목록`
+* **Atelier 서재 보기 7종** (실시간 미리보기 선택기 지원)
+  * 오브젝트 · 3D: `CD 케이스` (3D 주얼 케이스 · 힌지 개폐 · 홀로그램 CD) · `플로피 · CRT` (3.5인치 플로피 디스크 · CRT 모니터 삽입)
+  * 모션 · 작업: `탄성 덱` (기계식 힌지 텐션) · `모자이크` · `필름 릴` · `시간 축` · `스튜디오 목록`
 * 다중 캔버스 (노드 · 메모 · 묶음 · 관계 선 잇기) 및 자유 문서 페이지
 * 앱 잠금 · 프로젝트/항목 숨기기 (지문 · 기기 PIN), 화면 캡처 차단, 최근 앱 이름 가림, 휴지통 (30일 보관)
 * 라이프 레코더 (음성 녹음 · 글 메모 · 원고/카드/페이지로 넣기)
@@ -87,7 +87,7 @@ JDK 21 환경이 필요하며, `local.properties` 파일의 `sdk.dir`에 Android
 
 | 항목 | 값 |
 | --- | --- |
-| versionName | `0.3.2(Antigravity)` |
+| versionName | `0.3.3(Antigravity)` |
 | minSdk / targetSdk / compileSdk | 29 / 37 / 37 |
 | Kotlin / AGP | 2.4.21 / 9.4.1 |
 | Compose BOM / Navigation3 | 2026.05.01 / 1.1.2 |

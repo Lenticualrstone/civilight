@@ -49,8 +49,8 @@ data class AppSettings(
      * → chosen ratio. Absent = [PaneSplit.DEFAULT] (today's layout); not written while empty.
      */
     val paneSplit: Map<String, PaneSplit> = emptyMap(),
-    /** (0.3.2, Atelier) `서재 보기`. The old `viewByScreen["library"]` is kept and not read. */
-    val libraryStyle: LibraryStyle = LibraryStyle.GLASS_PRISM,
+    /** (0.3.3, Atelier) `서재 보기`. The old `viewByScreen["library"]` is kept and not read. */
+    val libraryStyle: LibraryStyle = LibraryStyle.CD_JEWEL_CASE,
     /** (0.2.0, U-16, CST-67) `카드 보기` of the character list. The old `viewByScreen["cast"]` is kept and not read. */
     val castCardStyle: CardStyle = CardStyle.FAN_DECK,
     /** (0.2.0) 서재 head toggle: `LIST` = the list, `CARD` = the chosen 3D view; absent = `CARD` (00 §13.4). */
@@ -99,27 +99,19 @@ data class AppSettings(
 }
 
 /**
- * (0.3.2, Atelier) 10 handcrafted `서재 보기` styles: 5 spatial 3D views + 5 kinetic workspace views.
- * Unknown legacy stored values (`bookshelf`, `timeline`, etc.) gracefully fall back to [GLASS_PRISM].
+ * (0.3.3, Atelier) 7 handcrafted `서재 보기` styles: 2 hyper-detailed 3D physical object views
+ * (CD Jewel Case, 3.5" Floppy + CRT) + 5 tactile kinetic workspace views.
+ * Unknown legacy stored values gracefully fall back to [CD_JEWEL_CASE].
  */
 @Serializable(with = LibraryStyle.Codec::class)
 enum class LibraryStyle {
-    /** `유리 프리즘` — 3D 굴절 회전 프리즘 (기본값). */
-    GLASS_PRISM,
+    /** `CD 케이스` — 3D 플라스틱 주얼 케이스 · 힌지 개폐 · 홀로그램 CD (기본값). */
+    CD_JEWEL_CASE,
 
-    /** `깊이 서고` — 3D 원근 통로 · 깊이 이동. */
-    ARCHIVE_VAULT,
+    /** `플로피 · CRT` — 3.5인치 플로피 디스크 · CRT 모니터 삽입 부팅. */
+    FLOPPY_CRT,
 
-    /** `양장 서가` — 3D 양장 책등 · 꺼내 펼침. */
-    BOOK_SPINE_3D,
-
-    /** `궤도 무대` — 3D 타원 궤도 · 스포트라이트. */
-    ORBIT_STAGE,
-
-    /** `화첩 펼침` — 3D 제본 축 · 표지 젖힘. */
-    FOLIO_SPREAD,
-
-    /** `탄성 덱` — 스프링 물리 · 부채꼴 덱. */
+    /** `탄성 덱` — 기계식 힌지 텐션 · 부채꼴 덱. */
     KINETIC_DECK,
 
     /** `모자이크` — 에디토리얼 격자 · 포커스. */
@@ -136,9 +128,9 @@ enum class LibraryStyle {
 
     val isList: Boolean get() = this == LIST
 
-    val isSpatial: Boolean get() = ordinal < 5
+    val isSpatial: Boolean get() = ordinal < 2
 
-    object Codec : LowerCamelEnumSerializer<LibraryStyle>("LibraryStyle", entries, GLASS_PRISM)
+    object Codec : LowerCamelEnumSerializer<LibraryStyle>("LibraryStyle", entries, CD_JEWEL_CASE)
 }
 
 /** (0.2.0, U-16) Character `카드 보기` values in settings order (00 §13.4). Unknown stored values read [FAN_DECK]. */

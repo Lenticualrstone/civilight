@@ -83,11 +83,11 @@ class Library020Test {
     @Test
     fun `V-01 V-02 V-03 V-08 the 서재 view and its head toggle`() {
         val all = LibraryStyle.entries.toSet()
-        // V-01: GLASS_PRISM with no stored toggle shows the 3D view and draws the toggle.
+        // V-01: CD_JEWEL_CASE with no stored toggle shows the 3D view and draws the toggle.
         val v1 = ShelfViews.of(AppSettings(), available = all)
-        assertEquals(LibraryStyle.GLASS_PRISM, v1.shown)
-        assertEquals(LibraryStyle.GLASS_PRISM, v1.rendered)
-        assertEquals(io.github.lenticualrstone.civilight.feature.library.shelf.atelier.AtelierCopy.GLASS_PRISM, v1.toggle!!.styleLabel)
+        assertEquals(LibraryStyle.CD_JEWEL_CASE, v1.shown)
+        assertEquals(LibraryStyle.CD_JEWEL_CASE, v1.rendered)
+        assertEquals(io.github.lenticualrstone.civilight.feature.library.shelf.atelier.AtelierCopy.CD_JEWEL_CASE, v1.toggle!!.styleLabel)
         assertEquals(SettingsCopy.VIEW_LIST, v1.toggle!!.listLabel)
         assertTrue(v1.toggle!!.styleOn)
         // V-02: the toggle on `목록` is remembered in `libraryToggle`.
@@ -99,12 +99,11 @@ class Library020Test {
         assertNull(ShelfViews.of(AppSettings(libraryStyle = LibraryStyle.LIST), available = all).toggle)
         // V-08: the 0.1.0 `viewByScreen["library"]` is not read.
         val v8 = ShelfViews.of(AppSettings(viewByScreen = mapOf("library" to ViewMode.LIST)), available = all)
-        assertEquals(LibraryStyle.GLASS_PRISM, v8.shown)
+        assertEquals(LibraryStyle.CD_JEWEL_CASE, v8.shown)
     }
 
     @Test
     fun `LIB-93 every Atelier style has a renderer and a style left out draws the list`() {
-        // 0.3.2 Atelier: all 10 styles (5 spatial 3D + 5 kinetic workspace incl. LIST) are registered.
         assertEquals(LibraryStyle.entries.toSet(), ShelfViewRenderers.available)
         for (style in LibraryStyle.entries.filterNot { it.isList }) {
             val view = ShelfViews.of(AppSettings(libraryStyle = style))
@@ -114,15 +113,12 @@ class Library020Test {
         val list = ShelfViews.of(AppSettings(libraryStyle = LibraryStyle.LIST))
         assertEquals(LibraryStyle.LIST, list.rendered)
         assertNull("스튜디오 목록: no toggle", list.toggle)
-        // A style without a renderer still falls back to no renderer / no toggle.
-        val none = ShelfViews.of(AppSettings(libraryStyle = LibraryStyle.GLASS_PRISM), available = emptySet())
+        val none = ShelfViews.of(AppSettings(libraryStyle = LibraryStyle.CD_JEWEL_CASE), available = emptySet())
         assertNull(none.rendered)
         assertNull(none.toggle)
-        // V-05: with 0 projects no view is drawn even when one exists.
-        val v = ShelfViews.of(AppSettings(), available = setOf(LibraryStyle.GLASS_PRISM))
+        val v = ShelfViews.of(AppSettings(), available = setOf(LibraryStyle.CD_JEWEL_CASE))
         assertFalse(ShelfViews.drawsView(v, ShelfUi(loaded = true, empty = io.github.lenticualrstone.civilight.domain.library.newproject.EmptyLibrary(showDeletedNotice = false))))
         assertTrue(ShelfViews.drawsView(v, ShelfUi(loaded = true)))
-        // LIB-94 tilt switch reaches the view.
         assertFalse(ShelfViews.of(AppSettings(viewTilt = false)).viewTilt)
         assertTrue(ShelfViews.of(AppSettings()).viewTilt)
     }
@@ -132,57 +128,53 @@ class Library020Test {
         val libAll = LibraryStyle.entries.toSet()
         val cardAll = CardStyle.entries.toSet()
         val ui = SettingsState.root(
-            AppSettings(libraryStyle = LibraryStyle.ORBIT_STAGE, castCardStyle = CardStyle.ROLODEX, viewTilt = false),
+            AppSettings(libraryStyle = LibraryStyle.FLOPPY_CRT, castCardStyle = CardStyle.ROLODEX, viewTilt = false),
             0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = libAll, cardViews = cardAll,
         )
         assertEquals("서재 보기", ui.libraryView!!.title)
-        assertEquals("궤도 무대", ui.libraryView!!.value)
+        assertEquals("플로피 · CRT", ui.libraryView!!.value)
         assertNull(ui.libraryView!!.sub)
         assertEquals("카드 보기", ui.cardView!!.title)
         assertEquals("롤로덱스", ui.cardView!!.value)
         assertEquals(SettingsCopy.VIEW_TILT, ui.tilt!!.title)
         assertFalse(ui.tilt!!.on)
         assertTrue(SettingsState.root(AppSettings(), 0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = libAll, cardViews = cardAll).tilt!!.on)
-        // Under reduced motion tilt is off whatever the switch says: the row is not drawn (no control that does nothing).
         assertNull(ViewStyles.tiltShown(ui.tilt, reduced = true))
         assertEquals(ui.tilt, ViewStyles.tiltShown(ui.tilt, reduced = false))
 
         val lib = ViewStyles.options(ViewKind.LIBRARY, AppSettings(), library = libAll)
         assertEquals(
-            listOf("유리 프리즘", "깊이 서고", "양장 서가", "궤도 무대", "화첩 펼침", "탄성 덱", "모자이크", "필름 릴", "시간 축", "스튜디오 목록"),
+            listOf("CD 케이스", "플로피 · CRT", "탄성 덱", "모자이크", "필름 릴", "시간 축", "스튜디오 목록"),
             lib.map { it.title },
         )
-        assertEquals(listOf(true) + List(9) { false }, lib.map { it.selected })
+        assertEquals(listOf(true) + List(6) { false }, lib.map { it.selected })
         val cards = ViewStyles.options(ViewKind.CARD, AppSettings(), cards = cardAll)
         assertEquals(listOf("부채꼴 덱", "회전 목마", "겹친 더미", "타로 펼침", "기울어진 벽", "롤로덱스", "목록"), cards.map { it.title })
-        assertEquals(LibraryStyle.ARCHIVE_VAULT, ViewStyles.libraryStyleOf(LibraryStyle.ARCHIVE_VAULT.name))
+        assertEquals(LibraryStyle.FLOPPY_CRT, ViewStyles.libraryStyleOf(LibraryStyle.FLOPPY_CRT.name))
         assertEquals(CardStyle.TAROT, ViewStyles.cardStyleOf(CardStyle.TAROT.name))
         assertNull(ViewStyles.libraryStyleOf("unknown"))
     }
 
     @Test
     fun `LIB-94 view rows follow the renderers`() {
-        // Tripwire: CardViewMirror is the same set as feature:cast CastCardViews.renderers.keys (TC-U16-01).
         assertEquals(CardStyle.entries.filterNot { it.isList }.toSet(), CardViewMirror.available)
-        val ui = SettingsState.root(AppSettings(libraryStyle = LibraryStyle.GLASS_PRISM, castCardStyle = CardStyle.FAN_DECK), 0, false, null, LibFx.NOW, LibFx.ZONE)
-        assertEquals("유리 프리즘", ui.libraryView!!.value)
+        val ui = SettingsState.root(AppSettings(libraryStyle = LibraryStyle.CD_JEWEL_CASE, castCardStyle = CardStyle.FAN_DECK), 0, false, null, LibFx.NOW, LibFx.ZONE)
+        assertEquals("CD 케이스", ui.libraryView!!.value)
         assertEquals("부채꼴 덱", ui.cardView!!.value)
         assertEquals(CardStyle.entries.map { ViewStyles.label(it) }, ViewStyles.options(ViewKind.CARD, AppSettings()).map { it.title })
         assertNotNull("tilt changes the 서재 views", ui.tilt)
         assertEquals(LibraryStyle.entries.map { ViewStyles.label(it) }, ViewStyles.options(ViewKind.LIBRARY, AppSettings()).map { it.title })
-        // None drawable: no row does nothing.
         val bare = SettingsState.root(AppSettings(), 0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = emptySet(), cardViews = emptySet())
         assertNull(bare.libraryView)
         assertNull(bare.cardView)
         assertNull(bare.tilt)
 
-        // One kind drawable: only its row, plus tilt; the picker offers 목록 and the drawable styles only.
-        val some = SettingsState.root(AppSettings(libraryStyle = LibraryStyle.ARCHIVE_VAULT), 0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = setOf(LibraryStyle.GLASS_PRISM), cardViews = emptySet())
+        val some = SettingsState.root(AppSettings(libraryStyle = LibraryStyle.FLOPPY_CRT), 0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = setOf(LibraryStyle.CD_JEWEL_CASE), cardViews = emptySet())
         assertEquals("스튜디오 목록", some.libraryView!!.value)
         assertNull(some.cardView)
         assertNotNull(some.tilt)
-        val lib = ViewStyles.options(ViewKind.LIBRARY, AppSettings(libraryStyle = LibraryStyle.ARCHIVE_VAULT), library = setOf(LibraryStyle.GLASS_PRISM))
-        assertEquals(listOf("유리 프리즘", "스튜디오 목록"), lib.map { it.title })
+        val lib = ViewStyles.options(ViewKind.LIBRARY, AppSettings(libraryStyle = LibraryStyle.FLOPPY_CRT), library = setOf(LibraryStyle.CD_JEWEL_CASE))
+        assertEquals(listOf("CD 케이스", "스튜디오 목록"), lib.map { it.title })
         assertEquals(listOf(false, true), lib.map { it.selected })
         assertEquals(listOf("목록"), ViewStyles.options(ViewKind.CARD, AppSettings(), cards = emptySet()).map { it.title })
     }
