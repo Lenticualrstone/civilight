@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.library.projectsettings
 
+import io.github.lenticualrstone.civilight.domain.world.map.Travel
 import io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldSettings
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationKinds
@@ -65,7 +66,7 @@ object ProjectSettingsRows {
         ProjectLinkRow(ProjectSettingsTarget.LEVELS, ProjectSettingsCopy.LEVELS, doc.project.structure.levels.joinToString(" › "), ProjectSettingsCopy.CHANGE),
         worldTime(doc),
         notation(doc),
-        // (0.2.0 S-3, WLD-47) No `이동 수단` row: travel modes are hidden (stored modes kept).
+        ProjectLinkRow(ProjectSettingsTarget.TRAVEL, ProjectSettingsCopy.TRAVEL, Travel.modes(doc).joinToString(" · ") { Travel.modeLabel(it) }, ProjectSettingsCopy.CHANGE),
         ProjectLinkRow(ProjectSettingsTarget.DAY_BANDS, ProjectSettingsCopy.DAY_BANDS, dayBands(doc), ProjectSettingsCopy.CHANGE),
     )
 

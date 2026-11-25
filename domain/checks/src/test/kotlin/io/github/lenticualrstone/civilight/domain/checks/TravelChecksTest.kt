@@ -92,6 +92,19 @@ class TravelChecksTest {
         assertEquals("하르트", pair.tag)
     }
 
+    /** Rule 19: the no-scale row names both places, so a hidden place keeps it out while locked. */
+    @Test
+    fun noScaleRowWithAHiddenPlaceStaysOutWhileLocked() {
+        val noScale = doc.copy(maps = doc.maps.mapValues { (k, m) -> if (k == K.MAP_LOWER_DISTRICT) m.copy(scale = null) else m })
+        val hidden = noScale.copy(world = noScale.world.copy(places = noScale.world.places.map { if (it.key == K.PLACE_UPPER_GATE) it.copy(hidden = true) else it }))
+        val pair = { unlocked: Boolean ->
+            Fx.run(hidden, Fx.inputs(hiddenUnlocked = unlocked)).ofType(CheckType.TRAVEL_NO_SCALE)
+                .single { it.subjectKeys == listOf(K.SCENE_1_7_2, K.SCENE_1_7_3) }
+        }
+        assertTrue(pair(false).lockedHidden)
+        assertTrue(!pair(true).lockedHidden)
+    }
+
     /** STO-30 compact rows: `▲ 같은 때 두 장소 · 하르트 | … · 둘 다 …` (row 11), then `동시에 두 장소` (row 12). */
     @Test
     fun trv09_trv10_sameTimeAndSimultaneousRows() {

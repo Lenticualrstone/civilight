@@ -97,11 +97,14 @@ data class CondRowUi(val index: Int, val name: String, val small: String, val ce
 /**
  * 글로 설명 (WLD-61) as pure functions. Reading: the on-device language model reader is a stub
  * (`needsExternal`; `LanguageModelConditionReader`), so `기기 안` falls back to the on-device keyword
- * reader; `클라우드` is a stub that sends nothing and reads nothing. Names link only to live project
+ * reader; `클라우드` is a stub that sends nothing and reads nothing, so it is not offered (0.3.0). Names link only to live project
  * places (`TextConditions.resolve`: never invented). Conditions bias the generator's input; the
  * map is always generated on device and stays seed-reproducible.
  */
 object TextMapFlow {
+    /** The only engine offered: `기기 안` (the keyword reader on device; nothing is sent anywhere). */
+    const val ON_DEVICE: Int = 0
+
     /** Live, unhidden pages with text, as `함께 읽기` sources. */
     fun pages(doc: ProjectDoc): List<Pair<Key, String>> = doc.pages.values
         .filter { it.deletedAt == null && !it.hidden && RichDocEdit.textOf(it.blocks).isNotBlank() }
@@ -129,8 +132,8 @@ object TextMapFlow {
      * Reads the text (plus the pages read along) into conditions. The author's own conditions stay;
      * the earlier read ones are replaced. A reading with no reader keeps everything and marks it.
      */
-    /** The input of a reading: text, engine and sources. */
-    fun readSignature(s: TextMapState): String = listOf(s.text, s.engine.toString(), s.offSources.sorted().joinToString(",")).joinToString("\u0001")
+    /** The input of a reading: text and sources (one engine, on device, so the stored engine is not part of it). */
+    fun readSignature(s: TextMapState): String = listOf(s.text, s.offSources.sorted().joinToString(",")).joinToString("\u0001")
 
     /** True when [s]'s input was already read. */
     fun isRead(s: TextMapState): Boolean = s.readOf == readSignature(s)
@@ -142,7 +145,8 @@ object TextMapFlow {
             .mapNotNull { (k, _) -> doc.pages[k]?.let { RichDocEdit.textOf(it.blocks) } }
         val full = (listOf(s.text) + pageTexts).joinToString("\n")
         if (s.text.isBlank()) return s.copy(conditions = s.conditions.filterNot { it.fromText }, unreadable = false)
-        return when (val r = readWith(s.engine, full, names)) {
+        // On device only (0.3.0): a stored `클라우드` (engine 1) from an older draft reads on device too.
+        return when (val r = readWith(ON_DEVICE, full, names)) {
             is ReadResult.Unavailable -> s.copy(unreadable = true)
             is ReadResult.Read -> {
                 val read = TextConditions.resolve(doc, r.readings, ctx).map { c ->

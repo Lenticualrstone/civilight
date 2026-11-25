@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.map.edit
 
 import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
+import io.github.lenticualrstone.civilight.feature.map.common.RouteLines
 import io.github.lenticualrstone.civilight.domain.world.common.StoryCodes
 import io.github.lenticualrstone.civilight.domain.world.map.MapEdits
 import io.github.lenticualrstone.civilight.domain.world.map.DetailEdits
@@ -259,7 +260,7 @@ object EditState {
         if (s.tool == io.github.lenticualrstone.civilight.feature.map.edit.EditTool.ROUTE && s.route != null) {
             val draft = s.routeDraft
             val km = MapScales.kmPerUnit(doc, map)?.let { Travel.number(Math.round(it * draft.length(map)).toDouble()) }
-            return PropsUi.RouteDraftProps(MapCopy.ROUTE_DRAWING, MapCopy.routeDraftBar(draft.points.size, km), draft.points.size >= 2)
+            return PropsUi.RouteDraftProps(MapCopy.ROUTE_DRAWING, RouteLines.draftBar(map, draft.points.size, km), draft.points.size >= 2)
         }
         val line = s.line
         if ((s.tool == EditTool.RIVER || s.tool == EditTool.ROAD) && line != null) {
@@ -267,7 +268,7 @@ object EditState {
                 Travel.number(Math.round(k * line.zipWithNext { a, b -> MapGeometry.distance(a, b) }.sum()).toDouble())
             }
             val title = if (s.tool == EditTool.RIVER) MapCopy.TOOL_RIVER else MapCopy.TOOL_ROAD
-            return PropsUi.LineDraftProps(title, MapCopy.routeDraftBar(line.size, km), line.size >= 2)
+            return PropsUi.LineDraftProps(title, RouteLines.draftBar(map, line.size, km), line.size >= 2)
         }
         val key = s.selected ?: return null
         scene.stamps.firstOrNull { it.key == key }?.let { st ->
@@ -301,8 +302,9 @@ object EditState {
             )
         }
         map.routes.firstOrNull { it.key == key }?.let { r ->
-            val sheet = Routes.sheet(doc, map, r)
-            return PropsUi.RouteProps(r.key, sheet.title, sheet, modeChips(doc, r), revealLabel(doc, r.revealPoint), layerLabel(map, r.layerKey))
+            val sheet = RouteLines.sheet(doc, map, r, scene.pins.mapTo(HashSet()) { it.key })
+            val modes = if (MapOffers.showsScale(map)) modeChips(doc, r) else emptyList()
+            return PropsUi.RouteProps(r.key, sheet.title, sheet, modes, revealLabel(doc, r.revealPoint), layerLabel(map, r.layerKey))
         }
         map.labels.firstOrNull { it.key == key }?.let { l ->
             return PropsUi.LabelProps(

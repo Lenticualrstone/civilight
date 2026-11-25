@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.map.canvas
 
 import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
+import io.github.lenticualrstone.civilight.feature.map.common.RouteLines
 import io.github.lenticualrstone.civilight.domain.world.map.MapReveal
 import io.github.lenticualrstone.civilight.domain.world.map.OverlayKind
 import io.github.lenticualrstone.civilight.domain.world.map.RegionShapes
@@ -130,12 +131,16 @@ object MapScenes {
             val dim = dimOf(r.key, r.layerKey) ?: return@mapNotNull null
             SceneRegion(r.key, r.name, r.color, RegionShapes.shapeAt(doc, map.key, r, lens), dim)
         }
-        // (0.2.0, WLD-75) Routes are hidden: kept in the map, never drawn.
+        val drawnPins = pins.mapTo(HashSet()) { it.key }
+        // Rule 19: a route that passes a pin of a hidden place is not drawn while locked, so the line never shows
+        // where that place is (its pin is masked). A switched-off layer or a pin not yet revealed does not count.
+        val maskedPins = map.pins.filter { MapReveal.isMasked(doc, it, hiddenOpen) }.mapTo(HashSet()) { it.key }
         val routes = if (!MapOffers.DRAWS_ROUTES) emptyList() else map.routes.mapNotNull { r ->
+            if (r.points.any { it.pinKey in maskedPins }) return@mapNotNull null
             val dim = dimOf(r.key, r.layerKey) ?: return@mapNotNull null
             val points = Routes.points(map, r)
             if (points.size < 2) return@mapNotNull null
-            SceneRoute(r.key, points, Routes.sheet(doc, map, r).mapLabel, dim)
+            SceneRoute(r.key, points, RouteLines.sheet(doc, map, r, drawnPins).mapLabel, dim)
         }
         val labels = map.labels.mapNotNull { l ->
             val dim = dimOf(l.key, l.layerKey) ?: return@mapNotNull null

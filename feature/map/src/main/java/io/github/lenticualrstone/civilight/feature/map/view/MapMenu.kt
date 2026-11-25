@@ -50,7 +50,7 @@ object MapMenu {
     fun rows(map: WorldMap, screen: MapMenuScreen): List<MapMenuRow> {
         val out = ArrayList<MapMenuRow>()
         out += MapMenuRow(MapMenuAction.RENAME, MapCopy.MAP_NAME, map.name)
-        // (0.2.0, WLD-75) Format editors, re-roll and 인물 동선 are hidden; their data stays.
+        // 인물 동선 waits for the distances pass (MapOffers.OFFERS_TRACK).
         if (MapOffers.OFFERS_GENERATION && screen != MapMenuScreen.NODE) {
             formatEditTitle(map)?.let { out += MapMenuRow(MapMenuAction.FORMAT_EDIT, it) }
             if (map.baseKind.known == MapBaseKind.GENERATED && map.generation != null) {

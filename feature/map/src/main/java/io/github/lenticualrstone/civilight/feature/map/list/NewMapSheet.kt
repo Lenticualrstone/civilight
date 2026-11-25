@@ -133,7 +133,7 @@ private fun OptionRow(option: NewMapOption, selected: Boolean, enabled: Boolean,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(colors.tint), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(colors.tint), contentAlignment = Alignment.Center) {
             CivilightIcon(option.icon, null, size = 20.dp, tint = if (selected) colors.acc else colors.ink2)
         }
         Column(Modifier.weight(1f)) {

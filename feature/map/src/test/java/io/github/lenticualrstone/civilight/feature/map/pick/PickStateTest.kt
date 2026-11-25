@@ -73,15 +73,13 @@ class PickStateTest {
     }
 
     @Test
-    fun `WLD-41 a view-only map keeps its pins pickable but offers no new pin`() {
+    fun `WLD-41 every pickable map offers a new pin, a node map is not pickable`() {
         val generated = doc.maps.getValue(K.MAP_LOWER_DISTRICT)
-        assertFalse(io.github.lenticualrstone.civilight.feature.map.common.MapOffers.editable(generated))
+        assertTrue(io.github.lenticualrstone.civilight.feature.map.common.MapOffers.canDropPin(generated))
         val ref = PickState.pick(doc, K.MAP_LOWER_DISTRICT, Point(0.45f, 0.40f), MapHit.Pin(K.PIN_ASH_MARKET), false, LensPoint.Latest, false)
         assertEquals(PlaceRef(PlaceRefKind.PLACE, K.PLACE_ASH_MARKET), ref)
-        assertFalse(PickState.canDropPin(doc, K.MAP_LOWER_DISTRICT))
-        val image = generated.copy(baseKind = io.github.lenticualrstone.civilight.model.map.MapBaseKind.IMAGE.open())
-        val withImage = doc.copy(maps = doc.maps + (image.key to image))
-        assertTrue(PickState.canDropPin(withImage, K.MAP_LOWER_DISTRICT))
-        assertFalse(PickState.canDropPin(withImage, K.MAP_ASH_MARKET))
+        assertTrue(PickState.canDropPin(doc, K.MAP_LOWER_DISTRICT))
+        assertTrue(PickState.canDropPin(doc, K.MAP_WORLD))
+        assertFalse(PickState.canDropPin(doc, K.MAP_ASH_MARKET))
     }
 }

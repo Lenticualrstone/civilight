@@ -180,14 +180,18 @@ fun ColumnScope.PropsPanel(props: PropsUi, readOnly: Boolean, actions: PanelActi
         }
         is PropsUi.RouteProps -> {
             CardHeader(MapCopy.ROUTE, actions::deselect)
-            CivilightText(props.title, type.itemTitle, maxLines = 1)
-            props.sheet.duration?.let { CivilightText(it, type.stat) }
+            // Board `MapRouteC`: `A → B` with `38 km · 지점 3` on the same line, then `2일 4시간`. Without a scale the
+            // line reads `축척 없음` and `축척 맞추기` stands where the duration would be.
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CivilightText(props.sheet.detail, type.small, Modifier.weight(1f), color = colors.ink3)
-                props.sheet.action?.let { CivilightButton(it, actions::setScale, variant = ButtonVariant.COMPACT_GHOST) }
+                CivilightText(props.title, type.itemTitle, Modifier.weight(1f), maxLines = 1)
+                CivilightText(props.sheet.detail, type.small, Modifier.padding(start = 10.dp), color = colors.ink3, maxLines = 1)
             }
-            ChipFlow {
-                props.modes.forEach { m -> FilterChip(m.label, m.selected, { actions.setRouteMode(props.key, m.index) }, enabled = !readOnly || m.index == null) }
+            props.sheet.duration?.let { CivilightText(it, type.stat) }
+            props.sheet.action?.let { CivilightButton(it, actions::setScale, variant = ButtonVariant.COMPACT_GHOST, enabled = !readOnly) }
+            if (props.modes.isNotEmpty()) {
+                ChipFlow {
+                    props.modes.forEach { m -> FilterChip(m.label, m.selected, { actions.setRouteMode(props.key, m.index) }, enabled = !readOnly || m.index == null) }
+                }
             }
             CardRow(MapCopy.REVEAL_POINT, props.reveal, onClick = { actions.openReveal(props.key) })
             CardRow(MapCopy.LAYER, props.layer, onClick = { actions.openLayer(props.key) })

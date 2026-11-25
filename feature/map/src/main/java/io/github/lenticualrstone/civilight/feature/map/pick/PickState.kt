@@ -46,11 +46,10 @@ object PickState {
     fun pickableMaps(doc: ProjectDoc) = MapViews.liveMaps(doc).filterNot { MapScales.isNodeMap(it) }
 
     /**
-     * (0.2.0, S-3, WLD-41) Whether a tap on an empty spot of [mapKey] may offer `새 장소` (a place and a
-     * new pin): only on a map 0.2.0 edits (`MapOffers.editable`, an `IMAGE` map). Generated and sketch
-     * maps stay pickable for their existing pins and regions but get no new pin.
+     * (WLD-41) Whether a tap on an empty spot of [mapKey] may offer `새 장소` (a place and a new pin):
+     * on every pickable map ([MapOffers.canDropPin]).
      */
-    fun canDropPin(doc: ProjectDoc, mapKey: Key): Boolean = pickableMaps(doc).firstOrNull { it.key == mapKey }?.let(MapOffers::editable) == true
+    fun canDropPin(doc: ProjectDoc, mapKey: Key): Boolean = pickableMaps(doc).firstOrNull { it.key == mapKey }?.let(MapOffers::canDropPin) == true
 
     fun scenePlace(doc: ProjectDoc, sceneKey: Key?): PlaceRef? = sceneKey?.let { k -> doc.manuscript.liveScenes.firstOrNull { it.key == k }?.place }
 

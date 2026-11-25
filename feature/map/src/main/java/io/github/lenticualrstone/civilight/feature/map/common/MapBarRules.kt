@@ -17,6 +17,13 @@ object MapBars {
     const val SPLIT = "split"
     const val PANEL = "panel"
 
+    /**
+     * Whether the inner side panel is drawn now: on the inner screen while it is open. Closed, the screen falls back
+     * to the cover's cards above the tool bar (`[PROPOSED]`: no board draws the inner screen with its panel closed),
+     * so a route draft's `되돌리기 · 완료`, a picked item's properties and the palettes stay reachable.
+     */
+    fun panelShown(inner: Boolean, closed: Boolean): Boolean = inner && !closed
+
     /** 지도 보기: `핀 옮기기` first, then the cover place sheet (inner draws the place as a side card), else the tools. */
     fun view(moving: Boolean, place: Boolean, inner: Boolean): String = when {
         moving -> MOVE

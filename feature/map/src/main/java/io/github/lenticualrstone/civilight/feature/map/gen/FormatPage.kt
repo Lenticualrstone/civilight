@@ -77,7 +77,7 @@ internal fun FormatPage(
                 val columns = GridFill.columns(maxWidth.value, tile)
                 val gap = GridFill.gap(maxWidth.value, tile, columns).dp
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    GridFill.rows(FormatCard.entries.toList(), columns).forEach { row ->
+                    GridFill.rows(FormatCard.shown, columns).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                             row.forEach { card ->
                                 val format = card.format
@@ -115,9 +115,39 @@ private fun TextCardPreview() {
     }
 }
 
+/**
+ * The `노드` card's preview (board `MapFormat`, `scr_mapgen.node_mini`): five node boxes joined by lines on `bg`,
+ * drawn at the board's numbers and centred in the tile.
+ */
 @Composable
 private fun NodeCardPreview() {
-    Box(Modifier.fillMaxSize().background(CivilightTheme.colors.raise), contentAlignment = Alignment.Center) {
-        CivilightIcon(IconId.Node, null, size = 28.dp, tint = CivilightTheme.colors.ink2)
+    val colors = CivilightTheme.colors
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize().background(colors.bg)) {
+        val u = density
+        val ox = (size.width - NodeMini.WIDTH * u) / 2f
+        val oy = (size.height - NodeMini.HEIGHT * u) / 2f
+        fun at(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(ox + x * u, oy + y * u)
+        NodeMini.LINKS.forEach { (a, b) -> drawLine(colors.ink3, at(a.first, a.second), at(b.first, b.second), strokeWidth = u) }
+        val box = androidx.compose.ui.geometry.Size(NodeMini.BOX_W * u, NodeMini.BOX_H * u)
+        val r = androidx.compose.ui.geometry.CornerRadius(5f * u)
+        NodeMini.BOXES.forEach { (x, y) ->
+            drawRoundRect(colors.raise, at(x, y), box, r)
+            drawRoundRect(colors.ink3, at(x, y), box, r, style = androidx.compose.ui.graphics.drawscope.Stroke(u))
+        }
     }
+}
+
+/** The board's mini node graph, in dp (`node_mini`: boxes 34 × 18, radius 5). */
+internal object NodeMini {
+    const val BOX_W = 34f
+    const val BOX_H = 18f
+    const val WIDTH = 145f
+    const val HEIGHT = 102f
+    val BOXES: List<Pair<Float, Float>> = listOf(23f to 9f, 23f to 48f, 7f to 84f, 95f to 84f, 111f to 66f)
+    val LINKS: List<Pair<Pair<Float, Float>, Pair<Float, Float>>> = listOf(
+        (40f to 27f) to (40f to 48f),
+        (40f to 66f) to (24f to 84f),
+        (40f to 66f) to (112f to 84f),
+        (112f to 102f) to (128f to 84f),
+    )
 }

@@ -27,15 +27,16 @@ class OnboardingGuideTest {
         // (emulator QA 2026-11-23: those cards floated with nothing marked).
         val counts = mapOf(
             TourModule.SCRIPT to 3, TourModule.CAST to 3, TourModule.WORLD_TIMELINE to 2, TourModule.RECORDER to 3,
-            TourModule.LIBRARY_HIDING to 3, TourModule.MAP to 2, TourModule.ROUTE_PLACE_TIME to 2,
+            TourModule.LIBRARY_HIDING to 3, TourModule.MAP to 3, TourModule.ROUTE_PLACE_TIME to 2,
         )
         TourModule.entries.forEach { assertEquals(it.name, counts.getValue(it), ModuleTours.stepCount(it)) }
         assertEquals(listOf("공개 시점", "용어 잇기"), ModuleTours.steps(TourModule.WORLD_TIMELINE).map { it.title })
         assertEquals(listOf("장소와 때", "인물 동선"), ModuleTours.steps(TourModule.ROUTE_PLACE_TIME).map { it.title })
-        // (0.2.0 S-3) The map tour has no `경로` step and its tool row names no `경로`; 인물 동선's tour is not offered.
-        assertEquals(listOf("도구 줄", "보이는 시점"), ModuleTours.steps(TourModule.MAP).map { it.title })
-        assertTrue(ModuleTours.steps(TourModule.MAP).none { "경로" in it.sub })
-        assertEquals(TourModule.entries - TourModule.ROUTE_PLACE_TIME - TourModule.MAP, ModuleTours.offered)
+        // (0.3.0) The map tour is back with its `경로` step (0.1.0 copy), and 인물 동선 · 장소와 때 is offered again.
+        assertEquals(listOf("도구 줄", "경로", "보이는 시점"), ModuleTours.steps(TourModule.MAP).map { it.title })
+        assertTrue("경로" in ModuleTours.steps(TourModule.MAP).first().sub)
+        assertEquals("거리 · 이동 수단 → 걸리는 날", ModuleTours.steps(TourModule.MAP)[1].sub)
+        assertEquals(TourModule.entries, ModuleTours.offered)
         val script = ModuleTours.steps(TourModule.SCRIPT)
         assertEquals("명령 칸" to "이동 · 검색 · 블록 추가 · 마이크", script[0].title to script[0].sub)
         assertEquals("블록을 오른쪽으로" to "시간 · 참고 · 속성 → 옆 패널 탭", script[1].title to script[1].sub)

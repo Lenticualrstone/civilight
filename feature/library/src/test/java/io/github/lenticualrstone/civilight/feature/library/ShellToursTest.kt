@@ -39,8 +39,8 @@ class ShellToursTest {
             CharacterTrack(p),
         )
         assertEquals(
-            // (0.2.0 S-3, LIB-96) 지도 만들기 and 인물 동선 tours are not offered: their routes host none.
-            listOf(TourModule.SCRIPT, TourModule.CAST, TourModule.WORLD_TIMELINE, TourModule.RECORDER, null, null),
+            // (0.3.0) 지도 만들기 runs on the map editor again, 인물 동선 · 장소와 때 on 인물 동선.
+            listOf(TourModule.SCRIPT, TourModule.CAST, TourModule.WORLD_TIMELINE, TourModule.RECORDER, TourModule.MAP, TourModule.ROUTE_PLACE_TIME),
             routes.map(ShellTours::moduleOf),
         )
         // List or detail neighbours never run a second copy of the same tour.

@@ -32,6 +32,11 @@ import io.github.lenticualrstone.civilight.feature.map.common.MapEnv
 import io.github.lenticualrstone.civilight.feature.map.common.MapNav
 import io.github.lenticualrstone.civilight.feature.map.common.mapBack
 import io.github.lenticualrstone.civilight.navigation.MapList
+import io.github.lenticualrstone.civilight.navigation.MapView as MapViewRoute
+import io.github.lenticualrstone.civilight.designsystem.component.ListRow
+import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
@@ -65,8 +70,8 @@ fun MapListScreen(route: MapList, deps: FeatureDeps) {
     ) { padding ->
         val inner = LocalWindowLayout.current.isInner
         Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())) {
-            // (0.2.0, WLD-75, U-15.1) The list's first row `＋ 새 지도` (class b) replaces the head `+`; it opens the
-            // image picker at once. Not drawn in a read-only project (U-15.10).
+            // (U-15.1) The list's first row `＋ 새 지도` (class b) stands for the board's head `+`; it opens the `새 지도`
+            // sheet. Not drawn in a read-only project (U-15.10).
             if (!readOnly) CreateRow(MapCopy.NEW_MAP, { newMap.open() }, Modifier.padding(horizontal = 8.dp))
             // Loading, empty and filled swap with a crossfade; only a change of kind animates, so adding a map does not.
             ContentSwap(ui, contentKey = { list -> if (list == null) "loading" else if (list.cards.isEmpty()) "empty" else "cards" }) { list ->
@@ -77,20 +82,36 @@ fun MapListScreen(route: MapList, deps: FeatureDeps) {
                         title = list.section,
                         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 48.dp),
                     )
-                    else -> SnapCardRow(
-                        items = list.cards,
-                        key = { it.key },
-                        kind = CardKind.RECENT,
-                        inner = inner,
-                        title = list.section,
-                        showPager = false,
-                        modifier = Modifier.padding(top = 4.dp),
-                    ) { card, imageModifier ->
-                        MapCard(card, imageModifier) { MapNav.open(deps.navigator, doc, route.projectKey, card.key) }
+                    else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        SnapCardRow(
+                            items = list.cards,
+                            key = { it.key },
+                            kind = CardKind.RECENT,
+                            inner = inner,
+                            title = list.section,
+                            showPager = false,
+                            modifier = Modifier.padding(top = 4.dp),
+                        ) { card, imageModifier ->
+                            MapCard(card, imageModifier) { MapNav.open(deps.navigator, doc, route.projectKey, card.key) }
+                        }
+                        RecentEdits(list.recent, Modifier.padding(horizontal = if (inner) 24.dp else 28.dp)) { row ->
+                            val target = MapNav.routeOf(doc, route.projectKey, row.mapKey)
+                            deps.navigator.push(if (target is MapViewRoute && row.pinKey != null) target.copy(focusPinKey = row.pinKey) else target)
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/** `최근 고친 곳` (board `MapNew`): section label and one row per recent edit; nothing when there is none. */
+@Composable
+private fun RecentEdits(rows: List<RecentEditUi>, modifier: Modifier, onOpen: (RecentEditUi) -> Unit) {
+    if (rows.isEmpty()) return
+    Column(modifier.padding(top = 22.dp, bottom = 24.dp)) {
+        SectionLabel(MapCopy.RECENT_EDITS, Modifier.padding(bottom = 6.dp))
+        rows.forEach { row -> ListRow(row.title, subtitle = row.sub, onClick = { onOpen(row) }) }
     }
 }
 

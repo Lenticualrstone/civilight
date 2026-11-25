@@ -52,6 +52,8 @@ class MapCopyLintTest {
         MapCopy.otherCandidates(3),
         MapCopy.sourceCount(MapCopy.SOURCE_PLACES, 6),
         MapCopy.sourcePage("하층 구역의 빛"),
+        MapCopy.recentTitle("하층 구역", MapCopy.REGION, "상층 관문 구역"),
+        MapCopy.recentSub("오늘 08:40", "세력 영역"),
     )
 
     @Test

@@ -31,8 +31,8 @@ enum class EditTool(val label: String, val icon: IconId) {
     ROAD(MapCopy.TOOL_ROAD, IconId.Line);
 
     companion object {
-        /** (0.2.0, WLD-75) The image map's bar: `이동 · 핀 · 영역 · 라벨 · 레이어` (`경로` hidden, its data kept). */
-        val BASE: List<EditTool> = listOf(MOVE, PIN, REGION, LABEL, LAYER)
+        /** The map editor's bar (board `MapEdit`): `이동 · 핀 · 영역 · 경로 · 라벨 · 레이어`. */
+        val BASE: List<EditTool> = listOf(MOVE, PIN, REGION, ROUTE, LABEL, LAYER)
         val DETAIL: List<EditTool> = listOf(MOVE, STAMP, RIVER, ROAD, LABEL, REGION, LAYER)
     }
 }

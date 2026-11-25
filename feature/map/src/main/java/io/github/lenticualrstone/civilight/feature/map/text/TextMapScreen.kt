@@ -49,7 +49,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.ConditionRow
 import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.ReadOnlyBanner
-import io.github.lenticualrstone.civilight.designsystem.component.SegmentedControl
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
@@ -101,7 +100,7 @@ private val DRAFT_JSON = Json { ignoreUnknownKeys = true }
 
 /**
  * 글로 설명 (WLD-61, boards `MapText`, `MapTextResult`, `MMapText`). Input: the text, `함께 읽기`
- * chips, `기기 안 · 클라우드`, `읽어 낸 조건 · N`, the condition rows (`⋯` edits), the hint and
+ * chips, `읽어 낸 조건 · N` (read on device only), the condition rows (`⋯` edits), the hint and
  * `조건 · 이 조건으로 만들기`. Result: the map, `조건 4 · 3 반영 · 닫기`, rows with `위치` or
  * `고치기`, `다른 후보 3 · 이 지도로 시작`; a tapped row highlights its area. Inner screens show the
  * same in a 560 dp column / card (`[PROPOSED]`).
@@ -259,7 +258,8 @@ private fun ColumnScope.InputPage(
             TextMapFlow.sources(doc, state).forEach { chip -> FilterChip(chip.label, chip.on, { set(TextMapFlow.toggleSource(state, chip.id)) }) }
         }
     }
-    SegmentedControl(MapCopy.ENGINES, state.engine, { set(state.copy(engine = it)) })
+    // (0.3.0) On device only: the keyword reader runs here and nothing leaves the device, so there is no
+    // `기기 안 · 클라우드` choice (the cloud reader reads nothing).
     if (state.unreadable) CivilightText(MapCopy.TEXT_UNREADABLE, type.small, color = colors.warn)
     CivilightText(TextMapFlow.readLine(state), type.sec, color = colors.ink3)
     // A row that is read from the text appears on its own, one after another (`rowIn`, D1).

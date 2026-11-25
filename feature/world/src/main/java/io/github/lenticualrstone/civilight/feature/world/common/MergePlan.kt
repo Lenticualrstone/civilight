@@ -70,8 +70,8 @@ data class MergeSheetUi(
  */
 object MergePlan {
     fun deleteSheet(impact: DeleteImpact, hiddenLocked: Boolean = false): DeleteSheetUi {
-        // (0.2.0, WLD-75) Routes are hidden: route ends are left out of the sheet (its `경로 끝 N` row and
-        // the `참조 N` total), display only; the delete itself still turns them dotted.
+        // While routes are closed ([SHOWS_ROUTES] false) route ends are left out of the sheet (its `경로 끝 N` row
+        // and the `참조 N` total), display only; the delete itself always turns them dotted.
         val shown = if (SHOWS_ROUTES) impact else impact.copy(references = impact.references.filterNot { it.kind == RefKind.ROUTE_END })
         val sheet = Messages.impactSheet(shown, hiddenLocked)
         return DeleteSheetUi(
@@ -152,7 +152,7 @@ object MergePlan {
 
     /** `대사 3 · @ 1 · 씬 등장 1`: the moved references by kind, in the trash rows' order. */
     fun refParts(counts: Map<RefKind, Int>): String = REF_ORDER.mapNotNull { (kind, word) ->
-        // (0.2.0, WLD-75) Route ends are not counted while routes are hidden.
+        // Route ends are not counted while routes are closed.
         if (kind == RefKind.ROUTE_END && !SHOWS_ROUTES) return@mapNotNull null
         counts[kind]?.takeIf { it > 0 }?.let { if (word == "@") "@ $it" else "$word $it" }
     }.joinToString(WorldCopy.SEP)
@@ -160,8 +160,8 @@ object MergePlan {
     /** `옮길 참조 · N` without the route ends while routes are hidden. */
     fun shownReferenceCount(total: Int, routeEnds: Int): Int = if (SHOWS_ROUTES) total else (total - routeEnds).coerceAtLeast(0)
 
-    /** (0.2.0, WLD-75) Routes have no surface in 0.2.0 (their data is kept). */
-    const val SHOWS_ROUTES: Boolean = false
+    /** (0.3.0) Routes are drawn and edited again, so the sheets count their pin ends (`경로 끝 N`). */
+    const val SHOWS_ROUTES: Boolean = true
 
     /** Pseudo field key of the `첫 공개` comparison row. */
     const val REVEAL_ROW = "reveal"

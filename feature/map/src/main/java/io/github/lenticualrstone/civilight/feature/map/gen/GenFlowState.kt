@@ -84,6 +84,12 @@ enum class FormatCard(val format: MapFormat?, val sub: String) {
 
     /** `육각 · 다각형 · 상세 지형 · 윤곽 · 노드` (the generator's format names) or `글로 설명`. */
     val title: String get() = format?.let(StepChoices::formatName) ?: MapCopy.FORMAT_TEXT
+
+    companion object {
+        /** The cards the picker draws: `글로 설명` only while it is offered (MapOffers.OFFERS_TEXT_TERRAIN). */
+        val shown: List<FormatCard>
+            get() = entries.filter { it.format != null || io.github.lenticualrstone.civilight.feature.map.common.MapOffers.OFFERS_TEXT_TERRAIN }
+    }
 }
 
 /** A step row: `강 · 0031`, locked or not, focused or not. */

@@ -2,7 +2,11 @@ package io.github.lenticualrstone.civilight.feature.map.edit
 
 import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
-import io.github.lenticualrstone.civilight.feature.map.common.HiddenRoute
+import io.github.lenticualrstone.civilight.feature.map.common.MapAside
+import io.github.lenticualrstone.civilight.designsystem.theme.HapticToken
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberHaptics
+import io.github.lenticualrstone.civilight.feature.map.common.MapAsideRules
+import io.github.lenticualrstone.civilight.feature.map.common.rememberMapAsideState
 import io.github.lenticualrstone.civilight.ui.tour.TourStepAbsent
 import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import androidx.compose.foundation.layout.Arrangement
@@ -16,9 +20,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,7 +43,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.MapToolbar
 import io.github.lenticualrstone.civilight.designsystem.component.MapVertex
 import io.github.lenticualrstone.civilight.designsystem.component.ReadOnlyBanner
 import io.github.lenticualrstone.civilight.designsystem.component.ScaleBar
-import io.github.lenticualrstone.civilight.designsystem.component.SidePanel
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
@@ -124,10 +128,10 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
     val route = EditorRoute(projectKey, mapKey)
     val vm = entryViewModel { MapEditViewModel(route.projectKey, route.mapKey, MapEnv.of(deps)) }
     val doc by vm.doc.collectAsState()
-    // (0.2.0, WLD-75, D11) Only image maps are edited; any other map opens view-only in 지도 보기 instead.
-    val editable = doc?.maps?.get(route.mapKey)?.let(MapOffers::editable)
-    if (editable == false) {
-        HiddenRoute(deps, io.github.lenticualrstone.civilight.navigation.MapView(route.projectKey, route.mapKey))
+    // A node map is edited in the node editor; a stale MapEdit for one is sent there.
+    val nodeMap = doc?.maps?.get(route.mapKey)?.let { !MapOffers.canEdit(it) }
+    if (nodeMap == true) {
+        LaunchedEffect(route.mapKey) { deps.navigator.replace(io.github.lenticualrstone.civilight.navigation.NodeMap(route.projectKey, route.mapKey)) }
         return
     }
     val readOnly by vm.readOnly.collectAsState()
@@ -135,6 +139,8 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
     val sheets = rememberSheetHost()
     val gate = rememberHiddenGate(route.projectKey)
     val inner = LocalWindowLayout.current.isInner
+    val aside = rememberMapAsideState()
+    val haptics = rememberHaptics()
 
     var editorText by rememberSaveable(route.mapKey) { mutableStateOf(EditorState().encode()) }
     var viewportArray by rememberSaveable(route.mapKey) { mutableStateOf(Viewport.UNSET.toArray()) }
@@ -196,7 +202,11 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
             override fun setScale() = deps.navigator.push(MapScaleRoute(route.projectKey, route.mapKey))
             override fun movePin(pinKey: Key) = set(Editor.startMovePin(s(), pinKey))
             override fun openPlaceCard(placeKey: Key) = deps.navigator.push(PlaceCard(route.projectKey, placeKey))
-            override fun setStampSize(stampKey: Key, size: Int) { vm.updateStamp(stampKey) { it.copy(size = size) } }
+            override fun setStampSize(stampKey: Key, size: Int) {
+                val old = vm.doc.value?.maps?.get(route.mapKey)?.stamps?.firstOrNull { it.key == stampKey }?.size
+                if (old != null && EditHaptics.sizePicked(old, size)) haptics.perform(HapticToken.TICK)
+                vm.updateStamp(stampKey) { it.copy(size = size) }
+            }
             override fun openStampPlace(stampKey: Key) = sheets.open(StampPlaceSheet(stampKey))
             override fun moveStamp() = set(Editor.startMoveStamp(s()))
             override fun undoLinePoint() = set(Editor.undoLinePoint(s()))
@@ -214,8 +224,8 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
         }
     }
 
-    // (0.2.0, S-9) Map tour steps this editor has no target for (the removed `경로` tool) are skipped.
-    MapTourSteps.absent().forEach { step -> key(step) { TourStepAbsent(step) } }
+    // 상세 지형 · 편집 has no `경로` cell: the tour skips that step there.
+    if (detail) TourStepAbsent(MapTourSteps.ROUTE)
     CivilightScreen(
         title = if (detail) MapCopy.DETAIL_TITLE else ui?.title.orEmpty(),
         smallLine = if (detail) map?.name else ui?.small,
@@ -389,6 +399,7 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
                 onTap = { p, hit ->
                     val m = map ?: return@MapCanvas
                     val out = Editor.tap(editor, m, p, hit)
+                    if (EditHaptics.placedPoint(editor, out.state) || out.commit is EditorCommit.PlaceStamp) haptics.perform(HapticToken.TICK)
                     set(out.state)
                     when (out.effect) {
                         EditorEffect.PICK_PLACE -> { pinQuery = ""; sheets.open(PinPlaceSheet(p.x, p.y)) }
@@ -409,8 +420,12 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
                             }
                         }
                         is EditorCommit.MoveCurveHandle -> when {
-                            m.stamps.any { it.key == c.labelKey } ->
-                                if (c.index == StampHandles.ROTATE) vm.rotateStampToward(c.labelKey, c.to) else vm.resizeStampToward(c.labelKey, c.to)
+                            m.stamps.any { it.key == c.labelKey } -> {
+                                val st = m.stamps.first { it.key == c.labelKey }
+                                val rotate = c.index == StampHandles.ROTATE
+                                if (if (rotate) EditHaptics.rotationDetent(st, c.to) else EditHaptics.sizeStep(st, c.to)) haptics.perform(HapticToken.TICK)
+                                if (rotate) vm.rotateStampToward(c.labelKey, c.to) else vm.resizeStampToward(c.labelKey, c.to)
+                            }
                             else -> {
                                 val curve = m.labels.firstOrNull { it.key == c.labelKey }?.curve
                                 if (curve != null && c.index in curve.indices) {
@@ -488,14 +503,14 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
             val toolCells = remember(detail) { tools.map { MapTool(it.label, it.icon) } }
             val motion = CivilightTheme.motion
             val toolbar: @Composable (Modifier) -> Unit = { mod ->
-                // LIB-19 map tour: the tool bar is the hole of `도구 줄` (MapTourSteps; no `경로` cell in 0.2.0).
+                // LIB-19 map tour: the tool bar and its `경로` cell are the holes of `도구 줄` and `경로` (MapTourSteps).
                 MapToolbar(
                     tools.indexOf(editor.tool).coerceAtLeast(0),
                     { set(Editor.chooseTool(editor, tools[it], detail)) },
                     mod.tourTarget(MapTourSteps.TOOLBAR).animateContentSize(motion.move(CivilightMotion.standard)),
                     tools = toolCells,
                     label = MapCopy.TOOLBAR,
-                )
+                ) { i -> MapTourSteps.stepOfTool(tools[i])?.let { Modifier.tourTarget(it) } ?: Modifier }
             }
             val shapeEdit = editor.shapeEdit
             val shapeChoice = shapeEdit?.let { pending -> d?.let { ShapeEdits.choice(it, route.mapKey, pending.regionKey, lens) } as? EditChoice.TwoButtons }
@@ -529,15 +544,15 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
                             )
                         }
                     }
-                    MapBars.LAYERS -> GlassCard(mod.fillMaxWidth().heightIn(max = 320.dp)) {
+                    MapBars.LAYERS -> GlassCard((if (isInner) mod.width(360.dp) else mod.fillMaxWidth()).heightIn(max = 320.dp)) {
                         Column(Modifier.verticalScroll(rememberScrollState())) { LayersPanel(st.layers, b.readOnly, layerActions) }
                     }
                     MapBars.PROPS -> st.props?.let { props ->
-                        GlassCard(mod.fillMaxWidth().heightIn(max = 360.dp)) {
+                        GlassCard((if (isInner) mod.width(360.dp) else mod.fillMaxWidth()).heightIn(max = 360.dp)) {
                             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { PropsPanel(props, b.readOnly, actions, ed.compare) }
                         }
                     }
-                    MapBars.STAMPS -> GlassCard(mod.fillMaxWidth().heightIn(max = 320.dp)) {
+                    MapBars.STAMPS -> GlassCard((if (isInner) mod.width(360.dp) else mod.fillMaxWidth()).heightIn(max = 320.dp)) {
                         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             StampPalette(ed.stampKind, ed.stampSize, { set(Editor.chooseStamp(ed, it)) }, { set(Editor.chooseStampSize(ed, it)) })
                         }
@@ -546,13 +561,14 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
             }
             SidePanelHost(
                 inner,
-                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
+                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + MapAsideRules.TOP_GAP.dp, bottom = padding.calculateBottomPadding() + 12.dp),
             ) {
-                SidePanel(
-                    onClose = actions::deselect,
+                MapAside(
+                    state = aside,
                     tabs = if (detail) listOf(MapCopy.TAB_STAMPS, MapCopy.TAB_LEGEND, MapCopy.TAB_LAYERS) else listOf(MapCopy.TAB_PROPS, MapCopy.TAB_LAYERS, MapCopy.TAB_LIST),
                     selectedTab = editor.panelTab,
                     onSelectTab = { set(editor.copy(panelTab = it)) },
+                    onBack = if (editor.selected != null) actions::deselect else null,
                 ) {
                     TabContent(editor.panelTab) { tab ->
                         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -581,7 +597,7 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
             FoldSwitch(inner) { isInner ->
                 val kind = MapBars.edit(
                     moving != null, shapeChoice != null, editor.tool == EditTool.LAYER, state.props != null,
-                    detail && editor.tool == EditTool.STAMP, isInner,
+                    detail && editor.tool == EditTool.STAMP, MapBars.panelShown(isInner, aside.closed),
                 )
                 val slot = kind?.let { MapBarSlot(it, EditBar(state, editor, shapeChoice, shapeEdit, readOnly)) }
                 if (isInner) {

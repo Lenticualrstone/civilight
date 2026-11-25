@@ -30,8 +30,8 @@ class ProjectSettingsTest {
     fun `LIB-69 구조 rows read as the ProjSettings board`() {
         assertEquals("잿빛 새벽의 등불", ui.projectName)
         assertEquals(
-            // (0.2.0 S-3, WLD-47) no `이동 수단` row.
-            listOf(ProjectSettingsTarget.LEVELS, ProjectSettingsTarget.WORLD_TIME, ProjectSettingsTarget.NOTATION, ProjectSettingsTarget.DAY_BANDS),
+            // (0.3.0, WLD-47) the `이동 수단` row is back.
+            listOf(ProjectSettingsTarget.LEVELS, ProjectSettingsTarget.WORLD_TIME, ProjectSettingsTarget.NOTATION, ProjectSettingsTarget.TRAVEL, ProjectSettingsTarget.DAY_BANDS),
             ui.structure.map { it.target },
         )
         row(ProjectSettingsTarget.LEVELS).let {
@@ -49,7 +49,10 @@ class ProjectSettingsTest {
             assertTrue(it.sub, it.sub!!.endsWith(" · 연표는 기준 사건도"))
             assertEquals("에피소드 기준", it.value)
         }
-        assertTrue(ui.structure.none { it.target == ProjectSettingsTarget.TRAVEL })
+        row(ProjectSettingsTarget.TRAVEL).let {
+            assertEquals("이동 수단", it.title)
+            assertTrue(it.sub, it.sub!!.startsWith("도보 15 km · 8시간"))
+        }
         assertEquals("하루는 새벽 4시부터 · 저녁 17–20", row(ProjectSettingsTarget.DAY_BANDS).sub)
     }
 

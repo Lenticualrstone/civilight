@@ -20,11 +20,11 @@ class EditStateTest {
         val ui = build(EditorState())
         assertEquals("하층 구역 지도 · 편집", ui.title)
         assertEquals("세계 지도 › 하층 구역 지도", ui.small)
-        // (0.2.0, WLD-75) No scale bar and no route rows: distances are hidden, their data kept.
-        assertNull(ui.scale)
+        // The scale bar is back; routes are listed again.
+        assertEquals("1일 · 15 km", ui.scale)
         assertEquals(listOf("길"), ui.layers.map { it.name })
         assertTrue(ui.items.any { it.text == "핀 · 결사의 문" })
-        assertTrue(ui.items.none { it.text == "경로 · 결사의 문 → 상층 관문" })
+        assertTrue(ui.items.any { it.text == "경로 · 결사의 문 → 상층 관문" })
         assertNull(ui.props)
     }
 
@@ -51,11 +51,17 @@ class EditStateTest {
     }
 
     @Test
-    fun `WLD-75 routes are hidden - a stored route is not drawn and cannot be picked`() {
-        assertTrue(doc.maps.getValue(K.MAP_LOWER_DISTRICT).routes.any { it.key == K.ROUTE_GATE_TO_UPPER_GATE })
+    fun `WLD-43 a stored route is drawn and picked, its sheet reads distance, duration and modes`() {
         val ui = build(Editor.select(EditorState(), K.ROUTE_GATE_TO_UPPER_GATE))
-        assertNull(ui.props)
-        assertTrue(ui.items.none { it.key == K.ROUTE_GATE_TO_UPPER_GATE })
+        val props = ui.props as PropsUi.RouteProps
+        assertEquals("결사의 문 → 상층 관문", props.title)
+        assertEquals("2일 4시간", props.sheet.duration)
+        assertEquals("38 km · 지점 3", props.sheet.detail)
+        assertNull(props.sheet.action)
+        assertTrue(props.modes.isNotEmpty())
+        assertTrue(ui.items.any { it.key == K.ROUTE_GATE_TO_UPPER_GATE })
+        val drawing = build(EditorState(tool = EditTool.ROUTE))
+        assertTrue(drawing.props == null || drawing.props is PropsUi.RouteDraftProps)
     }
 
     @Test
@@ -94,7 +100,7 @@ class EditStateTest {
     }
 
     @Test
-    fun `route draft bar counts points and km on a scaled map`() {
+    fun `route draft bar counts points and km`() {
         var s = Editor.chooseTool(EditorState(), EditTool.ROUTE)
         val lower = doc.maps.getValue(K.MAP_LOWER_DISTRICT)
         s = Editor.tap(s, lower, Point(0.20f, 0.40f), null).state

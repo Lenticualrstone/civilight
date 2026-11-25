@@ -22,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightTextField
@@ -113,6 +115,7 @@ fun MapScaleScreen(route: MapScale, deps: FeatureDeps) {
     ) { padding ->
         if (d == null || map == null || draft == null || scene == null) return@CivilightScreen
         val ui = ScaleEdit.ui(d, scene, draft)
+        val accent = CivilightTheme.colors.acc
         Box(Modifier.fillMaxSize()) {
             MapCanvas(
                 base = MapBases.of(map),
@@ -121,6 +124,16 @@ fun MapScaleScreen(route: MapScale, deps: FeatureDeps) {
                 onViewportChange = { viewportArray = it.toArray() },
                 showRouteChips = false,
                 onTap = { p, _ -> if (!readOnly) set(ScaleEdit.tap(draft, scene, p)) },
+                // The measured line A → B (board `MapScale`: 2 dp in `acc`).
+                extraDraw = { scope ->
+                    val a = draft.a
+                    val b = draft.b
+                    if (a != null && b != null) {
+                        val sa = scope.screen(a)
+                        val sb = scope.screen(b)
+                        drawLine(accent, Offset(sa.x, sa.y), Offset(sb.x, sb.y), 2.dp.toPx(), cap = StrokeCap.Round)
+                    }
+                },
                 marks = { scope ->
                     draft.a?.let { p -> val s = scope.screen(p); MapValueChip(MapCopy.SCALE_A, Modifier.mapAt(s.x, s.y).appear()) }
                     draft.b?.let { p -> val s = scope.screen(p); MapValueChip(MapCopy.SCALE_B, Modifier.mapAt(s.x, s.y).appear()) }

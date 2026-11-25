@@ -20,23 +20,26 @@ class MapMenuTest {
     private val doc = MapFx.doc()
 
     @Test
-    fun `WLD-75 format editors, re-roll and 인물 동선 are hidden from every map menu`() {
+    fun `each format map offers its editor, generated maps the re-roll and 인물 동선`() {
         val world = doc.maps.getValue(K.MAP_WORLD)
-        assertEquals(listOf("이름", "지우기"), MapMenu.rows(world, MapMenuScreen.VIEW).map { it.title })
+        assertEquals(listOf("이름", "칸 칠하기", "단계 다시 만들기", "인물 동선", "지우기"), MapMenu.rows(world, MapMenuScreen.VIEW).map { it.title })
         val lower = doc.maps.getValue(K.MAP_LOWER_DISTRICT)
-        assertEquals(listOf("이름"), MapMenu.rows(lower, MapMenuScreen.EDIT).map { it.title })
+        assertEquals(listOf("이름", "상세 지형 · 편집", "단계 다시 만들기"), MapMenu.rows(lower, MapMenuScreen.EDIT).map { it.title })
         assertEquals("하층 구역 지도", MapMenu.rows(lower, MapMenuScreen.EDIT).first().subtitle)
         val node = doc.maps.getValue(K.MAP_ASH_MARKET)
         assertEquals(listOf(MapMenuAction.RENAME, MapMenuAction.DELETE), MapMenu.rows(node, MapMenuScreen.NODE).map { it.action })
+        assertTrue(MapMenu.rows(world, MapMenuScreen.VIEW).any { it.action == MapMenuAction.TRACK })
+        assertTrue("a node map has no 인물 동선", MapMenu.rows(node, MapMenuScreen.VIEW).none { it.action == MapMenuAction.TRACK })
     }
 
     @Test
-    fun `WLD-75 no re-roll row, whatever the generator version`() {
+    fun `a map from another generator version shows the re-roll refused`() {
         val world = doc.maps.getValue(K.MAP_WORLD)
         val old = world.copy(generation = world.generation!!.copy(generatorVersion = "gen-0"))
-        assertTrue(MapMenu.rows(old, MapMenuScreen.VIEW).none { it.action == MapMenuAction.REROLL })
+        val row = MapMenu.rows(old, MapMenuScreen.VIEW).first { it.action == MapMenuAction.REROLL }
+        assertFalse(row.enabled)
+        assertEquals(MapCopy.REROLL_OTHER_VERSION, row.subtitle)
         assertFalse(MapMenu.canReroll(old))
-        assertEquals("단계 다시 만들기", MapCopy.REROLL_TITLE)
     }
 
     @Test

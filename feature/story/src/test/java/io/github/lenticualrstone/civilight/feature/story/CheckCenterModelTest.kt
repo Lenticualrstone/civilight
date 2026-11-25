@@ -10,9 +10,11 @@ import io.github.lenticualrstone.civilight.feature.story.check.CheckFixes
 import io.github.lenticualrstone.civilight.feature.story.check.CheckModel
 import io.github.lenticualrstone.civilight.feature.story.check.FixEffect
 import io.github.lenticualrstone.civilight.feature.story.check.SpeakerFix
+import io.github.lenticualrstone.civilight.model.open
 import io.github.lenticualrstone.civilight.model.checks.CheckType
 import io.github.lenticualrstone.civilight.model.script.BlockKind
 import io.github.lenticualrstone.civilight.navigation.Script
+import io.github.lenticualrstone.civilight.navigation.MapScale
 import io.github.lenticualrstone.civilight.model.sample.ExampleKeys as K
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -126,7 +128,7 @@ class CheckCenterModelTest {
 
     @Test
     fun onlyButtonsWithAnEffectAreDrawn_andReadOnlyDrawsNoEdits() {
-        val unavailable = setOf(FixKind.RELINK_RECORD, FixKind.BULK_REPLACE, FixKind.FIX_SCALE)
+        val unavailable = setOf(FixKind.RELINK_RECORD, FixKind.BULK_REPLACE)
         for (r in report.results) {
             val shown = CheckFixes.shown(doc, p, r, r.actions, inputs).map { it.first.kind }
             val expected = r.actions.filter { a ->
@@ -140,13 +142,35 @@ class CheckCenterModelTest {
         }
     }
 
-    /** S-3 hides the map's distance tools: `◇ 축척 없음 › 축척 고치기` has no effect and is not drawn. */
+    /** (0.3.0) The map's distance tools are back: `◇ 축척 없음 › 축척 맞추기` opens that map's scale; without a map it is not drawn. */
     @Test
-    fun fixScaleIsUnavailableAndNotDrawn_S3() {
+    fun fixScaleOpensTheMapScale() {
         val row = item(CheckType.SPEAKER_MISSING)
-        val fix = FixAction("축척 고치기", FixKind.FIX_SCALE, target = K.SCENE_1_7_3)
-        assertEquals(FixEffect.Unavailable, CheckFixes.effect(doc, p, row, fix, inputs))
-        assertTrue(CheckFixes.shown(doc, p, row, listOf(fix), inputs).isEmpty())
+        val fix = FixAction("축척 맞추기", FixKind.FIX_SCALE, target = K.MAP_LOWER_DISTRICT)
+        assertEquals(FixEffect.Navigate(MapScale(p, K.MAP_LOWER_DISTRICT), detail = false), CheckFixes.effect(doc, p, row, fix, inputs))
+        assertEquals(1, CheckFixes.shown(doc, p, row, listOf(fix), inputs).size)
+        val noMap = fix.copy(target = null)
+        assertEquals(FixEffect.Unavailable, CheckFixes.effect(doc, p, row, noMap, inputs))
+        assertTrue(CheckFixes.shown(doc, p, row, listOf(noMap), inputs).isEmpty())
+        // A node map never reads a scale, so the fix is not offered there.
+        val lower = doc.maps.getValue(K.MAP_LOWER_DISTRICT)
+        val asNode = doc.copy(maps = doc.maps + (lower.key to lower.copy(format = io.github.lenticualrstone.civilight.model.map.MapFormat.NODE.open())))
+        assertEquals(FixEffect.Unavailable, CheckFixes.effect(asNode, p, row, fix, inputs))
+        assertTrue(CheckFixes.shown(asNode, p, row, listOf(fix), inputs).isEmpty())
+    }
+
+    /** A real `◇ 축척 없음 · 점검 못 함` row (travel check on, the route's map without a scale) draws `축척 맞추기`. */
+    @Test
+    fun noScaleRowDrawsFixScale() {
+        val lower = doc.maps.getValue(K.MAP_LOWER_DISTRICT)
+        val noScale = doc.copy(maps = doc.maps + (lower.key to lower.copy(scale = null)))
+        val on = inputs.copy(travel = inputs.travel.copy(checkTravel = true))
+        val r = ProjectChecks.run(noScale, on)
+        val row = r.results.first { it.checkType == CheckType.TRAVEL_NO_SCALE }
+        val shown = CheckFixes.shown(noScale, p, row, row.actions, on)
+        val fix = shown.single { it.first.kind == FixKind.FIX_SCALE }
+        assertEquals("축척 맞추기", fix.first.label)
+        assertTrue(fix.second is FixEffect.Navigate && (fix.second as FixEffect.Navigate).route is MapScale)
     }
 
     private fun hasTrashEntry(itemKey: String?): Boolean {

@@ -40,21 +40,37 @@ class MapScenesTest {
     }
 
     @Test
-    fun `WLD-75 routes are kept but not drawn, their domain chip is unchanged`() {
+    fun `routes are drawn again, their map chip carries the mode, duration and length`() {
         val scene = MapScenes.build(doc, lower, LensPoint.Latest, false, SceneMode.VIEW)
-        assertTrue(scene.routes.isEmpty())
+        val drawn = scene.routes.first { it.key == K.ROUTE_GATE_TO_UPPER_GATE }
+        assertEquals(Point(0.20f, 0.40f), drawn.points.first())
+        assertEquals("결사의 문 → 상층 관문 · 도보 2일 4시간 · 38 km", drawn.label)
+        // The stored 0.1.x scale is read as before.
         val route = lower.routes.first { it.key == K.ROUTE_GATE_TO_UPPER_GATE }
-        assertEquals(Point(0.20f, 0.40f), io.github.lenticualrstone.civilight.domain.world.map.Routes.points(lower, route).first())
         assertEquals("결사의 문 → 상층 관문 · 도보 2일 4시간 · 38 km", io.github.lenticualrstone.civilight.domain.world.map.Routes.sheet(doc, lower, route).mapLabel)
         assertEquals("하층 구역", scene.labels.single().text)
     }
 
     @Test
+    fun `a route through a hidden place's pin is not drawn while locked`() {
+        val hidden = doc.copy(world = doc.world.copy(places = doc.world.places.map { if (it.key == K.PLACE_UPPER_GATE) it.copy(hidden = true) else it }))
+        val m = hidden.maps.getValue(K.MAP_LOWER_DISTRICT)
+        val gatePin = m.pins.first { it.placeKey == K.PLACE_UPPER_GATE }
+        val locked = MapScenes.build(hidden, m, LensPoint.Latest, false, SceneMode.EDIT)
+        assertNull(locked.routes.firstOrNull { it.key == K.ROUTE_GATE_TO_UPPER_GATE })
+        locked.routes.forEach { r ->
+            assertFalse(r.label, "상층 관문" in r.label)
+            assertFalse(r.label, Point(gatePin.x, gatePin.y) in r.points)
+        }
+        val open = MapScenes.build(hidden, m, LensPoint.Latest, true, SceneMode.EDIT)
+        assertEquals("결사의 문 → 상층 관문 · 도보 2일 4시간 · 38 km", open.routes.first { it.key == K.ROUTE_GATE_TO_UPPER_GATE }.label)
+    }
+
+    @Test
     fun `a layer filter keeps only that layer`() {
         val scene = MapScenes.build(doc, lower, LensPoint.Latest, false, SceneMode.VIEW, layerFilter = K.mapLayer(2))
-        // (0.2.0, WLD-75) The layer's two routes are kept in the map but not drawn.
         assertEquals(2, lower.routes.count { it.layerKey == K.mapLayer(2) })
-        assertTrue(scene.routes.isEmpty())
+        assertEquals(lower.routes.filter { it.layerKey == K.mapLayer(2) }.map { it.key }.toSet(), scene.routes.map { it.key }.toSet())
         assertTrue(scene.pins.isEmpty())
         assertTrue(scene.regions.isEmpty())
     }

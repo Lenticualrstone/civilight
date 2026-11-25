@@ -74,6 +74,24 @@ class TrackSpecTest {
     }
 
     @Test
+    fun `while locked a leg never follows a route through a hidden place's pin`() {
+        var doc = base.copy(world = base.world.copy(places = base.world.places.map { if (it.key == K.PLACE_ARCHIVE_ROOM) it.copy(hidden = true) else it }))
+        val lower = doc.maps.getValue(K.MAP_LOWER_DISTRICT)
+        val through = lower.routes.map { r ->
+            if (r.key != K.ROUTE_GATE_TO_MARKET) r
+            else r.copy(points = listOf(r.points.first(), io.github.lenticualrstone.civilight.model.map.RoutePoint.pin(K.PIN_ARCHIVE_ROOM), r.points.last()))
+        }
+        doc = doc.copy(maps = doc.maps + (lower.key to lower.copy(routes = through)))
+        val cast = SceneCastSource.of(rienScenes.associateWith { listOf(K.RIEN) })
+        val locked = CharacterTracks(doc, StoryEngine(doc), cast).track(K.RIEN)!!.legs.single { it.from.sceneKey == K.SCENE_1_3_2 }
+        assertNull(locked.routeKey)
+        assertTrue(locked.estimated)
+        assertEquals(CharacterTrack.ESTIMATED, locked.label)
+        val open = CharacterTracks(doc, StoryEngine(doc), cast, hiddenUnlocked = true).track(K.RIEN)!!.legs.single { it.from.sceneKey == K.SCENE_1_3_2 }
+        assertEquals(K.ROUTE_GATE_TO_MARKET, open.routeKey)
+    }
+
+    @Test
     fun `track from the real cast skips deleted places and dots hidden scenes`() {
         var doc = WorldFixture.withTerm(base, K.TERM_BLACKOUT) { it } // no-op copy
         doc = doc.copy(world = doc.world.copy(places = doc.world.places.map { if (it.key == K.PLACE_ASH_MARKET) it.copy(deletedAt = 1L) else it }))

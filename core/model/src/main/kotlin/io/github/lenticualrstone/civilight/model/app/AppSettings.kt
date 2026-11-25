@@ -247,7 +247,10 @@ enum class PaneSplit(
         const val GALLERY = "gallery"
         const val SCRIPT_PANEL = "scriptPanel"
 
-        val ALL: List<String> = listOf(LIBRARY, HOME, CAST, WORLD, TIMELINE, RECORDER, CHECKS, GALLERY, SCRIPT_PANEL)
+        /** (0.3.0) The map screens' floating side panel (editor, node map, 상세 지형): closed or open only. */
+        const val MAP_PANEL = "mapPanel"
+
+        val ALL: List<String> = listOf(LIBRARY, HOME, CAST, WORLD, TIMELINE, RECORDER, CHECKS, GALLERY, SCRIPT_PANEL, MAP_PANEL)
     }
 
     companion object {

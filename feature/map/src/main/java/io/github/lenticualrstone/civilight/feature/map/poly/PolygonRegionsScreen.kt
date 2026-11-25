@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.map.poly
 
+import io.github.lenticualrstone.civilight.feature.map.common.MapAside
+import io.github.lenticualrstone.civilight.feature.map.common.MapAsideRules
+import io.github.lenticualrstone.civilight.feature.map.common.rememberMapAsideState
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,7 +48,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.MapToolbar
 import io.github.lenticualrstone.civilight.designsystem.component.MapValueChip
 import io.github.lenticualrstone.civilight.designsystem.component.ReadOnlyBanner
 import io.github.lenticualrstone.civilight.designsystem.component.SegmentedControl
-import io.github.lenticualrstone.civilight.designsystem.component.SidePanel
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.feature.map.MapCopy
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapCanvas
@@ -101,6 +104,7 @@ fun PolygonRegionsScreen(route: PolygonRegionsRoute, deps: FeatureDeps) {
     val sheets = rememberSheetHost()
     val gate = rememberHiddenGate(route.projectKey)
     val inner = LocalWindowLayout.current.isInner
+    val aside = rememberMapAsideState()
     var stateText by rememberSaveable(route.mapKey) { mutableStateOf(PolyState().encode()) }
     var viewportArray by rememberSaveable(route.mapKey) { mutableStateOf(Viewport.UNSET.toArray()) }
     val state = remember(stateText) { PolyState.decode(stateText) }
@@ -195,9 +199,9 @@ fun PolygonRegionsScreen(route: PolygonRegionsRoute, deps: FeatureDeps) {
             }
             SidePanelHost(
                 inner,
-                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
+                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + MapAsideRules.TOP_GAP.dp, bottom = padding.calculateBottomPadding() + 12.dp),
             ) {
-                SidePanel(onClose = { set(PolyEditor.select(state, null)) }) {
+                MapAside(state = aside, tabs = emptyList(), selectedTab = 0, onSelectTab = {}, onBack = if (state.selected != null) ({ set(PolyEditor.select(state, null)) }) else null) {
                     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp), content = panel)
                 }
             }
@@ -211,6 +215,13 @@ fun PolygonRegionsScreen(route: PolygonRegionsRoute, deps: FeatureDeps) {
                 if (isInner) {
                     Column(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp)) {
                         splitBar()
+                        // Side panel closed: its content comes back as the card above the tool bar (MapBars.panelShown).
+                        if (!MapBars.panelShown(isInner, aside.closed)) {
+                            GlassCard(Modifier.widthIn(max = 360.dp).heightIn(max = 340.dp)) {
+                                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp), content = panel)
+                            }
+                            Spacer(Modifier.height(10.dp))
+                        }
                         toolbar(Modifier)
                     }
                 } else {

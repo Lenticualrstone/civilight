@@ -25,17 +25,13 @@ class MapTourStepsTest {
     }
 
     @Test
-    fun `S-9 WLD-75 the tour shows only steps the editor marks, never 경로`() {
-        assertFalse(EditTool.ROUTE in EditTool.BASE)
-        val shown = TourStepFilter.shown(titles.size, MapTourSteps.absent().toSet())
-        assertEquals(listOf(MapTourSteps.TOOLBAR, MapTourSteps.REVEAL), shown)
-        assertTrue(shown.none { titles[it] == EditTool.ROUTE.label })
-    }
-
-    @Test
-    fun `with the 경로 copy dropped, 보이는 시점 is step 1 and nothing is absent`() {
-        val twoStep = titles.filterNot { it == EditTool.ROUTE.label }
-        assertEquals(1, twoStep.indexOf("보이는 시점"))
-        assertEquals(listOf(0, 1), TourStepFilter.shown(twoStep.size, emptySet()))
+    fun `경로 is step 1, on the tool bar's 경로 cell`() {
+        assertTrue(EditTool.ROUTE in EditTool.BASE)
+        assertEquals(EditTool.ROUTE.label, titles[MapTourSteps.ROUTE])
+        assertEquals(MapTourSteps.ROUTE, MapTourSteps.stepOfTool(EditTool.ROUTE))
+        assertEquals(listOf(0, 1, 2), TourStepFilter.shown(titles.size, emptySet()))
+        // 상세 지형 · 편집 has no 경로 cell: the step is skipped there.
+        assertFalse(EditTool.ROUTE in EditTool.DETAIL)
+        assertEquals(listOf(MapTourSteps.TOOLBAR, MapTourSteps.REVEAL), TourStepFilter.shown(titles.size, setOf(MapTourSteps.ROUTE)))
     }
 }

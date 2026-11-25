@@ -44,14 +44,15 @@ class TextMapFlowTest {
     }
 
     @Test
-    fun `the author's conditions survive a new reading, the cloud stub reads nothing`() {
+    fun `the author's conditions survive a new reading, an old cloud draft reads on device`() {
         var s = TextMapFlow.read(doc, TextMapState(text = text), MapFx.ctx())
         s = TextMapFlow.upsert(s, CondState("own", "호수", listOf(4)))
         s = TextMapFlow.read(doc, s.copy(text = "동쪽은 메마른 사막."), MapFx.ctx())
         assertEquals(listOf("호수", "사막"), s.conditions.map { it.what })
+        // (0.3.0) No cloud choice: a draft saved with `클라우드` reads on device, and nothing is sent anywhere.
         val cloud = TextMapFlow.read(doc, s.copy(engine = 1), MapFx.ctx())
-        assertTrue(cloud.unreadable)
-        assertEquals(s.conditions, cloud.conditions)
+        assertFalse(cloud.unreadable)
+        assertEquals(s.conditions.map { it.what }, cloud.conditions.map { it.what })
         // An edited read condition becomes the author's own.
         val edited = TextMapFlow.upsert(s, s.conditions.last().copy(traits = listOf("넓음")))
         assertTrue(edited.conditions.none { it.fromText })

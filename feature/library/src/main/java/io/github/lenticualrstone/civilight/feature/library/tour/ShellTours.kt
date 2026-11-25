@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import io.github.lenticualrstone.civilight.domain.library.onboarding.TourModule
 import io.github.lenticualrstone.civilight.navigation.CharacterProfile
+import io.github.lenticualrstone.civilight.navigation.CharacterTrack
+import io.github.lenticualrstone.civilight.navigation.MapEdit
 import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.Script
 import io.github.lenticualrstone.civilight.navigation.World
@@ -24,8 +26,8 @@ object ShellTours {
         is CharacterProfile -> TourModule.CAST
         is World -> TourModule.WORLD_TIMELINE
         is Recording -> TourModule.RECORDER
-        // (0.2.0 LIB-96) `지도 만들기` is not offered (ModuleTours.offered), so the editor hosts no tour.
-        // (0.2.0 S-3) 인물 동선 is hidden (its route turns back), so its tour never starts.
+        is MapEdit -> TourModule.MAP
+        is CharacterTrack -> TourModule.ROUTE_PLACE_TIME
         else -> null
     }
 }

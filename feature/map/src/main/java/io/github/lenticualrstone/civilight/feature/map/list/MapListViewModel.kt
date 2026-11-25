@@ -15,6 +15,6 @@ import kotlinx.coroutines.flow.stateIn
  */
 class MapListViewModel(projectKey: Key, env: MapEnv) : MapScreenViewModel(projectKey, env) {
     val ui: StateFlow<MapListUi?> = combine(doc, hiddenOpen) { d, open ->
-        d?.let { MapListState.build(it, lensOf(it), open) }
+        d?.let { MapListState.build(it, lensOf(it), open, env.clock.now(), env.clock.zone) }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 }

@@ -39,9 +39,9 @@ data class MoreSettingsUi(
     val checkNoPlace: SettingsSwitchRow,
 ) {
     /**
-     * The 지도 section's rows as drawn in 0.2.0: `새 지도 그림` and `지형 만들기 · 글로 설명` are hidden with the
-     * generated and sketch maps they set (scope S-3), so no visible row stores a value nothing reads.
-     * Their stored values are kept.
+     * The 지도 section's rows as drawn. (0.3.0) `새 지도 그림` is back with 지형 만들기 (it seeds a new map's 그림).
+     * `지형 만들기 · 글로 설명` stays hidden: no on-device or cloud model reads it yet, so no visible row stores a
+     * value nothing reads. Its stored value is kept.
      */
     val mapRows: List<MoreValueRow>
         get() = listOf(mapStyle, terrain, largeExport).filter { it.value !in DisplaySettingsState.HIDDEN_MAP_VALUES }
@@ -53,8 +53,8 @@ data class MoreSettingsUi(
  * and glass, CNV-30 holo, the map area, STO-17 and the travel check).
  */
 object DisplaySettingsState {
-    /** (0.2.0, S-3) Value rows not drawn: generated and sketch maps are hidden ([MoreSettingsUi.mapRows]). */
-    val HIDDEN_MAP_VALUES: Set<MoreValue> = setOf(MoreValue.MAP_STYLE, MoreValue.TERRAIN_ENGINE)
+    /** Value rows not drawn ([MoreSettingsUi.mapRows]): the text-terrain engine, which nothing reads yet. */
+    val HIDDEN_MAP_VALUES: Set<MoreValue> = setOf(MoreValue.TERRAIN_ENGINE)
 
     fun motion(settings: AppSettings): MotionSettingsUi = MotionSettingsUi(
         animation = listOf(

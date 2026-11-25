@@ -6,6 +6,9 @@ import io.github.lenticualrstone.civilight.domain.world.map.MapViews
 import io.github.lenticualrstone.civilight.domain.world.map.RegionShapes
 import io.github.lenticualrstone.civilight.domain.world.map.Routes
 import io.github.lenticualrstone.civilight.domain.world.time.StoryEngine
+import io.github.lenticualrstone.civilight.domain.story.checks.Acks
+import io.github.lenticualrstone.civilight.domain.story.travel.TravelCheck
+import io.github.lenticualrstone.civilight.domain.story.travel.TravelSettings
 import io.github.lenticualrstone.civilight.domain.world.track.CharacterTrack
 import io.github.lenticualrstone.civilight.domain.world.track.CharacterTracks
 import io.github.lenticualrstone.civilight.domain.world.track.TrackStop
@@ -39,7 +42,21 @@ data class TrackLine(val points: List<Point>, val label: String?, val focused: B
 data class TrackPosition(val name: String, val at: Point, val focused: Boolean)
 
 /** A row of `리엔 · 씬 순서`: `1-2 | 하층 거리 | 씬 1 · 1일째 새벽`. */
-data class TrackRowUi(val sceneKey: Key, val episode: String, val place: String, val detail: String, val onMap: Boolean)
+data class TrackRowUi(
+    val sceneKey: Key,
+    val episode: String,
+    val place: String,
+    val detail: String,
+    val onMap: Boolean,
+    /** The stop the focused character stands at for the scrubber's point (board: `sel` with the `acc` edge). */
+    val current: Boolean = false,
+)
+
+/**
+ * The `▲ 이동 시간` card of the panel (board `MapTrack`): `하르트 · 1-5 → 1-7`, `도보 2일 4시간 · 있음 9시간 40분`.
+ * Only while the travel check is on (설정 `이동 점검`, off by default).
+ */
+data class TrackWarningUi(val who: String, val detail: String, val sceneKey: Key)
 
 /** 인물 동선 (WLD-62, board `MapTrack`). */
 data class TrackUi(
@@ -59,6 +76,7 @@ data class TrackUi(
     val lines: List<TrackLine>,
     val positions: List<TrackPosition>,
     val scrubber: List<RevealStop>,
+    val warning: TrackWarningUi? = null,
 )
 
 /**
@@ -140,6 +158,7 @@ object TrackState {
         lens: LensPoint,
         hiddenOpen: Boolean,
         layerFilter: Key?,
+        checkTravel: Boolean = false,
     ): TrackUi? {
         val tracks = tracks(doc, hiddenOpen)
         val all = candidates(doc, tracks)
@@ -179,14 +198,50 @@ object TrackState {
             scene = MapScenes.build(doc, map, lens, hiddenOpen, SceneMode.VIEW, filter),
             chips = all.map { TrackChipUi(it.characterKey, nameOf(doc, it), it.characterKey in chosen, it.characterKey == focusKey) },
             listTitle = focus?.listTitle,
-            rows = focus?.stops.orEmpty().map { row(doc, map, it, lens) },
+            rows = focus?.let { t ->
+                val here = tracks.positionAt(t, lens)?.sceneKey
+                t.stops.map { row(doc, map, it, lens).copy(current = it.sceneKey == here) }
+            }.orEmpty(),
             places = focus?.stops.orEmpty().groupingBy { it.placeName }.eachCount().map { (name, n) -> "$name${MapCopy.SEP}$n" },
             layerChips = listOf(LayerChipUi(null, MapCopy.ALL_PINS, filter == null)) + MapEdits.layers(map).map { LayerChipUi(it.key, it.name, it.key == filter) },
             stops = stops,
             lines = lines,
             positions = positions,
             scrubber = episodes.map { RevealStop(it.key, codes.unitLabel(it.key).orEmpty(), it.key == at) },
+            warning = if (checkTravel) warning(doc, shown, focusKey) else null,
         )
+    }
+
+    /** The `▲ 이동 시간` card alone (the screen keys it apart from the scrubber point, so `재생` does not re-run the check). */
+    fun warningOf(doc: ProjectDoc, selected: List<Key>, hiddenOpen: Boolean): TrackWarningUi? {
+        val tracks = tracks(doc, hiddenOpen)
+        val all = candidates(doc, tracks)
+        val chosen = selected.filter { k -> all.any { it.characterKey == k } }
+        val shown = chosen.mapNotNull { k -> all.firstOrNull { it.characterKey == k } }.map { masked(doc, it, hiddenOpen) }
+        return warning(doc, shown, chosen.lastOrNull())
+    }
+
+    /**
+     * The first open `▲` of the travel check between two stops of a shown track (the focused character's first),
+     * not accepted (`맞음`). Rule 19: only pairs whose both scenes are stops of the masked track, so a hidden
+     * scene, place or character never shows here while locked.
+     */
+    fun warning(doc: ProjectDoc, shown: List<CharacterTrack>, focusKey: Key?): TrackWarningUi? {
+        if (shown.isEmpty()) return null
+        val warnings = TravelCheck(doc, TravelSettings(checkTravel = true, checkNoPlace = false)).warnings
+            .filterNot { Acks.isAcknowledged(doc, it) }
+        for (t in shown.sortedByDescending { it.characterKey == focusKey }) {
+            val stops = t.stops.associateBy { it.sceneKey }
+            val w = warnings.firstOrNull { it.characterKey == t.characterKey && it.fromSceneKey in stops && it.toSceneKey in stops } ?: continue
+            val from = stops.getValue(w.fromSceneKey).episodeLabel
+            val to = stops.getValue(w.toSceneKey).episodeLabel
+            return TrackWarningUi(
+                who = "${nameOf(doc, t)}${MapCopy.SEP}$from${MapCopy.ARROW}$to",
+                detail = "${w.needText}${MapCopy.SEP}${MapCopy.TRACK_HAVE} ${w.haveText}",
+                sceneKey = w.toSceneKey,
+            )
+        }
+        return null
     }
 
     /** Rule 19: while locked, a stop at a hidden place (or a region of a hidden place or faction) and its legs stay out. */
@@ -234,7 +289,14 @@ object TrackState {
         return listOfNotNull(start)
     }
 
-    /** `▶` steps through the scrubber: the next episode after the lens point, or null at the end. */
+    /**
+     * Where `▶` starts: the first episode when the scrubber stands at 최신 (no episode marked) or on the last one,
+     * else null (it plays on from where it stands).
+     */
+    fun playStart(stops: List<RevealStop>): Key? =
+        if (stops.none { it.current } || nextStop(stops) == null) stops.firstOrNull()?.unitKey else null
+
+    /** `▶` steps through the scrubber: the next episode after the point, or null at the end. */
     fun nextStop(stops: List<RevealStop>): Key? {
         val i = stops.indexOfFirst { it.current }
         return stops.getOrNull(i + 1)?.unitKey

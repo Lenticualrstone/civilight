@@ -23,6 +23,8 @@ object MapCopy {
     // --- WLD-36 지도 목록 · 새 지도 (board MapNew) ---
     const val LIST_TITLE = "지도"
     const val NEW_MAP = "새 지도"
+    /** Board `MapNew`: the map list's second section. */
+    const val RECENT_EDITS = "최근 고친 곳"
     const val PARENT = "상위"
     const val TO_CHILD = "→ 하위 지도"
     const val NEW_GENERATED = "지형 만들기"
@@ -94,6 +96,9 @@ object MapCopy {
 
     // --- WLD-43 경로 (boards MapRouteC, MMapRoute) ---
     const val ROUTE = "경로"
+    /** A route end with no drawn pin (board `MapRouteC` title `A → B`). */
+    const val ROUTE_POINT = "지점"
+    const val ARROW = " → "
     const val CUSTOM_MODE = "직접"
 
     // --- WLD-44 라벨 ---
@@ -241,7 +246,6 @@ object MapCopy {
     const val TEXT_SMALL = "새 지도 · 글로 설명"
     const val TEXT_TITLE = "지형 만들기"
     const val READ_ALONG = "함께 읽기"
-    val ENGINES = listOf("기기 안", "클라우드")
     const val BTN_CONDITION = "조건"
     const val BTN_MAKE_FROM_CONDITIONS = "이 조건으로 만들기"
     const val TEXT_RESULT_TITLE = "글로 설명 · 결과"
@@ -276,8 +280,12 @@ object MapCopy {
     const val TRACK_PLAY = "재생"
     const val TRACK_PAUSE = "멈춤"
 
+    /** The panel's travel card (board `MapTrack`): `▲ 이동 시간` · `도보 2일 4시간 · 있음 9시간 40분`. */
+    const val TRACK_WARN = "▲ 이동 시간"
+    const val TRACK_HAVE = "있음"
+
     /** Shown when no reader can read the text (no on-device model, cloud off; WLD-61). */
-    const val TEXT_UNREADABLE = "읽어 낼 수 없음 · 기기 안 모델 없음 · 클라우드 꺼짐"
+    const val TEXT_UNREADABLE = "읽어 낼 수 없음"
 
     /** 인물 동선 with no stop on this map, or no character chosen (WLD-62). */
     const val TRACK_EMPTY = "동선 없음 · 인물 고르기"
@@ -308,6 +316,12 @@ object MapCopy {
 
     /** `120%`. */
     fun zoomLabel(percent: Int): String = "$percent%"
+
+    /** `하층 구역 · 영역 ‘상층 관문 구역’` (a `최근 고친 곳` row). */
+    fun recentTitle(mapName: String, kind: String, name: String): String = "$mapName$SEP$kind ‘$name’"
+
+    /** `오늘 08:40 · 세력 영역` (a `최근 고친 곳` sub-line). */
+    fun recentSub(time: String, detail: String): String = "$time$SEP$detail"
 
     /** `세계 지도 · 핀 ‘상층’`. */
     fun parentTag(mapName: String, placeName: String): String = "$mapName$SEP$PIN ‘$placeName’"

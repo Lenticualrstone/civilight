@@ -23,7 +23,7 @@ class MapViewStateTest {
         assertEquals("하층 구역 지도", ui.title)
         assertEquals("세계 · 지도 · 먹선", ui.small)
         assertEquals(listOf("세계 지도", "하층 구역 지도"), ui.crumbs.map { it.text })
-        assertNull(ui.scale) // (0.2.0, WLD-75) no scale bar
+        assertEquals("1일 · 15 km", ui.scale) // (0.3.0) the scale bar is back
         assertEquals(listOf("전체 핀", "길"), ui.chips.map { it.label })
         assertTrue(ui.chips.first().selected)
         assertFalse(ui.canReplaceBase)
@@ -35,7 +35,6 @@ class MapViewStateTest {
         val ui = build(mapKey = K.MAP_WORLD)
         assertTrue(ui.crumbs.isEmpty())
         assertEquals("세계 · 지도 · 양피지", ui.small)
-        assertNull(ui.scale) // (0.2.0, WLD-75) no scale bar
     }
 
     @Test

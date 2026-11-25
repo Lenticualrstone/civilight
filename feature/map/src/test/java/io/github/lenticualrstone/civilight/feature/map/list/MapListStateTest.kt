@@ -94,4 +94,51 @@ class MapListStateTest {
         assertNotNull(made.doc.maps[made.mapKey])
         assertTrue(MapEdit.Applied::class.isInstance(io.github.lenticualrstone.civilight.domain.world.map.MapEdits.newMap(doc, MapBaseKind.NODE, MapFx.ctx())))
     }
+
+    @Test
+    fun `최근 고친 곳 lists the newest edits, at most three, never a hidden place`() {
+        // Only the edits set below carry a time.
+        val base = doc.copy(maps = doc.maps.mapValues { (_, m) ->
+            m.copy(
+                pins = m.pins.map { it.copy(updatedAt = 0L) }, regions = m.regions.map { it.copy(updatedAt = 0L) },
+                routes = m.routes.map { it.copy(updatedAt = 0L) }, labels = m.labels.map { it.copy(updatedAt = 0L) },
+            )
+        })
+        val lower = base.maps.getValue(K.MAP_LOWER_DISTRICT)
+        val day = 24L * 3600_000L
+        val now = 100 * day + day / 2
+        val edited = lower.copy(
+            pins = lower.pins.map { p ->
+                when (p.key) {
+                    K.PIN_ASH_MARKET -> p.copy(updatedAt = now - 1000)
+                    K.PIN_SOCIETY_GATE -> p.copy(updatedAt = now - day)
+                    else -> p
+                }
+            },
+            routes = lower.routes.map { if (it.key == K.ROUTE_GATE_TO_UPPER_GATE) it.copy(updatedAt = now - 2000) else it },
+        )
+        val d = base.copy(maps = base.maps + (edited.key to edited))
+        val zone = java.time.ZoneOffset.UTC
+        val ui = MapListState.build(d, LensPoint.Latest, false, now, zone)
+        assertTrue(ui.recent.size <= MapListState.RECENT_COUNT)
+        assertEquals(K.PIN_ASH_MARKET, ui.recent.first().key)
+        assertEquals(K.PIN_ASH_MARKET, ui.recent.first().pinKey)
+        assertEquals("하층 구역 지도 · 핀 ‘잿더미 시장’", ui.recent.first().title)
+        assertTrue(ui.recent.first().sub, ui.recent.first().sub.startsWith("오늘 "))
+        assertEquals("하층 구역 지도 · 경로 ‘결사의 문 → 상층 관문’", ui.recent[1].title)
+        assertTrue(ui.recent[1].sub, ui.recent[1].sub.endsWith("도보 2일 4시간"))
+        assertEquals("하층 구역 지도 · 핀 ‘결사의 문’", ui.recent[2].title)
+        assertEquals("어제 · 핀", ui.recent[2].sub)
+        // Rule 19: a hidden place's pin is not listed while locked, and not named in a route row.
+        val hidden = d.copy(world = d.world.copy(places = d.world.places.map { if (it.key == K.PLACE_ASH_MARKET) it.copy(hidden = true) else it }))
+        val locked = MapListState.build(hidden, LensPoint.Latest, false, now, zone)
+        assertTrue(locked.recent.none { "잿더미 시장" in it.title })
+        val open = MapListState.build(hidden, LensPoint.Latest, true, now, zone)
+        assertEquals(K.PIN_ASH_MARKET, open.recent.first().key)
+        // A place name with ` · ` stays whole in the route row's title.
+        val dotted = d.copy(world = d.world.copy(places = d.world.places.map { if (it.key == K.PLACE_SOCIETY_GATE) it.copy(name = "동문 · 외곽") else it }))
+        val row = MapListState.build(dotted, LensPoint.Latest, false, now, zone).recent.first { it.key == K.ROUTE_GATE_TO_UPPER_GATE }
+        assertEquals("하층 구역 지도 · 경로 ‘동문 · 외곽 → 상층 관문’", row.title)
+        assertTrue(row.sub, row.sub.endsWith("도보 2일 4시간"))
+    }
 }

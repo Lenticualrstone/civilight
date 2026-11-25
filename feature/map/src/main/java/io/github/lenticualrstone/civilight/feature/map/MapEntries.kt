@@ -35,7 +35,7 @@ import io.github.lenticualrstone.civilight.navigation.MapReveal
 import io.github.lenticualrstone.civilight.navigation.MapScale
 import io.github.lenticualrstone.civilight.navigation.SketchStraighten
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
-import io.github.lenticualrstone.civilight.feature.map.common.HiddenRoute
+import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
 
 /**
  * The map area's entries (shell.md §1): every map route. `MapList` (WLD-36 … 39), `MapView`
@@ -51,18 +51,21 @@ fun EntryProviderScope<NavKey>.mapEntries(deps: FeatureDeps) {
     entry<MapEdit> { route -> MapEditScreen(route, deps) }
     entry<PickOnMap> { route -> PickOnMapScreen(route, deps) }
     entry<MapReveal> { route -> MapRevealScreen(route, deps) }
-    // (0.2.0, S-3, WLD-75) Hidden, data kept: distances (scale), generation, sketch, node / terrain / hex /
-    // polygon editors, text → terrain and 인물 동선 have no entry in 0.2.0. A route pushed from elsewhere
-    // (a stale back stack, another area) is turned back: a node map opens view-only in 지도 보기, the rest
-    // leave at once, so no hidden tool can be reached.
-    entry<MapScale> { HiddenRoute(deps) }
-    entry<MapFormatPicker> { HiddenRoute(deps) }
-    entry<MapGenerate> { HiddenRoute(deps) }
-    entry<SketchStraighten> { HiddenRoute(deps) }
-    entry<NodeMap> { route -> HiddenRoute(deps, MapView(route.projectKey, route.mapKey)) }
-    entry<DetailStamps> { HiddenRoute(deps) }
-    entry<HexPaint> { HiddenRoute(deps) }
-    entry<PolygonRegions> { HiddenRoute(deps) }
-    entry<TextMap> { HiddenRoute(deps) }
-    entry<CharacterTrack> { HiddenRoute(deps) }
+    // (0.3.0) Map making is back: generation, sketch, the node / terrain / hex / polygon editors and text →
+    // terrain have their screens again.
+    entry<MapFormatPicker> { route -> MapFormatPickerScreen(route, deps) }
+    entry<MapGenerate> { route -> MapGenerateScreen(route, deps) }
+    entry<SketchStraighten> { route -> SketchStraightenScreen(route, deps) }
+    entry<NodeMap> { route -> NodeMapScreen(route, deps) }
+    entry<DetailStamps> { route -> DetailStampsScreen(route, deps) }
+    entry<HexPaint> { route -> HexPaintScreen(route, deps) }
+    entry<PolygonRegions> { route -> PolygonRegionsScreen(route, deps) }
+    // 글로 설명 follows its one switch (the 양식 card reads it too); a closed one turns a stale push back.
+    entry<TextMap> { route ->
+        if (MapOffers.OFFERS_TEXT_TERRAIN) TextMapScreen(route, deps)
+        else androidx.compose.runtime.LaunchedEffect(Unit) { deps.navigator.pop() }
+    }
+    // (0.3.0) Distances and 인물 동선 are back.
+    entry<MapScale> { route -> MapScaleScreen(route, deps) }
+    entry<CharacterTrack> { route -> CharacterTrackScreen(route, deps) }
 }

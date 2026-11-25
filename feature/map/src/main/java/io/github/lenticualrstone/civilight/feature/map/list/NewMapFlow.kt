@@ -1,6 +1,5 @@
 package io.github.lenticualrstone.civilight.feature.map.list
 
-import io.github.lenticualrstone.civilight.feature.map.common.MapOffers
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,16 +33,12 @@ import java.io.File
 class NewMapFlow internal constructor(
     private val sheets: SheetHost,
     val content: @Composable SheetScope.(NewMapSheet) -> Unit,
-    private val pickImage: (MapParent?) -> Unit,
 ) {
     /**
-     * (0.2.0, WLD-75) A new map is one image plus pins: this opens the system image picker at once, and
-     * a picked image becomes an `IMAGE` map (`지도 N`, a child map of [parent] when given) that opens in
-     * 지도 보기. Cancelling the picker creates nothing. The old `새 지도` sheet is no longer opened.
+     * Opens `새 지도 · 닫기` (board `MapNew`): `지형 만들기 · 이미지 가져오기 · 스케치 촬영 · 노드 지도`. With a
+     * parent pin it shows the `상위` line and makes a child map.
      */
-    fun open(parent: MapParent? = null) {
-        if (MapOffers.NEW_MAP_IMAGE_ONLY) pickImage(parent) else sheets.open(NewMapSheet(parent?.mapKey, parent?.pinKey))
-    }
+    fun open(parent: MapParent? = null) = sheets.open(NewMapSheet(parent?.mapKey, parent?.pinKey))
 }
 
 /**
@@ -132,14 +127,5 @@ fun rememberNewMapFlow(projectKey: Key, deps: FeatureDeps, vm: MapScreenViewMode
             },
         )
     }
-    val pickNewImage: (MapParent?) -> Unit = { parent ->
-        if (readOnly) {
-            deps.toasts.show(MapCopy.READ_ONLY, actionLabel = null)
-        } else {
-            parentMap = parent?.mapKey
-            parentPin = parent?.pinKey
-            pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-        }
-    }
-    return NewMapFlow(sheets, content, pickNewImage)
+    return NewMapFlow(sheets, content)
 }

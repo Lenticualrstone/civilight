@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.domain.world.track
 
 import io.github.lenticualrstone.civilight.domain.world.common.Copy
 import io.github.lenticualrstone.civilight.domain.world.common.StoryCodes
+import io.github.lenticualrstone.civilight.domain.world.map.MapReveal
 import io.github.lenticualrstone.civilight.domain.world.time.SceneCastSource
 import io.github.lenticualrstone.civilight.domain.world.time.SceneTimeSource
 import io.github.lenticualrstone.civilight.domain.world.time.SceneWhen
@@ -155,7 +156,12 @@ class CharacterTracks(
         if (a.kind.known != PlaceRefKind.PLACE || b.kind.known != PlaceRefKind.PLACE || a.key == b.key) return null
         for ((map, pinA) in PlaceRefs.livePins(doc, a.key)) {
             val pinB = map.pins.firstOrNull { it.placeKey == b.key && doc.liveness.isOverlayLive(map.key, it) } ?: continue
-            val route = map.routes.firstOrNull { r -> r.points.any { it.pinKey == pinA.key } && r.points.any { it.pinKey == pinB.key } }
+            // Rule 19: while locked, a route that passes a pin of a hidden place is not followed (the line would show
+            // where that place is); the leg falls back to another route or the straight `추정` line.
+            val masked = if (hiddenUnlocked) emptySet() else map.pins.filter { MapReveal.isMasked(doc, it, false) }.mapTo(HashSet()) { it.key }
+            val route = map.routes.firstOrNull { r ->
+                r.points.any { it.pinKey == pinA.key } && r.points.any { it.pinKey == pinB.key } && r.points.none { it.pinKey in masked }
+            }
             if (route != null) return map.key to route.key
         }
         return null

@@ -1,5 +1,10 @@
 package io.github.lenticualrstone.civilight.feature.map.hex
 
+import io.github.lenticualrstone.civilight.feature.map.common.MapAside
+import io.github.lenticualrstone.civilight.feature.map.common.MapBars
+import io.github.lenticualrstone.civilight.feature.map.common.MapAsideRules
+import io.github.lenticualrstone.civilight.feature.map.common.rememberMapAsideState
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import io.github.lenticualrstone.civilight.designsystem.component.SidePanelHost
@@ -40,7 +45,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.SegmentedContr
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
-import io.github.lenticualrstone.civilight.designsystem.component.SidePanel
 import io.github.lenticualrstone.civilight.designsystem.component.TerrainSwatch
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
@@ -96,6 +100,7 @@ fun HexPaintScreen(route: HexPaintRoute, deps: FeatureDeps) {
     val hiddenOpen by vm.hiddenOpen.collectAsState()
     val sheets = rememberSheetHost()
     val inner = LocalWindowLayout.current.isInner
+    val aside = rememberMapAsideState()
     var stateText by rememberSaveable(route.mapKey) { mutableStateOf(HexPaintState().encode()) }
     var viewportArray by rememberSaveable(route.mapKey) { mutableStateOf(Viewport.UNSET.toArray()) }
     val state = remember(stateText) { HexPaintState.decode(stateText) }
@@ -171,14 +176,15 @@ fun HexPaintScreen(route: HexPaintRoute, deps: FeatureDeps) {
             }
             SidePanelHost(
                 inner,
-                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = 12.dp),
+                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + MapAsideRules.TOP_GAP.dp, bottom = padding.calculateBottomPadding() + 12.dp),
             ) {
-                SidePanel(onClose = { deps.navigator.pop() }) {
+                MapAside(state = aside, tabs = emptyList(), selectedTab = 0, onSelectTab = {}) {
                     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp), content = panel)
                 }
             }
             FoldSwitch(inner) { isInner ->
-                if (!isInner) {
+                // The cover card, and on the inner screen while the side panel is closed (MapBars.panelShown).
+                if (!MapBars.panelShown(isInner, aside.closed)) {
                     GlassCard(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp).heightIn(max = 420.dp)) {
                         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp), content = panel)
                     }

@@ -108,9 +108,9 @@ class SettingsBatch6Test {
     }
 
     @Test
-    fun `S-3 the map section draws only the large export row, generated-map settings are hidden`() {
+    fun `the map section draws the new-map style and large export rows, the unread text-terrain engine stays hidden`() {
         val ui = DisplaySettingsState.more(AppSettings())
-        assertEquals(listOf(MoreValue.LARGE_EXPORT), ui.mapRows.map { it.value })
+        assertEquals(listOf(MoreValue.MAP_STYLE, MoreValue.LARGE_EXPORT), ui.mapRows.map { it.value })
     }
 
     @Test

@@ -8,6 +8,7 @@ import io.github.lenticualrstone.civilight.domain.checks.FixKind
 import io.github.lenticualrstone.civilight.domain.story.checks.Fingerprints
 import io.github.lenticualrstone.civilight.domain.story.travel.TravelVerdict
 import io.github.lenticualrstone.civilight.domain.story.travel.TravelWarning
+import io.github.lenticualrstone.civilight.domain.world.map.MapScales
 import io.github.lenticualrstone.civilight.model.checks.CheckType
 
 /** Rows 10–14 (`이동`) from the story area's travel check (STO-29/30, R18). */
@@ -47,8 +48,11 @@ internal object TravelSource {
         )
     }
 
-    private fun placeHidden(scope: CheckScope, w: TravelWarning): Boolean =
-        scope.hiding.place(scope.doc.index.unit(w.fromSceneKey)?.place) || scope.hiding.place(scope.doc.index.unit(w.toSceneKey)?.place)
+    private fun placeHidden(scope: CheckScope, w: TravelWarning): Boolean = placesHidden(scope, w.fromSceneKey, w.toSceneKey)
+
+    /** Rule 19: either scene's place hidden (while locked) keeps the row out, since its body names both places. */
+    private fun placesHidden(scope: CheckScope, from: io.github.lenticualrstone.civilight.model.Key, to: io.github.lenticualrstone.civilight.model.Key): Boolean =
+        scope.hiding.place(scope.doc.index.unit(from)?.place) || scope.hiding.place(scope.doc.index.unit(to)?.place)
 
     /**
      * `◇ 축척 없음 · 점검 못 함` once per scene pair (`ED`: the engine gives one per character on the
@@ -58,7 +62,9 @@ internal object TravelSource {
         scope.travel.noScale.groupBy { it.fromSceneKey to it.toSceneKey }.map { (pair, group) ->
             val (from, to) = pair
             val subjects = listOf(from, to)
-            val names = group.mapNotNull { scope.doc.index.character(it.characterKey)?.name }.distinct()
+            // A hidden character's name never goes in the tag while locked (the row stays when others are visible).
+            val names = group.filterNot { scope.hiding.character(it.characterKey) }
+                .mapNotNull { scope.doc.index.character(it.characterKey)?.name }.distinct()
             CheckResult(
                 checkType = CheckType.TRAVEL_NO_SCALE,
                 subjectKeys = subjects,
@@ -67,9 +73,14 @@ internal object TravelSource {
                 tag = names.joinToString(CheckCopy.SEP).ifEmpty { null },
                 location = scope.sceneRef(from),
                 body = group.first().detail,
-                actions = listOf(FixAction(CheckCopy.FIX_SCALE, FixKind.FIX_SCALE, group.first().mapKey)),
+                // A node map has no scale (MapScales.kmPerUnit is null whatever is stored), so `축척 맞추기` is offered only on others.
+                actions = listOfNotNull(
+                    group.first().mapKey?.takeIf { k -> scope.doc.maps[k]?.let { !MapScales.isNodeMap(it) } == true }
+                        ?.let { FixAction(CheckCopy.FIX_SCALE, FixKind.FIX_SCALE, it) },
+                ),
                 storyOrder = scope.sceneOrder(to),
-                lockedHidden = group.all { scope.hiding.character(it.characterKey) } || scope.hiding.scene(from) || scope.hiding.scene(to),
+                lockedHidden = group.all { scope.hiding.character(it.characterKey) } || scope.hiding.scene(from) || scope.hiding.scene(to) ||
+                    placesHidden(scope, from, to),
                 cannotCheck = true,
             )
         }

@@ -14,7 +14,7 @@ import kotlinx.serialization.json.Json
 enum class NodeTool(val label: String, val icon: IconId) {
     MOVE(MapCopy.TOOL_MOVE, IconId.Move),
     NODE(MapCopy.TOOL_NODE, IconId.Node),
-    LINK(MapCopy.TOOL_LINK, IconId.Line),
+    LINK(MapCopy.TOOL_LINK, IconId.Route),
     LABEL(MapCopy.TOOL_LABEL, IconId.Label),
     LAYER(MapCopy.TOOL_LAYER, IconId.Layers),
 }

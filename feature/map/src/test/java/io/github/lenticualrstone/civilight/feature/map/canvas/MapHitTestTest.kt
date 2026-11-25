@@ -5,7 +5,6 @@ import io.github.lenticualrstone.civilight.feature.map.MapFx.K
 import io.github.lenticualrstone.civilight.model.Point
 import io.github.lenticualrstone.civilight.model.position.LensPoint
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -37,8 +36,8 @@ class MapHitTestTest {
     }
 
     @Test
-    fun `routes are not drawn (WLD-75), so a tap on one reaches the region below`() {
-        assertNotEquals(MapHit.Route(K.ROUTE_GATE_TO_UPPER_GATE), tapAt(Point(0.20f, 0.34f)))
+    fun `a tap on a drawn route picks it, off it reaches the region below`() {
+        assertEquals(MapHit.Route(K.ROUTE_GATE_TO_UPPER_GATE), tapAt(Point(0.20f, 0.34f)))
         assertEquals(MapHit.Region(K.REGION_LOWER_DISTRICT), tapAt(Point(0.50f, 0.58f)))
         assertNull(tapAt(Point(0.80f, 0.80f)))
     }

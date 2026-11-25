@@ -25,6 +25,8 @@ class GenFlowTest {
         val ui = GenFlow.ui(state)
         assertEquals("같은 세계 · 시드 4827 · 양식만 다름 · 시작 전까지 바꾸기 가능", ui.formatNote)
         assertEquals(listOf("육각", "다각형", "상세 지형", "윤곽", "노드", "글로 설명"), FormatCard.entries.map { it.title })
+        // (0.3.0) 글로 설명 is back, read on device only: the picker draws all six cards.
+        assertEquals(FormatCard.entries, FormatCard.shown)
         assertEquals(MapFormat.HEX, GenFlow.pickFormat(state, MapFormat.HEX).format)
         assertEquals(2, GenFlow.toSteps(state).page)
     }

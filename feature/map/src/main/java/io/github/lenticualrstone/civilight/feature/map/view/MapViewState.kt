@@ -63,9 +63,9 @@ data class MapViewUi(
     val moving: MovingPinUi?,
     /** `그림 · 색면` chip of a generated detailed-terrain or polygon map (WLD-57), the style's name. */
     val styleChip: String? = null,
-    /** (0.2.0, WLD-75) `편집`: image maps only; every other map is view-only. */
+    /** `편집`: every map 지도 보기 shows ([MapOffers.canEdit]). */
     val canEdit: Boolean = true,
-    /** (0.2.0, WLD-75) `핀 옮기기`: image maps only. */
+    /** `핀 옮기기` ([MapOffers.canMovePin]). */
     val canMovePin: Boolean = true,
     /** (0.2.0, WLD-76) The `배경 에셋` row: only with `게임 제작 도구` on. */
     val showsAssets: Boolean = true,

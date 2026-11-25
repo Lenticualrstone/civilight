@@ -140,17 +140,17 @@ class World020FeatureTest {
     // --- WLD-75 routes in the delete and merge sheets ----------------------------------------------
 
     @Test
-    fun `WLD-75 route ends are not counted in the merge line while routes are hidden`() {
+    fun `route ends are counted in the merge line now that routes are drawn`() {
         val counts = mapOf(
             io.github.lenticualrstone.civilight.domain.trash.RefKind.SCENE_PLACE to 2,
             io.github.lenticualrstone.civilight.domain.trash.RefKind.ROUTE_END to 3,
         )
-        assertFalse(io.github.lenticualrstone.civilight.feature.world.common.MergePlan.SHOWS_ROUTES)
-        assertEquals("장소 2", io.github.lenticualrstone.civilight.feature.world.common.MergePlan.refParts(counts))
+        assertTrue(io.github.lenticualrstone.civilight.feature.world.common.MergePlan.SHOWS_ROUTES)
+        assertEquals("장소 2 · 경로 끝 3", io.github.lenticualrstone.civilight.feature.world.common.MergePlan.refParts(counts))
     }
 
     @Test
-    fun `WLD-75 the delete sheet's 참조 N total leaves out route ends while routes are hidden`() {
+    fun `the delete sheet's 참조 N total counts route ends`() {
         fun site(kind: io.github.lenticualrstone.civilight.domain.trash.RefKind, owner: String) =
             io.github.lenticualrstone.civilight.domain.trash.RefSite(kind, owner)
         val impact = io.github.lenticualrstone.civilight.domain.trash.DeleteImpact(
@@ -168,9 +168,9 @@ class World020FeatureTest {
             speakerLocations = null,
         )
         val sheet = io.github.lenticualrstone.civilight.feature.world.common.MergePlan.deleteSheet(impact)
-        assertEquals("장소 · 참조 2", sheet.sub)
-        assertTrue(sheet.staying.none { it.label.startsWith("경로 끝") })
-        assertEquals(1, io.github.lenticualrstone.civilight.feature.world.common.MergePlan.shownReferenceCount(3, 2))
+        assertEquals("장소 · 참조 3", sheet.sub)
+        assertTrue(sheet.staying.any { it.label.startsWith("경로 끝") })
+        assertEquals(3, io.github.lenticualrstone.civilight.feature.world.common.MergePlan.shownReferenceCount(3, 2))
     }
 
     // --- WLD-74 events --------------------------------------------------------------------------------

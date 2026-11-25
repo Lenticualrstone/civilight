@@ -28,8 +28,7 @@ class DetailAndShapeTest {
     @Test
     fun `WLD-60 the detailed-terrain tool bar and its panel tabs`() {
         assertEquals(listOf("이동", "도장", "강", "길", "라벨", "영역", "레이어"), EditTool.DETAIL.map { it.label })
-        // (0.2.0, WLD-75) The image map's bar has no `경로`.
-        assertEquals(listOf("이동", "핀", "영역", "라벨", "레이어"), EditTool.BASE.map { it.label })
+        assertEquals(listOf("이동", "핀", "영역", "경로", "라벨", "레이어"), EditTool.BASE.map { it.label })
         assertEquals(2, Editor.chooseTool(EditorState(), EditTool.LAYER, detail = true).panelTab)
         assertEquals(1, Editor.chooseTool(EditorState(), EditTool.LAYER).panelTab)
     }
@@ -66,7 +65,8 @@ class DetailAndShapeTest {
         listOf(Point(0.1f, 0.1f), Point(0.2f, 0.2f), Point(0.3f, 0.1f)).forEach { s = Editor.tap(s, lower, it, null).state }
         val props = EditState.build(doc, K.MAP_LOWER_DISTRICT, LensPoint.Latest, false, s)!!.props as PropsUi.LineDraftProps
         assertEquals("강", props.title)
-        assertTrue(props.bar, props.bar.startsWith("지점 3 · "))
+        // The draft bar counts the points and, with the map's scale, the length.
+        assertEquals("지점 3 · 34 km", props.bar)
         assertTrue(props.canFinish)
         s = Editor.undoLinePoint(s)
         assertEquals(2, s.line!!.size)

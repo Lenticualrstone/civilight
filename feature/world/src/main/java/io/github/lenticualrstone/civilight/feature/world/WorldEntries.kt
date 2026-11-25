@@ -45,21 +45,11 @@ fun EntryProviderScope<NavKey>.worldEntries(deps: FeatureDeps) {
     entry<EventDetail> { route -> EventDetailScreen(route, deps) }
     entry<WorldCalendar> { route -> WorldTimeScreen(route, deps) }
     entry<TimelineMap> { route -> TimelineMapScreen(route, deps) }
-    // (0.2.0, S-3, WLD-47, WLD-75) `이동 수단` is hidden with the distances (values kept). Its only entry,
-    // `feature:library`'s `프로젝트 설정 › 이동 수단` row, is hidden in the same change.
-    entry<TravelModes> { route -> if (SHOWS_TRAVEL_MODES) TravelModesScreen(route, deps) else HiddenTravelModes(deps) }
+    // (0.3.0, WLD-47, WLD-75) `이동 수단` is back with the distances; its entry is `프로젝트 설정 › 이동 수단`.
+    entry<TravelModes> { route -> TravelModesScreen(route, deps) }
     deps.sheets.register<EventCreateSheet> { sheet -> EventCreateSheetContent(sheet) }
     deps.sheets.register<LinkCandidatesSheet> { sheet -> LinkCandidatesSheetContent(sheet) }
     // `공개 시점 옮기기` and its steps read the open project, so they also show over other areas'
     // screens once those can name the sheet (WLD-28; see Requests: a shared key in core:navigation).
     registerRevealSheets(deps)
-}
-
-/** Whether the `TravelModes` route opens its editor; false since the library row is hidden (0.2.0 integration). */
-internal const val SHOWS_TRAVEL_MODES: Boolean = false
-
-/** (0.2.0, WLD-47) `이동 수단` without a screen: the route turns back at once and draws nothing. */
-@androidx.compose.runtime.Composable
-private fun HiddenTravelModes(deps: FeatureDeps) {
-    androidx.compose.runtime.LaunchedEffect(Unit) { deps.navigator.pop() }
 }

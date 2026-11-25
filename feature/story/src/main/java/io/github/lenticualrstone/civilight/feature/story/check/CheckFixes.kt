@@ -31,6 +31,7 @@ import io.github.lenticualrstone.civilight.model.checks.CheckType
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.script.BlockKind
 import io.github.lenticualrstone.civilight.navigation.CharacterProfile
+import io.github.lenticualrstone.civilight.navigation.MapScale
 import io.github.lenticualrstone.civilight.navigation.ProfileTab
 import io.github.lenticualrstone.civilight.navigation.Route
 import io.github.lenticualrstone.civilight.navigation.SceneWhereSheet
@@ -112,10 +113,10 @@ object CheckFixes {
                 if (warning == null || mode == null) FixEffect.Unavailable else FixEffect.Edit(action.label) { d, ctx -> WhereModel.applyModeChip(d, warning, mode, ctx) }
             }
             FixKind.OPEN_BULK -> FixEffect.OpenBulk(result.subjectKeys.filter { WhereModel.isLiveScene(doc, it) })
-            // S-3 hides the map's distance tools ("hidden means hidden everywhere"), so `축척 고치기` is not
-            // drawn; restore `Navigate(MapScale(projectKey, it), detail = false)` only if the map lane keeps
-            // MapScale reachable under S-3 (Requests).
-            FixKind.FIX_SCALE -> FixEffect.Unavailable
+            // (0.3.0) The map's distance tools are back: `축척 맞추기` opens the map's scale.
+            // A node map has no scale to set (its distances never read one), so the fix is unavailable there.
+            FixKind.FIX_SCALE -> target?.takeIf { k -> doc.maps[k]?.let { !io.github.lenticualrstone.civilight.domain.world.map.MapScales.isNodeMap(it) } == true }
+                ?.let { FixEffect.Navigate(MapScale(projectKey, it), detail = false) } ?: FixEffect.Unavailable
             FixKind.TO_AUTO -> target?.let { scene -> FixEffect.Edit(action.label) { d, ctx -> if (WhereModel.isLiveScene(d, scene)) Transitions.toAuto(d, scene, ctx.edit) else d } } ?: FixEffect.Unavailable
             FixKind.EDIT_TRANSITION, FixKind.WRITE_DIRECT -> target?.let { FixEffect.OpenSheet(SceneWhereSheet(projectKey, it)) } ?: FixEffect.Unavailable
             FixKind.HIDE_SCENE -> target?.let { scene -> FixEffect.Edit(action.label) { d, ctx -> UnitSettingsEdit.setHidden(d, scene, true, ctx.edit) } } ?: FixEffect.Unavailable

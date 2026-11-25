@@ -210,8 +210,8 @@ class OnboardingTest {
         assertEquals(
             listOf(
                 "스크립트 | 봤음", "인물 | 봤음", "세계 · 연표 | 아직 안 봄", "라이프 레코더 | 봤음",
-                // (0.2.0 S-3, LIB-96) 지도 만들기 and 인물 동선 tours have no replay row.
-                "서재 · 숨기기 | 아직 안 봄",
+                // 인물 동선's tour has no replay row while 인물 동선 is closed; 지도 만들기 is back.
+                "서재 · 숨기기 | 아직 안 봄", "지도 만들기 | 아직 안 봄", "인물 동선 · 장소와 때 | 아직 안 봄",
             ),
             ui.modules.map { "${it.title} | ${it.sub}" },
         )

@@ -146,7 +146,7 @@ fun PickOnMapScreen(route: PickOnMap, deps: FeatureDeps) {
                         val ref = PickState.pick(doc0, state.mapKey, p, hit, state.regions, MapScreenViewModel.lensOf(doc0), hiddenOpen)
                         pickedKind = ref?.kind?.known?.name
                         pickedKey = ref?.key
-                        // (0.2.0, WLD-41) `새 장소` only on an editable (image) map; view-only maps get no new pin.
+                        // (WLD-41) `새 장소` on an empty spot of any pickable map.
                         emptySpot = if (ref == null && !state.regions && PickState.canDropPin(doc0, state.mapKey)) floatArrayOf(p.x, p.y) else null
                     },
                 )

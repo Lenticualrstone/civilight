@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.map.node
 
+import io.github.lenticualrstone.civilight.feature.map.common.MapAside
+import io.github.lenticualrstone.civilight.feature.map.common.MapAsideRules
+import io.github.lenticualrstone.civilight.feature.map.common.rememberMapAsideState
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.width
 import io.github.lenticualrstone.civilight.designsystem.component.DelayedProgress
 import io.github.lenticualrstone.civilight.designsystem.component.MapValueChip
 import androidx.compose.runtime.collectAsState
@@ -27,7 +32,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.CommandBar
 import io.github.lenticualrstone.civilight.designsystem.component.MapTool
 import io.github.lenticualrstone.civilight.designsystem.component.MapToolbar
 import io.github.lenticualrstone.civilight.designsystem.component.ReadOnlyBanner
-import io.github.lenticualrstone.civilight.designsystem.component.SidePanel
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.feature.map.MapCopy
 import io.github.lenticualrstone.civilight.feature.map.canvas.MapCanvas
@@ -94,6 +98,7 @@ fun NodeMapScreen(route: NodeMap, deps: FeatureDeps) {
     val menu = io.github.lenticualrstone.civilight.feature.map.common.rememberMapMenuHost(route.projectKey, route.mapKey, deps, vm, sheets)
     val gate = rememberHiddenGate(route.projectKey)
     val inner = LocalWindowLayout.current.isInner
+    val aside = rememberMapAsideState()
     val exporter = rememberMapExporter(deps)
 
     var editorText by rememberSaveable(route.mapKey) { mutableStateOf(NodeEditorState().encode()) }
@@ -301,11 +306,11 @@ fun NodeMapScreen(route: NodeMap, deps: FeatureDeps) {
                             }
                         }
                     }
-                    MapBars.LAYERS -> GlassCard(mod.fillMaxWidth().heightIn(max = 320.dp)) {
+                    MapBars.LAYERS -> GlassCard((if (isInner) mod.width(360.dp) else mod.fillMaxWidth()).heightIn(max = 320.dp)) {
                         Column(Modifier.verticalScroll(rememberScrollState())) { LayersPanel(b.state.layers, readOnly, layerActions) }
                     }
                     MapBars.PROPS -> b.state.props?.let { props ->
-                        GlassCard(mod.fillMaxWidth().heightIn(max = 340.dp)) {
+                        GlassCard((if (isInner) mod.width(360.dp) else mod.fillMaxWidth()).heightIn(max = 340.dp)) {
                             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 NodePropsPanel(props, readOnly, actions)
                             }
@@ -315,13 +320,14 @@ fun NodeMapScreen(route: NodeMap, deps: FeatureDeps) {
             }
             SidePanelHost(
                 inner,
-                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + 8.dp, end = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp),
+                Modifier.align(Alignment.TopEnd).padding(top = padding.calculateTopPadding() + MapAsideRules.TOP_GAP.dp, bottom = padding.calculateBottomPadding() + 12.dp),
             ) {
-                SidePanel(
-                    onClose = actions::deselect,
+                MapAside(
+                    state = aside,
                     tabs = listOf(MapCopy.TAB_PROPS, MapCopy.TAB_LAYERS, MapCopy.TAB_LIST),
                     selectedTab = editor.panelTab,
                     onSelectTab = { set(editor.copy(panelTab = it)) },
+                    onBack = if (editor.selected != null) actions::deselect else null,
                 ) {
                     TabContent(editor.panelTab) { tab ->
                         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -335,7 +341,7 @@ fun NodeMapScreen(route: NodeMap, deps: FeatureDeps) {
                 }
             }
             FoldSwitch(inner) { isInner ->
-                val kind = MapBars.node(state.moving != null || state.linking != null, editor.tool == NodeTool.LAYER, state.props != null, isInner)
+                val kind = MapBars.node(state.moving != null || state.linking != null, editor.tool == NodeTool.LAYER, state.props != null, MapBars.panelShown(isInner, aside.closed))
                 val slot = kind?.let { MapBarSlot(it, NodeBar(state, editor)) }
                 if (isInner) {
                     Column(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp)) {
