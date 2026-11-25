@@ -87,10 +87,9 @@ class MainActivity : FragmentActivity() {
         super.onStart()
         // DS-67: a shown toast's timer stands still while the app is not visible.
         locator.toasts.resume(ToastHold.APP_STOPPED)
-        if (wentToBackground) {
-            wentToBackground = false
-            locator.unlock.onForeground()
-        }
+        // Always check re-lock on start (even if the Activity was destroyed while backgrounded).
+        wentToBackground = false
+        locator.unlock.onForeground()
     }
 
     override fun onPause() {

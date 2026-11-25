@@ -209,7 +209,8 @@ private fun NewerBody(sheet: NewerFileSheet, summary: String, onClose: () -> Uni
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val context = LocalContext.current
-    TitleAndSummary(sheet.title, sheet.ratingBadge?.let(::ratingOfBadge), summary)
+    // S-4: rating badges are not shown in UI; keep summary only.
+    TitleAndSummary(sheet.title, null, summary)
     CivilightText(sheet.heading, type.itemTitleCompact, Modifier.padding(top = 16.dp, bottom = 6.dp), color = colors.ink)
     sheet.rows.forEach { (label, value) -> KeyValueLine(label, value) }
     CivilightText(sheet.note, type.small, Modifier.padding(top = 10.dp), color = colors.ink3)

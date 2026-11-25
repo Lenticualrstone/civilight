@@ -271,10 +271,12 @@ fun RecordingRoute(route: Recording, deps: FeatureDeps) {
                         CaptureSlot.MicOff -> MicOffPane(
                             onClose = hub::dismissMic,
                             onOpenSettings = {
-                                context.startActivity(
-                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                    )
+                                }
                             },
                             onToText = { hub.launch { micOffToText() } },
                         )

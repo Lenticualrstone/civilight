@@ -53,6 +53,7 @@ sealed interface DecryptResult {
 object PackageCrypto {
     const val KDF = "PBKDF2-HMAC-SHA256"
     const val CIPHER = "AES-256-GCM"
+    const val MAX_ITERATIONS = 1_000_000
     const val DEFAULT_ITERATIONS = 600_000
     const val SALT_BYTES = 16
     const val NONCE_BYTES = 12
@@ -145,6 +146,8 @@ object PackageCrypto {
             DecryptResult.Ok(gcm(Cipher.DECRYPT_MODE, dataKey, unb64(header.nonce), headerBytes, payload), header)
         } catch (e: AEADBadTagException) {
             DecryptResult.WrongPassword
+        } catch (e: IllegalArgumentException) {
+            DecryptResult.NotEncrypted(e.message ?: "bad base64")
         } catch (e: GeneralSecurityException) {
             DecryptResult.NotEncrypted(e.message ?: "cipher error")
         }
@@ -152,7 +155,7 @@ object PackageCrypto {
 
     /** PBKDF2-HMAC-SHA256 → 256-bit key. */
     fun deriveKey(password: CharArray, salt: ByteArray, iterations: Int): ByteArray {
-        require(iterations > 0) { "iterations must be positive" }
+        require(iterations in 1..MAX_ITERATIONS) { "iterations out of range: $iterations" }
         val spec = PBEKeySpec(password, salt, iterations, KEY_BYTES * 8)
         try {
             return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded

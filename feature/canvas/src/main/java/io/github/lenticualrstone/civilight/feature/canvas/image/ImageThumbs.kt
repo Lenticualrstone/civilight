@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
@@ -29,6 +30,6 @@ fun BoxScope.MineThumb(hash: String, onBitmap: (ImageBitmap) -> Unit = {}) {
             deps.stores.blobs.fileOf(hash)?.let { runCatching { SlotImages.decode(it, null, THUMB_SIDE) }.getOrNull() }?.asImageBitmap()
         }
     }
-    bitmap?.let { onBitmap(it) }
+    LaunchedEffect(bitmap) { bitmap?.let(onBitmap) }
     bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Crop) }
 }

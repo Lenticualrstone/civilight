@@ -4,11 +4,16 @@
 }
 
 # Routes and sheet keys are saved and restored by class name (Navigation3 NavKeySerializer,
-# RouteCodec), so their names and serializers must survive shrinking.
--keepnames class * implements androidx.navigation3.runtime.NavKey
--keepclassmembers class * implements androidx.navigation3.runtime.NavKey {
+# RouteCodec), so their classes, companions and serializers must survive R8 shrinking.
+-keep class * implements androidx.navigation3.runtime.NavKey {
     public static ** INSTANCE;
     public static ** Companion;
     public final kotlinx.serialization.KSerializer serializer(...);
 }
--keepnames class **$$serializer
+-keep class * implements androidx.navigation3.runtime.NavKey$Companion {
+    public final kotlinx.serialization.KSerializer serializer(...);
+}
+-keep class io.github.lenticualrstone.civilight.navigation.**$Companion {
+    public final kotlinx.serialization.KSerializer serializer(...);
+}
+-keep class **$$serializer { *; }

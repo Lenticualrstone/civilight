@@ -601,7 +601,8 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
                 )
                 val slot = kind?.let { MapBarSlot(it, EditBar(state, editor, shapeChoice, shapeEdit, readOnly)) }
                 if (isInner) {
-                    Column(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = padding.calculateBottomPadding() + 20.dp)) {
+                    val asideInset = if (aside.closed) 20.dp else 276.dp
+                    Column(Modifier.align(Alignment.BottomStart).padding(start = 20.dp, end = asideInset, bottom = padding.calculateBottomPadding() + 20.dp)) {
                         scaleLabel?.let { ScaleBar(it, Modifier.padding(bottom = 10.dp)) }
                         MapBar(slot) { k, b -> barContent(b, k, true) }
                         toolbar(Modifier)

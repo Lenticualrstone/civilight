@@ -161,14 +161,10 @@ object CommandBarRules {
 
 /** Copy of the frame's command bar. */
 object CommandBarCopy {
-    /**
-     * Accessibility label of the scope switch (DS-65 §3). No source gives one yet: `TODO_COPY_DS_COMMAND_SCOPE`
-     * is listed under Requests in `docs/status/shell.md` (Q-DS-24). Until then the group has no label of its
-     * own and each cell reads its pane title.
-     */
-    val SCOPE_GROUP: String? = null
+    /** Accessibility label of the scope switch (DS-65 §3). */
+    val SCOPE_GROUP: String = "찾기 범위"
 
-    val all: List<String> = listOfNotNull(SCOPE_GROUP)
+    val all: List<String> = listOf(SCOPE_GROUP)
 }
 
 /**

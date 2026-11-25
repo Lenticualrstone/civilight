@@ -73,12 +73,14 @@ class ScriptLayoutTest {
     @Test
     fun `a narrow two-pane detail is laid out as cover, and a tight inner width drops the panel`() {
         assertFalse(ScriptLayout.of(410f, panelOpen = true).wide)
-        val tight = ScriptLayout.of(620f, panelOpen = true)
+        // Z Fold 8 at 480 dpi inner portrait (616 x 816 dp) keeps the side panel (288 dp column >= 280 dp).
+        assertTrue(ScriptLayout.of(616f, panelOpen = true, height = 816f).panel)
+        val tight = ScriptLayout.of(600f, panelOpen = true)
         assertTrue(tight.wide)
         assertFalse(tight.panel)
         // No room for the panel: no rail either (nothing to reopen).
         assertFalse(tight.rail)
-        assertFalse(ScriptLayout.of(620f, panelOpen = false).rail)
+        assertFalse(ScriptLayout.of(600f, panelOpen = false).rail)
         assertEquals(560f, tight.columnWidth)
     }
 

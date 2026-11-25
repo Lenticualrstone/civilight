@@ -55,8 +55,8 @@ data class ScriptLayout(
         /** Space kept between the column and the panel's hairline. */
         const val PANEL_GAP = 16f
 
-        /** Narrowest column worth keeping the panel for; below it the panel is not drawn. */
-        const val COLUMN_MIN = 320f
+        /** Narrowest column worth keeping the panel for (280 dp supports Z Fold 8 inner portrait at 480 dpi / 616 dp). */
+        const val COLUMN_MIN = 280f
 
         /**
          * Where the manuscript stays while the panel slides in (SCR-66, one re-wrap): the last layout without the panel

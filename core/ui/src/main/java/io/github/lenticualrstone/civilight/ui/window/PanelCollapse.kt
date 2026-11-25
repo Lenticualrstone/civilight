@@ -245,9 +245,13 @@ fun PanelSeamButton(
     dragModifier: Modifier = Modifier,
 ) {
     val colors = CivilightTheme.colors
+    val isLandscape = LocalWindowLayout.current.isLandscape
     val label = PanelRules.label(state.closed)
     val shape = RoundedCornerShape(12.dp)
     val tabShape = RoundedCornerShape(PanelRules.tabRadius(state.open).dp)
+    // M3 fold-aware placement: in inner landscape the horizontal crease runs at y = 50%, so shift
+    // the seam tab above the crease (y ≈ 30%) instead of placing it directly on the fold line.
+    val verticalAlignment = if (isLandscape) androidx.compose.ui.BiasAlignment(0f, -0.4f) else Alignment.Center
     Box(
         modifier
             .fillMaxHeight()
@@ -263,7 +267,7 @@ fun PanelSeamButton(
                     p.place(IntOffset(px, 0))
                 }
             },
-        contentAlignment = Alignment.Center,
+        contentAlignment = verticalAlignment,
     ) {
         Box(
             Modifier

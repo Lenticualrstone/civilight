@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,41 +96,26 @@ object ProjectCovers {
     }
 }
 
-/** Decodes a cover image off the main thread, sampled to about [targetWidth] px and cut by its crop. */
+/** Decodes a cover image off the main thread, EXIF-upright, sampled safely to [targetWidth] px and cropped. */
 object CoverBitmaps {
-    fun decode(file: File, crop: Crop?, targetWidth: Int): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.path, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        val cropWidth = crop?.w ?: bounds.outWidth
-        var sample = 1
-        while (cropWidth / (sample * 2) >= targetWidth) sample *= 2
-        val raw = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
-        if (crop == null) return raw
-        val matrix = Matrix().apply {
-            if (crop.rotation % 360 != 0) postRotate(crop.rotation.toFloat())
-            if (crop.flipH) postScale(-1f, 1f)
-        }
-        val turned = if (matrix.isIdentity) raw else Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
-        val x = (crop.x / sample).coerceIn(0, turned.width - 1)
-        val y = (crop.y / sample).coerceIn(0, turned.height - 1)
-        val w = (crop.w / sample).coerceIn(1, turned.width - x)
-        val h = (crop.h / sample).coerceIn(1, turned.height - y)
-        return Bitmap.createBitmap(turned, x, y, w, h)
-    }
+    fun decode(file: File, crop: Crop?, targetWidth: Int): Bitmap? =
+        ImageBitmaps.decodeUprightSampled(file, crop, targetWidth)
 }
 
 /**
- * A picked original from the blob store. While it decodes (or when it is gone) nothing is drawn; once it is
- * there it fades in on `standard` (audit row 9). Decoded pictures stay in memory only (LIB-90).
+ * A picked original from the blob store. Uses the shared [ImageCache] so scrolling never re-decodes
+ * from disk on re-entry; decoded pictures stay in memory only (LIB-90).
  */
 @Composable
 fun CoverBlobImage(hash: String, crop: Crop?, targetWidth: Int, modifier: Modifier = Modifier) {
     val deps = LocalFeatureDeps.current
     val motion = CivilightTheme.motion
-    val bitmap by produceState<ImageBitmap?>(null, hash, crop) {
+    val safeWidth = targetWidth.coerceAtLeast(1)
+    val initial = remember(hash, crop, safeWidth) { ImageCache.get(ImageCache.key(hash, crop, safeWidth)) }
+    val bitmap by produceState(initial, hash, crop, safeWidth) {
+        if (value != null) return@produceState
         value = withContext(Dispatchers.IO) {
-            deps.stores.blobs.fileOf(hash)?.let { runCatching { CoverBitmaps.decode(it, crop, targetWidth) }.getOrNull() }?.asImageBitmap()
+            deps.stores.blobs.fileOf(hash)?.let { runCatching { ImageBitmaps.getOrDecode(hash, it, crop, safeWidth) }.getOrNull() }
         }
     }
     Crossfade(bitmap, modifier.fillMaxSize(), animationSpec = motion.spec(CivilightMotion.standard), label = "coverImage") { image ->

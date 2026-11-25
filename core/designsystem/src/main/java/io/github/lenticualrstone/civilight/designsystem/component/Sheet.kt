@@ -181,17 +181,20 @@ private fun SheetSurface(
     val systemBelow = if (imeUp) navBottom else systemBottomWithoutKeyboard()
     val sheetBottomPadding = if (imeUp) navBottom + OverlayGaps.sheetBottomIme else systemBelow + OverlayGaps.sheetBottom
     var sheetHeight by sheetHeightState
-    val shape: Shape = if (centered) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     BoxWithConstraints(
         Modifier.fillMaxSize().windowInsetsPadding(KeyboardLift),
-        contentAlignment = if (centered) Alignment.Center else Alignment.BottomCenter,
     ) {
+        // M3 structural safeguard: in a narrow split pane (<480 dp) never squish a centred modal to ~212 dp;
+        // fall back to a bottom-anchored sheet that uses the full pane width.
+        val useCentered = centered && maxWidth >= 480.dp
+        val effectiveShape: Shape = if (useCentered) RoundedCornerShape(28.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         val maxSheet = maxHeight - statusTop - LayoutMetrics.sheetMaxTopBelowStatusBar
         Box(
             modifier = Modifier
+                .align(if (useCentered) Alignment.Center else Alignment.BottomCenter)
                 .then(
                     // DS-66: the centred sheet sits in the band `[statusTop + 24, H − systemBottom − 24]`, 24 dp sides.
-                    if (centered) {
+                    if (useCentered) {
                         Modifier
                             .padding(
                                 start = OverlayGaps.dialogBand,
@@ -210,7 +213,7 @@ private fun SheetSurface(
                     if (reduced) {
                         alpha = p
                         translationY = drag.value
-                    } else if (centered) {
+                    } else if (useCentered) {
                         alpha = p
                         val s = CENTRED_START_SCALE + (1f - CENTRED_START_SCALE) * p
                         scaleX = s
@@ -235,14 +238,14 @@ private fun SheetSurface(
                     },
                 ),
         ) {
-            GlassBackground(GlassSurface.SHEET, Modifier.matchParentSize(), shape = shape)
+            GlassBackground(GlassSurface.SHEET, Modifier.matchParentSize(), shape = effectiveShape)
             OnGlass {
                 Column(
                     Modifier
                         .animateContentSize(motion.move(CivilightMotion.standard))
-                        .clip(shape)
-                        .insetOutline(colors.line, 1.dp, shape)
-                        .padding(top = 10.dp, start = sidePadding, end = sidePadding, bottom = if (centered) 20.dp else sheetBottomPadding),
+                        .clip(effectiveShape)
+                        .insetOutline(colors.line, 1.dp, effectiveShape)
+                        .padding(top = 10.dp, start = sidePadding, end = sidePadding, bottom = if (useCentered) 20.dp else sheetBottomPadding),
                 ) {
                     Box(
                         Modifier

@@ -94,11 +94,11 @@ val LocalWindowLayout = compositionLocalOf { WindowLayout.Cover }
  * container size, so a screen laid out with `fillMaxSize` fills it exactly (r3 fill rule: no leftover band).
  */
 @Composable
-fun rememberWindowLayout(): WindowLayout {
+fun rememberWindowLayout(posture: FoldPosture = FoldPosture.UNKNOWN): WindowLayout {
     val density = LocalDensity.current
     val size = LocalWindowInfo.current.containerSize
     val configuration = LocalConfiguration.current
     val widthDp = if (size.width > 0) with(density) { size.width.toDp().value.toInt() } else configuration.screenWidthDp
     val heightDp = if (size.height > 0) with(density) { size.height.toDp().value.toInt() } else configuration.screenHeightDp
-    return remember(widthDp, heightDp) { WindowLayout(widthDp, heightDp) }
+    return remember(widthDp, heightDp, posture) { WindowLayout(widthDp, heightDp, posture) }
 }

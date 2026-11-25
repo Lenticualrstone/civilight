@@ -9,6 +9,8 @@ import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
 import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -92,6 +94,7 @@ fun MapToolbar(
         Row(
             Modifier
                 .insetOutline(colors.line, 1.dp, shape)
+                .horizontalScroll(rememberScrollState())
                 .padding(4.dp)
                 .selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(2.dp),

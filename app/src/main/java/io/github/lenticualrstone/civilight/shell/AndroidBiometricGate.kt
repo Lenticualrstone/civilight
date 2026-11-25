@@ -13,6 +13,7 @@ import io.github.lenticualrstone.civilight.ui.security.AuthRequest
 import io.github.lenticualrstone.civilight.ui.security.AuthResult
 import io.github.lenticualrstone.civilight.ui.security.BiometricGate
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
 
 /**
@@ -23,15 +24,15 @@ import kotlin.coroutines.resume
  */
 class AndroidBiometricGate(private val activity: FragmentActivity) : BiometricGate {
     private val manager = BiometricManager.from(activity)
+    private val activePrompts = AtomicInteger(0)
 
     /**
      * True while a prompt is up. The device-credential screen can be a separate activity, which
      * stops ours; that must not count as leaving the app (no app lock, no re-lock of what the
-     * prompt is opening).
+     * prompt is opening). Ref-counted so rapid double-taps cannot clear it prematurely.
      */
-    @Volatile
-    var isPrompting: Boolean = false
-        private set
+    val isPrompting: Boolean
+        get() = activePrompts.get() > 0
 
     private val biometricWithCredential: Int =
         if (Build.VERSION.SDK_INT >= 30) BIOMETRIC_STRONG or DEVICE_CREDENTIAL else BIOMETRIC_WEAK or DEVICE_CREDENTIAL
@@ -57,11 +58,11 @@ class AndroidBiometricGate(private val activity: FragmentActivity) : BiometricGa
             .apply { request.subtitle?.let(::setSubtitle) }
             .setAllowedAuthenticators(authenticators)
             .build()
-        isPrompting = true
+        activePrompts.incrementAndGet()
         try {
             return prompt(info)
         } finally {
-            isPrompting = false
+            activePrompts.decrementAndGet()
         }
     }
 
@@ -81,10 +82,9 @@ class AndroidBiometricGate(private val activity: FragmentActivity) : BiometricGa
                             BiometricPrompt.ERROR_NEGATIVE_BUTTON,
                             BiometricPrompt.ERROR_CANCELED,
                             -> AuthResult.CANCELLED
-                            BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL,
-                            BiometricPrompt.ERROR_HW_NOT_PRESENT,
-                            BiometricPrompt.ERROR_HW_UNAVAILABLE,
-                            -> AuthResult.UNAVAILABLE
+                            // Only treat missing device credential as UNAVAILABLE; transient HW errors must
+                            // never bypass AppLock (they fail closed as FAILED so the user can retry or use PIN).
+                            BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL -> AuthResult.UNAVAILABLE
                             else -> AuthResult.FAILED
                         }
                         if (continuation.isActive) continuation.resume(outcome)

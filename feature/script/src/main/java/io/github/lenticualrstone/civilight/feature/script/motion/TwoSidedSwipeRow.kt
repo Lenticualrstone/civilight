@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -88,7 +89,7 @@ fun TwoSidedSwipeRow(
         drag.place(target)
     }
     LaunchedEffect(enabled) { if (!enabled) drag.cancel() }
-    Box(modifier) {
+    Box(modifier.clipToBounds()) {
         // Only the side being revealed is composed: the two layers overlap on a cover screen (192 + 300 > 390).
         if (BlockSwipe.showsReference(drag.offset, refOn)) {
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterStart) {
@@ -102,11 +103,8 @@ fun TwoSidedSwipeRow(
         }
         Box(
             Modifier
-                .offset { IntOffset(drag.offset.roundToInt(), 0) }
-                .background(colors.bg)
-                // 0.2.3 gesture rules (core `GestureRules`): undecided inside the slop (a tap or the block's long press stays
-                // possible), given up to the manuscript's scroll as soon as the drag reads vertical, and taken only in a
-                // direction this row can still move (a closed row with no edit side lets a leftward drag through).
+                // 0.2.3 gesture rules (core `GestureRules`): horizontalSwipe runs before offset so pointer
+                // deltas stay in stationary coordinates instead of oscillating with the sliding child.
                 .horizontalSwipe(
                     enabled = enabled,
                     canStart = { dx -> drag.canStart(dx, refPx, editPx, refOn, editOn) },
@@ -115,7 +113,9 @@ fun TwoSidedSwipeRow(
                         val settled = drag.release(refPx, editPx, refOn, editOn)
                         if (settled != side) onSideChange(settled)
                     },
-                ),
+                )
+                .offset { IntOffset(drag.offset.roundToInt(), 0) }
+                .background(colors.bg),
         ) { content() }
     }
 }

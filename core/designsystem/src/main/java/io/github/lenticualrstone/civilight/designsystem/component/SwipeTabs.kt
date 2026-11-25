@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import io.github.lenticualrstone.civilight.designsystem.foundation.GestureRules
 import io.github.lenticualrstone.civilight.designsystem.foundation.horizontalSwipe
 import androidx.compose.ui.graphics.graphicsLayer
@@ -107,16 +108,13 @@ fun SwipeRevealBox(
     LaunchedEffect(revealed, widthPx) {
         offset.animateTo(if (revealed) -widthPx else 0f, CivilightMotion.spec(CivilightMotion.swipe, reduced))
     }
-    Box(modifier) {
+    Box(modifier.clipToBounds()) {
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
             Box(Modifier.graphicsLayer { alpha = (-offset.value / widthPx).coerceIn(0f, 1f) }) { actions() }
         }
         Box(
             Modifier
-                .offset { IntOffset(offset.value.roundToInt(), 0) }
-                .background(CivilightTheme.colors.bg)
-                // 0.2.3: sideways only when clearly sideways and only toward where the block can go, so the list
-                // scrolls, a pager turns and a long press still fires (GestureRules).
+                // 0.2.3: horizontalSwipe sits before offset so drag deltas stay in stationary coordinates.
                 .horizontalSwipe(
                     enabled = enabled,
                     canStart = { dx -> GestureRules.canMove(dx, offset.value, -widthPx, 0f) },
@@ -128,7 +126,9 @@ fun SwipeRevealBox(
                             if (open != revealed) onRevealedChange(open)
                         }
                     },
-                ),
+                )
+                .offset { IntOffset(offset.value.roundToInt(), 0) }
+                .background(CivilightTheme.colors.bg),
         ) { content() }
     }
 }
@@ -274,7 +274,7 @@ fun TwoSidedSwipeRow(
     val editOn by rememberUpdatedState(editEnabled)
     val showRef by remember { derivedStateOf { SwipeReveal.showsReference(offset.value, refOn) } }
     val showEdit by remember { derivedStateOf { SwipeReveal.showsEdit(offset.value, editOn) } }
-    Box(modifier) {
+    Box(modifier.clipToBounds()) {
         if (showRef) {
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
                 Box(Modifier.graphicsLayer { alpha = (-offset.value / refPx).coerceIn(0f, 1f) }) { referenceActions() }
@@ -287,8 +287,6 @@ fun TwoSidedSwipeRow(
         }
         Box(
             Modifier
-                .offset { IntOffset(offset.value.roundToInt(), 0) }
-                .background(CivilightTheme.colors.bg)
                 .horizontalSwipe(
                     enabled = referenceEnabled || editEnabled,
                     canStart = { dx ->
@@ -311,7 +309,9 @@ fun TwoSidedSwipeRow(
                             if (next != side) onSideChange(next)
                         }
                     },
-                ),
+                )
+                .offset { IntOffset(offset.value.roundToInt(), 0) }
+                .background(CivilightTheme.colors.bg),
         ) { content() }
     }
 }

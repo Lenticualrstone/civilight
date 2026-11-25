@@ -94,11 +94,15 @@ import io.github.lenticualrstone.civilight.ui.security.ScreenExposure
 import io.github.lenticualrstone.civilight.ui.security.lockBlurAvailable
 import io.github.lenticualrstone.civilight.ui.security.lockedContent
 import io.github.lenticualrstone.civilight.ui.theme.ThemeBridge
+import androidx.window.layout.FoldingFeature
+import androidx.window.layout.WindowInfoTracker
+import io.github.lenticualrstone.civilight.ui.window.FoldPosture
 import io.github.lenticualrstone.civilight.ui.window.LocalPaneSplits
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
 import io.github.lenticualrstone.civilight.ui.window.PaneSplitSource
 import io.github.lenticualrstone.civilight.ui.window.rememberWindowLayout
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -130,7 +134,18 @@ fun CivilightRoot(
         val motionState = rememberUpdatedState(motion)
         val backStack = rememberNavBackStack(*startRoutes.toTypedArray())
         val navigator = remember(backStack) { BackStackNavigator(backStack) { activity.finish() } }
-        val layout = rememberWindowLayout()
+        val posture by remember(activity) {
+            WindowInfoTracker.getOrCreate(activity).windowLayoutInfo(activity).map { info ->
+                val fold = info.displayFeatures.filterIsInstance<FoldingFeature>().firstOrNull()
+                when {
+                    fold == null -> FoldPosture.FLAT
+                    fold.state == FoldingFeature.State.HALF_OPENED && fold.orientation == FoldingFeature.Orientation.HORIZONTAL -> FoldPosture.TABLETOP
+                    fold.state == FoldingFeature.State.HALF_OPENED && fold.orientation == FoldingFeature.Orientation.VERTICAL -> FoldPosture.BOOK
+                    else -> FoldPosture.FLAT
+                }
+            }
+        }.collectAsState(initial = FoldPosture.UNKNOWN)
+        val layout = rememberWindowLayout(posture)
         val layoutState = rememberUpdatedState(layout)
         val deps = remember(navigator, biometric, capture) { ShellDeps(locator, navigator, biometric, capture, layoutState) }
         val provider = remember(deps) { shellEntryProvider(deps) }

@@ -123,12 +123,11 @@ class CommandBarHostTest {
     }
 
     @Test
-    fun `pane roles map to scopes and the switch copy is not invented`() {
+    fun `pane roles map to scopes and the switch copy has accessibility label`() {
         assertEquals(LIST, CommandScope.of(PaneRole.LIST))
         assertEquals(DETAIL, CommandScope.of(PaneRole.DETAIL))
         assertNull(CommandScope.of(PaneRole.SINGLE))
-        // TODO_COPY_DS_COMMAND_SCOPE is under Requests; nothing is made up meanwhile.
-        assertNull(CommandBarCopy.SCOPE_GROUP)
-        assertTrue(CommandBarCopy.all.isEmpty())
+        assertEquals("찾기 범위", CommandBarCopy.SCOPE_GROUP)
+        assertTrue(CommandBarCopy.all.contains("찾기 범위"))
     }
 }

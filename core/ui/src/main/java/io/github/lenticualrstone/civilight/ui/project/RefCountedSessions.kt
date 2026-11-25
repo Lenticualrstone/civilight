@@ -3,10 +3,13 @@ package io.github.lenticualrstone.civilight.ui.project
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Shares one opened value per key between users: the first [acquire] opens it, every user calls
@@ -21,14 +24,14 @@ class RefCountedSessions<K : Any, T : Any>(
     private val closeDelayMs: Long = DEFAULT_CLOSE_DELAY_MS,
 ) {
     private class Slot<T>(val value: CompletableDeferred<T>) {
-        var users = 0
+        @Volatile var users = 0
         var closing: Job? = null
 
         @Volatile var ready: T? = null
     }
 
     private val mutex = Mutex()
-    private val slots = HashMap<K, Slot<T>>()
+    private val slots = ConcurrentHashMap<K, Slot<T>>()
 
     /** Opens (or shares) the value of [key]. Throws what the open threw; the caller then must not [release]. */
     suspend fun acquire(key: K): T {
@@ -54,9 +57,22 @@ class RefCountedSessions<K : Any, T : Any>(
         return try {
             slot.value.await()
         } catch (e: Throwable) {
-            mutex.withLock {
-                slot.users--
-                if (slots[key] === slot && slot.value.isCompleted) slots.remove(key)
+            withContext(NonCancellable) {
+                var toClose: T? = null
+                mutex.withLock {
+                    slot.users = (slot.users - 1).coerceAtLeast(0)
+                    if (slots[key] === slot && slot.users <= 0) {
+                        if (slot.value.isCompleted && slot.ready == null) {
+                            // Open failed and nobody else is waiting: forget the failed slot.
+                            slots.remove(key)
+                        } else if (slot.ready != null) {
+                            // Open succeeded just as the sole waiter cancelled: schedule normal close.
+                            slots.remove(key)
+                            toClose = slot.ready
+                        }
+                    }
+                }
+                toClose?.let { runCatching { close(key, it) } }
             }
             throw e
         }

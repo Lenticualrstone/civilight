@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -420,13 +422,13 @@ private const val LIST_W = 212f
 @Composable
 private fun StyleList(s: PickState, modifier: Modifier) {
     val colors = CivilightTheme.colors
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         PickGroup.entries.forEach { g ->
             val ids = s.entries.indices.filter { s.entries[it].group == g }
             if (ids.isEmpty()) return@forEach
             CivilightText("${ViewPick.groupLabel(g)} · ${ids.size}", CivilightTheme.type.small.merge(TextStyle(fontWeight = FontWeight.SemiBold)), Modifier.padding(horizontal = 4.dp).height(20.dp), color = colors.ink3, maxLines = 1)
             ids.chunked(2).forEach { pair ->
-                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth().height(52.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     pair.forEach { i -> ListRow(s, i, Modifier.weight(1f).fillMaxHeight()) }
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }

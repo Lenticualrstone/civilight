@@ -7,78 +7,53 @@
 
 # Civilight
 
-이야기와 세계관이 무거운 게임을 위한 시나리오 작성 앱. 폴더블에 맞춰 만들었다.
+방대한 세계관과 인물 관계를 다루는 창작자를 위한 로컬 우선 시나리오 집필 앱.  
+**갤럭시 Z 폴드 8**의 커버(10:16)와 내부 화면(4:3 세로·가로)을 기준으로 설계했습니다.
 
 ![Android 10+](https://img.shields.io/badge/Android-10%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
-![version](https://img.shields.io/badge/version-0.1.0-blue)
+![version](https://img.shields.io/badge/version-0.3.1(Antigravity)-blue)
 ![font license](https://img.shields.io/badge/font-Pretendard%20OFL%201.1-lightgrey)
 
 </div>
 
 ## 소개
 
-Civilight는 스크립트, 인물, 세계, 연표를 한 프로젝트 안에서 쓰는 앱이다.
-혼자 쓰는 작가를 위해 만들었다. 커버 화면에서 빠르게 쓰고, 안쪽 화면에서 펼쳐 놓고 본다.
-어디까지 썼는지를 기준으로 인물과 설정을 보여 주어, 아직 쓰지 않은 내용이 미리 새지 않게 한다.
+Civilight는 **원고(스크립트) · 인물 · 세계 · 연표 · 지도 · 캔버스 · 갤러리 · 라이프 레코더**를 하나의 프로젝트 안에서 연결해 쓰는 안드로이드 앱입니다.
+
+* **시점 기반 설정 관리**: 현재 집필 중인 씬을 기준으로 인물 정보·관계·용어 공개 여부를 계산해, 아직 다루지 않은 설정이 원고에 먼저 섞이지 않도록 돕습니다.
+* **폴더블 중심 화면 구성**: 커버 화면에서는 빠르게 대사를 입력하고, 내부 화면에서는 원고와 보조 패널(시간·참고·속성·현황) 또는 목록과 상세를 나란히 두고 작업합니다.
+* **로컬 우선 저장**: 프로젝트는 기기 안에 JSON과 원본 이미지(블롭) 단위로 저장되며, `.civilight` 암호화 파일로 내보내거나 다시 열 수 있습니다.
 
 ## 주요 기능
 
-기능 명세는 8개 영역, 462개 항목이다. 아래는 코드에 들어 있는 것을 영역별로 줄인 것이다.
-
-### 스크립트
-
-- 대사, 나레이션, 괄호 지문, 연출 지시, 선택지, 시스템 텍스트, 작가 메모 블록
-- 화자 고르기와 줄바꿈 규칙을 갖춘 원고 편집
-- 씬 단위 위치 표시(`이 씬 · 1-7`)와 씬 나누기, 합치기
-- 커버 화면 한 칸 배치와 안쪽 화면 원고 + 옆 패널 배치
+### 스크립트 (원고)
+* 대사 · 나레이션 · 괄호 지문 · 연출 지시 · 선택지 · 시스템 텍스트 · 작가 메모(`⌁`) 블록 지원
+* 채팅형 하단 입력바(화자 자동 이어쓰기, 종류 칩, 6줄 입력, `/` 단축 명령, `@` 항목 잇기)
+* 블록 좌우 밀기 액션 및 길게 누르기 통합 메뉴, 복선(`심기 · 다시 언급 · 거두기`)과 에피소드 판 남기기
+* 씬 단위 위치 표기(`1-7 씬 3`), 씬 나누기 · 합치기 · 옮기기, 대본 PDF / 대사 표 CSV / 게임 엔진 JSON 내보내기
 
 ### 스토리 · 시점 · 때 · 점검
+* 프로젝트 홈, 이어 쓰기, 사용자 정의 이야기 단계(장 · 에피소드 · 씬)
+* **시점 렌즈**: 선택한 시점의 값으로 인물·세계 정보를 조회하고 `이 값 고치기` / `여기서부터 바뀜`으로 분기 기록
+* **때와 점검 센터**: 직전 씬 기준 간격으로 시간 계산, 앞질러 쓴 용어 · 지워진 항목 참조 · 이동 시간 점검
 
-- 프로젝트 홈, 이어 쓰기, 새 프로젝트의 `시작해 볼 것`
-- 시점 렌즈: 지금까지 쓴 곳을 기준으로 인물과 설정을 보여 준다
-- 씬의 때를 기준과 간격으로 저장하고, 이동 거리와 시간을 점검한다
-- 순서와 때가 어긋나거나 앞질러 쓴 용어를 점검 센터에 모은다
+### 인물 · 갤러리
+* 인물 목록(3D 카드 뷰 · 목록 뷰), 다중 태그 필터, 프로젝트별 사용자 정의 항목, 말투 요약 및 비밀 탭 잠금
+* 양방향 관계 및 시점별 변화 기록, 전체 관계도
+* 인물별·프로젝트 통합 갤러리(목록 · 격자 · 카드 · 필름 · 무드보드 · 빨랫줄 · 전시실 · 색 묶음 · 태그 줄 · 씬 순서)
 
-### 인물
+### 세계 · 연표 · 지도
+* 용어(별칭 · 첫 공개 · 후보 탐색), 장소, 세력 카드
+* 사용자 정의 세계 달력과 연표(그때 나이 자동 계산)
+* 지도 만들기(지형 생성 · 이미지 가져오기 · 스케치 촬영 · 노드 지도), 핀 · 영역 · 경로 · 축척 · 인물 동선
 
-- 인물 목록, 카드, 태그 필터, 찾기
-- 프로젝트별 항목과 비밀 항목
-- 두 사람 사이의 관계와 각자의 마음, 변화 기록
-- 관계도
-
-### 세계
-
-- 장소, 용어, 세력 카드
-- 용어의 첫 공개 기록과 후보 확인
-- 세계 달력과 연표
-- 지도와 인물 동선
-
-### 캔버스 · 페이지
-
-- 확대와 이동이 되는 캔버스, 노드와 선, 선 라벨
-- 관계 선을 관계 기록으로 잇기
-- 페이지, 카드, 이미지 보기
-
-### 서재 · 보호 · 파일
-
-- 프로젝트 목록, 최근 연 파일, 예시 프로젝트
-- 잠금과 다시 잠그기, 등급과 숨기기
-- 내보내기와 `.civilight` 파일 열기
-- 지우기와 되살리기 휴지통
-
-### 라이프 레코더
-
-- 녹음 화면과 각 화면에서 들어가는 진입점
-- 마이크 권한 안내와 글로 쓰기 대체
-- 받아쓰기는 아직 자리만 있다 (아래 진행 상황 참고)
-
-### 디자인 시스템
-
-- 라이트와 다크 테마, Pretendard 글꼴
-- 유리 막대, 명령 칸, 분할 버튼, 탭, 대화상자
-- 원고 줄 세 개와 캐럿으로 만든 앱 마크
+### 캔버스 · 페이지 · 서재 · 보호
+* 다중 캔버스(노드 · 메모 · 묶음 · 관계 선 잇기) 및 자유 문서 페이지
+* 서재 보기(3D 책장 등 3D 뷰 + 타임라인 · 원고지 · 편지함 · 진행 칸 · 표지 벽 · 포스터 · 표, 실시간 미리보기 선택기)
+* 앱 잠금 · 프로젝트/항목 숨기기(지문 · 기기 PIN), 화면 캡처 차단, 최근 앱 이름 가림, 휴지통(30일 보관)
+* 라이프 레코더(음성 녹음 · 글 메모 · 원고/카드/페이지로 넣기)
 
 ## 화면
 
@@ -90,63 +65,47 @@ Civilight는 스크립트, 인물, 세계, 연표를 한 프로젝트 안에서 
 
 ## 설치
 
-1. [Releases](../../releases)에서 `civilight-0.1.0.apk`를 받는다.
-2. 설정에서 이 출처의 앱 설치를 허용한다 (출처를 알 수 없는 앱).
-3. 받은 APK를 열어 설치한다.
-
-Android 10 (API 29) 이상이 필요하다.
+1. [Releases](../../releases)에서 최신 `civilight-*.apk`를 받습니다.
+2. 안드로이드 설정에서 해당 출처의 앱 설치를 허용합니다.
+3. APK를 실행해 설치합니다. (Android 10 / API 29 이상)
 
 ## 빌드
 
-JDK 21이 필요하다 (Gradle 데몬 툴체인으로 지정됨). Android SDK 경로는 `local.properties`의 `sdk.dir`에 둔다.
+JDK 21이 필요하며, `local.properties`에 `sdk.dir` 경로를 지정합니다.
 
 ```bash
 ./gradlew :app:assembleDebug
-```
-
-```bash
 ./gradlew :app:assembleRelease
-```
-
-```bash
 ./gradlew test
 ```
 
-릴리즈 서명은 저장소 밖 `~/.civilight-signing/signing.properties` (또는 `CIVILIGHT_SIGNING` 환경 변수가 가리키는 파일)에서 읽는다. 없으면 서명 없는 릴리즈가 만들어진다.
+릴리즈 서명 설정은 저장소 밖 `~/.civilight-signing/signing.properties`(또는 `CIVILIGHT_SIGNING` 환경 변수)에서 읽습니다.
 
 | 항목 | 값 |
 | --- | --- |
-| versionName | 0.1.0 |
+| versionName | `0.3.1(Antigravity)` |
 | minSdk / targetSdk / compileSdk | 29 / 37 / 37 |
-| Kotlin | 2.4.21 |
-| Android Gradle Plugin | 9.4.1 |
-| Compose BOM | 2026.05.01 |
-| Navigation3 | 1.1.2 |
+| Kotlin / AGP | 2.4.21 / 9.4.1 |
+| Compose BOM / Navigation3 | 2026.05.01 / 1.1.2 |
 
-## 구조
+## 아키텍처 (23개 Gradle 모듈)
 
-22개 Gradle 모듈.
-
-| 묶음 | 모듈 | 역할 |
+| 계층 | 모듈 | 역할 |
 | --- | --- | --- |
-| core | `model` `store` `designsystem` `navigation` `ui` | 데이터 모델, 저장, 디자인 시스템, 라우팅, 공용 화면 부품 |
-| domain | `story` `script` `cast` `world` `trash` `library` `recorder` `checks` `actions` | 화면 없는 규칙과 계산 (JVM 테스트 대상) |
-| feature | `library` `story` `script` `cast` `world` `map` `canvas` `recorder` | 영역별 화면 |
-| app | `app` | 앱 진입점과 화면 연결 |
+| `core` | `model` `store` `designsystem` `navigation` `ui` | 불변 도메인 모델, 차분 저장소, 디자인 시스템, 라우팅, 공용 화면 프레임 |
+| `domain` | `story` `script` `cast` `world` `trash` `library` `recorder` `checks` `actions` | 순수 JVM 비즈니스 규칙과 계산 (단위 테스트 3,500+개) |
+| `feature` | `library` `story` `script` `cast` `world` `map` `canvas` `recorder` | 영역별 Compose UI 및 상태 관리 |
+| `app` | `app` | 진입점, DI(`ServiceLocator`), Navigation3 조립, 생체 인증·힌지 연동 |
 
-## 진행 상황
+## 현재 한계 (외부 연동 스텁)
 
-이 앱은 초기 버전이다. 기능 목록과 명세는 [docs/FEATURES.md](docs/FEATURES.md)에 있고, 모듈별 구현 상태는 `docs/status/`에 있다.
+로컬 집필과 관리 기능은 모두 기기 안에서 동작합니다. 외부 서비스가 필요한 일부 기능은 정직한 스텁/로컬 폴백으로 동작합니다.
 
-- 많은 화면이 부분 구현이다. 컴파일되고 저장소와 연결되어 있지만, 실제 기기에서 다듬어 보지 못한 것이 많다.
-- 외부 서비스가 필요한 기능은 자리만 있다. Google Drive 백업, 음성 받아쓰기, 홈 화면 위젯과 빠른 설정 타일, 잠금 화면 녹음, 글로 설명하는 지형 만들기가 그렇다.
-- `docs/FEATURES.md`의 상태 열은 아직 갱신되지 않았다.
+* Google Drive 자동 백업 및 복원 (로컬 `.civilight` 내보내기·열기는 정상 동작)
+* 실시간 음성 받아쓰기(STT) (녹음 및 원본 음성 보관·재생·수동 편집은 정상 동작)
+* 클라우드 LLM 기반 지형 생성 (온디바이스 키워드 조건 해석기는 정상 동작)
 
-## 글꼴
+## 글꼴 및 라이선스
 
-본문과 화면 글꼴은 [Pretendard](https://github.com/orioncactus/pretendard)를 쓴다.
-
-## 라이선스
-
-- Pretendard: SIL Open Font License 1.1. 전문은 [licenses/Pretendard-OFL.txt](licenses/Pretendard-OFL.txt).
-- 앱 코드: 미정.
+* 글꼴: [Pretendard](https://github.com/orioncactus/pretendard) (SIL Open Font License 1.1 — [licenses/Pretendard-OFL.txt](licenses/Pretendard-OFL.txt))
+* 앱 코드: 개인 프로젝트 (라이선스 미정)

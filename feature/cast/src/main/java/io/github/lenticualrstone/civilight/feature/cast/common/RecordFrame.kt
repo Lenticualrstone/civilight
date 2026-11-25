@@ -37,6 +37,9 @@ import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.ui.lens.LensChipLabel
+import io.github.lenticualrstone.civilight.ui.nav.LocalPaneRole
+import io.github.lenticualrstone.civilight.ui.scaffold.CommandScope
+import io.github.lenticualrstone.civilight.ui.scaffold.LocalCommandBarHost
 import io.github.lenticualrstone.civilight.ui.scaffold.LocalSheets
 import io.github.lenticualrstone.civilight.ui.scaffold.LocalToasts
 import io.github.lenticualrstone.civilight.ui.scaffold.SheetHost
@@ -80,6 +83,7 @@ fun RecordFrame(
         val toasts = LocalToasts.current
         val toast by toasts.current.collectAsState()
         val wide = LocalWindowLayout.current.isInner
+        val paneHost = if (CommandScope.of(LocalPaneRole.current) != null) LocalCommandBarHost.current else null
         GlassScaffold(
             topBar = {
                 // The floating buttons and the glass top bar swap in place (P3); both draw the lens as the shared `LensChip`.
@@ -111,18 +115,37 @@ fun RecordFrame(
             // 70 %), so page text scrolling under them showed through as a faint ghost behind a label. The tab row
             // gets its own scrim until the bar's opaque part covers an extra row (see Requests).
             bottomBar = {
-                BottomGlassBar(
-                    extraRow = {
+                if (paneHost != null) {
+                    // Two-pane inner screen: the frame draws the shared command bar (DS-65); draw only the tabs pill above it.
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = paneHost.panePadding + 8.dp, start = 16.dp, end = 16.dp),
+                    ) {
                         Row(
-                            // The pill is fully round (radius 22 on a 44 row): without an inset `개요` and its underline
-                            // started under the left corner and were cut off. The inset clears the corner at the underline.
-                            Modifier.weight(1f).clip(RoundedCornerShape(22.dp)).background(CivilightTheme.colors.raise.copy(alpha = SCRIM_ALPHA))
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(22.dp))
+                                .background(CivilightTheme.colors.raise.copy(alpha = SCRIM_ALPHA))
                                 .padding(horizontal = TAB_ROW_INSET),
                             verticalAlignment = Alignment.CenterVertically,
                             content = tabs,
                         )
-                    },
-                ) { commandBar() }
+                    }
+                } else {
+                    BottomGlassBar(
+                        extraRow = {
+                            Row(
+                                // The pill is fully round (radius 22 on a 44 row): without an inset `개요` and its underline
+                                // started under the left corner and were cut off. The inset clears the corner at the underline.
+                                Modifier.weight(1f).clip(RoundedCornerShape(22.dp)).background(CivilightTheme.colors.raise.copy(alpha = SCRIM_ALPHA))
+                                    .padding(horizontal = TAB_ROW_INSET),
+                                verticalAlignment = Alignment.CenterVertically,
+                                content = tabs,
+                            )
+                        },
+                    ) { commandBar() }
+                }
             },
             overlay = { padding ->
                 Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding() + 6.dp), contentAlignment = Alignment.BottomCenter) {

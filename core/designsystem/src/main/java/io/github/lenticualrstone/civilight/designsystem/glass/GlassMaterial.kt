@@ -63,13 +63,15 @@ fun rememberGlassSource(): GlassSource {
  */
 val LocalGlassSource = staticCompositionLocalOf<GlassSource?> { null }
 
-/** Records this node's content as the backdrop of [source]. */
-fun Modifier.glassSource(source: GlassSource): Modifier = this
-    .onGloballyPositioned { source.positionInRoot = it.positionInRoot() }
-    .drawWithContent {
-        source.layer.record { this@drawWithContent.drawContent() }
-        drawLayer(source.layer)
-    }
+/** Records this node's content as the backdrop of [source] when [enabled] (skipped in opaque/scrim modes). */
+fun Modifier.glassSource(source: GlassSource, enabled: Boolean = true): Modifier =
+    if (!enabled) this
+    else this
+        .onGloballyPositioned { source.positionInRoot = it.positionInRoot() }
+        .drawWithContent {
+            source.layer.record { this@drawWithContent.drawContent() }
+            drawLayer(source.layer)
+        }
 
 /**
  * Limits simultaneous sheet blurs in [GlassMode.BLUR_COSTLY] to one (DS-22 proposed); later sheets draw
@@ -134,6 +136,23 @@ fun GlassBackground(
     val bottomBorder = animatedColor(style.bottomBorder ?: noBorder, label = "glassBottomBorder")
     val topBorder = animatedColor(style.topBorder ?: noBorder, label = "glassTopBorder")
     val saturation = style.saturation.takeIf { style.blur > 0.dp } ?: blurTokens.glassSaturation
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val blurRadiusPx = with(density) { lastBlur.radius.toPx() }
+    val cachedBlurEffect = remember(blurRadiusPx) {
+        if (Build.VERSION.SDK_INT >= 31 && blurRadiusPx > 0f) BlurEffect(blurRadiusPx, blurRadiusPx, TileMode.Clamp) else null
+    }
+    val cachedColorFilter = remember(saturation) {
+        ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(saturation) })
+    }
+    val cachedMaskBrush = remember(style.mask) {
+        style.mask?.let { m ->
+            if (m.anchoredAtTop) {
+                Brush.verticalGradient(0f to Color.Black, m.opaqueFraction to Color.Black, 1f to Color.Transparent)
+            } else {
+                Brush.verticalGradient(0f to Color.Transparent, 1f - m.opaqueFraction to Color.Black, 1f to Color.Black)
+            }
+        }
+    }
     val blurLayer = rememberGraphicsLayer()
     var selfPosition by remember { mutableStateOf(Offset.Zero) }
     Box(
@@ -147,29 +166,17 @@ fun GlassBackground(
             }
             .drawBehind {
                 val amount = blurAmount.value
-                if (amount > 0f && lastBlur.radius > 0.dp && source != null && Build.VERSION.SDK_INT >= 31) {
-                    val radius = lastBlur.radius.toPx()
-                    blurLayer.renderEffect = BlurEffect(radius, radius, TileMode.Clamp)
+                if (amount > 0f && cachedBlurEffect != null && source != null && Build.VERSION.SDK_INT >= 31) {
+                    blurLayer.renderEffect = cachedBlurEffect
                     blurLayer.alpha = amount
-                    blurLayer.colorFilter = ColorFilter.colorMatrix(
-                        ColorMatrix().apply { setToSaturation(saturation) },
-                    )
+                    blurLayer.colorFilter = cachedColorFilter
                     val dx = source.positionInRoot.x - selfPosition.x
                     val dy = source.positionInRoot.y - selfPosition.y
                     blurLayer.record { translate(dx, dy) { drawLayer(source.layer) } }
                     drawLayer(blurLayer)
                 }
                 drawRect(fillColor.value)
-                style.mask?.let { m ->
-                    val brush = if (m.anchoredAtTop) {
-                        Brush.verticalGradient(0f to Color.Black, m.opaqueFraction to Color.Black, 1f to Color.Transparent)
-                    } else {
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            1f - m.opaqueFraction to Color.Black,
-                            1f to Color.Black,
-                        )
-                    }
+                cachedMaskBrush?.let { brush ->
                     drawRect(brush, blendMode = BlendMode.DstIn)
                 }
                 val hair = 1.dp.toPx()

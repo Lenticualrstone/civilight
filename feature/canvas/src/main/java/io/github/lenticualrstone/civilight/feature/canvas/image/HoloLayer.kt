@@ -33,6 +33,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.lenticualrstone.civilight.designsystem.component.HoloStrength
 import io.github.lenticualrstone.civilight.designsystem.component.HoloMath
 import io.github.lenticualrstone.civilight.designsystem.component.HoloPose
@@ -160,10 +163,28 @@ internal fun rememberHoloTilt(gate: SweepGate?): HoloTilt {
     val motion = CivilightTheme.motion
     val loops = motion.loops
     val hub = currentHub()
-    DisposableEffect(hub, loops) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(hub, loops, lifecycle) {
         hub.gate.reducedMotion(!loops)
-        hub.gate.shown()
-        onDispose { hub.gate.hidden() }
+        var active = false
+        fun update(visible: Boolean) {
+            if (visible == active) return
+            active = visible
+            if (visible) hub.gate.shown() else hub.gate.hidden()
+        }
+        update(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> update(true)
+                Lifecycle.Event.ON_PAUSE -> update(false)
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            update(false)
+        }
     }
     val sweep = remember { Animatable(1f) }
     val settle = remember { Animatable(1f) }

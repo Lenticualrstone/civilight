@@ -15,13 +15,13 @@ internal object Cards3dCopy {
     const val FACE_DOWN_HINT = "카드 누르기 · 뒤집기"
 
     /** Under the pulled-out wall card (board `fhint`). */
-    const val WALL_HINT = "밀어서 넘기기 · 눌러서 열기"
+    const val WALL_HINT = "밀어서 보기 · 눌러서 열기"
 
     /** Over the 롤로덱스 buttons (board `rhint`). */
     const val ROLODEX_HINT = "아래로 끌면 다음 · 위로 끌면 이전"
 
     /** Over the 겹친 더미 buttons (board `cnt .hint`). */
-    const val PILE_HINT = "밀어서 넘기기 · 누르면 열기"
+    const val PILE_HINT = "밀어서 보기 · 눌러서 열기"
 
     /** 타로: deal the next (or the previous) spread of five (QA 0.2.1: every character can be reached). */
     const val NEXT_SPREAD = "다음 펼침"
