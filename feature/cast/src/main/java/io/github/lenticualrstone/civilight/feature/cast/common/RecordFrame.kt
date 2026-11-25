@@ -116,41 +116,21 @@ fun RecordFrame(
             // gets its own scrim until the bar's opaque part covers an extra row (see Requests).
             bottomBar = {
                 if (paneHost != null) {
-                    // (0.5.0) Two-pane inner screen: real glass blur pill above the shared command bar.
-                    val pillShape = RoundedCornerShape(22.dp)
-                    Box(
+                    // Two-pane inner screen: clean transparent tabs sitting directly above the shared command bar.
+                    Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(bottom = paneHost.panePadding + 8.dp, start = 16.dp, end = 16.dp),
-                    ) {
-                        Box(Modifier.fillMaxWidth().clip(pillShape)) {
-                            GlassBackground(GlassSurface.BANNER, Modifier.matchParentSize(), shape = pillShape)
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = TAB_ROW_INSET),
-                                verticalAlignment = Alignment.CenterVertically,
-                                content = tabs,
-                            )
-                        }
-                    }
+                            .padding(bottom = paneHost.panePadding + 4.dp, start = 16.dp, end = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        content = tabs,
+                    )
                 } else {
-                    val pillShape = RoundedCornerShape(22.dp)
+                    // (0.5.2) Match night-manuscript-r3 Profile: tabs sit directly on BottomGlassBar's blurred glass
+                    // without a heavy dark pill container.
                     BottomGlassBar(
                         inner = wide,
                         aboveKeyboard = true,
-                        extraRow = {
-                            Box(Modifier.weight(1f).clip(pillShape)) {
-                                GlassBackground(GlassSurface.BANNER, Modifier.matchParentSize(), shape = pillShape)
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = TAB_ROW_INSET),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    content = tabs,
-                                )
-                            }
-                        },
+                        extraRow = tabs,
                     ) { commandBar() }
                 }
             },

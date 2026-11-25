@@ -416,9 +416,13 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                 }
             },
         ) { padding ->
-            val art = remember(doc, c, wide) { CharacterImages.background(doc, c, inner = wide) }
-            // No background: the portrait is the record's hero, in the holo board's tilting card when holo is on.
-            val portrait = remember(doc, c, art) { if (art == null) CharacterImages.image(doc, c, ImagePlace.CARD) else null }
+            val bgArt = remember(doc, c, wide) { CharacterImages.background(doc, c, inner = wide) }
+            val cardPortrait = remember(doc, c) { CharacterImages.image(doc, c, ImagePlace.CARD) }
+            // (0.5.2) Match night-manuscript-r3 Profile hero: full-bleed FadingHeaderArt (22dp edge blur fade)
+            // for background art OR non-holo portrait; only use tilting HoloCard when holo is explicitly enabled.
+            val art = bgArt ?: cardPortrait?.takeIf { !it.holo }
+            val portrait = if (bgArt == null && cardPortrait?.holo == true) cardPortrait else null
+            val artSlotField = if (bgArt != null) FixedField.BACKGROUND else FixedField.PORTRAIT
             val gallery = remember(doc, c, gate.open) { CastGallery.section(doc, c, gate.open) }
             val secret = SecretTabExtras(
                 summaryEdit = if (editable) ({ sheets.open(SpeechSummarySheet(p, c)) }) else null,
@@ -451,7 +455,16 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = PROFILE_SIDE, end = PROFILE_SIDE, top = topPad, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
-                item(key = "art") { FoldRevealValue(art) { image -> RecordArt(image, inner = wide, sidePadding = PROFILE_SIDE) } }
+                item(key = "art") {
+                    FoldRevealValue(art) { image ->
+                        androidx.compose.foundation.layout.Box(
+                            Modifier.then(
+                                if (editable) Modifier.pressable(onClick = { actions.onFixed(artSlotField) }, scaleOnPress = false)
+                                else Modifier,
+                            ),
+                        ) { RecordArt(image, inner = wide, sidePadding = PROFILE_SIDE) }
+                    }
+                }
                 item(key = "portrait") {
                     FoldRevealValue(portrait) { image ->
                         androidx.compose.foundation.layout.Box(
@@ -459,7 +472,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                                 if (editable) Modifier.pressable(onClick = { actions.onFixed(FixedField.PORTRAIT) }, scaleOnPress = false)
                                 else Modifier,
                             ),
-                        ) { PortraitHero(image, ambientBlur = appSettings.portraitAmbientBlur, sidePadding = PROFILE_SIDE) }
+                        ) { PortraitHero(image) }
                     }
                 }
                 item(key = "head") { RecordHead(state, editable, actions) }

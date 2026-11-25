@@ -64,8 +64,8 @@ private fun List<TextRun>.flatText(): String = joinToString("") { run ->
 }.trim()
 
 /**
- * (0.5.0) Horizontal scrollable modular tab pill with animated active capsule highlight
- * and a quick preset/template button at the trailing edge.
+ * (0.5.2) Clean horizontal scrollable underline tab bar matching the night-manuscript-r3 Profile aesthetic:
+ * transparent background over BottomGlassBar, bold `ink` active label + crisp `2.dp` accent underline.
  */
 @Composable
 internal fun ModularProfileTabBar(
@@ -82,25 +82,20 @@ internal fun ModularProfileTabBar(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(scroll)
-            .padding(vertical = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         tabs.forEach { tab ->
             val active = tab.id == selectedId
-            val bg by animateColorAsState(
-                if (active) colors.acc.copy(alpha = if (colors.isDark) 0.24f else 0.16f) else Color.Transparent,
-                label = "profileTabBg",
-            )
-            val fg by animateColorAsState(if (active) colors.acc else colors.ink2, label = "profileTabFg")
-            val shape = RoundedCornerShape(16.dp)
-            Box(
+            val fg by animateColorAsState(if (active) colors.ink else colors.ink3, label = "profileTabFg")
+            val barColor by animateColorAsState(if (active) colors.acc else Color.Transparent, label = "profileTabBar")
+            Column(
                 Modifier
-                    .clip(shape)
-                    .background(bg)
-                    .pressable(onClick = { onSelect(tab) }, scaleOnPress = false, shape = shape)
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                contentAlignment = Alignment.Center,
+                    .pressable(onClick = { onSelect(tab) }, scaleOnPress = false)
+                    .padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 CivilightText(
                     tab.label,
@@ -108,13 +103,19 @@ internal fun ModularProfileTabBar(
                     color = fg,
                     maxLines = 1,
                 )
+                Box(
+                    Modifier
+                        .height(2.dp)
+                        .size(width = 24.dp, height = 2.dp)
+                        .background(barColor, RoundedCornerShape(1.dp)),
+                )
             }
         }
         Box(
             Modifier
-                .size(30.dp)
-                .clip(RoundedCornerShape(15.dp))
-                .pressable(onClick = onManageTemplates, scaleOnPress = false, shape = RoundedCornerShape(15.dp)),
+                .size(28.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .pressable(onClick = onManageTemplates, scaleOnPress = false, shape = RoundedCornerShape(14.dp)),
             contentAlignment = Alignment.Center,
         ) {
             CivilightIcon(IconId.Sliders, contentDescription = "탭 프리셋 설정", size = 15.dp, tint = colors.ink3)
