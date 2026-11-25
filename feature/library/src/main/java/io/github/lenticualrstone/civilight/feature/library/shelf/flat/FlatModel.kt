@@ -123,26 +123,13 @@ class RowFactsCache {
     }
 }
 
-/** The seven flat views, in the picker's order (r3 `VIEWS`). */
+/** Kinetic Atelier views helper (legacy flat views retired in 0.3.2). */
 object FlatViews {
-    val styles: List<LibraryStyle> = listOf(
-        LibraryStyle.TIMELINE,
-        LibraryStyle.MANUSCRIPT_GRID,
-        LibraryStyle.MAILBOX,
-        LibraryStyle.PROGRESS_CELLS,
-        LibraryStyle.COVER_WALL,
-        LibraryStyle.POSTER,
-        LibraryStyle.TABLE,
-    )
+    val styles: List<LibraryStyle> = io.github.lenticualrstone.civilight.feature.library.shelf.atelier.AtelierRegistry.kineticStyles
 
     fun isFlat(style: LibraryStyle): Boolean = style in styles
 
-    /**
-     * Cover boards open a project on its first tap where they draw no detail block (원고지, 진행 칸, 표지 벽, 표);
-     * the others, and every inner board, pick first and open from the detail's `열기`.
-     */
-    fun opensOnTap(style: LibraryStyle, wide: Boolean): Boolean =
-        !wide && (style == LibraryStyle.MANUSCRIPT_GRID || style == LibraryStyle.PROGRESS_CELLS || style == LibraryStyle.COVER_WALL || style == LibraryStyle.TABLE)
+    fun opensOnTap(style: LibraryStyle, wide: Boolean): Boolean = !wide && style == LibraryStyle.LIST
 
     /** Total characters over the drawn projects only (a locked project adds nothing). */
     fun totalChars(items: List<ShelfCardItem>): Int =

@@ -95,11 +95,11 @@ class SettingsAndContainerTest {
         try {
             val store = SettingsStore(PreferenceDataStoreFactory.create(scope = scope, produceFile = { file }))
             // Defaults (D1): the 3D views; the toggle is absent, so the 3D view shows.
-            assertEquals(io.github.lenticualrstone.civilight.model.app.LibraryStyle.BOOKSHELF, io.github.lenticualrstone.civilight.model.app.ShownView.library(store.current()))
+            assertEquals(io.github.lenticualrstone.civilight.model.app.LibraryStyle.GLASS_PRISM, io.github.lenticualrstone.civilight.model.app.ShownView.library(store.current()))
             store.setLibraryToggle(ViewMode.LIST)
             assertEquals(io.github.lenticualrstone.civilight.model.app.LibraryStyle.LIST, io.github.lenticualrstone.civilight.model.app.ShownView.library(store.current()))
             // Picking a 3D style shows it on return (LIB-94); picking 목록 leaves the toggle.
-            store.setLibraryStyle(io.github.lenticualrstone.civilight.model.app.LibraryStyle.CONSTELLATION)
+            store.setLibraryStyle(io.github.lenticualrstone.civilight.model.app.LibraryStyle.ORBIT_STAGE)
             assertEquals(ViewMode.CARD, store.current().libraryToggle)
             store.setCastToggle(ViewMode.LIST)
             store.setCastCardStyle(io.github.lenticualrstone.civilight.model.app.CardStyle.LIST)
@@ -111,7 +111,7 @@ class SettingsAndContainerTest {
         val scope2 = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {
             val again = SettingsStore(PreferenceDataStoreFactory.create(scope = scope2, produceFile = { file })).current()
-            assertEquals(io.github.lenticualrstone.civilight.model.app.LibraryStyle.CONSTELLATION, again.libraryStyle)
+            assertEquals(io.github.lenticualrstone.civilight.model.app.LibraryStyle.ORBIT_STAGE, again.libraryStyle)
             assertEquals(io.github.lenticualrstone.civilight.model.app.CardStyle.LIST, again.castCardStyle)
             assertFalse(again.viewTilt)
         } finally {

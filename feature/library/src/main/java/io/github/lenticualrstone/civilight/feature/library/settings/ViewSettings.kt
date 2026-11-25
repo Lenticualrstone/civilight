@@ -35,22 +35,8 @@ object CardViewMirror {
 
 /** Labels and picker rows of the 0.2.0 view settings (U-16, LIB-93, LIB-94, CST-67). */
 object ViewStyles {
-    fun label(style: LibraryStyle): String = when (style) {
-        LibraryStyle.BOOKSHELF -> SettingsCopy.LIB_BOOKSHELF
-        LibraryStyle.COVER_SPIN -> SettingsCopy.LIB_COVER_SPIN
-        LibraryStyle.MANUSCRIPT_STACK -> SettingsCopy.LIB_MANUSCRIPT_STACK
-        LibraryStyle.ARCHIVE_HALL -> SettingsCopy.LIB_ARCHIVE_HALL
-        LibraryStyle.INDEX_DRAWER -> SettingsCopy.LIB_INDEX_DRAWER
-        LibraryStyle.CONSTELLATION -> SettingsCopy.LIB_CONSTELLATION
-        LibraryStyle.LIST -> SettingsCopy.VIEW_LIST
-        LibraryStyle.TIMELINE -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.TIMELINE
-        LibraryStyle.MANUSCRIPT_GRID -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.PAPER
-        LibraryStyle.MAILBOX -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.MAIL
-        LibraryStyle.PROGRESS_CELLS -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.CELLS
-        LibraryStyle.COVER_WALL -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.WALL
-        LibraryStyle.POSTER -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.POSTER
-        LibraryStyle.TABLE -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViewCopy.TABLE
-    }
+    fun label(style: LibraryStyle): String =
+        io.github.lenticualrstone.civilight.feature.library.shelf.atelier.AtelierCopy.label(style)
 
     fun label(style: CardStyle): String = when (style) {
         CardStyle.FAN_DECK -> SettingsCopy.CARD_FAN_DECK

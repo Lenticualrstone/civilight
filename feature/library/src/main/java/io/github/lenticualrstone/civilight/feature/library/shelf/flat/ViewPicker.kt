@@ -80,7 +80,6 @@ import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCopy
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfUi
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfViewInput
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfViewRenderers
-import io.github.lenticualrstone.civilight.feature.library.shelf.views.previewInert
 import io.github.lenticualrstone.civilight.model.app.LibraryStyle
 import kotlinx.coroutines.launch
 import kotlin.math.min
@@ -115,14 +114,14 @@ internal fun LibraryViewPicker(ui: ShelfUi, stored: LibraryStyle, onApply: (Libr
     val cancel = { close(onCancel) }
     val apply = { if (ViewPick.canApply(sel, cur)) entries.getOrNull(sel)?.style?.let { s -> close { onApply(s) } } ?: Unit else cancel() }
     LocalBackHandler.current(true, cancel)
-    val look = FlatLook.current()
+    val scrim = CivilightTheme.colors.shade
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val hostW = maxWidth
         val hostH = maxHeight
         val wide = ShelfCards.isWide(hostW.value.toInt())
         // Scrim (board `.scr`): a tap cancels.
         Box(
-            Modifier.fillMaxSize().graphicsLayer { alpha = shown.value }.background(look.scrim)
+            Modifier.fillMaxSize().graphicsLayer { alpha = shown.value }.background(scrim)
                 .pointerInput(Unit) { detectTapGestures { cancel() } }
                 .clearAndSetSemantics { },
         )
@@ -523,7 +522,7 @@ private fun Scaled(nativeW: Float, nativeH: Float, scale: Float, radius: Float, 
 @Composable
 internal fun StylePreview(style: LibraryStyle, ui: ShelfUi, w: Dp, h: Dp) {
     val colors = CivilightTheme.colors
-    Box(Modifier.size(w, h).background(colors.bg).previewInert()) {
+    Box(Modifier.size(w, h).background(colors.bg).clearAndSetSemantics { }) {
         val wide = ShelfCards.isWide(w.value.toInt())
         val renderer = ShelfViewRenderers.of(style)
         if (renderer != null && ui.empty == null && (ui.cards.isNotEmpty() || ui.lockedGroup != null)) {
@@ -630,5 +629,23 @@ internal fun ViewChip(style: LibraryStyle, onClick: () -> Unit) {
             if (named) CivilightText(label, TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold), color = colors.ink, maxLines = 1)
             CivilightIcon(IconId.Down, contentDescription = null, size = 14.dp, tint = colors.ink3)
         }
+    }
+}
+
+@Composable
+private fun RoundNav(icon: IconId, label: String, enabled: Boolean, onClick: () -> Unit) {
+    val colors = CivilightTheme.colors
+    val shape = RoundedCornerShape(22.dp)
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(shape)
+            .background(colors.tint)
+            .insetOutline(colors.line, 1.dp, shape)
+            .pressable(onClick = onClick, enabled = enabled, role = Role.Button, shape = shape)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        CivilightIcon(icon, contentDescription = null, size = 18.dp, tint = if (enabled) colors.ink else colors.ink3)
     }
 }

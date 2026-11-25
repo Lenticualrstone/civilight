@@ -49,8 +49,8 @@ data class AppSettings(
      * → chosen ratio. Absent = [PaneSplit.DEFAULT] (today's layout); not written while empty.
      */
     val paneSplit: Map<String, PaneSplit> = emptyMap(),
-    /** (0.2.0, U-16, LIB-93) `서재 보기`. The old `viewByScreen["library"]` is kept and not read. */
-    val libraryStyle: LibraryStyle = LibraryStyle.BOOKSHELF,
+    /** (0.3.2, Atelier) `서재 보기`. The old `viewByScreen["library"]` is kept and not read. */
+    val libraryStyle: LibraryStyle = LibraryStyle.GLASS_PRISM,
     /** (0.2.0, U-16, CST-67) `카드 보기` of the character list. The old `viewByScreen["cast"]` is kept and not read. */
     val castCardStyle: CardStyle = CardStyle.FAN_DECK,
     /** (0.2.0) 서재 head toggle: `LIST` = the list, `CARD` = the chosen 3D view; absent = `CARD` (00 §13.4). */
@@ -98,56 +98,47 @@ data class AppSettings(
     }
 }
 
-/** (0.2.0, U-16) `서재 보기` values in settings order (00 §13.4). Unknown stored values read [BOOKSHELF]. */
+/**
+ * (0.3.2, Atelier) 10 handcrafted `서재 보기` styles: 5 spatial 3D views + 5 kinetic workspace views.
+ * Unknown legacy stored values (`bookshelf`, `timeline`, etc.) gracefully fall back to [GLASS_PRISM].
+ */
 @Serializable(with = LibraryStyle.Codec::class)
 enum class LibraryStyle {
-    /** `3D 책장` (D1). */
-    BOOKSHELF,
+    /** `유리 프리즘` — 3D 굴절 회전 프리즘 (기본값). */
+    GLASS_PRISM,
 
-    /** `표지 회전`. */
-    COVER_SPIN,
+    /** `깊이 서고` — 3D 원근 통로 · 깊이 이동. */
+    ARCHIVE_VAULT,
 
-    /** `원고 더미`. */
-    MANUSCRIPT_STACK,
+    /** `양장 서가` — 3D 양장 책등 · 꺼내 펼침. */
+    BOOK_SPINE_3D,
 
-    /** `서고 회랑`. */
-    ARCHIVE_HALL,
+    /** `궤도 무대` — 3D 타원 궤도 · 스포트라이트. */
+    ORBIT_STAGE,
 
-    /** `색인 카드 서랍`. */
-    INDEX_DRAWER,
+    /** `화첩 펼침` — 3D 제본 축 · 표지 젖힘. */
+    FOLIO_SPREAD,
 
-    /** `별자리`. */
-    CONSTELLATION,
+    /** `탄성 덱` — 스프링 물리 · 부채꼴 덱. */
+    KINETIC_DECK,
 
-    /** `목록`. */
-    LIST,
+    /** `모자이크` — 에디토리얼 격자 · 포커스. */
+    BENTO_MOSAIC,
 
-    // (0.2.3, r3 `libviews`) Flat 서재 views, appended after LIST: stored by name, so 0.2.2 values read as before.
+    /** `필름 릴` — 35mm 필름 · 내부 패럴랙스. */
+    FILM_REEL,
 
-    /** `타임라인` (띠). */
-    TIMELINE,
+    /** `시간 축` — 맥동 노드 · 작업 연대기. */
+    PULSE_TIMELINE,
 
-    /** `원고지` (격자). */
-    MANUSCRIPT_GRID,
-
-    /** `편지함`. */
-    MAILBOX,
-
-    /** `진행 칸`. */
-    PROGRESS_CELLS,
-
-    /** `표지 벽`. */
-    COVER_WALL,
-
-    /** `포스터` (넘기기). */
-    POSTER,
-
-    /** `표`. */
-    TABLE;
+    /** `스튜디오 목록` — 모션 목록 · 빠른 작업. */
+    LIST;
 
     val isList: Boolean get() = this == LIST
 
-    object Codec : LowerCamelEnumSerializer<LibraryStyle>("LibraryStyle", entries, BOOKSHELF)
+    val isSpatial: Boolean get() = ordinal < 5
+
+    object Codec : LowerCamelEnumSerializer<LibraryStyle>("LibraryStyle", entries, GLASS_PRISM)
 }
 
 /** (0.2.0, U-16) Character `카드 보기` values in settings order (00 §13.4). Unknown stored values read [FAN_DECK]. */

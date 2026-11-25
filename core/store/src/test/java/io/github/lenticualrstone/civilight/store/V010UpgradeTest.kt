@@ -180,7 +180,7 @@ class V010UpgradeTest {
         val text = fixture("settings.json").readText()
         val settings = AppSettingsCodec.decode(text)
         assertEquals(mapOf("library" to ViewMode.LIST, "cast" to ViewMode.CARD), settings.viewByScreen)
-        assertEquals(LibraryStyle.BOOKSHELF, ShownView.library(settings))
+        assertEquals(LibraryStyle.GLASS_PRISM, ShownView.library(settings))
         assertEquals(CardStyle.FAN_DECK, ShownView.cast(settings))
         assertFalse("S-2 travel check off", settings.checkTravel)
         assertFalse(settings.recorder.lockScreenRecording)

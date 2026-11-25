@@ -136,16 +136,16 @@ class Model020Test {
 
     @Test
     fun `shown view and toggle`() {
-        assertEquals(LibraryStyle.BOOKSHELF, ShownView.of(LibraryStyle.BOOKSHELF, null))
-        assertEquals(LibraryStyle.LIST, ShownView.of(LibraryStyle.BOOKSHELF, ViewMode.LIST))
+        assertEquals(LibraryStyle.GLASS_PRISM, ShownView.of(LibraryStyle.GLASS_PRISM, null))
+        assertEquals(LibraryStyle.LIST, ShownView.of(LibraryStyle.GLASS_PRISM, ViewMode.LIST))
         assertEquals(LibraryStyle.LIST, ShownView.of(LibraryStyle.LIST, ViewMode.CARD))
         assertFalse(ShownView.showsToggle(LibraryStyle.LIST))
         assertEquals(CardStyle.TAROT, ShownView.of(CardStyle.TAROT, ViewMode.GRID))
         val unknown = CivilightJson.decode(AppSettings.serializer(), """{"libraryStyle":"hologram","castCardStyle":"x"}""")
-        assertEquals(LibraryStyle.BOOKSHELF, unknown.libraryStyle)
+        assertEquals(LibraryStyle.GLASS_PRISM, unknown.libraryStyle)
         assertEquals(CardStyle.FAN_DECK, unknown.castCardStyle)
         val old = CivilightJson.decode(AppSettings.serializer(), """{"viewByScreen":{"library":"list","cast":"card"}}""")
-        assertEquals(LibraryStyle.BOOKSHELF, ShownView.library(old))
+        assertEquals(LibraryStyle.GLASS_PRISM, ShownView.library(old))
         assertEquals(CardStyle.FAN_DECK, ShownView.cast(old))
         assertEquals(mapOf("library" to ViewMode.LIST, "cast" to ViewMode.CARD), old.viewByScreen)
         assertFalse("S-2: travel check off by default", old.checkTravel)

@@ -3,9 +3,8 @@ package io.github.lenticualrstone.civilight.feature.library.shelf
 import androidx.compose.runtime.Composable
 import io.github.lenticualrstone.civilight.designsystem.theme.Unhide
 import io.github.lenticualrstone.civilight.feature.library.settings.SettingsCopy
-import io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfScene
-import io.github.lenticualrstone.civilight.feature.library.shelf.views.ShelfScene3D
 import io.github.lenticualrstone.civilight.feature.library.settings.ViewStyles
+import io.github.lenticualrstone.civilight.feature.library.shelf.atelier.AtelierRegistry
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.AppSettings
 import io.github.lenticualrstone.civilight.model.app.LibraryStyle
@@ -57,16 +56,8 @@ typealias ShelfViewRenderer = @Composable (ShelfViewInput) -> Unit
  * head toggle (a toggle between two identical lists would be a control that does nothing).
  */
 object ShelfViewRenderers {
-    private val threeD: Map<LibraryStyle, ShelfViewRenderer> = ShelfScene.styles.associateWith { style ->
-        { input: ShelfViewInput -> ShelfScene3D(style, input) }
-    }
-
-    /** (0.2.3, r3 `libviews`) The seven flat views: one frame, one renderer each. */
-    private val flat: Map<LibraryStyle, ShelfViewRenderer> = io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatViews.styles.associateWith { style ->
-        { input: ShelfViewInput -> io.github.lenticualrstone.civilight.feature.library.shelf.flat.FlatScene(style, input) }
-    }
-
-    val renderers: Map<LibraryStyle, ShelfViewRenderer> = threeD + flat
+    /** (0.3.2, Atelier) All 10 handcrafted library views (5 spatial 3D + 5 kinetic workspace). */
+    val renderers: Map<LibraryStyle, ShelfViewRenderer> = AtelierRegistry.renderers
 
     fun of(style: LibraryStyle): ShelfViewRenderer? = renderers[style]
 
@@ -99,7 +90,7 @@ object ShelfViews {
         } else {
             null
         }
-        val rendered = shown.takeIf { !it.isList && it in available }
+        val rendered = shown.takeIf { it in available }
         return ShelfViewUi(chosen, shown, rendered, toggle, settings.viewTilt)
     }
 
