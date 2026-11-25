@@ -50,7 +50,9 @@ object ScriptPdfContent {
             for (b in doc.manuscript.liveBlocksOf(sceneKey)) {
                 if (!Manuscript.isShown(b.kind.known, printLayers)) continue
                 val label = when (b.kind.known) {
-                    BlockKind.DIALOGUE -> b.speakerKey?.let { Labels.speakerName(doc, it) } ?: Manuscript.SpeakerLabel.Missing.TEXT
+                    BlockKind.DIALOGUE -> b.displayNameOverride?.takeIf { it.isNotBlank() }
+                        ?: b.speakerKey?.let { Manuscript.displayNameAt(doc, it, b.key) ?: Labels.speakerName(doc, it) }
+                        ?: Manuscript.SpeakerLabel.Missing.TEXT
                     BlockKind.CHOICE -> "선택지"
                     BlockKind.SYSTEM -> "시스템"
                     BlockKind.MEMO -> "⌁ 작가 메모"

@@ -25,9 +25,15 @@ private const val THUMB_SIDE = 360
 @Composable
 fun BoxScope.MineThumb(hash: String, onBitmap: (ImageBitmap) -> Unit = {}) {
     val deps = LocalFeatureDeps.current
-    val bitmap by produceState<ImageBitmap?>(null, hash) {
+    val cached = androidx.compose.runtime.remember(hash) {
+        io.github.lenticualrstone.civilight.ui.image.ImageCache.get(io.github.lenticualrstone.civilight.ui.image.ImageCache.key(hash, null, THUMB_SIDE))
+    }
+    val bitmap by produceState<ImageBitmap?>(cached, hash) {
+        if (value != null) return@produceState
         value = withContext(Dispatchers.IO) {
-            deps.stores.blobs.fileOf(hash)?.let { runCatching { SlotImages.decode(it, null, THUMB_SIDE) }.getOrNull() }?.asImageBitmap()
+            deps.stores.blobs.fileOf(hash)?.let { file ->
+                runCatching { io.github.lenticualrstone.civilight.ui.image.ImageBitmaps.getOrDecode(hash, file, null, THUMB_SIDE) }.getOrNull()
+            }
         }
     }
     LaunchedEffect(bitmap) { bitmap?.let(onBitmap) }

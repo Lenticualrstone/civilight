@@ -71,6 +71,7 @@ import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
     val vm = entryViewModel { HomeViewModel(route.projectKey, deps.storyServices()) }
     val ui by vm.ui.collectAsState()
+    val settings by deps.settings.collectAsState()
     val sheets = rememberSheetHost()
     val navigator = deps.navigator
     val inDetailPane = LocalPaneRole.current == PaneRole.DETAIL
@@ -84,8 +85,8 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
                 CommandBar(
                     hint = ui?.commandHint.orEmpty(),
                     onClick = { navigator.push(ProjectSearch(route.projectKey)) },
-                    // S-8: inside the app the recorder opens only from here.
-                    onMic = { navigator.push(Recording(projectKey = route.projectKey)) },
+                    // S-8 + 0.5.0 Labs gate: recorder opens from home only when Life Recorder is enabled in Labs.
+                    onMic = if (settings.lifeRecorderEnabled) ({ navigator.push(Recording(projectKey = route.projectKey)) }) else null,
                 )
             },
             sheets = sheets,

@@ -67,7 +67,7 @@ internal class BackupSettingsViewModel(private val services: LibraryServices) : 
             deps.stores.fieldTemplates.ensureLoaded()
             combine(deps.settings, deps.stores.library.state, backups.book.state, deps.stores.fieldTemplates.state) { s, _, b, t -> Triple(s, b.recovery != null, t.templates) }
                 .collect { (settings, recoverySet, templates) ->
-                    val docs = withContext(Dispatchers.IO) { StoreBackupSources(deps).projects().map { it.doc } }
+                    val docs = withContext(Dispatchers.IO) { runCatching { StoreBackupSources(deps).projects().map { it.doc } }.getOrElse { emptyList() } }
                     warnings.value = BackupSettingsState.warnings(docs, settings, recoverySet, templates)
                 }
         }

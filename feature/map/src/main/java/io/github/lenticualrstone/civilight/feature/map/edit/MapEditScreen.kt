@@ -230,6 +230,8 @@ private fun MapEditorScreen(projectKey: String, mapKey: String, deps: FeatureDep
         title = if (detail) MapCopy.DETAIL_TITLE else ui?.title.orEmpty(),
         smallLine = if (detail) map?.name else ui?.small,
         back = mapBack(deps),
+        lens = doc?.let { io.github.lenticualrstone.civilight.ui.lens.lensChipLabel(it) },
+        onLens = { sheets.open(io.github.lenticualrstone.civilight.navigation.LensSheet(route.projectKey)) },
         actions = {
             // LIB-19 map tour: `⋯` (its `시점별 공개` row) is the `보이는 시점` hole (MapTourSteps).
             CivilightIconButton(IconId.More, MapCopy.MORE, { sheets.open(MapMoreSheet) }, Modifier.tourTarget(MapTourSteps.REVEAL))

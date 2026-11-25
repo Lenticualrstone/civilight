@@ -175,6 +175,8 @@ fun Manuscript(
     revealedSide: SwipeSide = SwipeSide.REFERENCE,
     /** (0.2.4) The block row whose long-press menu is open: it lifts above the scrim. */
     liftedRow: String? = null,
+    /** (0.5.0) User-chosen vertical breathing spacing between script blocks. */
+    blockSpacing: io.github.lenticualrstone.civilight.model.app.BlockSpacing = io.github.lenticualrstone.civilight.model.app.BlockSpacing.NORMAL,
 ) {
     val motion = CivilightTheme.motion
     val column = if (layout.wide) Modifier.padding(start = layout.columnStart.dp).width(layout.columnWidth.dp) else Modifier.fillMaxWidth()
@@ -225,10 +227,19 @@ fun Manuscript(
         state = listState,
         modifier = Modifier.fillMaxHeight().then(column),
         // The scene head brings its own 8 dp top margin (DS-43): no second gap under the bar (QA #13).
-        contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + BlockGap),
-        verticalArrangement = Arrangement.spacedBy(BlockGap),
+        contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + blockSpacing.shiftDp.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        items(rows, key = { it.key }, contentType = { it::class }) { row ->
+        items(rows.size, key = { rows[it].key }, contentType = { rows[it]::class }) { index ->
+            val row = rows[index]
+            val prev = rows.getOrNull(index - 1)
+            val topGap = when {
+                index == 0 -> 0.dp
+                row is BlockRow && prev is BlockRow &&
+                    row.kind == BlockKind.DIALOGUE && prev.kind == BlockKind.DIALOGUE &&
+                    row.speaker?.characterKey != null && row.speaker.characterKey == prev.speaker?.characterKey -> blockSpacing.sameSpeakerDp.dp
+                else -> blockSpacing.shiftDp.dp
+            }
             val isEntering = row is BlockRow && row.blockKey in entered
             val enter = if (row is BlockRow && isEntering) {
                 Modifier.enterFromBelow(row.key) { actions.onEntered(row.blockKey) }
@@ -260,7 +271,7 @@ fun Manuscript(
                     if (row.key == liftedRow) actions.onLiftedBounds(row.key, bounds.rect)
                 }
             } else Modifier
-            Box(place.then(reveal).then(tourMark).then(track).lifted(row.key == liftedRow)) {
+            Box(place.then(reveal).then(tourMark).then(track).padding(top = topGap).lifted(row.key == liftedRow)) {
                 when (row) {
                     is HeadRow -> HeadView(
                         row,

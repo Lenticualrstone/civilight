@@ -78,23 +78,23 @@ internal fun TrashScreen(route: Trash, services: LibraryServices) {
         if (ui.loaded && purging?.let(ui::row) == null) purging = null
     }
 
-    CenterColumn {
-        CivilightScreen(
-            title = TrashScreenCopy.TITLE,
-            smallLine = TrashScreenCopy.SMALL,
-            back = IconAction(BACK_LABEL) { deps.navigator.pop() },
-            actions = {
-                if (ui.purgeable.isNotEmpty()) TextAction(TrashScreenCopy.EMPTY_TRASH, { if (!working) emptying = true })
-            },
-            sheets = sheets,
-            localSheets = { key ->
-                when (key) {
-                    is SceneChoiceSheet -> sheetBody { SceneChoiceContent(vm, waiting != null) }
-                    is ScenePickSheet -> sheetBody { ScenePickContent(key.projectKey, services, vm, waiting != null) }
-                    else -> null
-                }
-            },
-        ) { padding ->
+    CivilightScreen(
+        title = TrashScreenCopy.TITLE,
+        smallLine = TrashScreenCopy.SMALL,
+        back = IconAction(BACK_LABEL) { deps.navigator.pop() },
+        actions = {
+            if (ui.purgeable.isNotEmpty()) TextAction(TrashScreenCopy.EMPTY_TRASH, { if (!working) emptying = true })
+        },
+        sheets = sheets,
+        localSheets = { key ->
+            when (key) {
+                is SceneChoiceSheet -> sheetBody { SceneChoiceContent(vm, waiting != null) }
+                is ScenePickSheet -> sheetBody { ScenePickContent(key.projectKey, services, vm, waiting != null) }
+                else -> null
+            }
+        },
+    ) { padding ->
+        CenterColumn {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
@@ -137,7 +137,7 @@ internal fun TrashScreen(route: Trash, services: LibraryServices) {
     purging?.let { key ->
         val row = ui.row(key) ?: return@let
         ConfirmDialog(
-            title = TrashScreenCopy.PURGE_CONFIRM,
+            title = "${row.row.title}\n${TrashScreenCopy.PURGE_CONFIRM}",
             confirmLabel = TrashScreenCopy.PURGE,
             cancelLabel = TrashScreenCopy.CANCEL,
             hardToUndo = true,
@@ -150,7 +150,7 @@ internal fun TrashScreen(route: Trash, services: LibraryServices) {
     }
     if (emptying) {
         ConfirmDialog(
-            title = TrashScreenCopy.EMPTY_CONFIRM,
+            title = "${TrashScreenCopy.EMPTY_CONFIRM} (${ui.purgeable.size}건)",
             confirmLabel = TrashScreenCopy.EMPTY_TRASH,
             cancelLabel = TrashScreenCopy.CANCEL,
             hardToUndo = true,

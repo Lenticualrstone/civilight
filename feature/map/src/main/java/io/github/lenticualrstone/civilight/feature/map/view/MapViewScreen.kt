@@ -150,6 +150,8 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
         title = ui?.title.orEmpty(),
         smallLine = ui?.small,
         back = mapBack(deps),
+        lens = d?.let { io.github.lenticualrstone.civilight.ui.lens.lensChipLabel(it) },
+        onLens = { sheets.open(io.github.lenticualrstone.civilight.navigation.LensSheet(route.projectKey)) },
         actions = { CivilightIconButton(IconId.More, MapCopy.MORE, { sheets.open(MapMoreSheet) }) },
         sheets = sheets,
         localSheets = { key ->

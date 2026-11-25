@@ -59,7 +59,7 @@ class PickerCreateTest {
     @Test
     fun `the @ picker makes the kind of its chip, people under 전체`() {
         val kinds = PickerModels.SCRIPT_LINK_KINDS
-        assertEquals(listOf(PickerCopy.ALL, PickerCopy.KIND_CHARACTER, PickerCopy.KIND_TERM, PickerCopy.KIND_PLACE), LinkCreate.chips(kinds).map { it.label })
+        assertEquals(listOf(PickerCopy.ALL, PickerCopy.KIND_CHARACTER, PickerCopy.KIND_TERM, PickerCopy.KIND_PLACE, PickerCopy.KIND_EVENT), LinkCreate.chips(kinds).map { it.label })
         assertEquals(CreateKind.CHARACTER, LinkCreate.kindInView(null, kinds))
         assertEquals(CreateKind.TERM, LinkCreate.kindInView(PickKind.TERM.name, kinds))
         assertEquals(CreateKind.PLACE, LinkCreate.kindInView(PickKind.PLACE.name, kinds))

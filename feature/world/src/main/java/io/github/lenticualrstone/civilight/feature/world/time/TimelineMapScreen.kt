@@ -134,6 +134,8 @@ fun TimelineMapScreen(route: TimelineMap, deps: FeatureDeps) {
         title = WorldCopy.TIMELINE_TITLE,
         smallLine = WorldCopy.SMALL_TIMELINE_MAP,
         back = worldBack(route, deps),
+        lens = doc?.let { io.github.lenticualrstone.civilight.ui.lens.lensChipLabel(it) },
+        onLens = { sheets.open(io.github.lenticualrstone.civilight.navigation.LensSheet(route.projectKey)) },
         commandBar = { WorldCommandBar(deps, route.projectKey, WorldCopy.SEARCH_TIMELINE) },
         sheets = sheets,
     ) { padding ->

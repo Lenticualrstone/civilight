@@ -19,7 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +40,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
 import io.github.lenticualrstone.civilight.model.app.AppSettings
@@ -45,7 +48,10 @@ import io.github.lenticualrstone.civilight.model.app.BlockSpacing
 import io.github.lenticualrstone.civilight.model.app.DragResistance
 import io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem
 import io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem
+import io.github.lenticualrstone.civilight.model.app.MiniRailSide
 import io.github.lenticualrstone.civilight.model.app.ProfileShape
+import io.github.lenticualrstone.civilight.model.app.ProfileTabConfig
+import io.github.lenticualrstone.civilight.model.app.ProfileTabPreset
 import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
@@ -56,9 +62,21 @@ import kotlinx.serialization.Serializable
 @Serializable
 private data object MiniRailSheet : SheetKey
 
+@Serializable
+private data object ProfileTabsSheet : SheetKey
+
+private enum class SettingsCategory(val title: String) {
+    DISPLAY(SettingsCopy.SECTION_DISPLAY),
+    WRITING(SettingsCopy.CAT_WRITING),
+    FOLDABLE(SettingsCopy.CAT_FOLDABLE),
+    SECURITY(SettingsCopy.SECTION_KEEP_SECURITY),
+    LABS(SettingsCopy.CAT_LABS),
+    SUPPORT(SettingsCopy.SECTION_SUPPORT),
+}
+
 /**
- * 설정 (0.4.0 reorganized into 6 related groups with category icons, inline tactile controls,
- * customizable mini-rail preview sheet, and experimental section).
+ * 설정 (0.5.0 Android-Settings-style 2-level category hub with dedicated `실험실` category,
+ * live mini-rail position/icon preview, portrait ambient blur toggle, and profile tab presets).
  */
 @Composable
 internal fun SettingsScreen(services: LibraryServices) {
@@ -68,19 +86,35 @@ internal fun SettingsScreen(services: LibraryServices) {
     val settings by vm.settings.collectAsState()
     val sheets = rememberSheetHost()
     val open: (SettingsRootRow) -> Unit = { row -> navigator.push(SettingsRoutes.routeOf(row)) }
+    var activeCategoryName by rememberSaveable { mutableStateOf<String?>(null) }
+    val activeCategory = activeCategoryName?.let { name -> SettingsCategory.entries.firstOrNull { it.name == name } }
+
+    LocalBackHandler.current(activeCategory != null) { activeCategoryName = null }
 
     SettingsFrame(
-        title = SettingsCopy.TITLE,
-        smallLine = SettingsCopy.SMALL,
-        onBack = { navigator.pop() },
+        title = activeCategory?.title ?: SettingsCopy.TITLE,
+        smallLine = if (activeCategory != null) SettingsCopy.TITLE else SettingsCopy.SMALL,
+        onBack = {
+            if (activeCategory != null) activeCategoryName = null
+            else navigator.pop()
+        },
         sheets = sheets,
         localSheets = { key ->
             when (key) {
                 MiniRailSheet -> sheetBody {
                     MiniRailCustomizeContent(
                         settings = settings,
+                        onSideChange = vm::setMiniRailSide,
                         onToggleScript = vm::toggleMiniRailScript,
                         onToggleProject = vm::toggleMiniRailProject,
+                        onClose = { close() },
+                    )
+                }
+                ProfileTabsSheet -> sheetBody {
+                    ProfileTabPresetContent(
+                        settings = settings,
+                        onSelectPreset = vm::setProfileTabPreset,
+                        onUpdateTabs = vm::setCustomProfileTabs,
                         onClose = { close() },
                     )
                 }
@@ -88,111 +122,161 @@ internal fun SettingsScreen(services: LibraryServices) {
             }
         },
     ) {
-        // 1. 화면 · 보기
-        SettingsSection(SettingsCopy.SECTION_DISPLAY, first = true)
-        ThemeSegmented(ui.themeIndex, vm::setTheme, Modifier.padding(top = 4.dp, bottom = 6.dp))
-        LinkRow(ui.textSize, leadingIcon = IconId.Text) { open(SettingsRootRow.TEXT_SIZE) }
-        ui.libraryView?.let { row -> LinkRow(row, leadingIcon = IconId.Grid) { navigator.push(ViewKind.LIBRARY.route) } }
-        ui.cardView?.let { row -> LinkRow(row, leadingIcon = IconId.Layers) { navigator.push(ViewKind.CARD.route) } }
-        SettingsSegmentedBlock(
-            title = SettingsCopy.PROFILE_SHAPE,
-            icon = IconId.User,
-            options = listOf(SettingsCopy.SHAPE_SQUARE, SettingsCopy.SHAPE_CIRCLE),
-            selectedIndex = ProfileShape.entries.indexOf(settings.profileShape).coerceAtLeast(0),
-            onSelect = { idx -> ProfileShape.entries.getOrNull(idx)?.let(vm::setProfileShape) },
-        )
-        SettingsValueRow(
-            title = SettingsCopy.MINI_RAIL,
-            subtitle = SettingsCopy.MINI_RAIL_SUB,
-            value = "${settings.miniRailScript.size} · ${settings.miniRailProject.size}",
-            leadingIcon = IconId.Panel,
-            onClick = { sheets.open(MiniRailSheet) },
-        )
-
-        // 2. 움직임 · 손맛
-        SettingsSection(SettingsCopy.SECTION_FEEL)
-        SettingsSegmentedBlock(
-            title = SettingsCopy.DRAG_RESISTANCE,
-            subtitle = SettingsCopy.DRAG_RESISTANCE_SUB,
-            icon = IconId.Sliders,
-            options = listOf(
-                SettingsCopy.RESISTANCE_SOFT,
-                SettingsCopy.RESISTANCE_NORMAL,
-                SettingsCopy.RESISTANCE_FIRM,
-                SettingsCopy.RESISTANCE_HEAVY,
-            ),
-            selectedIndex = DragResistance.entries.indexOf(settings.dragResistance).coerceAtLeast(0),
-            onSelect = { idx -> DragResistance.entries.getOrNull(idx)?.let(vm::setDragResistance) },
-        )
-        ViewStyles.tiltShown(ui.tilt, CivilightTheme.motion.reduced)?.let { row ->
-            SwitchSettingRow(row, leadingIcon = IconId.Rotate, onChange = vm::setViewTilt)
+        when (activeCategory) {
+            null -> {
+                // Top-level Android-style category hub
+                SettingsRow(
+                    title = SettingsCopy.SECTION_DISPLAY,
+                    subtitle = SettingsCopy.CAT_DISPLAY_SUB,
+                    leadingIcon = IconId.Grid,
+                    onClick = { activeCategoryName = SettingsCategory.DISPLAY.name },
+                )
+                SettingsRow(
+                    title = SettingsCopy.CAT_WRITING,
+                    subtitle = SettingsCopy.CAT_WRITING_SUB,
+                    leadingIcon = IconId.Edit,
+                    onClick = { activeCategoryName = SettingsCategory.WRITING.name },
+                )
+                SettingsRow(
+                    title = SettingsCopy.CAT_FOLDABLE,
+                    subtitle = SettingsCopy.CAT_FOLDABLE_SUB,
+                    leadingIcon = IconId.Panel,
+                    onClick = { activeCategoryName = SettingsCategory.FOLDABLE.name },
+                )
+                SettingsRow(
+                    title = SettingsCopy.SECTION_KEEP_SECURITY,
+                    subtitle = SettingsCopy.CAT_SECURITY_SUB,
+                    leadingIcon = IconId.Shield,
+                    onClick = { activeCategoryName = SettingsCategory.SECURITY.name },
+                )
+                SettingsRow(
+                    title = SettingsCopy.CAT_LABS,
+                    subtitle = SettingsCopy.CAT_LABS_SUB,
+                    leadingIcon = IconId.Spark,
+                    onClick = { activeCategoryName = SettingsCategory.LABS.name },
+                )
+                SettingsRow(
+                    title = SettingsCopy.SECTION_SUPPORT,
+                    subtitle = SettingsCopy.CAT_SUPPORT_SUB,
+                    leadingIcon = IconId.Book,
+                    onClick = { activeCategoryName = SettingsCategory.SUPPORT.name },
+                )
+            }
+            SettingsCategory.DISPLAY -> {
+                ThemeSegmented(ui.themeIndex, vm::setTheme, Modifier.padding(top = 4.dp, bottom = 6.dp))
+                LinkRow(ui.textSize, leadingIcon = IconId.Text) { open(SettingsRootRow.TEXT_SIZE) }
+                ui.libraryView?.let { row -> LinkRow(row, leadingIcon = IconId.Grid) { navigator.push(ViewKind.LIBRARY.route) } }
+                ui.cardView?.let { row -> LinkRow(row, leadingIcon = IconId.Layers) { navigator.push(ViewKind.CARD.route) } }
+                SettingsSegmentedBlock(
+                    title = SettingsCopy.PROFILE_SHAPE,
+                    icon = IconId.User,
+                    options = listOf(SettingsCopy.SHAPE_SQUARE, SettingsCopy.SHAPE_CIRCLE),
+                    selectedIndex = ProfileShape.entries.indexOf(settings.profileShape).coerceAtLeast(0),
+                    onSelect = { idx -> ProfileShape.entries.getOrNull(idx)?.let(vm::setProfileShape) },
+                )
+                SwitchRow(
+                    title = SettingsCopy.PORTRAIT_AMBIENT_BLUR,
+                    subtitle = SettingsCopy.PORTRAIT_AMBIENT_BLUR_SUB,
+                    checked = settings.portraitAmbientBlur,
+                    onCheckedChange = vm::setPortraitAmbientBlur,
+                    leadingIcon = IconId.Image,
+                )
+                LinkRow(ui.motion, leadingIcon = IconId.Wave) { open(SettingsRootRow.MOTION) }
+            }
+            SettingsCategory.WRITING -> {
+                SettingsSegmentedBlock(
+                    title = SettingsCopy.BLOCK_SPACING,
+                    icon = IconId.List,
+                    options = listOf(SettingsCopy.SPACING_COMPACT, SettingsCopy.SPACING_NORMAL, SettingsCopy.SPACING_RELAXED),
+                    selectedIndex = BlockSpacing.entries.indexOf(settings.blockSpacing).coerceAtLeast(0),
+                    onSelect = { idx -> BlockSpacing.entries.getOrNull(idx)?.let(vm::setBlockSpacing) },
+                )
+                SwitchRow(
+                    title = SettingsCopy.SMART_PUNCTUATION,
+                    subtitle = SettingsCopy.SMART_PUNCTUATION_SUB,
+                    checked = settings.smartPunctuation,
+                    onCheckedChange = vm::setSmartPunctuation,
+                    leadingIcon = IconId.Edit,
+                )
+                SwitchRow(
+                    title = SettingsCopy.LONG_PRESS_WIGGLE,
+                    subtitle = SettingsCopy.LONG_PRESS_WIGGLE_SUB,
+                    checked = settings.longPressWiggle,
+                    onCheckedChange = vm::setLongPressWiggle,
+                    leadingIcon = IconId.Spark,
+                )
+                SettingsValueRow(
+                    title = SettingsCopy.PROFILE_TABS,
+                    subtitle = SettingsCopy.PROFILE_TABS_SUB,
+                    value = profilePresetLabel(settings.profileTabPreset),
+                    leadingIcon = IconId.User,
+                    onClick = { sheets.open(ProfileTabsSheet) },
+                )
+                LinkRow(ui.more, leadingIcon = IconId.Map) { open(SettingsRootRow.MORE) }
+                LinkRow(ui.templates, leadingIcon = IconId.File) { open(SettingsRootRow.TEMPLATES) }
+            }
+            SettingsCategory.FOLDABLE -> {
+                SettingsValueRow(
+                    title = SettingsCopy.MINI_RAIL,
+                    subtitle = SettingsCopy.MINI_RAIL_SUB,
+                    value = "${if (settings.miniRailSide == MiniRailSide.LEFT) SettingsCopy.SIDE_LEFT else SettingsCopy.SIDE_RIGHT} · ${settings.miniRailScript.size}/${settings.miniRailProject.size}",
+                    leadingIcon = IconId.Panel,
+                    onClick = { sheets.open(MiniRailSheet) },
+                )
+                SettingsSegmentedBlock(
+                    title = SettingsCopy.DRAG_RESISTANCE,
+                    subtitle = SettingsCopy.DRAG_RESISTANCE_SUB,
+                    icon = IconId.Sliders,
+                    options = listOf(
+                        SettingsCopy.RESISTANCE_SOFT,
+                        SettingsCopy.RESISTANCE_NORMAL,
+                        SettingsCopy.RESISTANCE_FIRM,
+                        SettingsCopy.RESISTANCE_HEAVY,
+                    ),
+                    selectedIndex = DragResistance.entries.indexOf(settings.dragResistance).coerceAtLeast(0),
+                    onSelect = { idx -> DragResistance.entries.getOrNull(idx)?.let(vm::setDragResistance) },
+                )
+                ViewStyles.tiltShown(ui.tilt, CivilightTheme.motion.reduced)?.let { row ->
+                    SwitchSettingRow(row, leadingIcon = IconId.Rotate, onChange = vm::setViewTilt)
+                }
+            }
+            SettingsCategory.SECURITY -> {
+                SwitchLinkRow(ui.drive, leadingIcon = IconId.Drive) { open(SettingsRootRow.DRIVE) }
+                LinkRow(ui.recovery, leadingIcon = IconId.Shield) { open(SettingsRootRow.RECOVERY) }
+                SwitchSettingRow(ui.appLock, leadingIcon = IconId.Lock, onChange = vm::setAppLock)
+                LinkRow(ui.hiding, leadingIcon = IconId.EyeOff) { open(SettingsRootRow.HIDING) }
+            }
+            SettingsCategory.LABS -> {
+                SwitchRow(
+                    title = SettingsCopy.TYPEWRITER_SCROLL,
+                    subtitle = SettingsCopy.TYPEWRITER_SCROLL_SUB,
+                    checked = settings.typewriterScroll,
+                    onCheckedChange = vm::setTypewriterScroll,
+                    leadingIcon = IconId.Outline,
+                )
+                SwitchRow(
+                    title = SettingsCopy.SMART_SPEAKER_SWAP,
+                    subtitle = SettingsCopy.SMART_SPEAKER_SWAP_SUB,
+                    checked = settings.smartSpeakerSwap,
+                    onCheckedChange = vm::setSmartSpeakerSwap,
+                    leadingIcon = IconId.User,
+                )
+                SwitchRow(
+                    title = SettingsCopy.LIFE_RECORDER_EXP,
+                    subtitle = SettingsCopy.LIFE_RECORDER_EXP_SUB,
+                    checked = settings.lifeRecorderEnabled,
+                    onCheckedChange = vm::setLifeRecorderEnabled,
+                    leadingIcon = IconId.Mic,
+                )
+                if (settings.lifeRecorderEnabled) {
+                    SettingsRow(title = SettingsCopy.RECORDER, leadingIcon = IconId.Mic, onClick = { open(SettingsRootRow.RECORDER) })
+                }
+            }
+            SettingsCategory.SUPPORT -> {
+                SettingsRow(title = SettingsCopy.TRASH, leadingIcon = IconId.Trash, onClick = { open(SettingsRootRow.TRASH) })
+                SettingsRow(title = SettingsCopy.HELP, leadingIcon = IconId.Book, onClick = { open(SettingsRootRow.HELP) })
+            }
         }
-        SwitchRow(
-            title = SettingsCopy.LONG_PRESS_WIGGLE,
-            subtitle = SettingsCopy.LONG_PRESS_WIGGLE_SUB,
-            checked = settings.longPressWiggle,
-            onCheckedChange = vm::setLongPressWiggle,
-            leadingIcon = IconId.Spark,
-        )
-        LinkRow(ui.motion, leadingIcon = IconId.Wave) { open(SettingsRootRow.MOTION) }
-
-        // 3. 작업 기본값
-        SettingsSection(SettingsCopy.SECTION_WORK)
-        SettingsSegmentedBlock(
-            title = SettingsCopy.BLOCK_SPACING,
-            icon = IconId.List,
-            options = listOf(SettingsCopy.SPACING_COMPACT, SettingsCopy.SPACING_NORMAL, SettingsCopy.SPACING_RELAXED),
-            selectedIndex = BlockSpacing.entries.indexOf(settings.blockSpacing).coerceAtLeast(0),
-            onSelect = { idx -> BlockSpacing.entries.getOrNull(idx)?.let(vm::setBlockSpacing) },
-        )
-        SwitchRow(
-            title = SettingsCopy.TYPEWRITER_SCROLL,
-            subtitle = SettingsCopy.TYPEWRITER_SCROLL_SUB,
-            checked = settings.typewriterScroll,
-            onCheckedChange = vm::setTypewriterScroll,
-            leadingIcon = IconId.Outline,
-        )
-        SwitchRow(
-            title = SettingsCopy.SMART_PUNCTUATION,
-            subtitle = SettingsCopy.SMART_PUNCTUATION_SUB,
-            checked = settings.smartPunctuation,
-            onCheckedChange = vm::setSmartPunctuation,
-            leadingIcon = IconId.Edit,
-        )
-        LinkRow(ui.more, leadingIcon = IconId.Map) { open(SettingsRootRow.MORE) }
-        LinkRow(ui.templates, leadingIcon = IconId.File) { open(SettingsRootRow.TEMPLATES) }
-
-        // 4. 보관 · 보안
-        SettingsSection(SettingsCopy.SECTION_KEEP_SECURITY)
-        SwitchLinkRow(ui.drive, leadingIcon = IconId.Drive) { open(SettingsRootRow.DRIVE) }
-        LinkRow(ui.recovery, leadingIcon = IconId.Shield) { open(SettingsRootRow.RECOVERY) }
-        SwitchSettingRow(ui.appLock, leadingIcon = IconId.Lock, onChange = vm::setAppLock)
-        LinkRow(ui.hiding, leadingIcon = IconId.EyeOff) { open(SettingsRootRow.HIDING) }
-
-        // 5. 실험 기능
-        SettingsSection(SettingsCopy.SECTION_EXPERIMENTAL)
-        SwitchRow(
-            title = SettingsCopy.SMART_SPEAKER_SWAP,
-            subtitle = SettingsCopy.SMART_SPEAKER_SWAP_SUB,
-            checked = settings.smartSpeakerSwap,
-            onCheckedChange = vm::setSmartSpeakerSwap,
-            leadingIcon = IconId.User,
-        )
-        SwitchRow(
-            title = SettingsCopy.LIFE_RECORDER_EXP,
-            subtitle = SettingsCopy.LIFE_RECORDER_EXP_SUB,
-            checked = settings.lifeRecorderEnabled,
-            onCheckedChange = vm::setLifeRecorderEnabled,
-            leadingIcon = IconId.Mic,
-        )
-        if (settings.lifeRecorderEnabled) {
-            SettingsRow(title = SettingsCopy.RECORDER, leadingIcon = IconId.Mic, onClick = { open(SettingsRootRow.RECORDER) })
-        }
-
-        // 6. 관리 · 지원
-        SettingsSection(SettingsCopy.SECTION_SUPPORT)
-        SettingsRow(title = SettingsCopy.TRASH, leadingIcon = IconId.Trash, onClick = { open(SettingsRootRow.TRASH) })
-        SettingsRow(title = SettingsCopy.HELP, leadingIcon = IconId.Book, onClick = { open(SettingsRootRow.HELP) })
     }
 }
 
@@ -229,6 +313,7 @@ private fun SettingsSegmentedBlock(
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.MiniRailCustomizeContent(
     settings: AppSettings,
+    onSideChange: (MiniRailSide) -> Unit,
     onToggleScript: (MiniRailScriptItem) -> Unit,
     onToggleProject: (MiniRailProjectItem) -> Unit,
     onClose: () -> Unit,
@@ -240,6 +325,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.MiniRailCustomizeCont
     } else {
         settings.miniRailProject.map(::projectRailIcon)
     }
+    val railOnLeft = if (tab == 0) settings.miniRailSide == MiniRailSide.LEFT else true
 
     SheetHeader(title = SettingsCopy.MINI_RAIL, closeLabel = "닫기", onClose = onClose)
     SheetScrollBody {
@@ -249,6 +335,15 @@ private fun androidx.compose.foundation.layout.ColumnScope.MiniRailCustomizeCont
             onSelect = { tab = it },
             modifier = Modifier.padding(bottom = 12.dp),
         )
+        if (tab == 0) {
+            CivilightText(SettingsCopy.MINI_RAIL_SIDE, CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
+            SegmentedControl(
+                options = listOf(SettingsCopy.SIDE_LEFT, SettingsCopy.SIDE_RIGHT),
+                selectedIndex = if (settings.miniRailSide == MiniRailSide.LEFT) 0 else 1,
+                onSelect = { idx -> onSideChange(if (idx == 0) MiniRailSide.LEFT else MiniRailSide.RIGHT) },
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+        }
 
         // Live Z Fold unfolded mini-rail preview
         CivilightText(SettingsCopy.MINI_RAIL_PREVIEW, CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
@@ -261,8 +356,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.MiniRailCustomizeCont
                 .background(colors.bg)
                 .insetOutline(colors.line, 1.dp, frameShape),
         ) {
-            // Left or right rail preview (script = right rail, project = left rail)
-            if (tab == 1) {
+            if (railOnLeft) {
                 MiniRailPreviewStrip(previewIcons, colors)
                 Box(Modifier.width(1.dp).fillMaxHeight().background(colors.line))
             }
@@ -280,7 +374,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.MiniRailCustomizeCont
                 Spacer(Modifier.height(4.dp))
                 Box(Modifier.fillMaxWidth(0.62f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(colors.acc.copy(alpha = 0.18f)))
             }
-            if (tab == 0) {
+            if (!railOnLeft) {
                 Box(Modifier.width(1.dp).fillMaxHeight().background(colors.line))
                 MiniRailPreviewStrip(previewIcons, colors)
             }
@@ -368,6 +462,49 @@ private fun projectRailLabel(item: MiniRailProjectItem): String = when (item) {
     MiniRailProjectItem.CHECKS -> "점검"
     MiniRailProjectItem.GALLERY -> "갤러리"
     MiniRailProjectItem.SETTINGS -> "설정"
+}
+
+private fun profilePresetLabel(preset: ProfileTabPreset): String = when (preset) {
+    ProfileTabPreset.STANDARD -> SettingsCopy.PRESET_STANDARD
+    ProfileTabPreset.MODERN_DRAMA -> SettingsCopy.PRESET_MODERN
+    ProfileTabPreset.GAME_VN -> SettingsCopy.PRESET_GAME_VN
+    ProfileTabPreset.MINIMAL -> SettingsCopy.PRESET_MINIMAL
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.ProfileTabPresetContent(
+    settings: AppSettings,
+    onSelectPreset: (ProfileTabPreset) -> Unit,
+    onUpdateTabs: (List<ProfileTabConfig>) -> Unit,
+    onClose: () -> Unit,
+) {
+    val colors = CivilightTheme.colors
+    val activeTabs = settings.customProfileTabs.ifEmpty { settings.profileTabPreset.defaultTabs() }
+    SheetHeader(title = SettingsCopy.PROFILE_TABS, closeLabel = "닫기", onClose = onClose)
+    SheetScrollBody {
+        CivilightText("프리셋 불러오기", CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
+        ProfileTabPreset.entries.forEach { preset ->
+            val preview = preset.defaultTabs().joinToString(" · ") { it.label }
+            RadioRow(
+                title = profilePresetLabel(preset),
+                subtitle = preview,
+                selected = settings.profileTabPreset == preset && settings.customProfileTabs.isEmpty(),
+                onClick = { onSelectPreset(preset) },
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        CivilightText("활성 탭 모듈", CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
+        activeTabs.forEach { tab ->
+            CheckboxRow(
+                label = tab.label,
+                checked = tab.enabled,
+                onCheckedChange = { checked ->
+                    val next = activeTabs.map { if (it.id == tab.id) it.copy(enabled = checked) else it }
+                    if (next.any { it.enabled }) onUpdateTabs(next)
+                },
+            )
+        }
+    }
 }
 
 /**

@@ -35,8 +35,10 @@ internal fun SheetScope.RecentsSheetContent(
     recents: List<RecentCardUi>,
     wide: Boolean,
     recorderSub: String,
+    lifeRecorderEnabled: Boolean = false,
     onOpen: (RecentItem) -> Unit,
     onRecorder: () -> Unit,
+    onMultiExport: (() -> Unit)? = null,
 ) {
     val scope = this
     val colors = CivilightTheme.colors
@@ -52,18 +54,33 @@ internal fun SheetScope.RecentsSheetContent(
             }
         }
     }
-    SectionLabel(ShelfCopy.LIBRARY_SECTION, Modifier.padding(top = 24.dp))
-    ListRow(
-        title = ShelfCopy.RECORDER,
-        subtitle = recorderSub,
-        leading = { RecorderTile() },
-        trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = colors.ink3) },
-        onClick = {
-            scope.close()
-            onRecorder()
-        },
-        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-    )
+    if (onMultiExport != null) {
+        ListRow(
+            title = "여러 프로젝트 내보내기",
+            subtitle = "여러 프로젝트를 한 번에 백업 · 내보내기",
+            leading = { CivilightIcon(IconId.File, contentDescription = null, tint = colors.acc) },
+            trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = colors.ink3) },
+            onClick = {
+                scope.close()
+                onMultiExport()
+            },
+            modifier = Modifier.padding(top = 16.dp),
+        )
+    }
+    if (lifeRecorderEnabled) {
+        SectionLabel(ShelfCopy.LIBRARY_SECTION, Modifier.padding(top = 24.dp))
+        ListRow(
+            title = ShelfCopy.RECORDER,
+            subtitle = recorderSub,
+            leading = { RecorderTile() },
+            trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = colors.ink3) },
+            onClick = {
+                scope.close()
+                onRecorder()
+            },
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+        )
+    }
 }
 
 /** The mic tile of the 라이프 레코더 row: 44 × 44, radius 14, `pri` fill. */

@@ -74,8 +74,7 @@ fun TopGlassBar(
     // S18a: the back button folds in from the start edge and the row's start padding follows on `standard`.
     val startPadding by animateDpAsState(if (back != null) start - 12.dp else start, motion.move(CivilightMotion.standard), label = "barStart")
     val lastBack = rememberLastNonNull(back)
-    val minBarHeight = (barHeight - 16.dp).coerceAtLeast(64.dp) + inset
-    Box(modifier.fillMaxWidth().heightIn(min = minBarHeight)) {
+    Box(modifier.fillMaxWidth().heightIn(min = barHeight + inset)) {
         GlassBackground(GlassSurface.TOP_BAR, Modifier.matchParentSize())
         OnGlass {
             TopBarRow(
@@ -196,12 +195,11 @@ fun BottomGlassBar(
     val height = barHeight ?: if (extraRow != null || paneRows != null) LayoutMetrics.bottomBarWithRow else LayoutMetrics.bottomBar
     val side = if (inner) LayoutMetrics.commandBarSideInner else LayoutMetrics.commandBarSide
     val bottom = if (inner) LayoutMetrics.commandBarBottomInner else LayoutMetrics.commandBarBottom
-    val minBottomHeight = (height - 20.dp).coerceAtLeast(72.dp) + inset
     Box(
         modifier
             .then(if (aboveKeyboard) Modifier.windowInsetsPadding(KeyboardLift) else Modifier)
             .fillMaxWidth()
-            .heightIn(min = minBottomHeight),
+            .heightIn(min = height + inset),
         contentAlignment = Alignment.BottomCenter,
     ) {
         GlassBackground(GlassSurface.BOTTOM_BAR, Modifier.matchParentSize())
@@ -209,7 +207,7 @@ fun BottomGlassBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = bottom + inset, top = 16.dp),
+                    .padding(bottom = bottom + inset, top = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {

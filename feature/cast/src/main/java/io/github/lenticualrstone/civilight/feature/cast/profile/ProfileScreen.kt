@@ -172,6 +172,15 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     val doc = ready.doc
     val p = route.projectKey
     val c = route.characterKey
+    val appSettings by deps.settings.collectAsState()
+    val modularTabs = remember(appSettings) {
+        (appSettings.customProfileTabs.ifEmpty { appSettings.profileTabPreset.defaultTabs() }).filter { it.enabled }
+            .ifEmpty { io.github.lenticualrstone.civilight.model.app.ProfileTabPreset.STANDARD.defaultTabs() }
+    }
+    var selectedModularId by rememberSaveable(c) { mutableStateOf(modularTabs.first().id) }
+    val activeModularTab = modularTabs.firstOrNull { it.id == selectedModularId } ?: modularTabs.first()
+    var speechOverride by remember(c) { mutableStateOf(false) }
+    var secretOverride by remember(c) { mutableStateOf(false) }
     val gate = rememberHiddenGate(p)
     val context = LocalContext.current
     // CST-74: 4 tabs while `게임 제작 도구` is off. CST-73: the 비밀 tab behind the device lock while locked.
@@ -333,11 +342,26 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
             // the lens backs up `값이 바뀌는 때` when the header has no field row.
             lensModifier = Modifier.tourTarget(CastTourSteps.LENS).tourTarget(CastTourSteps.TIMED_VALUE, fallback = true),
             tabs = {
-                CivilightTabs(ProfileTabs.labels(gameTools), shownTabs.indexOf(shownTab).coerceAtLeast(0), { i ->
-                    vm.updateTabs { SecretTabGate.select(it, shownTabs[i], secretLocked) }
-                }, Modifier.weight(1f)) { i ->
-                    CastTourSteps.stepOfTab(shownTabs[i].ordinal)?.let { Modifier.tourTarget(it) } ?: Modifier
-                }
+                ModularProfileTabBar(
+                    tabs = modularTabs,
+                    selectedId = activeModularTab.id,
+                    onSelect = { picked ->
+                        speechOverride = false
+                        secretOverride = false
+                        selectedModularId = picked.id
+                        val mapped = when (picked.kind) {
+                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.OVERVIEW -> ProfileTab.OVERVIEW
+                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.RELATIONS -> ProfileTab.RELATIONS
+                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SPEECH -> ProfileTab.SPEECH
+                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.GAME_TEXT -> ProfileTab.GAME_TEXT
+                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SECRET -> ProfileTab.SECRET
+                            else -> ProfileTab.OVERVIEW
+                        }
+                        vm.updateTabs { SecretTabGate.select(it, mapped, secretLocked) }
+                    },
+                    onManageTemplates = { sheets.open(ProfileTabTemplatesSheetKey) },
+                    modifier = Modifier.weight(1f),
+                )
             },
             commandBar = {
                 CommandBarView(
@@ -358,6 +382,20 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                     is VoiceLineSheet -> { { VoiceLineContent(key) } }
                     is BodyEditSheet -> { { BodyEditContent(key) } }
                     is RelationSlotSheet -> { { RelationSlotContent(key) } }
+                    ProfileTabTemplatesSheetKey -> {
+                        {
+                            ProfileTabTemplateSheetContent(
+                                settings = appSettings,
+                                onSelectPreset = { preset ->
+                                    deps.appScope.launch { deps.stores.settings.setProfileTabPreset(preset) }
+                                },
+                                onUpdateTabs = { next ->
+                                    deps.appScope.launch { deps.stores.settings.setCustomProfileTabs(next) }
+                                },
+                                onClose = { close() },
+                            )
+                        }
+                    }
                     is RecordMenuSheet -> {
                         {
                             RecordMenuContent(
@@ -421,7 +459,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                                 if (editable) Modifier.pressable(onClick = { actions.onFixed(FixedField.PORTRAIT) }, scaleOnPress = false)
                                 else Modifier,
                             ),
-                        ) { PortraitHero(image) }
+                        ) { PortraitHero(image, ambientBlur = appSettings.portraitAmbientBlur, sidePadding = PROFILE_SIDE) }
                     }
                 }
                 item(key = "head") { RecordHead(state, editable, actions) }
@@ -429,9 +467,60 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                 // One item for the tab body: the tabs swap their content in place (row 3).
                 item(key = "tab") {
                     // No clip: the gallery row runs past the list's side padding and must not be cut while the tabs swap.
-                    AnimatedContent(ui.tab, transitionSpec = { motion.swap(clip = false) }, label = "recordTab") { shown ->
-                        // CST-73: the outgoing body of a relocked 비밀 tab is not kept composed through the fade.
-                        if (SecretTabGate.composesBody(shown, tabState, secretLocked)) TabBody(doc, c, state, fullState, ui.copy(tab = shown), gate.open, gallery, wide, actions, recorderLink, secret)
+                    val tabKey = when {
+                        secretOverride -> "secret_override"
+                        speechOverride -> "speech_override"
+                        else -> activeModularTab.id
+                    }
+                    AnimatedContent(tabKey, transitionSpec = { motion.swap(clip = false) }, label = "recordTab") { currentKey ->
+                        when {
+                            currentKey == "speech_override" || activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SPEECH -> {
+                                TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.SPEECH), gate.open, gallery, wide, actions, recorderLink, secret)
+                            }
+                            currentKey == "secret_override" || activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SECRET -> {
+                                if (SecretTabGate.composesBody(ProfileTab.SECRET, tabState, secretLocked)) {
+                                    TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.SECRET), gate.open, gallery, wide, actions, recorderLink, secret)
+                                }
+                            }
+                            activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.OVERVIEW -> {
+                                TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.OVERVIEW), gate.open, gallery, wide, actions, recorderLink, secret)
+                            }
+                            activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.RELATIONS -> {
+                                TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.RELATIONS), gate.open, gallery, wide, actions, recorderLink, secret)
+                            }
+                            activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.GAME_TEXT -> {
+                                TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.GAME_TEXT), gate.open, gallery, wide, actions, recorderLink, secret)
+                            }
+                            activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.APPEARANCES -> {
+                                AppearancesTraceTab(
+                                    doc = doc,
+                                    characterKey = c,
+                                    hiddenUnlocked = gate.open,
+                                    onJumpToBlock = { blockKey ->
+                                        deps.navigator.push(io.github.lenticualrstone.civilight.navigation.Script(p, blockKey = blockKey))
+                                    },
+                                )
+                            }
+                            else -> {
+                                ModularSectionTab(
+                                    doc = doc,
+                                    tab = activeModularTab,
+                                    state = state,
+                                    actions = actions,
+                                    speechSummary = doc.index.character(c)?.speechSummary,
+                                    onEditSpeechSummary = secret.summaryEdit,
+                                    onOpenSpeech = {
+                                        secretOverride = false
+                                        speechOverride = true
+                                    },
+                                    onOpenSecret = {
+                                        speechOverride = false
+                                        secretOverride = true
+                                        vm.updateTabs { SecretTabGate.select(it, ProfileTab.SECRET, secretLocked) }
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -543,4 +632,7 @@ private data class SecretTabExtras(
     val lockEnabled: Boolean,
     val onLock: (Boolean) -> Unit,
 )
+
+@kotlinx.serialization.Serializable
+private data object ProfileTabTemplatesSheetKey : io.github.lenticualrstone.civilight.navigation.SheetKey
 

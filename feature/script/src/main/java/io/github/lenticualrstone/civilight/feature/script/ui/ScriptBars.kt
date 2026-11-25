@@ -94,9 +94,10 @@ fun ScriptTopBar(
     onPositionLabel: () -> Unit,
     onLayers: (() -> Unit)?,
     onFind: (() -> Unit)? = null,
+    back: io.github.lenticualrstone.civilight.designsystem.component.IconAction? = null,
 ) {
     // (0.2.0, SCR-01, U-14.13) `이 씬 · 1-7` · `찾기` (icon `search`, a) · `표시` (icon `layers`, a).
-    TopGlassBar(title = title, smallLine = line, wide = wide, barHeight = LayoutMetrics.topBarScript) {
+    TopGlassBar(title = title, smallLine = line, back = back, wide = wide, barHeight = LayoutMetrics.topBarScript) {
         if (positionLabel != null) LensChip(positionLabel, LensChipState.SCRIPT_POSITION, onPositionLabel)
         if (onFind != null) io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton(
             io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.SEARCH, onFind,

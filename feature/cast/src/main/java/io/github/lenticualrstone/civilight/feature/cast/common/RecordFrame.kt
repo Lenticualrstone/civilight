@@ -116,33 +116,40 @@ fun RecordFrame(
             // gets its own scrim until the bar's opaque part covers an extra row (see Requests).
             bottomBar = {
                 if (paneHost != null) {
-                    // Two-pane inner screen: the frame draws the shared command bar (DS-65); draw only the tabs pill above it.
+                    // (0.5.0) Two-pane inner screen: real glass blur pill above the shared command bar.
+                    val pillShape = RoundedCornerShape(22.dp)
                     Box(
                         Modifier
                             .fillMaxWidth()
                             .padding(bottom = paneHost.panePadding + 8.dp, start = 16.dp, end = 16.dp),
                     ) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(CivilightTheme.colors.raise.copy(alpha = SCRIM_ALPHA))
-                                .padding(horizontal = TAB_ROW_INSET),
-                            verticalAlignment = Alignment.CenterVertically,
-                            content = tabs,
-                        )
-                    }
-                } else {
-                    BottomGlassBar(
-                        extraRow = {
+                        Box(Modifier.fillMaxWidth().clip(pillShape)) {
+                            GlassBackground(GlassSurface.CHIP, Modifier.matchParentSize(), shape = pillShape)
                             Row(
-                                // The pill is fully round (radius 22 on a 44 row): without an inset `개요` and its underline
-                                // started under the left corner and were cut off. The inset clears the corner at the underline.
-                                Modifier.weight(1f).clip(RoundedCornerShape(22.dp)).background(CivilightTheme.colors.raise.copy(alpha = SCRIM_ALPHA))
+                                Modifier
+                                    .fillMaxWidth()
                                     .padding(horizontal = TAB_ROW_INSET),
                                 verticalAlignment = Alignment.CenterVertically,
                                 content = tabs,
                             )
+                        }
+                    }
+                } else {
+                    val pillShape = RoundedCornerShape(22.dp)
+                    BottomGlassBar(
+                        inner = wide,
+                        aboveKeyboard = true,
+                        extraRow = {
+                            Box(Modifier.weight(1f).clip(pillShape)) {
+                                GlassBackground(GlassSurface.CHIP, Modifier.matchParentSize(), shape = pillShape)
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = TAB_ROW_INSET),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    content = tabs,
+                                )
+                            }
                         },
                     ) { commandBar() }
                 }

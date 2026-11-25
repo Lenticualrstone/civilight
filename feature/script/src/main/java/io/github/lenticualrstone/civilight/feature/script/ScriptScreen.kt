@@ -464,6 +464,63 @@ private fun scriptSheet(
                 RelinkSheet(Relink.of(doc, key.recordKey, open), vm.readOnly) { block -> vm.relinkRecord(key.recordKey, block) }
             }
         }
+        is io.github.lenticualrstone.civilight.feature.script.synergy.MentionPreviewSheetKey -> {
+            {
+                io.github.lenticualrstone.civilight.feature.script.synergy.MentionPreviewSheetContent(
+                    doc = doc,
+                    targetKindName = key.targetKind,
+                    targetKey = key.targetKey,
+                    onOpenDetail = {
+                        when (io.github.lenticualrstone.civilight.model.text.LinkTargetKind.entries.firstOrNull { it.name == key.targetKind }) {
+                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.CHARACTER ->
+                                deps.navigator.push(io.github.lenticualrstone.civilight.navigation.CharacterProfile(route.projectKey, key.targetKey))
+                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.TERM ->
+                                deps.navigator.push(io.github.lenticualrstone.civilight.navigation.TermCard(route.projectKey, key.targetKey))
+                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.PLACE ->
+                                deps.navigator.push(io.github.lenticualrstone.civilight.navigation.PlaceCard(route.projectKey, key.targetKey))
+                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.FACTION ->
+                                deps.navigator.push(io.github.lenticualrstone.civilight.navigation.FactionCard(route.projectKey, key.targetKey))
+                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.EVENT ->
+                                deps.navigator.push(io.github.lenticualrstone.civilight.navigation.EventDetail(route.projectKey, key.targetKey))
+                            else -> Unit
+                        }
+                    },
+                    onOpenRefPanel = {
+                        vm.setPanelTab(PanelTab.REF)
+                    },
+                    onClose = { close() },
+                )
+            }
+        }
+        is io.github.lenticualrstone.civilight.feature.script.synergy.ScriptOutlineSheetKey -> {
+            {
+                val open = rememberHiddenGate(key.projectKey).open
+                io.github.lenticualrstone.civilight.feature.script.synergy.ScriptOutlineSheetContent(
+                    doc = doc,
+                    unitKey = key.unitKey,
+                    hiddenUnlocked = open,
+                    onJumpScene = { sceneKey ->
+                        doc.manuscript.liveBlocksOf(sceneKey).firstOrNull()?.let { b ->
+                            deps.navigator.push(Script(route.projectKey, blockKey = b.key))
+                        }
+                    },
+                    onClose = { close() },
+                )
+            }
+        }
+        is io.github.lenticualrstone.civilight.feature.script.synergy.SpeakerFocusSheetKey -> {
+            {
+                io.github.lenticualrstone.civilight.feature.script.synergy.SpeakerFocusSheetContent(
+                    doc = doc,
+                    unitKey = key.unitKey,
+                    focusedSpeakerKey = null,
+                    onSelectSpeaker = { speakerKey ->
+                        if (speakerKey != null) vm.pickChipSpeaker(speakerKey)
+                    },
+                    onClose = { close() },
+                )
+            }
+        }
         else -> null
     }
 }
@@ -573,8 +630,20 @@ private fun ScriptFrame(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
+    val scriptSettings by deps.settings.collectAsState()
     val rows = c.rows
     val game = GameTools.on(doc)
+    // (0.5.0) Typewriter scroll: keep the selected/edited block anchored near 38% from the top of the viewport.
+    LaunchedEffect(editor.selected, scriptSettings.typewriterScroll) {
+        if (!scriptSettings.typewriterScroll) return@LaunchedEffect
+        val key = editor.selected ?: return@LaunchedEffect
+        val idx = rows.indexOfFirst { it is BlockRow && it.blockKey == key }
+        if (idx >= 0) {
+            val vh = listState.layoutInfo.viewportSize.height
+            val targetOffset = if (vh > 0) -(vh * 0.36f).toInt() else 0
+            listState.animateScrollToItem(idx, targetOffset)
+        }
+    }
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
             revealedRow = null
@@ -753,14 +822,14 @@ private fun ScriptFrame(
         onEvent = { e ->
             when (e) {
                 is ScriptInputEvent.TextChanged -> {
-                    if (vm.onDraftText(e.text, e.selectionStart, e.selectionEnd) == DraftEffect.OPEN_LINK_PICKER) {
+                    if (vm.onDraftText(e.text, e.selectionStart, e.selectionEnd, smartPunctuation = scriptSettings.smartPunctuation) == DraftEffect.OPEN_LINK_PICKER) {
                         sheets.open(DraftLinkSheetKey(route.projectKey))
                     }
                 }
                 ScriptInputEvent.EnterPressed -> {
                     val t = draft.text
                     val at = draft.selEnd.coerceIn(0, t.length)
-                    vm.onDraftText(t.substring(0, at) + "\n" + t.substring(at), at + 1, at + 1)
+                    vm.onDraftText(t.substring(0, at) + "\n" + t.substring(at), at + 1, at + 1, smartPunctuation = scriptSettings.smartPunctuation)
                 }
                 is ScriptInputEvent.Ime -> imeUp = e.visible
                 is ScriptInputEvent.Focus -> fieldFocused = e.focused
@@ -769,8 +838,17 @@ private fun ScriptFrame(
             }
         },
         onSend = {
+            val sentSpeaker = if (draft.kind == BlockKind.DIALOGUE && draft.mark == null) draft.speakerKey else null
             vm.sendDraft(sceneKey)
             revealedRow = null
+            // (0.5.0, Labs) Smart speaker swap: after sending a dialogue block, pre-select the previous partner speaker.
+            if (scriptSettings.smartSpeakerSwap && sentSpeaker != null) {
+                val partner = rows.asReversed()
+                    .filterIsInstance<BlockRow>()
+                    .firstOrNull { it.kind == BlockKind.DIALOGUE && it.speaker?.characterKey != null && it.speaker.characterKey != sentSpeaker }
+                    ?.speaker?.characterKey
+                if (partner != null) vm.pickChipSpeaker(partner)
+            }
         },
         onSpeakerChip = { if (draft.kind == BlockKind.DIALOGUE) sheets.open(ChipSpeakerSheetKey(route.projectKey, sceneKey)) },
         onKindChip = { sheets.open(KindMenuSheetKey(route.projectKey, editKey = editKey)) },
@@ -838,13 +916,18 @@ private fun ScriptFrame(
         }
     }
 
+    val railOnLeft = scriptSettings.miniRailSide == io.github.lenticualrstone.civilight.model.app.MiniRailSide.LEFT
+    val panelSide = if (railOnLeft) PanelSide.START else PanelSide.END
     Box(
         Modifier
             .fillMaxSize()
             .onGloballyPositioned { frameTopPx = it.positionInWindow().y },
     ) {
         Box(
-            (if (upperSettled) Modifier.fillMaxHeight() else Modifier.height(upperHeight.dp)).width(layout.areaWidth.dp),
+            Modifier
+                .align(if (railOnLeft) Alignment.TopEnd else Alignment.TopStart)
+                .then(if (upperSettled) Modifier.fillMaxHeight() else Modifier.height(upperHeight.dp))
+                .width(layout.areaWidth.dp),
         ) {
             GlassScaffold(
                 topBar = {
@@ -859,11 +942,12 @@ private fun ScriptFrame(
                                 positionLabel = header.positionLabel,
                                 wide = wide,
                                 onPositionLabel = {
-                                    val scene = header.sceneKey ?: return@ScriptTopBar
-                                    sheets.open(PositionSheetKey(route.projectKey, scene, header.positionLabel.orEmpty()))
+                                    sheets.open(io.github.lenticualrstone.civilight.feature.script.synergy.ScriptOutlineSheetKey(route.projectKey, c.unitKey))
                                 },
                                 onLayers = ::openLayers,
                                 onFind = { openFind() },
+                                back = if (io.github.lenticualrstone.civilight.ui.nav.LocalPaneRole.current == io.github.lenticualrstone.civilight.ui.nav.PaneRole.DETAIL) null
+                                else io.github.lenticualrstone.civilight.designsystem.component.IconAction("뒤로") { deps.navigator.pop() },
                             )
                         }
                     }
@@ -923,33 +1007,34 @@ private fun ScriptFrame(
                                         deps.navigator.push(RecorderRecordDetail(tap.recordKey))
                                         true
                                     }
-                                    // (0.4.0) Short tap on an `@` mention opens a quick-info sheet or navigates
-                                    // cleanly without interfering with block long-press or horizontal swipe.
+                                    // (0.5.0) Short tap on an `@` mention opens Obsidian-style compact preview sheet
+                                    // (`자세히 열기` / `참고 패널`) without breaking reading flow or long-press.
                                     is BlockTap.Link -> {
                                         val link = tap.link
-                                        val openLive = when (link.target.kind.known) {
+                                        val known = link.target.kind.known
+                                        val live = when (known) {
                                             io.github.lenticualrstone.civilight.model.text.LinkTargetKind.CHARACTER ->
-                                                doc.index.character(link.target.key)?.takeIf { it.deletedAt == null }?.let {
-                                                    deps.navigator.push(io.github.lenticualrstone.civilight.navigation.CharacterProfile(route.projectKey, it.key))
-                                                    true
-                                                } ?: false
+                                                doc.index.character(link.target.key)?.deletedAt == null
                                             io.github.lenticualrstone.civilight.model.text.LinkTargetKind.TERM ->
-                                                doc.index.term(link.target.key)?.takeIf { it.deletedAt == null }?.let {
-                                                    deps.navigator.push(io.github.lenticualrstone.civilight.navigation.TermCard(route.projectKey, it.key))
-                                                    true
-                                                } ?: false
+                                                doc.index.term(link.target.key)?.deletedAt == null
                                             io.github.lenticualrstone.civilight.model.text.LinkTargetKind.PLACE ->
-                                                doc.index.place(link.target.key)?.takeIf { it.deletedAt == null }?.let {
-                                                    deps.navigator.push(io.github.lenticualrstone.civilight.navigation.PlaceCard(route.projectKey, it.key))
-                                                    true
-                                                } ?: false
+                                                doc.index.place(link.target.key)?.deletedAt == null
                                             io.github.lenticualrstone.civilight.model.text.LinkTargetKind.FACTION ->
-                                                doc.index.faction(link.target.key)?.takeIf { it.deletedAt == null }?.let {
-                                                    deps.navigator.push(io.github.lenticualrstone.civilight.navigation.FactionCard(route.projectKey, it.key))
-                                                    true
-                                                } ?: false
+                                                doc.index.faction(link.target.key)?.deletedAt == null
+                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.EVENT ->
+                                                doc.world.events.any { it.key == link.target.key && it.deletedAt == null }
                                             else -> false
                                         }
+                                        val openLive = if (live && known != null) {
+                                            sheets.open(
+                                                io.github.lenticualrstone.civilight.feature.script.synergy.MentionPreviewSheetKey(
+                                                    projectKey = route.projectKey,
+                                                    targetKind = known.name,
+                                                    targetKey = link.target.key,
+                                                ),
+                                            )
+                                            true
+                                        } else false
                                         if (!openLive) {
                                             sheets.open(
                                                 io.github.lenticualrstone.civilight.feature.script.links.LinkCardSheetKey(
@@ -1002,13 +1087,13 @@ private fun ScriptFrame(
                         revealedRow = revealedRow,
                         revealedSide = revealedSide,
                         liftedRow = blockMenu?.liftedRow,
+                        blockSpacing = scriptSettings.blockSpacing,
                     )
                 }
             }
         }
         val panelWidth = rememberLastNonNull(targetLayout.panelWidth.takeIf { targetLayout.panel }) ?: ScriptLayout.panelWidthFor(widthDp, heightDp)
         val seamShown = targetLayout.panel || targetLayout.rail
-        val scriptSettings by deps.settings.collectAsState()
         if (seamShown) {
             val railActions = scriptSettings.miniRailScript.mapNotNull { item ->
                 when (item) {
@@ -1045,30 +1130,30 @@ private fun ScriptFrame(
                             icon = IconId.Outline,
                             label = "씬 목차",
                             onClick = {
-                                header.sceneKey?.let { scene ->
-                                    sheets.open(PositionSheetKey(route.projectKey, scene, header.positionLabel.orEmpty()))
-                                }
+                                sheets.open(io.github.lenticualrstone.civilight.feature.script.synergy.ScriptOutlineSheetKey(route.projectKey, c.unitKey))
                             },
                         )
                     io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.SPEAKER_FOCUS ->
                         io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
                             icon = IconId.User,
                             label = "화자 포커스",
-                            onClick = { sheets.open(LayersSheetKey(route.projectKey)) },
+                            onClick = {
+                                sheets.open(io.github.lenticualrstone.civilight.feature.script.synergy.SpeakerFocusSheetKey(route.projectKey, c.unitKey))
+                            },
                         )
                 }
             }
             PanelRail(
                 panelState,
-                PanelSide.END,
-                Modifier.align(Alignment.TopEnd),
+                panelSide,
+                Modifier.align(if (railOnLeft) Alignment.TopStart else Alignment.TopEnd),
                 topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
                 actions = railActions,
             )
         }
         AnimatedVisibility(
             visible = targetLayout.panel,
-            modifier = Modifier.align(Alignment.TopEnd),
+            modifier = Modifier.align(if (railOnLeft) Alignment.TopStart else Alignment.TopEnd),
             enter = if (ScriptLayout.slidesFromRail(beforePanel)) motion.panelToggleEnter() else motion.panelEnter(),
             exit = if (ScriptLayout.slidesFromRail(targetLayout)) motion.panelToggleExit() else motion.panelExit(),
         ) {
@@ -1085,9 +1170,9 @@ private fun ScriptFrame(
         if (seamShown) {
             PanelSeamButton(
                 panelState,
-                PanelSide.END,
+                panelSide,
                 panelDp = { panelWidth },
-                modifier = Modifier.align(Alignment.CenterEnd).fillMaxWidth(),
+                modifier = Modifier.align(if (railOnLeft) Alignment.CenterStart else Alignment.CenterEnd).fillMaxWidth(),
             )
         }
         val lastSplit = rememberLastNonNull(split)

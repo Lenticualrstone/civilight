@@ -131,6 +131,7 @@ class GalleryPanels(private val doc: ProjectDoc, private val locked: Boolean) {
             LinkTargetKind.PLACE -> doc.liveness.isPlaceLive(key)
             LinkTargetKind.FACTION -> doc.liveness.isFactionLive(key)
             LinkTargetKind.PAGE -> doc.liveness.isPageLive(key)
+            LinkTargetKind.EVENT -> doc.world.events.any { it.key == key && it.deletedAt == null }
             LinkTargetKind.PROJECT -> true
         }
         if (!live) return false
@@ -142,6 +143,7 @@ class GalleryPanels(private val doc: ProjectDoc, private val locked: Boolean) {
             LinkTargetKind.FACTION -> key !in hidden.factions
             LinkTargetKind.PAGE -> key !in hidden.pages
             LinkTargetKind.UNIT -> key !in hidden.scenes
+            LinkTargetKind.EVENT -> true
             LinkTargetKind.PROJECT -> true
         }
     }

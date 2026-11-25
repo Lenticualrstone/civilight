@@ -100,10 +100,12 @@ fun CanvasBoardScreen(route: CanvasBoard, deps: FeatureDeps) {
     val sheets = rememberSheetHost()
     val back = IconAction(CanvasCopy.BACK) { deps.navigator.pop() }
     val ready = load as? ProjectLoad.Ready
+    val failed = load as? ProjectLoad.Failed
     // N-58: switching canvases stays on this screen (one view model), so a delete toast's `되돌리기` keeps working.
     var selected by rememberSaveable(route) { mutableStateOf(route.canvasKey) }
     val canvas = ready?.let { CanvasEdits.resolveForRoute(it.doc, selected) }
     val state = when {
+        failed != null -> BoardState.FAILED
         ready == null -> BoardState.LOADING
         canvas == null -> BoardState.NO_CANVAS
         else -> BoardState.BOARD
@@ -114,6 +116,15 @@ fun CanvasBoardScreen(route: CanvasBoard, deps: FeatureDeps) {
     ContentSwap(state, Modifier.fillMaxSize(), label = "canvasBoardState") { s ->
         when (s) {
             BoardState.LOADING -> CivilightScreen(title = "", smallLine = CanvasCopy.SMALL_LINE, back = back) { }
+            BoardState.FAILED -> CivilightScreen(title = CanvasCopy.SMALL_LINE, back = back) { pad ->
+                Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
+                    io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock(
+                        title = "프로젝트를 불러오지 못했습니다",
+                        subtitle = "뒤로 이동해 다시 열어 주세요.",
+                        icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Warn,
+                    )
+                }
+            }
             BoardState.NO_CANVAS -> NoCanvas(shownReady?.readOnly ?: true, back, vm)
             BoardState.BOARD -> if (shownReady != null && shownCanvas != null) {
                 CanvasBoard(route, deps, vm, shownReady.doc, shownReady.readOnly, shownCanvas, sheets, back, onSwitch = { selected = it })
@@ -122,7 +133,7 @@ fun CanvasBoardScreen(route: CanvasBoard, deps: FeatureDeps) {
     }
 }
 
-private enum class BoardState { LOADING, NO_CANVAS, BOARD }
+private enum class BoardState { LOADING, FAILED, NO_CANVAS, BOARD }
 
 /** A project without a canvas: one is made (CNV-02 [PROPOSED]); a read-only project shows an empty state. */
 @Composable
@@ -167,7 +178,10 @@ private fun CanvasBoard(
     val motion = CivilightTheme.motion
     LaunchedEffect(revealed) { if (revealed) reveal.animateTo(1f, motion.spec(CivilightMotion.enter)) }
     val relationLines = remember(doc, canvas, lens, gate.open) { BoardScene.relationLines(doc, canvas, lens, gate.open) }
-    val scene = BoardScene.build(doc, canvas, lens, gate.open, moved, relationLines)
+    val movedSnapshot = moved.toMap()
+    val scene = remember(doc, canvas, lens, gate.open, movedSnapshot, relationLines) {
+        BoardScene.build(doc, canvas, lens, gate.open, movedSnapshot, relationLines)
+    }
 
     // A dropped node keeps its on-screen position until the document has it (no flicker back).
     LaunchedEffect(canvas) { dropSettled(canvas, moved) }

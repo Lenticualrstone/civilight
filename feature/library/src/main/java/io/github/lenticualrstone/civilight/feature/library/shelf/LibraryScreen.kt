@@ -122,6 +122,7 @@ internal fun LibraryScreen(services: LibraryServices) {
     LaunchedEffect(Unit) { services.backups.load() }
     val vm = entryViewModel { LibraryViewModel(services) }
     val ui by vm.state.collectAsState()
+    val settings by deps.settings.collectAsState()
     val view by vm.view.collectAsState()
     val docs by vm.documents.collectAsState()
     val sheets = rememberSheetHost()
@@ -298,11 +299,13 @@ internal fun LibraryScreen(services: LibraryServices) {
                             recents = ui.recents,
                             wide = inner,
                             recorderSub = ui.recorderSub,
+                            lifeRecorderEnabled = settings.lifeRecorderEnabled,
                             onOpen = { item ->
                                 openProject(item.projectKey)
                                 navigator.push(RecentsModel.routeOf(item))
                             },
                             onRecorder = { navigator.push(RecorderInbox()) },
+                            onMultiExport = if (ui.exportable.isNotEmpty()) ({ sheets.open(MultiExportSheet) }) else null,
                         )
                     }
                     MultiExportSheet -> sheetBody {

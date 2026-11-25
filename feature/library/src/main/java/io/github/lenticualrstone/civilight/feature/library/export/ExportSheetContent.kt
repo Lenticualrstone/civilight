@@ -140,6 +140,8 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
                     preview = AndroidCoverPreview(deps.stores.blobs),
                     authenticate = { deps.biometric.authenticate(AuthRequest(AuthCopy.HIDDEN_PROJECTS)) == AuthResult.SUCCESS },
                 )
+            } catch (_: Throwable) {
+                ExportBuild.Unavailable
             } finally {
                 working = false
             }

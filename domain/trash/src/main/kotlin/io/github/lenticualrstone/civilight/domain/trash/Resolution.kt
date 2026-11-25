@@ -104,6 +104,7 @@ object Resolution {
             LinkTargetKind.FACTION -> RefTargetKind.FACTION
             LinkTargetKind.PAGE -> RefTargetKind.PAGE
             LinkTargetKind.UNIT -> RefTargetKind.UNIT
+            LinkTargetKind.EVENT -> RefTargetKind.EVENT
             LinkTargetKind.PROJECT, null -> return null
         }
         return resolve(doc, kind, target.key, locks)

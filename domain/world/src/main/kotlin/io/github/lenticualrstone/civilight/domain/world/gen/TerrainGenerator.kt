@@ -433,12 +433,18 @@ object TerrainGenerator {
             score[i] = s
             candidates += i
         }
-        val target = when (input.kind) {
+        val baseTarget = when (input.kind) {
             GeneratedMapKind.CONTINENT -> 6
             GeneratedMapKind.TWIN -> 7
             GeneratedMapKind.ISLANDS -> 6
             GeneratedMapKind.REGION -> 5
         } + biases.count { it.kind == ConditionKind.TOWN || it.kind == ConditionKind.PORT }
+        val densityDelta = when (input.choice(GenerationStepKind.TOWN_ROAD, StepChoices.TOWN_DENSITY)) {
+            "적게" -> -2
+            "많이" -> 3
+            else -> 0
+        }
+        val target = (baseTarget + densityDelta).coerceAtLeast(2)
         val picked = ArrayList<Int>()
         for (c in candidates.sortedWith(compareByDescending<Int> { score[it] }.thenBy { it })) {
             if (picked.size >= target) break

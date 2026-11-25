@@ -55,7 +55,8 @@ object DialogueCsvExport {
             for (b in doc.manuscript.liveBlocksOf(scene.key)) {
                 when (b.kind.known) {
                     BlockKind.DIALOGUE -> out += Row(
-                        speaker = b.speakerKey?.let { Labels.speakerName(doc, it) }.orEmpty(),
+                        speaker = b.displayNameOverride?.takeIf { it.isNotBlank() }
+                            ?: b.speakerKey?.let { Manuscript.displayNameAt(doc, it, b.key) ?: Labels.speakerName(doc, it) }.orEmpty(),
                         line = Runs.exportText(b.runs, scope.includeParens),
                         voiceId = if (voices) VoiceIds.currentId(doc, b).orEmpty() else "",
                         id = b.key,

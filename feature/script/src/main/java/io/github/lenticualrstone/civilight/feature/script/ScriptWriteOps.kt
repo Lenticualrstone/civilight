@@ -146,9 +146,13 @@ fun ScriptViewModel.claimDraft() {
 }
 
 /** A change of the field's text or caret; returns what the screen opens (the `@` picker). */
-fun ScriptViewModel.onDraftText(text: String, selStart: Int, selEnd: Int): DraftEffect {
+fun ScriptViewModel.onDraftText(text: String, selStart: Int, selEnd: Int, smartPunctuation: Boolean = false): DraftEffect {
     if (readOnly) return DraftEffect.NONE
-    val (next, effect) = Drafts.textChanged(draftFlow.value, text, selStart, selEnd)
+    val transformed = if (smartPunctuation) Drafts.applySmartPunctuation(text) else text
+    val delta = text.length - transformed.length
+    val adjStart = (selStart - delta).coerceIn(0, transformed.length)
+    val adjEnd = (selEnd - delta).coerceIn(0, transformed.length)
+    val (next, effect) = Drafts.textChanged(draftFlow.value, transformed, adjStart, adjEnd)
     setDraft(next)
     return effect
 }
@@ -165,6 +169,8 @@ fun ScriptViewModel.insertDraftLink(kind: PickKind, key: Key, text: String) {
         PickKind.CHARACTER -> LinkTargetKind.CHARACTER
         PickKind.TERM -> LinkTargetKind.TERM
         PickKind.PLACE -> LinkTargetKind.PLACE
+        PickKind.EVENT -> LinkTargetKind.EVENT
+        PickKind.FACTION -> LinkTargetKind.FACTION
         else -> return
     }
     setDraft(Drafts.insertLink(draftFlow.value, TextRun.Link(Keys.newKey(), LinkTarget(target, key), text)))

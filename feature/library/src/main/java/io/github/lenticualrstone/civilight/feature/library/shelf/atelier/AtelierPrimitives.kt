@@ -63,6 +63,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
 import io.github.lenticualrstone.civilight.designsystem.glass.OnGlass
+import io.github.lenticualrstone.civilight.designsystem.glass.glassSource
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
@@ -431,45 +432,65 @@ internal fun AtelierStageFrame(
     val safeIndex = activeIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
     val activeItem = items.getOrNull(safeIndex)
     val inertModifier = if (input.preview) Modifier.clearAndSetSemantics { } else Modifier
+    // (0.5.0) Restore live glass backdrop blur behind AtelierFocusDock over the 3D/kinetic scene.
+    val sceneSource = io.github.lenticualrstone.civilight.designsystem.glass.rememberGlassSource()
+    val glassMode = io.github.lenticualrstone.civilight.designsystem.theme.LocalGlassMode.current
+    val recordBackdrop = !input.preview && (
+        glassMode == io.github.lenticualrstone.civilight.designsystem.glass.GlassMode.BLUR ||
+            glassMode == io.github.lenticualrstone.civilight.designsystem.glass.GlassMode.BLUR_COSTLY
+        )
 
     Box(Modifier.fillMaxSize().background(colors.bg).then(inertModifier)) {
-        // Soft atmospheric ambient light behind every Atelier scene.
-        Canvas(Modifier.fillMaxSize()) {
-            val cx = size.width * (0.5f + tilt.x * 0.08f)
-            val cy = size.height * (0.42f + tilt.y * 0.06f)
-            val radius = size.minDimension * 0.72f
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        colors.acc.copy(alpha = if (colors.isDark) 0.10f else 0.07f),
-                        Color.Transparent,
-                    ),
-                    center = Offset(cx, cy),
-                    radius = radius,
+        Box(
+            Modifier
+                .fillMaxSize()
+                .then(
+                    if (recordBackdrop) Modifier.glassSource(sceneSource, enabled = true)
+                    else Modifier,
                 ),
-                radius = radius,
-                center = Offset(cx, cy),
-            )
-        }
+        ) {
+            // Soft atmospheric ambient light behind every Atelier scene.
+            Canvas(Modifier.fillMaxSize()) {
+                val cx = size.width * (0.5f + tilt.x * 0.08f)
+                val cy = size.height * (0.42f + tilt.y * 0.06f)
+                val radius = size.minDimension * 0.72f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            colors.acc.copy(alpha = if (colors.isDark) 0.10f else 0.07f),
+                            Color.Transparent,
+                        ),
+                        center = Offset(cx, cy),
+                        radius = radius,
+                    ),
+                    radius = radius,
+                    center = Offset(cx, cy),
+                )
+            }
 
-        Box(Modifier.fillMaxSize()) {
-            content(tilt)
+            Box(Modifier.fillMaxSize()) {
+                content(tilt)
+            }
         }
 
         if (showDock && activeItem != null) {
-            AtelierFocusDock(
-                item = activeItem,
-                index = safeIndex,
-                total = items.size,
-                input = input,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(
-                        start = 16.dp,
-                        end = 16.dp,
-                        bottom = (input.barBottom + 10f).dp,
-                    ),
-            )
+            androidx.compose.runtime.CompositionLocalProvider(
+                io.github.lenticualrstone.civilight.designsystem.glass.LocalGlassSource provides sceneSource,
+            ) {
+                AtelierFocusDock(
+                    item = activeItem,
+                    index = safeIndex,
+                    total = items.size,
+                    input = input,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            bottom = (input.barBottom + 10f).dp,
+                        ),
+                )
+            }
         }
     }
 }

@@ -29,7 +29,7 @@ fun Modifier.graphGestures(
     listenerOf: () -> GraphSurfaceListener,
     onPinch: (GraphViewport) -> Unit = {},
 ): Modifier = this
-    .pointerInput(Unit) {
+    .pointerInput(density) {
         val slop = viewConfiguration.touchSlop
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
@@ -44,8 +44,10 @@ fun Modifier.graphGestures(
             }?.takeIf { listenerOf().canDrag(it) }
             var mode = GestureMode.PENDING
             var current = start
+            var cancelled = false
             while (true) {
                 val event = awaitPointerEvent()
+                if (event.changes.any { it.isConsumed && !it.pressed }) cancelled = true
                 val pressed = event.changes.filter { it.pressed }
                 if (pressed.isEmpty()) break
                 if (pressed.size >= 2) {
@@ -73,7 +75,7 @@ fun Modifier.graphGestures(
                 }
             }
             when (mode) {
-                GestureMode.PENDING -> listenerOf().onTap(hit, at)
+                GestureMode.PENDING -> if (!cancelled) listenerOf().onTap(hit, at)
                 GestureMode.DRAG_NODE -> dragKey?.let { listenerOf().onDragEnd(it) }
                 GestureMode.TRANSFORM -> listenerOf().onViewportSettled(current)
                 GestureMode.IGNORED -> Unit

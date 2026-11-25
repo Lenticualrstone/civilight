@@ -232,6 +232,7 @@ object PickerModels {
             if (PickKind.CHARACTER in kinds) add(PickerCopy.KIND_CHARACTER to characters(doc, query, hiddenOpen = hiddenOpen))
             if (PickKind.TERM in kinds) add(PickerCopy.KIND_TERM to terms(doc, query, hiddenOpen))
             if (PickKind.PLACE in kinds) add(PickerCopy.KIND_PLACE to places(doc, query, hiddenOpen, includeRegions = false))
+            if (PickKind.EVENT in kinds) add(PickerCopy.KIND_EVENT to events(doc, query))
             if (PickKind.FACTION in kinds) add(PickerCopy.KIND_FACTION to factions(doc, query, hiddenOpen))
         }
         val hiddenKinds = parts.filter { it.second.hiddenCount > 0 }
@@ -242,17 +243,21 @@ object PickerModels {
         )
     }
 
-    /** The link kinds of the `@` picker in script text (SCR-55). */
-    val SCRIPT_LINK_KINDS: Set<PickKind> = setOf(PickKind.CHARACTER, PickKind.TERM, PickKind.PLACE)
+    /** The link kinds of the `@` picker in script text (SCR-55 + 0.5.0 unified Event links). */
+    val SCRIPT_LINK_KINDS: Set<PickKind> = setOf(PickKind.CHARACTER, PickKind.TERM, PickKind.PLACE, PickKind.EVENT)
 
     /** The link kinds of document text (`LinkTargetKind.DOCUMENT` minus pages, which have no picker here). */
-    val DOCUMENT_LINK_KINDS: Set<PickKind> = setOf(PickKind.CHARACTER, PickKind.TERM, PickKind.PLACE, PickKind.FACTION)
+    val DOCUMENT_LINK_KINDS: Set<PickKind> = setOf(PickKind.CHARACTER, PickKind.TERM, PickKind.PLACE, PickKind.EVENT, PickKind.FACTION)
 
     /**
      * `@` 연결 (SCR-55): people, terms (with aliases) and places in one list. Locked hidden items are
      * left out and counted; the last row names their kind when only one kind is hidden.
      */
-    fun links(doc: ProjectDoc, query: String = "", hiddenOpen: Boolean = false): PickerModel {
+    fun links(doc: ProjectDoc, query: String = "", hiddenOpen: Boolean = false): PickerModel =
+        links(doc, query, hiddenOpen, SCRIPT_LINK_KINDS)
+
+    @Suppress("unused")
+    private fun legacyLinksUnused(doc: ProjectDoc, query: String, hiddenOpen: Boolean): PickerModel {
         val people = characters(doc, query, hiddenOpen = hiddenOpen)
         val terms = terms(doc, query, hiddenOpen)
         val places = places(doc, query, hiddenOpen, includeRegions = false)

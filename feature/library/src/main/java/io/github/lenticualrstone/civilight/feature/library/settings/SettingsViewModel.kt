@@ -213,4 +213,20 @@ internal class SettingsViewModel(private val services: LibraryServices) : ViewMo
             settingsStore.setMiniRailProject(next)
         }
     }
+
+    fun setPortraitAmbientBlur(on: Boolean) {
+        viewModelScope.launch { settingsStore.setPortraitAmbientBlur(on) }
+    }
+
+    fun setMiniRailSide(side: io.github.lenticualrstone.civilight.model.app.MiniRailSide) {
+        viewModelScope.launch { settingsStore.setMiniRailSide(side) }
+    }
+
+    fun setProfileTabPreset(preset: io.github.lenticualrstone.civilight.model.app.ProfileTabPreset) {
+        viewModelScope.launch { settingsStore.setProfileTabPreset(preset) }
+    }
+
+    fun setCustomProfileTabs(tabs: List<io.github.lenticualrstone.civilight.model.app.ProfileTabConfig>) {
+        viewModelScope.launch { settingsStore.setCustomProfileTabs(tabs) }
+    }
 }

@@ -276,6 +276,7 @@ class ExampleProjectInvariantsTest {
                 LinkTargetKind.PAGE -> doc.pages[key] != null
                 LinkTargetKind.UNIT -> key in unitKeys
                 LinkTargetKind.PROJECT -> key == K.PROJECT
+                LinkTargetKind.EVENT -> doc.world.events.any { it.key == key }
                 null -> false
             }
             check(resolves) { "${surface.name}: link ${link.linkKey} → $key" }

@@ -128,6 +128,8 @@ fun TimelineScreen(route: Timeline, deps: FeatureDeps) {
         title = timeline?.title ?: WorldCopy.TIMELINE_TITLE,
         smallLine = timeline?.smallLine,
         back = worldBack(route, deps),
+        lens = doc?.let { io.github.lenticualrstone.civilight.ui.lens.lensChipLabel(it) },
+        onLens = { sheets.open(io.github.lenticualrstone.civilight.navigation.LensSheet(route.projectKey)) },
         actions = {
             if (timeline?.available == true) {
                 // WLD-64: the 연표 + 지도 screen (its only entry).
@@ -322,14 +324,18 @@ private fun TimelineLine(row: TimelineRowUi, selected: Boolean, onClick: (() -> 
         modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.pressable(PressAction.Click(onClick), role = Role.Button, scaleOnPress = false) else Modifier)
-            .drawBehind { drawRect(colors.hl.copy(alpha = colors.hl.alpha * hl)) }
+            .drawBehind {
+                drawRect(colors.hl.copy(alpha = colors.hl.alpha * hl))
+                // Draw the vertical timeline axis directly without IntrinsicSize.Min double measurement.
+                val axisX = 6.dp.toPx()
+                val axisW = 1.dp.toPx()
+                drawRect(colors.line, androidx.compose.ui.geometry.Offset(axisX, 0f), androidx.compose.ui.geometry.Size(axisW, size.height))
+            }
             .heightIn(min = 44.dp)
-            .height(IntrinsicSize.Min)
             .dimmed(row.dimmed),
     ) {
-        // The line and its diamond (board: 1 px `line` with the dot centred on it).
-        Box(Modifier.width(24.dp).fillMaxHeight()) {
-            Box(Modifier.padding(start = 6.dp).width(1.dp).fillMaxHeight().background(colors.line))
+        // The diamond on the vertical line (board: 1 px `line` with the dot centred on it).
+        Box(Modifier.width(24.dp).height(44.dp)) {
             Box(
                 Modifier
                     .offset(x = 6.dp - dot / 2, y = if (row.current) 14.dp else 16.dp)

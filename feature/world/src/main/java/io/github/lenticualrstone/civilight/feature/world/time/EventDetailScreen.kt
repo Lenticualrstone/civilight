@@ -85,6 +85,8 @@ fun EventDetailScreen(route: EventDetail, deps: FeatureDeps) {
         },
         smallLine = detail?.paneTitle,
         back = worldBack(route, deps),
+        lens = doc?.let { io.github.lenticualrstone.civilight.ui.lens.lensChipLabel(it) },
+        onLens = { sheets.open(io.github.lenticualrstone.civilight.navigation.LensSheet(route.projectKey)) },
         actions = {
             if (detail?.access == EventAccess.Open) {
                 CivilightIconButton(

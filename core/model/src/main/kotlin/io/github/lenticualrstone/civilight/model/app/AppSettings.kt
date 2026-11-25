@@ -91,6 +91,14 @@ data class AppSettings(
     val miniRailScript: List<MiniRailScriptItem> = MiniRailScriptItem.DEFAULT,
     /** (0.4.0) Customized icon slots on collapsed mini rail in Project workspace. */
     val miniRailProject: List<MiniRailProjectItem> = MiniRailProjectItem.DEFAULT,
+    /** (0.5.0) Subtle portrait-based ambient blur backdrop behind PortraitHero (default ON). */
+    val portraitAmbientBlur: Boolean = true,
+    /** (0.5.0) Side placement of the collapsed mini icon rail & script side panel (default LEFT). */
+    val miniRailSide: MiniRailSide = MiniRailSide.LEFT,
+    /** (0.5.0) Active character profile tab preset (`표준 창작`, `현대극`, `게임/VN`, `미니멀`). */
+    val profileTabPreset: ProfileTabPreset = ProfileTabPreset.STANDARD,
+    /** (0.5.0) User-customized character profile tabs (empty = use [profileTabPreset] defaults). */
+    val customProfileTabs: List<ProfileTabConfig> = emptyList(),
 ) {
     /**
      * Whether [module]'s side panel (list or script panel) is closed (0.2.3, r3). Without a choice of its own,
@@ -417,4 +425,85 @@ enum class MiniRailProjectItem {
     }
 
     object Codec : LowerCamelEnumSerializer<MiniRailProjectItem>("MiniRailProjectItem", entries, SCRIPT)
+}
+
+/** (0.5.0) Placement side for the collapsed mini icon rail & script side panel. */
+@Serializable(with = MiniRailSide.Codec::class)
+enum class MiniRailSide {
+    LEFT, RIGHT;
+
+    object Codec : LowerCamelEnumSerializer<MiniRailSide>("MiniRailSide", entries, LEFT)
+}
+
+/** (0.5.0) Built-in & modular character profile tab kinds. */
+@Serializable(with = ProfileTabKind.Codec::class)
+enum class ProfileTabKind {
+    OVERVIEW,
+    EQUIPMENT,
+    ABILITIES,
+    RELATIONS,
+    PAST,
+    TRIVIA,
+    APPEARANCES,
+    SPEECH,
+    GAME_TEXT,
+    SECRET,
+    CUSTOM;
+
+    object Codec : LowerCamelEnumSerializer<ProfileTabKind>("ProfileTabKind", entries, CUSTOM)
+}
+
+/** (0.5.0) One modular tab slot in a character profile template/preset. */
+@Serializable
+data class ProfileTabConfig(
+    val id: String,
+    val label: String,
+    val kind: ProfileTabKind,
+    val enabled: Boolean = true,
+)
+
+/** (0.5.0) Ready-made character profile tab presets. */
+@Serializable(with = ProfileTabPreset.Codec::class)
+enum class ProfileTabPreset {
+    STANDARD,
+    MODERN_DRAMA,
+    GAME_VN,
+    MINIMAL;
+
+    fun defaultTabs(): List<ProfileTabConfig> = when (this) {
+        STANDARD -> listOf(
+            ProfileTabConfig("overview", "개요", ProfileTabKind.OVERVIEW),
+            ProfileTabConfig("equipment", "장비", ProfileTabKind.EQUIPMENT),
+            ProfileTabConfig("abilities", "능력", ProfileTabKind.ABILITIES),
+            ProfileTabConfig("relations", "관계", ProfileTabKind.RELATIONS),
+            ProfileTabConfig("past", "과거", ProfileTabKind.PAST),
+            ProfileTabConfig("trivia", "여담", ProfileTabKind.TRIVIA),
+            ProfileTabConfig("appearances", "작중 행적", ProfileTabKind.APPEARANCES),
+        )
+        MODERN_DRAMA -> listOf(
+            ProfileTabConfig("overview", "개요", ProfileTabKind.OVERVIEW),
+            ProfileTabConfig("relations", "관계", ProfileTabKind.RELATIONS),
+            ProfileTabConfig("speech", "말투", ProfileTabKind.SPEECH),
+            ProfileTabConfig("past", "과거", ProfileTabKind.PAST),
+            ProfileTabConfig("trivia", "여담", ProfileTabKind.TRIVIA),
+            ProfileTabConfig("appearances", "작중 행적", ProfileTabKind.APPEARANCES),
+        )
+        GAME_VN -> listOf(
+            ProfileTabConfig("overview", "개요", ProfileTabKind.OVERVIEW),
+            ProfileTabConfig("equipment", "장비", ProfileTabKind.EQUIPMENT),
+            ProfileTabConfig("abilities", "능력", ProfileTabKind.ABILITIES),
+            ProfileTabConfig("relations", "관계", ProfileTabKind.RELATIONS),
+            ProfileTabConfig("speech", "말투", ProfileTabKind.SPEECH),
+            ProfileTabConfig("game_text", "게임 텍스트", ProfileTabKind.GAME_TEXT),
+            ProfileTabConfig("appearances", "작중 행적", ProfileTabKind.APPEARANCES),
+            ProfileTabConfig("secret", "비밀", ProfileTabKind.SECRET),
+        )
+        MINIMAL -> listOf(
+            ProfileTabConfig("overview", "개요", ProfileTabKind.OVERVIEW),
+            ProfileTabConfig("relations", "관계", ProfileTabKind.RELATIONS),
+            ProfileTabConfig("appearances", "작중 행적", ProfileTabKind.APPEARANCES),
+        )
+    }
+
+    object Codec : LowerCamelEnumSerializer<ProfileTabPreset>("ProfileTabPreset", entries, STANDARD)
 }

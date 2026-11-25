@@ -251,8 +251,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.termBody(
     }
     item(key = "header") { SectionLabel(card.header, civilightItem().padding(top = 22.dp, bottom = 2.dp)) }
     card.groups.forEach { group ->
-        // With one group the header already reads `쓰인 곳 · N`.
-        if (card.groups.size > 1) {
+        // With one group the header already reads `쓰인 곳 · N`, except when candidates need bulk actions.
+        if (card.groups.size > 1 || (group.id == "candidates" && card.bulkActions.size == 2 && !readOnly)) {
             item(key = "group:${group.id}") {
                 Row(civilightItem().fillMaxWidth().padding(top = 14.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                     SectionLabel(group.title, Modifier.weight(1f))

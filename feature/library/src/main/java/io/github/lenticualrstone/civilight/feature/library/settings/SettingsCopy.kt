@@ -159,4 +159,27 @@ object SettingsCopy {
 
     const val LIFE_RECORDER_EXP = "라이프 레코더 표시"
     const val LIFE_RECORDER_EXP_SUB = "서재 · 홈에 음성 메모 진입점 표시"
+
+    // (0.5.0) Android-style 2-level category hub, Labs, portrait ambient blur, rail side & profile tab presets
+    const val CAT_DISPLAY_SUB = "테마 · 글자 크기 · 서재/카드 보기 · 블러 · 프로필 모양"
+    const val CAT_WRITING = "집필 · 스크립트"
+    const val CAT_WRITING_SUB = "블록 여백 · 문장부호 · 떨림 · 인물 탭 구성 · 템플릿"
+    const val CAT_FOLDABLE = "폴더블 · 조작"
+    const val CAT_FOLDABLE_SUB = "미니 아이콘 레일 · 스크롤 저항감 · 기울임 반응"
+    const val CAT_SECURITY_SUB = "Drive 백업 · 복구 암호 · 앱 잠금 · 숨기기"
+    const val CAT_LABS = "실험실"
+    const val CAT_LABS_SUB = "타자기 스크롤 · 화자 자동 교대 · 라이프 레코더"
+    const val CAT_SUPPORT_SUB = "휴지통 · 도움말 · 안내 다시 보기"
+
+    const val PORTRAIT_AMBIENT_BLUR = "초상 앰비언트 블러"
+    const val PORTRAIT_AMBIENT_BLUR_SUB = "인물 카드 초상 뒤 은은한 배경 흐림 효과"
+    const val MINI_RAIL_SIDE = "레일 · 패널 위치"
+    const val SIDE_LEFT = "좌측"
+    const val SIDE_RIGHT = "우측"
+    const val PROFILE_TABS = "인물 카드 탭 구성"
+    const val PROFILE_TABS_SUB = "기본 탭 프리셋 · 모듈형 탭 추가 및 순서"
+    const val PRESET_STANDARD = "표준 창작"
+    const val PRESET_MODERN = "현대극 · 드라마"
+    const val PRESET_GAME_VN = "게임 · VN"
+    const val PRESET_MINIMAL = "미니멀"
 }

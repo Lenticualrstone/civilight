@@ -221,7 +221,8 @@ fun ColumnScope.LinkPickerSheet(
     val creatable = creator?.takeIf { c -> kinds.any { k -> LinkCreate.createKind(k)?.let { it in c.kinds } == true } }
     val shownKinds = chip?.let { name -> kinds.filter { it.name == name }.toSet().ifEmpty { null } } ?: kinds
     val model = remember(doc, query, gate.open, shownKinds) { PickerModels.links(doc, query, gate.open, shownKinds) }
-    val chips = remember(kinds, creatable != null) { if (creatable == null) emptyList() else LinkCreate.chips(kinds) }
+    // (0.5.0) Always show kind filter chips (`전체 · 인물 · 용어 · 장소 · 사건`) even when creator is null.
+    val chips = remember(kinds) { LinkCreate.chips(kinds) }
     val createKind = LinkCreate.kindInView(chip, kinds)?.takeIf { k -> creatable?.kinds?.contains(k) == true }
     PickerWithCreate(doc, gate, creatable, onCreated = { v, key -> LinkCreate.pickKind(v.kind)?.let { onPick(it, key, v.name) } }) { onCreate ->
         ItemPickerSheet(
@@ -237,7 +238,7 @@ fun ColumnScope.LinkPickerSheet(
 
 /** (0.2.0, U-15.3) The `@` picker's kind chips and the kind its create row makes (JVM tested). */
 object LinkCreate {
-    private val ORDER = listOf(PickKind.CHARACTER, PickKind.TERM, PickKind.PLACE, PickKind.FACTION)
+    private val ORDER = listOf(PickKind.CHARACTER, PickKind.TERM, PickKind.PLACE, PickKind.EVENT, PickKind.FACTION)
 
     fun createKind(kind: PickKind): CreateKind? = when (kind) {
         PickKind.CHARACTER -> CreateKind.CHARACTER
@@ -259,6 +260,7 @@ object LinkCreate {
         PickKind.CHARACTER -> PickerCopy.KIND_CHARACTER
         PickKind.TERM -> PickerCopy.KIND_TERM
         PickKind.PLACE -> PickerCopy.KIND_PLACE
+        PickKind.EVENT -> PickerCopy.KIND_EVENT
         PickKind.FACTION -> PickerCopy.KIND_FACTION
         else -> PickerCopy.KIND_ITEM
     }

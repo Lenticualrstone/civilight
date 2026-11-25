@@ -197,6 +197,7 @@ fun CivilightRoot(
             LocalPaneSplits provides paneSplits,
             LocalBottomChrome provides bottomChrome,
             LocalWindowToasts provides true,
+            io.github.lenticualrstone.civilight.designsystem.component.LocalProfileSquare provides (settings.profileShape == io.github.lenticualrstone.civilight.model.app.ProfileShape.SQUARE),
         ) {
             // A file opened from outside waits until the app lock is passed (LIB-08).
             val unlock by deps.unlock.state.collectAsState()

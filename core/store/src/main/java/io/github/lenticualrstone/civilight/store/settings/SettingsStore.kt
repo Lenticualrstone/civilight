@@ -15,8 +15,11 @@ import io.github.lenticualrstone.civilight.model.app.LargeMapExport
 import io.github.lenticualrstone.civilight.model.app.MapStylePref
 import io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem
 import io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem
+import io.github.lenticualrstone.civilight.model.app.MiniRailSide
 import io.github.lenticualrstone.civilight.model.app.PaneSplit
 import io.github.lenticualrstone.civilight.model.app.ProfileShape
+import io.github.lenticualrstone.civilight.model.app.ProfileTabConfig
+import io.github.lenticualrstone.civilight.model.app.ProfileTabPreset
 import io.github.lenticualrstone.civilight.model.app.RatingDefaults
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
 import io.github.lenticualrstone.civilight.model.app.SceneNotationPref
@@ -123,6 +126,14 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setLifeRecorderEnabled(value: Boolean) = update { it.copy(lifeRecorderEnabled = value) }
     suspend fun setMiniRailScript(value: List<MiniRailScriptItem>) = update { it.copy(miniRailScript = value) }
     suspend fun setMiniRailProject(value: List<MiniRailProjectItem>) = update { it.copy(miniRailProject = value) }
+
+    // (0.5.0) Portrait ambient blur, mini-rail side, and modular character profile tab presets
+    suspend fun setPortraitAmbientBlur(value: Boolean) = update { it.copy(portraitAmbientBlur = value) }
+    suspend fun setMiniRailSide(value: MiniRailSide) = update { it.copy(miniRailSide = value) }
+    suspend fun setProfileTabPreset(value: ProfileTabPreset) = update {
+        it.copy(profileTabPreset = value, customProfileTabs = emptyList())
+    }
+    suspend fun setCustomProfileTabs(value: List<ProfileTabConfig>) = update { it.copy(customProfileTabs = value) }
 
     companion object {
         val KEY = stringPreferencesKey("appSettings")

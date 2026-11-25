@@ -78,14 +78,14 @@ data class LinkTarget(
 }
 
 enum class LinkTargetKind {
-    CHARACTER, TERM, PLACE, FACTION, PAGE, UNIT, PROJECT;
+    CHARACTER, TERM, PLACE, FACTION, PAGE, UNIT, PROJECT, EVENT;
 
     companion object {
-        /** Allowed in script blocks, choice options and transition runs (SCR-55). */
-        val SCRIPT: Set<LinkTargetKind> = setOf(CHARACTER, TERM, PLACE)
+        /** Allowed in script blocks, choice options and transition runs (SCR-55 + 0.5.0 Event). */
+        val SCRIPT: Set<LinkTargetKind> = setOf(CHARACTER, TERM, PLACE, EVENT)
 
         /** Allowed in character bodies, field long text, voice lines, archive docs, world text, pages (CNV-13, WLD-17). */
-        val DOCUMENT: Set<LinkTargetKind> = setOf(CHARACTER, TERM, PLACE, FACTION, PAGE)
+        val DOCUMENT: Set<LinkTargetKind> = setOf(CHARACTER, TERM, PLACE, FACTION, PAGE, EVENT)
 
         /** Allowed in recorder record text (LRC-17). */
         val RECORDER: Set<LinkTargetKind> = entries.toSet()

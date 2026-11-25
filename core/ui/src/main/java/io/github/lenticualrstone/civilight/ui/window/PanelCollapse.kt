@@ -330,7 +330,6 @@ fun PanelRail(
             .fillMaxHeight()
             .width(PanelRules.RAIL_SPACE.dp)
             .graphicsLayer { this.alpha = alpha() }
-            .background(colors.bg)
             .drawBehind {
                 val w = PaneSplitRules.DIVIDER_DP * density
                 val x = if (side == PanelSide.START) size.width - w else 0f
@@ -338,6 +337,10 @@ fun PanelRail(
             }
             .then(if (state.closed) Modifier else Modifier.clearAndSetSemantics { }),
     ) {
+        io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground(
+            io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface.PANEL,
+            Modifier.matchParentSize(),
+        )
         if (state.closed) {
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier

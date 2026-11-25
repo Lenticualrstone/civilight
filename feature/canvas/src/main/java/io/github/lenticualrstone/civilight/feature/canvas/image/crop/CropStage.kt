@@ -142,12 +142,12 @@ fun CropStage(
         val from = origin?.let { t -> stageInWindow?.let { stage -> t.translate(-stage.left, -stage.top) } }
         val p = grow.value
         val growLayer = Modifier.graphicsLayer {
-            if (motion.reduced || from == null) {
+            if (motion.reduced || from == null || w <= 0f || h <= 0f || frame.width <= 0f || frame.height <= 0f) {
                 alpha = if (origin == null) appear else p
             } else {
                 val cx = frame.left + frame.width / 2
                 val cy = frame.top + frame.height / 2
-                transformOrigin = TransformOrigin(cx / w, cy / h)
+                transformOrigin = TransformOrigin((cx / w).coerceIn(0f, 1f), (cy / h).coerceIn(0f, 1f))
                 val s0 = (from.width / frame.width).coerceIn(0.05f, 1f)
                 val sc = s0 + (1f - s0) * p
                 scaleX = sc

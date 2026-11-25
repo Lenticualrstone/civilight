@@ -80,9 +80,15 @@ fun BoxScope.BlobImage(
     placeholder: @Composable BoxScope.() -> Unit,
 ) {
     val deps = LocalFeatureDeps.current
-    val bitmap by produceState<ImageBitmap?>(null, hash, crop, maxSide) {
+    val cached = androidx.compose.runtime.remember(hash, crop, maxSide) {
+        hash?.let { io.github.lenticualrstone.civilight.ui.image.ImageCache.get(io.github.lenticualrstone.civilight.ui.image.ImageCache.key(it, crop, maxSide)) }
+    }
+    val bitmap by produceState<ImageBitmap?>(cached, hash, crop, maxSide) {
+        if (value != null) return@produceState
         value = withContext(Dispatchers.IO) {
-            hash?.let { deps.stores.blobs.fileOf(it) }?.let { runCatching { SlotImages.decode(it, crop, maxSide) }.getOrNull() }?.asImageBitmap()
+            val h = hash ?: return@withContext null
+            val file = deps.stores.blobs.fileOf(h) ?: return@withContext null
+            runCatching { io.github.lenticualrstone.civilight.ui.image.ImageBitmaps.getOrDecode(h, file, crop, maxSide) }.getOrNull()
         }
     }
     val shown = bitmap
@@ -119,11 +125,15 @@ object SlotImages {
             if (crop.rotation % 360 != 0) postRotate(crop.rotation.toFloat())
             if (crop.flipH) postScale(-1f, 1f)
         }
-        val turned = if (matrix.isIdentity) source else Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+        val turned = if (matrix.isIdentity) source else Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true).also {
+            if (it !== source) source.recycle()
+        }
         val x = (crop.x / sample).coerceIn(0, turned.width - 1)
         val y = (crop.y / sample).coerceIn(0, turned.height - 1)
         val w = (crop.w / sample).coerceIn(1, turned.width - x)
         val h = (crop.h / sample).coerceIn(1, turned.height - y)
-        return Bitmap.createBitmap(turned, x, y, w, h)
+        val cropped = Bitmap.createBitmap(turned, x, y, w, h)
+        if (cropped !== turned) turned.recycle()
+        return cropped
     }
 }

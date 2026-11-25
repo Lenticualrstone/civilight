@@ -56,6 +56,7 @@ fun LinkTargetKind.toRecorderTargetKind(): RecorderTargetKind = when (this) {
     LinkTargetKind.TERM -> RecorderTargetKind.TERM
     LinkTargetKind.FACTION -> RecorderTargetKind.FACTION
     LinkTargetKind.PAGE -> RecorderTargetKind.PAGE
+    LinkTargetKind.EVENT -> RecorderTargetKind.UNIT
 }
 
 /** Card kinds (rule 20 dotted chip, `카드에 넣기`). */
