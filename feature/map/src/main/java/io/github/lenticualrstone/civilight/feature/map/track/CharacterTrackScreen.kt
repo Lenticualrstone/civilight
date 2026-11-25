@@ -185,7 +185,7 @@ fun CharacterTrackScreen(route: CharacterTrackRoute, deps: FeatureDeps) {
                         midpoint(l.points.map { scope.screen(it) })?.let { m -> MapValueChip(l.label!!, Modifier.mapAt(m.x, m.y, ay = 1.2f)) }
                     }
                     u.stops.forEach { s -> val p = scope.screen(s.at); RouteStop(s.label, s.focused, Modifier.mapAt(p.x, p.y)) }
-                    u.positions.forEach { pos -> key(pos.name) { WalkingChip(pos, u.lines, scope) } }
+                    u.positions.forEach { pos -> key(pos.name) { WalkingChip(doc, pos, u.lines, scope) } }
                 },
             )
             TopBarTapGuard(padding.calculateTopPadding())
@@ -324,7 +324,7 @@ private fun WarningCard(w: TrackWarningUi, onClick: () -> Unit) {
 
 /** The position chip of a character: when the lens moves it walks along the leg to the new stop on `enter` (it jumps when motion is reduced). */
 @Composable
-private fun WalkingChip(pos: TrackPosition, lines: List<TrackLine>, scope: MapMarkScope) {
+private fun WalkingChip(doc: io.github.lenticualrstone.civilight.model.doc.ProjectDoc?, pos: TrackPosition, lines: List<TrackLine>, scope: MapMarkScope) {
     val motion = CivilightTheme.motion
     val progress = remember { Animatable(1f) }
     var path by remember { mutableStateOf(listOf(pos.at)) }
@@ -340,5 +340,6 @@ private fun WalkingChip(pos: TrackPosition, lines: List<TrackLine>, scope: MapMa
         }
     }
     val p = scope.screen(TrackPath.pointAt(path, progress.value))
-    PersonChip(pos.name, Modifier.mapAt(p.x, p.y, ay = 1.6f))
+    val portrait = io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, pos.characterKey.takeIf { it.isNotEmpty() })
+    PersonChip(pos.name, Modifier.mapAt(p.x, p.y, ay = 1.6f), image = portrait)
 }

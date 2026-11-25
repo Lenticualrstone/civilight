@@ -53,6 +53,7 @@ fun ColumnScope.ItemPickerSheet(
     placeholder: String = PickerCopy.SEARCH_PLACEHOLDER,
     createKind: CreateKind? = null,
     onCreate: ((query: String) -> Unit)? = null,
+    avatarOf: (@Composable (Key) -> androidx.compose.ui.graphics.painter.Painter?)? = null,
 ) {
     var field by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(query)) }
     SheetHeader(title = title, onClose = onClose)
@@ -99,7 +100,15 @@ fun ColumnScope.ItemPickerSheet(
             // title stays in the key because a term's name and its aliases are rows with the same item key.
             items(section.items, key = { "${it.kind}-${it.key}-${it.title}-$index" }) { item ->
                 if (item.avatar) {
-                    PickerRow(name = item.title, selected = item.key == selectedKey, onClick = { onPick(item) }, subtitle = item.subtitle, modifier = civilightItem())
+                    val avatarImage = if (item.kind == PickKind.CHARACTER) avatarOf?.invoke(item.key) else null
+                    PickerRow(
+                        name = item.title,
+                        selected = item.key == selectedKey,
+                        onClick = { onPick(item) },
+                        subtitle = item.subtitle,
+                        image = avatarImage,
+                        modifier = civilightItem(),
+                    )
                 } else {
                     ListRow(
                         title = item.title,

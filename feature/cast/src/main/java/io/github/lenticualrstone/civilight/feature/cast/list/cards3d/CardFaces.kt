@@ -246,7 +246,7 @@ private fun BoxScope.EdgeLight(radius: Float, bp: Bp) {
  * `한 줄 소개` (or `비어 있음`), up to two `항목 · 값` rows and `열기`.
  */
 @Composable
-internal fun DeckBackFace(card: CastCard, back: CardBack?, bp: Bp, onOpen: () -> Unit) {
+internal fun DeckBackFace(card: CastCard, back: CardBack?, image: SlotImage?, bp: Bp, onOpen: () -> Unit) {
     val colors = CivilightTheme.colors
     val mat = CardMaterial.of(colors.isDark)
     Column(
@@ -254,10 +254,20 @@ internal fun DeckBackFace(card: CastCard, back: CardBack?, bp: Bp, onOpen: () ->
             .padding(start = bp.dp(18f), end = bp.dp(18f), top = bp.dp(18f), bottom = bp.dp(16f)),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(bp.dp(10f))) {
-            Box(Modifier.size(bp.dp(36f)).clip(RoundedCornerShape(50)).background(colors.tint)) {
-                val preset = remember(card.key) { PresetPainter(presetFor(card.key)) }
-                Image(preset, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                CivilightText(card.initial, bp.font(15f, 15f, 800), Modifier.align(Alignment.Center), color = Color.White, maxLines = 1)
+            val iconShape = if (io.github.lenticualrstone.civilight.designsystem.component.LocalProfileSquare.current) {
+                RoundedCornerShape(bp.dp(9f))
+            } else {
+                RoundedCornerShape(50)
+            }
+            val portraitPainter = rememberSlotPainter(image)
+            Box(Modifier.size(bp.dp(36f)).clip(iconShape).background(colors.tint)) {
+                if (portraitPainter != null) {
+                    Image(portraitPainter, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                } else {
+                    val preset = remember(card.key) { PresetPainter(presetFor(card.key)) }
+                    Image(preset, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    CivilightText(card.initial, bp.font(15f, 15f, 800), Modifier.align(Alignment.Center), color = Color.White, maxLines = 1)
+                }
             }
             Column(Modifier.weight(1f)) {
                 CivilightText(back?.title ?: card.title, bp.font(19f, 24f, 800), color = colors.ink, maxLines = 1)

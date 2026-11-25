@@ -88,6 +88,7 @@ fun ColumnScope.CharacterPickerSheet(
             onRestoreDeleted = onRestoreDeleted?.let { restore -> { row -> restore(row.key) } },
             createKind = onCreate?.let { CreateKind.CHARACTER },
             onCreate = onCreate?.let { create -> { q -> create(CreateKind.CHARACTER, q, PickerCreate.matched(q, model)) } },
+            avatarOf = { key -> io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, key) },
         )
     }
 }
@@ -232,6 +233,7 @@ fun ColumnScope.LinkPickerSheet(
             onChip = { chip = it },
             createKind = createKind.takeIf { onCreate != null },
             onCreate = if (onCreate != null && createKind != null) ({ q -> onCreate(createKind, q, PickerCreate.matched(q, model)) }) else null,
+            avatarOf = { key -> io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, key) },
         )
     }
 }

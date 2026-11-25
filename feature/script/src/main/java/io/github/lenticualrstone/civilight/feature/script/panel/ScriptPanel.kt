@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -273,7 +274,11 @@ private fun PropFieldView(field: PropField, onChange: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            field.avatar?.let { Avatar(it, size = 26.dp) }
+            field.avatar?.let {
+                val doc = io.github.lenticualrstone.civilight.ui.project.LocalProjectStore.current?.doc?.collectAsState()?.value
+                val img = io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, field.avatarKey)
+                Avatar(it, size = 26.dp, image = img)
+            }
             val style = if (field.mono) type.number.merge(TextStyle(fontSize = 13.sp)) else type.command
             CivilightText(field.value, style, Modifier.weight(1f), color = if (field.dotted) colors.ink2 else colors.ink, maxLines = 1)
             field.note?.let { CivilightText(it, type.small, color = colors.ink3, maxLines = 1) }

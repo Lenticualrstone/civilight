@@ -222,6 +222,7 @@ fun PickerRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     avatarName: String = name,
+    image: androidx.compose.ui.graphics.painter.Painter? = null,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -235,7 +236,7 @@ fun PickerRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(avatarName, size = AvatarSize.Picker)
+        Avatar(avatarName, size = AvatarSize.Picker, image = image)
         Column(Modifier.weight(1f)) {
             CivilightText(name, type.itemTitle, color = colors.ink, maxLines = 1)
             if (subtitle != null) CivilightText(subtitle, type.small, color = colors.ink3, maxLines = 1)

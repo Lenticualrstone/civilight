@@ -91,8 +91,8 @@ fun SheetScope.ChangeSheet(key: ChangeSheetKey, doc: ProjectDoc, draft: ChangeDr
             ContentSwap(model.segment, label = "changeSegment") { segment ->
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     when (segment) {
-                        ChangeSegment.RELATION -> model.relation?.let { RelationBody(key, it, draft, actions, open) }
-                        ChangeSegment.FIELD -> model.field?.let { FieldBody(key, it, draft, actions, open) }
+                        ChangeSegment.RELATION -> model.relation?.let { RelationBody(key, doc, it, draft, actions, open) }
+                        ChangeSegment.FIELD -> model.field?.let { FieldBody(key, doc, it, draft, actions, open) }
                         ChangeSegment.TERM -> model.term?.let { TermBody(key, it, open) }
                     }
                 }
@@ -116,14 +116,22 @@ fun SheetScope.ChangeSheet(key: ChangeSheetKey, doc: ProjectDoc, draft: ChangeDr
 }
 
 @Composable
-private fun RelationBody(key: ChangeSheetKey, model: RelationSegment, draft: ChangeDraft, actions: ChangeActions, open: (SheetKey) -> Unit) {
+private fun RelationBody(key: ChangeSheetKey, doc: ProjectDoc, model: RelationSegment, draft: ChangeDraft, actions: ChangeActions, open: (SheetKey) -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     // `리 리엔 · 하 하르트`: each chip opens the character picker for that side.
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        PersonChip(model.viewer, set = draft.viewerKey != null) { open(ChangePickSheetKey(key.projectKey, key.blockKey, PickRole.VIEWER)) }
+        PersonChip(
+            model.viewer,
+            set = draft.viewerKey != null,
+            image = io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, draft.viewerKey),
+        ) { open(ChangePickSheetKey(key.projectKey, key.blockKey, PickRole.VIEWER)) }
         CivilightText("·", type.small, color = colors.ink3)
-        PersonChip(model.partner, set = draft.partnerKey != null) { open(ChangePickSheetKey(key.projectKey, key.blockKey, PickRole.PARTNER)) }
+        PersonChip(
+            model.partner,
+            set = draft.partnerKey != null,
+            image = io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, draft.partnerKey),
+        ) { open(ChangePickSheetKey(key.projectKey, key.blockKey, PickRole.PARTNER)) }
     }
     // The items to change appear once both people are set.
     if (draft.viewerKey != null && draft.partnerKey != null) AppearOnJoin {
@@ -177,11 +185,15 @@ private fun SlotSectionView(section: SlotSection, actions: ChangeActions) {
 }
 
 @Composable
-private fun FieldBody(key: ChangeSheetKey, model: FieldSegment, draft: ChangeDraft, actions: ChangeActions, open: (SheetKey) -> Unit) {
+private fun FieldBody(key: ChangeSheetKey, doc: ProjectDoc, model: FieldSegment, draft: ChangeDraft, actions: ChangeActions, open: (SheetKey) -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Row(verticalAlignment = Alignment.CenterVertically) {
-        PersonChip(model.owner, set = draft.ownerKey != null) { open(ChangePickSheetKey(key.projectKey, key.blockKey, PickRole.FIELD_OWNER)) }
+        PersonChip(
+            model.owner,
+            set = draft.ownerKey != null,
+            image = io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, draft.ownerKey),
+        ) { open(ChangePickSheetKey(key.projectKey, key.blockKey, PickRole.FIELD_OWNER)) }
     }
     if (model.fields.isEmpty()) return
     ChipFlow {
@@ -221,7 +233,13 @@ private fun TermBody(key: ChangeSheetKey, model: TermSegment, open: (SheetKey) -
 
 /** A character (or term) chip: avatar + name, outlined; unset reads `인물 고르기`. 44 dp target. */
 @Composable
-private fun PersonChip(label: String, set: Boolean, avatar: Boolean = true, onClick: () -> Unit) {
+private fun PersonChip(
+    label: String,
+    set: Boolean,
+    avatar: Boolean = true,
+    image: androidx.compose.ui.graphics.painter.Painter? = null,
+    onClick: () -> Unit,
+) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(18.dp)
     Row(
@@ -233,7 +251,7 @@ private fun PersonChip(label: String, set: Boolean, avatar: Boolean = true, onCl
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (set && avatar) Avatar(label, size = 28.dp)
+        if (set && avatar) Avatar(label, size = 28.dp, image = image)
         CivilightText(label, CivilightTheme.type.chip, color = if (set) colors.ink else colors.acc, maxLines = 1)
     }
 }

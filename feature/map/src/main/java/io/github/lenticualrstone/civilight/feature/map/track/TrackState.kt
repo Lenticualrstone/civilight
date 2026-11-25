@@ -39,7 +39,7 @@ data class TrackStopMark(val label: String, val at: Point, val focused: Boolean)
 data class TrackLine(val points: List<Point>, val label: String?, val focused: Boolean, val dashed: Boolean)
 
 /** The position chip at the lens point: initial + name at the latest stop at or before it. */
-data class TrackPosition(val name: String, val at: Point, val focused: Boolean)
+data class TrackPosition(val name: String, val at: Point, val focused: Boolean, val characterKey: Key = "")
 
 /** A row of `리엔 · 씬 순서`: `1-2 | 하층 거리 | 씬 1 · 1일째 새벽`. */
 data class TrackRowUi(
@@ -186,7 +186,7 @@ object TrackState {
                 val points = along?.takeIf { it.size >= 2 } ?: listOf(a, b)
                 lines += TrackLine(points, leg.label.takeIf { route == null || leg.dotted }, focused, dashed = !focused || leg.dotted || route == null)
             }
-            tracks.positionAt(t, lens)?.let { stop -> pointOn(doc, map, stop.place, lens)?.let { positions += TrackPosition(nameOf(doc, t), it, focused) } }
+            tracks.positionAt(t, lens)?.let { stop -> pointOn(doc, map, stop.place, lens)?.let { positions += TrackPosition(nameOf(doc, t), it, focused, t.characterKey) } }
         }
         val episodes = RevealState.episodes(doc)
         val at = RevealState.lensEpisode(doc, lens, episodes)

@@ -99,9 +99,9 @@ fun SheetScope.RelationChangeContent(projectKey: Key, blockKey: Key, viewerKey: 
                 SheetHeader(view.title, onClose = host::close, subtitle = view.sub, closeLabel = view.cancelLabel)
                 SheetScrollBody {
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        PersonChip(view.viewerName) { picking = VIEWER }
+                        PersonChip(view.viewerName, io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, viewer)) { picking = VIEWER }
                         CivilightText(CastCopy.SEP.trim(), type.small, color = colors.ink3)
-                        PersonChip(view.partnerName) { picking = PARTNER }
+                        PersonChip(view.partnerName, io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, other)) { picking = PARTNER }
                     }
                     SectionLabel(RelationDrafts.CHANGE_ITEMS, Modifier.padding(top = 16.dp, bottom = 6.dp))
                     ChipFlow {
@@ -192,13 +192,13 @@ private const val PARTNER = "partner"
 
 /** `리 리엔`: avatar and name; tapping changes that person. */
 @Composable
-private fun PersonChip(name: String, onClick: () -> Unit) {
+private fun PersonChip(name: String, image: androidx.compose.ui.graphics.painter.Painter? = null, onClick: () -> Unit) {
     Row(
         Modifier.pressable(onClick = onClick, scaleOnPress = false, onClickLabel = name).heightIn(min = 44.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(name, size = AvatarSize.MapChip)
+        Avatar(name, size = AvatarSize.MapChip, image = image)
         CivilightText(name, CivilightTheme.type.label, color = CivilightTheme.colors.ink)
     }
 }

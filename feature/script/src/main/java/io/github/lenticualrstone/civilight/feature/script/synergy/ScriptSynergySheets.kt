@@ -121,7 +121,11 @@ internal fun MentionPreviewSheetContent(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (kind == LinkTargetKind.CHARACTER) {
-            Avatar(name = title, size = AvatarSize.Picker)
+            Avatar(
+                name = title,
+                size = AvatarSize.Picker,
+                image = io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, targetKey),
+            )
         } else {
             val icon = when (kind) {
                 LinkTargetKind.TERM -> IconId.Book
@@ -248,7 +252,13 @@ internal fun SpeakerFocusSheetContent(
                             append("대사 ${count}줄 (${pct}%)")
                             ch.speechSummary?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
                         },
-                        leading = { Avatar(name = ch.name, size = AvatarSize.List) },
+                        leading = {
+                            Avatar(
+                                name = ch.name,
+                                size = AvatarSize.List,
+                                image = io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, ch.key),
+                            )
+                        },
                         trailing = {
                             if (selected) {
                                 CivilightIcon(IconId.Check, contentDescription = null, size = 18.dp, tint = colors.acc)

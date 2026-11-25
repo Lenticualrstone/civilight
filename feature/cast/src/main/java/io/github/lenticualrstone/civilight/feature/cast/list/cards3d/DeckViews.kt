@@ -148,7 +148,7 @@ internal fun FanDeckView(env: CardEnv) {
                                     item is DeckItem.Lock -> LockCardFace(item.row, bp, compact = false, onUnlock = env.actions.unlock)
                                     showBack && item is DeckItem.Character -> {
                                         val b = remember(item.card.key, env.input.backOf) { env.input.backOf(item.card.key) }
-                                        DeckBackFace(item.card, b, bp, onOpen = { env.actions.open(item.card.key) })
+                                        DeckBackFace(item.card, b, env.input.imageOf(item.card.key), bp, onOpen = { env.actions.open(item.card.key) })
                                     }
                                     item is DeckItem.Character -> PortraitFace(
                                         item.card, env.input.imageOf(item.card.key), item.card.key in env.input.hiddenKeys, PortraitStyle.DECK, bp,

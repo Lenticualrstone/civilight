@@ -241,8 +241,14 @@ fun Pill(
 
 /** The script's speaker pill: avatar 32 + `리 · 리엔` style label. */
 @Composable
-fun SpeakerPill(name: String, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Pill(text = label, onClick = onClick, modifier = modifier, leading = { Avatar(name, size = AvatarSize.Pill) })
+fun SpeakerPill(
+    name: String,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    image: androidx.compose.ui.graphics.painter.Painter? = null,
+) {
+    Pill(text = label, onClick = onClick, modifier = modifier, leading = { Avatar(name, size = AvatarSize.Pill, image = image) })
 }
 
 /**

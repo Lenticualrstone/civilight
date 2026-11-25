@@ -319,14 +319,14 @@ private fun EmptyGalleryCard(onAdd: () -> Unit) {
 
 /** `관계` (CST-28; `Relations`): one block per partner from the viewer's side, dotted and hidden rows, `+ 관계`. */
 @Composable
-fun RelationsTab(state: ProfileState, actions: RecordActions) {
+fun RelationsTab(state: ProfileState, actions: RecordActions, doc: ProjectDoc? = null) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val tab = state.relations
     Column(Modifier.fillMaxWidth().padding(top = 22.dp)) {
         SectionLabel(tab.header, trailing = tab.mapLink, onTrailing = actions.onMap, trailingAccent = false)
         Spacer(Modifier.padding(top = 6.dp))
-        for (block in tab.blocks) RelationBlockView(block, onClick = if (actions.editable) ({ actions.onRelation(block.partnerKey) }) else null)
+        for (block in tab.blocks) RelationBlockView(block, doc = doc, onClick = if (actions.editable) ({ actions.onRelation(block.partnerKey) }) else null)
         for (row in tab.deletedRows) {
             val relationKey = state.deletedPartnerRelations[row.partnerKey]
             val fixes = actions.editable && relationKey != null && row.partnerKey !in state.keptPartners
@@ -349,9 +349,10 @@ fun RelationsTab(state: ProfileState, actions: RecordActions) {
 }
 
 @Composable
-private fun RelationBlockView(block: RelationBlock, onClick: (() -> Unit)?) {
+private fun RelationBlockView(block: RelationBlock, doc: ProjectDoc?, onClick: (() -> Unit)?) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
+    val portrait = io.github.lenticualrstone.civilight.ui.image.rememberCharacterAvatarPainter(doc, block.partnerKey)
     Column(
         Modifier
             .fillMaxWidth()
@@ -360,7 +361,7 @@ private fun RelationBlockView(block: RelationBlock, onClick: (() -> Unit)?) {
             .padding(vertical = 14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Avatar(block.partnerName, size = AvatarSize.List)
+            Avatar(block.partnerName, size = AvatarSize.List, image = portrait)
             Column(Modifier.weight(1f)) {
                 CivilightText(block.title, type.itemTitle, color = colors.ink, maxLines = 1)
                 ValueSwap(block.sub, type.small, color = colors.ink3, maxLines = 2)

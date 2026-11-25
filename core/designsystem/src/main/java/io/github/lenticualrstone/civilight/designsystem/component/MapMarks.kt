@@ -151,7 +151,12 @@ fun RouteStop(label: String, chosen: Boolean, modifier: Modifier = Modifier) {
  * inset, gap 4, 600 12 / 16 `ink`; mini avatar 18.
  */
 @Composable
-fun PersonChip(name: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun PersonChip(
+    name: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    image: androidx.compose.ui.graphics.painter.Painter? = null,
+) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(13.dp)
     Box(modifier.then(if (onClick != null) Modifier.pressable(onClick = onClick, hitTarget = HitTarget.CHIP, shape = shape) else Modifier)) {
@@ -164,7 +169,7 @@ fun PersonChip(name: String, modifier: Modifier = Modifier, onClick: (() -> Unit
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Avatar(name, size = AvatarSize.MapChip)
+            Avatar(name, size = AvatarSize.MapChip, image = image)
             CivilightText(name, CivilightTheme.type.chip.merge(Label600), color = colors.ink, maxLines = 1)
         }
     }

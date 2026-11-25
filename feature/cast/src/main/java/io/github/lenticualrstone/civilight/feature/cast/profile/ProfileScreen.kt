@@ -637,7 +637,7 @@ private fun TabBody(
             val bars = remember(doc, characterKey, hiddenUnlocked) { Appearances.of(doc, characterKey, hiddenUnlocked) }
             OverviewTab(doc, state, full, ui.showEmpty, gallery, inner, actions, recorderLink) { AppearanceSection(bars) }
         }
-        ProfileTab.RELATIONS -> RelationsTab(state, actions)
+        ProfileTab.RELATIONS -> RelationsTab(state, actions, doc = doc)
         ProfileTab.SPEECH -> {
             val c = doc.index.character(characterKey) ?: return
             val lens = doc.castLens

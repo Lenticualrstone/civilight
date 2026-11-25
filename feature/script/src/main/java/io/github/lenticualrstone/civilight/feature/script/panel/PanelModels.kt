@@ -41,6 +41,7 @@ data class PropField(
     val label: String,
     val value: String,
     val avatar: String? = null,
+    val avatarKey: Key? = null,
     val canChange: Boolean = false,
     /** Right side note: `1-9에서 공개`, `자동`, `고정 · 11월 20일 내보냄`. */
     val note: String? = null,
@@ -135,7 +136,7 @@ data class PropsModel(
                     Manuscript.SpeakerLabel.Hidden ->
                         speaker = PropField(ScriptCopy.SPEAKER_FIELD, Manuscript.SpeakerLabel.Hidden.TEXT, canChange = !readOnly)
                     is Manuscript.SpeakerLabel.Named -> {
-                        speaker = PropField(ScriptCopy.SPEAKER_FIELD, label.name, avatar = label.name, canChange = !readOnly)
+                        speaker = PropField(ScriptCopy.SPEAKER_FIELD, label.name, avatar = label.name, avatarKey = block.speakerKey, canChange = !readOnly)
                         val key = block.speakerKey!!
                         val shown = Manuscript.displayNameAt(doc, key, block.key) ?: label.name
                         val note = DisplayNames.propertiesValue(doc, key, ReadPoint.BeforeBlock(block.key)).second
