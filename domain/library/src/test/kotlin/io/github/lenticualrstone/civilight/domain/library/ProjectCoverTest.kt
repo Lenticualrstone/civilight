@@ -53,7 +53,7 @@ class ProjectCoverTest {
         assertEquals(
             listOf(
                 ProjectMenuAction.OPEN, ProjectMenuAction.RENAME, ProjectMenuAction.COVER,
-                ProjectMenuAction.HIDE, ProjectMenuAction.BACKUP_EXPORT, ProjectMenuAction.DELETE,
+                ProjectMenuAction.RATING, ProjectMenuAction.HIDE, ProjectMenuAction.BACKUP_EXPORT, ProjectMenuAction.DELETE,
             ),
             menu.rows.map { it.action },
         )

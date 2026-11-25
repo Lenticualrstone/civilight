@@ -245,6 +245,12 @@ internal fun SettingsScreen(services: LibraryServices) {
                 LinkRow(ui.recovery, leadingIcon = IconId.Shield) { open(SettingsRootRow.RECOVERY) }
                 SwitchSettingRow(ui.appLock, leadingIcon = IconId.Lock, onChange = vm::setAppLock)
                 LinkRow(ui.hiding, leadingIcon = IconId.EyeOff) { open(SettingsRootRow.HIDING) }
+                SettingsRow(
+                    title = "수위 등급 기본 규칙",
+                    subtitle = "전체 · 15세 · R-18 기본 보호 및 내보내기 표시",
+                    leadingIcon = IconId.Shield,
+                    onClick = { navigator.push(io.github.lenticualrstone.civilight.navigation.SettingsRating) },
+                )
             }
             SettingsCategory.LABS -> {
                 SwitchRow(

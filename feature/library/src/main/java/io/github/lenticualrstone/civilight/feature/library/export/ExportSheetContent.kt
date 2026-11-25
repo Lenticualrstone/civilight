@@ -135,8 +135,7 @@ internal fun SheetScope.ExportSheetContent(sheet: ExportSheet, services: Library
                     writtenBy = SaveDialog.writtenBy(context),
                     now = deps.clock.now(),
                     pdf = AndroidPdfWriter(context),
-                    // (0.2.0, LIB-92) No rating on the PDF cover; the stored setting is kept and not read.
-                    coverRating = false,
+                    coverRating = services.deps.settings.value.ratingDefaults.exportCoverRating,
                     preview = AndroidCoverPreview(deps.stores.blobs),
                     authenticate = { deps.biometric.authenticate(AuthRequest(AuthCopy.HIDDEN_PROJECTS)) == AuthResult.SUCCESS },
                 )

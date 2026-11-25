@@ -373,15 +373,68 @@ internal fun ColumnScope.ProfileTabTemplateSheetContent(
             )
         }
         Spacer(Modifier.height(12.dp))
-        CivilightText("표시할 탭 모듈 선택", CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
-        activeTabs.forEach { tab ->
-            CheckboxRow(
-                label = tab.label,
-                checked = tab.enabled,
-                onCheckedChange = { checked ->
-                    val next = activeTabs.map { if (it.id == tab.id) it.copy(enabled = checked) else it }
-                    if (next.any { it.enabled }) onUpdateTabs(next)
+        CivilightText("표시할 탭 모듈 선택 · 순서", CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
+        activeTabs.forEachIndexed { idx, tab ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    CheckboxRow(
+                        label = tab.label,
+                        checked = tab.enabled,
+                        onCheckedChange = { checked ->
+                            val next = activeTabs.map { if (it.id == tab.id) it.copy(enabled = checked) else it }
+                            if (next.any { it.enabled }) onUpdateTabs(next)
+                        },
+                    )
+                }
+                if (idx > 0) {
+                    TextAction(
+                        "↑",
+                        onClick = {
+                            val list = activeTabs.toMutableList()
+                            val moved = list.removeAt(idx)
+                            list.add(idx - 1, moved)
+                            onUpdateTabs(list)
+                        },
+                        color = colors.ink2,
+                        style = CivilightTheme.type.small,
+                    )
+                }
+                if (idx < activeTabs.lastIndex) {
+                    TextAction(
+                        "↓",
+                        onClick = {
+                            val list = activeTabs.toMutableList()
+                            val moved = list.removeAt(idx)
+                            list.add(idx + 1, moved)
+                            onUpdateTabs(list)
+                        },
+                        color = colors.ink2,
+                        style = CivilightTheme.type.small,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        var newTabName by remember { mutableStateOf("") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            io.github.lenticualrstone.civilight.designsystem.component.CivilightTextField(
+                value = newTabName,
+                onValueChange = { newTabName = it },
+                placeholder = "새 커스텀 탭 이름 (예: 대사집 · 소속)",
+                modifier = Modifier.weight(1f),
+            )
+            TextAction(
+                "추가",
+                onClick = {
+                    val trimmed = newTabName.trim()
+                    if (trimmed.isNotEmpty()) {
+                        val id = "custom_${System.currentTimeMillis()}"
+                        onUpdateTabs(activeTabs + ProfileTabConfig(id = id, label = trimmed, kind = ProfileTabKind.CUSTOM, enabled = true))
+                        newTabName = ""
+                    }
                 },
+                color = colors.acc,
+                style = CivilightTheme.type.small,
             )
         }
     }

@@ -512,7 +512,7 @@ private fun AtelierFocusDock(
             .clip(shape)
             .insetOutline(colors.line, 1.dp, shape),
     ) {
-        GlassBackground(GlassSurface.CHIP, Modifier.matchParentSize(), shape = shape)
+        GlassBackground(GlassSurface.BANNER, Modifier.matchParentSize(), shape = shape)
         OnGlass {
             Column(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),

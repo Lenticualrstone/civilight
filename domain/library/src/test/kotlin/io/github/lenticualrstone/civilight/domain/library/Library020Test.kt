@@ -36,17 +36,15 @@ class Library020Test {
     private fun withGameTools(doc: ProjectDoc, on: Boolean?) = doc.copy(project = doc.project.copy(gameTools = on))
 
     @Test
-    fun `R-01 no 수위 등급 row in any project menu`() {
+    fun `R-01 수위 등급 row restored in project menu`() {
         for (doc in listOf(glass, oath, Fixtures.withProtections(glass, Rating.R15, Protections()))) {
             val menu = ProjectMenus.of(doc)
-            assertFalse(menu.rows.any { it.action == ProjectMenuAction.RATING })
-            assertFalse(menu.rows.any { it.title.contains("등급") || it.sub.orEmpty().contains("R-1") })
+            assertTrue(menu.rows.any { it.action == ProjectMenuAction.RATING })
         }
-        // The hidden project still offers `숨김 풀기`, and the order is LIB-02 without the rating row.
         assertEquals(
             listOf(
                 ProjectMenuAction.OPEN, ProjectMenuAction.RENAME, ProjectMenuAction.COVER,
-                ProjectMenuAction.UNHIDE, ProjectMenuAction.BACKUP_EXPORT, ProjectMenuAction.DELETE,
+                ProjectMenuAction.RATING, ProjectMenuAction.UNHIDE, ProjectMenuAction.BACKUP_EXPORT, ProjectMenuAction.DELETE,
             ),
             ProjectMenus.of(oath).rows.map { it.action },
         )

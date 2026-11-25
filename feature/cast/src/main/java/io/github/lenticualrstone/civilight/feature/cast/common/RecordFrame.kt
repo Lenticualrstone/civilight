@@ -124,7 +124,7 @@ fun RecordFrame(
                             .padding(bottom = paneHost.panePadding + 8.dp, start = 16.dp, end = 16.dp),
                     ) {
                         Box(Modifier.fillMaxWidth().clip(pillShape)) {
-                            GlassBackground(GlassSurface.CHIP, Modifier.matchParentSize(), shape = pillShape)
+                            GlassBackground(GlassSurface.BANNER, Modifier.matchParentSize(), shape = pillShape)
                             Row(
                                 Modifier
                                     .fillMaxWidth()
@@ -141,7 +141,7 @@ fun RecordFrame(
                         aboveKeyboard = true,
                         extraRow = {
                             Box(Modifier.weight(1f).clip(pillShape)) {
-                                GlassBackground(GlassSurface.CHIP, Modifier.matchParentSize(), shape = pillShape)
+                                GlassBackground(GlassSurface.BANNER, Modifier.matchParentSize(), shape = pillShape)
                                 Row(
                                     Modifier
                                         .fillMaxWidth()

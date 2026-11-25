@@ -44,7 +44,7 @@ object ProjectMenus {
             if (!isExample) {
                 add(ProjectMenuRow(ProjectMenuAction.RENAME, "이름 바꾸기", null))
                 add(ProjectMenuRow(ProjectMenuAction.COVER, CoverSummary.TITLE, CoverSummary.menuSub(doc, fileExists)))
-                // (0.2.0, LIB-92, S-4) No `수위 등급` row: the rating is kept in the project, never shown or set.
+                add(ProjectMenuRow(ProjectMenuAction.RATING, "수위 등급", RatingLabels.badge(p.rating)))
                 if (p.protections.hidden) {
                     add(ProjectMenuRow(ProjectMenuAction.UNHIDE, "숨김 풀기", null))
                 } else {

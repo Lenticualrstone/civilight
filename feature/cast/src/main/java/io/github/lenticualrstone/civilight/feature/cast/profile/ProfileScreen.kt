@@ -475,11 +475,33 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                     AnimatedContent(tabKey, transitionSpec = { motion.swap(clip = false) }, label = "recordTab") { currentKey ->
                         when {
                             currentKey == "speech_override" || activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SPEECH -> {
-                                TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.SPEECH), gate.open, gallery, wide, actions, recorderLink, secret)
+                                androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) {
+                                    if (currentKey == "speech_override") {
+                                        TextAction(
+                                            "← ${activeModularTab.label}으로 돌아가기",
+                                            onClick = { speechOverride = false },
+                                            color = CivilightTheme.colors.acc,
+                                            style = CivilightTheme.type.small,
+                                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                                        )
+                                    }
+                                    TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.SPEECH), gate.open, gallery, wide, actions, recorderLink, secret)
+                                }
                             }
                             currentKey == "secret_override" || activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SECRET -> {
                                 if (SecretTabGate.composesBody(ProfileTab.SECRET, tabState, secretLocked)) {
-                                    TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.SECRET), gate.open, gallery, wide, actions, recorderLink, secret)
+                                    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) {
+                                        if (currentKey == "secret_override") {
+                                            TextAction(
+                                                "← ${activeModularTab.label}으로 돌아가기",
+                                                onClick = { secretOverride = false },
+                                                color = CivilightTheme.colors.acc,
+                                                style = CivilightTheme.type.small,
+                                                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                                            )
+                                        }
+                                        TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.SECRET), gate.open, gallery, wide, actions, recorderLink, secret)
+                                    }
                                 }
                             }
                             activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.OVERVIEW -> {

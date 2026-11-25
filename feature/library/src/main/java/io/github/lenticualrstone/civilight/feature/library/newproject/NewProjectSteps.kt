@@ -85,8 +85,9 @@ internal fun ColumnScope.NameStep(form: NewProjectForm, update: FormUpdate) {
             ChoiceCard(title, selected = form.format == format, onClick = { update { NewProjectRules.withFormat(it, format) } }, subtitle = sub)
         }
     }
-    // (0.2.0, LIB-92, S-4) No `수위 등급` row, picker or R-18 block: a new project stores `rating: all` with the
-    // `전체` protections (all off, D34).
+    // (0.5.1) Restored content rating tag picker (`전체 · 15세 · R-18`).
+    FieldCaption(NewProjectCopy.RATING, trailing = NewProjectCopy.RATING_NOTE)
+    RatingCells(form.rating, onSelect = { r -> update { it.copy(rating = r) } })
 }
 
 /**

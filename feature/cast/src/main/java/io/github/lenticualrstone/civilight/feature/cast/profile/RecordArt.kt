@@ -107,11 +107,12 @@ fun PortraitHero(
                         .then(
                             if (Build.VERSION.SDK_INT >= 31) {
                                 Modifier.graphicsLayer {
-                                    alpha = 0.42f
-                                    renderEffect = BlurEffect(48f, 48f, TileMode.Clamp)
+                                    val r = 36.dp.toPx()
+                                    alpha = 0.56f
+                                    renderEffect = BlurEffect(r, r, TileMode.Clamp)
                                 }
                             } else {
-                                Modifier.graphicsLayer { alpha = 0.16f }
+                                Modifier.graphicsLayer { alpha = 0.22f }
                             },
                         ),
                 )

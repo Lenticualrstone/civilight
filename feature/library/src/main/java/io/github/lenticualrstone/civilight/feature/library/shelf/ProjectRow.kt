@@ -35,8 +35,9 @@ import io.github.lenticualrstone.civilight.ui.theme.ThemeBridge
  * stored value (D34), kept in the row model and never drawn.
  */
 @Composable
-internal fun BadgeLine(@Suppress("UNUSED_PARAMETER") rating: Rating, text: String, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+internal fun BadgeLine(rating: Rating, text: String, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        io.github.lenticualrstone.civilight.designsystem.component.RatingBadge(ThemeBridge.rating(rating))
         CivilightText(text, CivilightTheme.type.small, color = CivilightTheme.colors.ink3, maxLines = 1)
     }
 }

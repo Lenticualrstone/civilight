@@ -88,6 +88,8 @@ import io.github.lenticualrstone.civilight.ui.tour.TourStepAbsent
 import io.github.lenticualrstone.civilight.domain.library.onboarding.TourModule
 import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
 import io.github.lenticualrstone.civilight.feature.library.newproject.startNewProject
+import io.github.lenticualrstone.civilight.feature.library.rating.RatingPickContent
+import io.github.lenticualrstone.civilight.feature.library.rating.RatingPickSheet
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.navigation.ExportSheet
@@ -215,8 +217,10 @@ internal fun LibraryScreen(services: LibraryServices) {
                 close()
                 openSheet(RenameSheet(key))
             }
-            // (0.2.0, LIB-92) The ⋯ sheet no longer offers `수위 등급`; nothing to open.
-            ProjectMenuAction.RATING -> close()
+            ProjectMenuAction.RATING -> {
+                close()
+                openSheet(io.github.lenticualrstone.civilight.feature.library.rating.RatingPickSheet(key))
+            }
             ProjectMenuAction.HIDE -> {
                 close()
                 vm.hide(key)
@@ -292,6 +296,11 @@ internal fun LibraryScreen(services: LibraryServices) {
                     }
                     is RenameSheet -> sheetBody {
                         docs[key.projectKey]?.takeIf { ui.shows(key.projectKey) }?.let { doc -> RenameContent(doc.project.name) { vm.rename(key.projectKey, it) } }
+                    }
+                    is RatingPickSheet -> sheetBody {
+                        docs[key.projectKey]?.takeIf { ui.shows(key.projectKey) }?.let { doc ->
+                            RatingPickContent(key.projectKey, doc.project.rating.known ?: io.github.lenticualrstone.civilight.model.project.Rating.ALL)
+                        }
                     }
                     // (0.2.2) Pulled up from the 3D views' peek row; live, masked recents.
                     RecentsSheet -> sheetBody {
