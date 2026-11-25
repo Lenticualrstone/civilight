@@ -223,19 +223,22 @@ private fun SheetSurface(
                         translationY = (1f - p) * sheetHeight + drag.value
                     }
                 }
-                .draggable(
-                    orientation = Orientation.Vertical,
-                    state = rememberDraggableState { delta ->
-                        scope.launch { drag.snapTo((drag.value + delta).coerceAtLeast(0f)) }
-                    },
-                    onDragStopped = {
-                        if (sheetHeight > 0f && drag.value > sheetHeight * DISMISS_FRACTION) {
-                            onDismissRequest()
-                            drag.animateTo(0f, motion.move(CivilightMotion.exit))
-                        } else {
-                            drag.animateTo(0f, motion.move(CivilightMotion.standard))
-                        }
-                    },
+                .then(
+                    if (useCentered) Modifier
+                    else Modifier.draggable(
+                        orientation = Orientation.Vertical,
+                        state = rememberDraggableState { delta ->
+                            scope.launch { drag.snapTo((drag.value + delta).coerceAtLeast(0f)) }
+                        },
+                        onDragStopped = {
+                            if (sheetHeight > 0f && drag.value > sheetHeight * DISMISS_FRACTION) {
+                                onDismissRequest()
+                                drag.animateTo(0f, motion.move(CivilightMotion.exit))
+                            } else {
+                                drag.animateTo(0f, motion.move(CivilightMotion.standard))
+                            }
+                        },
+                    ),
                 ),
         ) {
             GlassBackground(GlassSurface.SHEET, Modifier.matchParentSize(), shape = effectiveShape)
@@ -245,17 +248,24 @@ private fun SheetSurface(
                         .animateContentSize(motion.move(CivilightMotion.standard))
                         .clip(effectiveShape)
                         .insetOutline(colors.line, 1.dp, effectiveShape)
-                        .padding(top = 10.dp, start = sidePadding, end = sidePadding, bottom = if (useCentered) 20.dp else sheetBottomPadding),
+                        .padding(
+                            top = if (useCentered) 20.dp else 10.dp,
+                            start = sidePadding,
+                            end = sidePadding,
+                            bottom = if (useCentered) 20.dp else sheetBottomPadding,
+                        ),
                 ) {
-                    Box(
-                        Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .size(36.dp, 4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(colors.ink3.copy(alpha = 0.5f))
-                            .clearAndSetSemantics { },
-                    )
-                    Spacer(Modifier.height(12.dp))
+                    if (!useCentered) {
+                        Box(
+                            Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .size(36.dp, 4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(colors.ink3.copy(alpha = 0.5f))
+                                .clearAndSetSemantics { },
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
                     Column(content = sheet)
                 }
             }

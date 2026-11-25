@@ -117,7 +117,7 @@ class CommandBarHostTest {
     @Test
     fun `details with their own frame keep their own bar until they register`() {
         assertTrue(ListDetailPairs.detailDrawsOwnBar(Script("P", "S")))
-        assertTrue(ListDetailPairs.detailDrawsOwnBar(CharacterProfile("P", "C")))
+        assertFalse(ListDetailPairs.detailDrawsOwnBar(CharacterProfile("P", "C")))
         assertFalse(ListDetailPairs.detailDrawsOwnBar(ProjectHome("P")))
         assertFalse(ListDetailPairs.detailDrawsOwnBar(null))
     }

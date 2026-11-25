@@ -2,8 +2,12 @@ package io.github.lenticualrstone.civilight.feature.library.settings
 
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
+import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -55,7 +59,7 @@ internal fun SettingsFrame(
         localSheets = localSheets,
         bottomBar = bottomButton?.let { button ->
             {
-                BottomGlassBar {
+                BottomGlassBar(inner = LocalWindowLayout.current.isInner) {
                     CivilightButton(
                         button.text,
                         onClick = button.onClick,
@@ -90,8 +94,8 @@ internal fun SettingsSection(text: String, first: Boolean = false) {
 }
 
 @Composable
-internal fun LinkRow(row: SettingsLinkRow, onClick: () -> Unit) {
-    SettingsValueRow(title = row.title, onClick = onClick, value = row.value, subtitle = row.sub)
+internal fun LinkRow(row: SettingsLinkRow, leadingIcon: IconId? = null, onClick: () -> Unit) {
+    SettingsValueRow(title = row.title, onClick = onClick, value = row.value, subtitle = row.sub, leadingIcon = leadingIcon)
 }
 
 /**
@@ -99,18 +103,31 @@ internal fun LinkRow(row: SettingsLinkRow, onClick: () -> Unit) {
  * leaves up and the new one comes in from below (CNV-42); reduced motion crossfades.
  */
 @Composable
-internal fun SettingsValueRow(title: String, onClick: () -> Unit, modifier: Modifier = Modifier, value: String? = null, subtitle: String? = null) {
+internal fun SettingsValueRow(
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    value: String? = null,
+    subtitle: String? = null,
+    leadingIcon: IconId? = null,
+) {
     val colors = CivilightTheme.colors
     ListRow(
         title = title,
         modifier = modifier,
         subtitle = subtitle,
+        leading = leadingIcon?.let { icon ->
+            { CivilightIcon(icon, contentDescription = null, size = 18.dp, tint = colors.ink2) }
+        },
         onClick = onClick,
         compact = true,
         trailing = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (value != null) ValueSwap(value, CivilightTheme.type.small, color = colors.ink2, contentAlignment = Alignment.CenterEnd)
-                CivilightText(if (value != null) " ›" else "›", CivilightTheme.type.small, color = colors.ink2, maxLines = 1)
+                CivilightIcon(IconId.Next, contentDescription = null, size = 14.dp, tint = colors.ink3)
             }
         },
     )
@@ -121,12 +138,21 @@ internal fun SwitchSettingRow(row: SettingsSwitchRow, onChange: (Boolean) -> Uni
     SwitchRow(title = row.title, checked = row.on, onCheckedChange = onChange, subtitle = row.sub, enabled = row.enabled)
 }
 
+@Composable
+internal fun SwitchSettingRow(row: SettingsSwitchRow, leadingIcon: IconId, onChange: (Boolean) -> Unit) {
+    SwitchRow(title = row.title, checked = row.on, onCheckedChange = onChange, subtitle = row.sub, enabled = row.enabled, leadingIcon = leadingIcon)
+}
+
 /** A row that opens another screen while showing a switch it does not toggle (the Drive row). */
 @Composable
-internal fun SwitchLinkRow(row: SettingsSwitchRow, onClick: () -> Unit) {
+internal fun SwitchLinkRow(row: SettingsSwitchRow, leadingIcon: IconId? = null, onClick: () -> Unit) {
+    val colors = CivilightTheme.colors
     ListRow(
         title = row.title,
         subtitle = row.sub,
+        leading = leadingIcon?.let { icon ->
+            { CivilightIcon(icon, contentDescription = null, size = 18.dp, tint = colors.ink2) }
+        },
         compact = true,
         onClick = onClick,
         trailing = { CivilightSwitch(row.on, onCheckedChange = null) },

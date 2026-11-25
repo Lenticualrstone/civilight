@@ -36,6 +36,8 @@ import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
 
@@ -50,12 +52,12 @@ fun ModsTabView(model: ModsTabModel, actions: PanelActions) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         model.cards.forEach { card ->
             when (card) {
-                is ModCard.Today -> ModCardBox(ScriptCopy.MOD_TODAY) {
-                    CivilightText(card.written, type.number.merge(TextStyle(fontSize = 18.sp)), color = colors.ink)
-                    Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(colors.line)) {
-                        Box(Modifier.fillMaxWidth(card.progress).height(4.dp).clip(RoundedCornerShape(2.dp)).background(colors.acc))
-                    }
-                    CivilightText(card.goal, type.small, color = colors.ink3)
+                is ModCard.PlayTime -> ModCardBox(
+                    label = "예상 플레이 타임",
+                    trailing = { CivilightIcon(IconId.Clock, contentDescription = null, size = 14.dp, tint = colors.ink3) },
+                ) {
+                    CivilightText(card.sceneSummary, type.number.merge(TextStyle(fontSize = 17.sp)), color = colors.ink)
+                    CivilightText(card.projectSummary, type.small, color = colors.ink3)
                 }
                 is ModCard.SceneCount -> ModCardBox(ScriptCopy.MOD_SCENE) {
                     CivilightText(card.text.ifEmpty { ScriptCopy.MODS_SCENE_EMPTY }, type.command.merge(TextStyle(fontSize = 13.sp, lineHeight = 20.sp)), color = colors.ink)

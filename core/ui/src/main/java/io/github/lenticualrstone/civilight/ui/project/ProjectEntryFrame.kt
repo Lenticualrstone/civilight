@@ -1,7 +1,9 @@
 package io.github.lenticualrstone.civilight.ui.project
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -13,9 +15,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.FullScreenError
+import io.github.lenticualrstone.civilight.designsystem.icon.AppMark
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
@@ -35,6 +41,7 @@ import io.github.lenticualrstone.civilight.ui.security.ProtectWindow
 import io.github.lenticualrstone.civilight.ui.security.WindowProtection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** The open store of the project whose screen this is (inside [ProjectEntryFrame]). */
@@ -63,10 +70,12 @@ private sealed interface FrameLoad {
  */
 @Composable
 fun ProjectEntryFrame(projectKey: Key, deps: FeatureDeps, content: @Composable () -> Unit) {
-    var load by remember(projectKey) {
-        mutableStateOf<FrameLoad>(deps.projects.peek(projectKey)?.let { FrameLoad.Ready(it) } ?: FrameLoad.Loading)
-    }
+    val motion = CivilightTheme.motion
+    val entry = deps.stores.library.state.collectAsState().value.entry(projectKey)
+    val projectTitle = entry?.name?.takeUnless { entry.hidden } ?: ""
+    var load by remember(projectKey) { mutableStateOf<FrameLoad>(FrameLoad.Loading) }
     LaunchedEffect(projectKey) {
+        val started = System.currentTimeMillis()
         val store = try {
             deps.projects.acquire(projectKey)
         } catch (e: CancellationException) {
@@ -74,6 +83,12 @@ fun ProjectEntryFrame(projectKey: Key, deps: FeatureDeps, content: @Composable (
         } catch (e: Throwable) {
             load = FrameLoad.Failed(e)
             return@LaunchedEffect
+        }
+        // (0.4.0) Intentional brief project-opening transition beat so opening feels tactile instead of a harsh flash.
+        if (!motion.reduced) {
+            val elapsed = System.currentTimeMillis() - started
+            val minBeatMs = motion.delayMs(260)
+            if (elapsed < minBeatMs) delay(minBeatMs - elapsed)
         }
         try {
             load = FrameLoad.Ready(store)
@@ -85,7 +100,20 @@ fun ProjectEntryFrame(projectKey: Key, deps: FeatureDeps, content: @Composable (
     // S9: loading → content → error crossfade (contentKey by kind, so a new store does not re-animate).
     ContentSwap(load, contentKey = { it::class }, label = "projectFrame") { l ->
         when (l) {
-            FrameLoad.Loading -> Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
+            FrameLoad.Loading -> Box(
+                Modifier.fillMaxSize().background(CivilightTheme.colors.bg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AppMark(size = 44.dp, barProgress = 1f, showCaret = true)
+                    if (projectTitle.isNotEmpty()) {
+                        CivilightText(projectTitle, CivilightTheme.type.heading, color = CivilightTheme.colors.ink2, maxLines = 1)
+                    }
+                }
+            }
             is FrameLoad.Failed -> FullScreenError(
                 icon = IconId.Warn,
                 title = PROJECT_OPEN_FAILED,

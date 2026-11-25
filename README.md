@@ -13,7 +13,7 @@
 ![Android 10+](https://img.shields.io/badge/Android-10%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
-![version](https://img.shields.io/badge/version-0.3.3(Antigravity)-blue)
+![version](https://img.shields.io/badge/version-0.4.0(Antigravity)-blue)
 ![font license](https://img.shields.io/badge/font-Pretendard%20OFL%201.1-lightgrey)
 
 </div>
@@ -50,12 +50,14 @@ Civilight는 **원고(스크립트) · 인물 · 세계 · 연표 · 지도 · �
 * 지도 만들기 (지형 생성 · 이미지 가져오기 · 스케치 촬영 · 노드 지도), 핀 · 영역 · 경로 · 축척 · 인물 동선
 
 ### 서재 · 캔버스 · 페이지 · 보호
-* **Atelier 서재 보기 7종** (실시간 미리보기 선택기 지원)
-  * 오브젝트 · 3D: `CD 케이스` (3D 주얼 케이스 · 힌지 개폐 · 홀로그램 CD) · `플로피 · CRT` (3.5인치 플로피 디스크 · CRT 모니터 삽입)
+* **Atelier 서재 보기 6종** (기계식 1칸 락 저항감 설정 · 실시간 미리 보기 선택기 지원)
+  * 오브젝트 · 3D: `CD 케이스` (3D 주얼 케이스 · 힌지 개폐 · 홀로그램 CD)
   * 모션 · 작업: `탄성 덱` (기계식 힌지 텐션) · `모자이크` · `필름 릴` · `시간 축` · `스튜디오 목록`
+* **폴더블 커스텀 미니 아이콘 레일** (펼친 화면 패널 접힘 시 실시간 미리 보기와 함께 원하는 아이콘 커스텀)
+* **스크립트 6종 블록 좌측 세이프 영역** (대사 1:1 사각형/원형 캐릭터 프로필 + 이름, 프로필 탭 시 캐릭터 카드 즉시 열람)
+* **예상 플레이 타임 추론** (블록·연출·선택지 가중치 + 오차범위 표기) 및 **지도 마스터 시드 · 규모 설정**
 * 다중 캔버스 (노드 · 메모 · 묶음 · 관계 선 잇기) 및 자유 문서 페이지
 * 앱 잠금 · 프로젝트/항목 숨기기 (지문 · 기기 PIN), 화면 캡처 차단, 최근 앱 이름 가림, 휴지통 (30일 보관)
-* 라이프 레코더 (음성 녹음 · 글 메모 · 원고/카드/페이지로 넣기)
 
 ## 화면
 
@@ -87,7 +89,7 @@ JDK 21 환경이 필요하며, `local.properties` 파일의 `sdk.dir`에 Android
 
 | 항목 | 값 |
 | --- | --- |
-| versionName | `0.3.3(Antigravity)` |
+| versionName | `0.4.0(Antigravity)` |
 | minSdk / targetSdk / compileSdk | 29 / 37 / 37 |
 | Kotlin / AGP | 2.4.21 / 9.4.1 |
 | Compose BOM / Navigation3 | 2026.05.01 / 1.1.2 |

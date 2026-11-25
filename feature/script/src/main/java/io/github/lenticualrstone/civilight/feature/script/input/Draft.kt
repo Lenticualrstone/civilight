@@ -108,14 +108,33 @@ object Drafts {
         if (inserted == "(" && prefix == removedEnd && d.kind == BlockKind.DIALOGUE) {
             return d.copy(selStart = prefix, selEnd = prefix, parenOpen = true, pendingParenAt = prefix) to DraftEffect.NONE
         }
-        if (inserted == ")" && prefix == removedEnd && (parenOpen || pending != null)) {
-            return d.copy(selStart = prefix, selEnd = prefix, parenOpen = false, pendingParenAt = null) to DraftEffect.NONE
+        // (0.4.0) Handle both direct `)` and IME-committed trailing `)` (e.g. "감)") cleanly without leaving `(text))`.
+        if ((inserted == ")" || (inserted.endsWith(")") && inserted.length <= 4)) && (parenOpen || pending != null) && d.kind == BlockKind.DIALOGUE) {
+            val beforeClose = inserted.dropLast(1)
+            val runs = if (beforeClose.isNotEmpty() || prefix != removedEnd) {
+                Runs.normalize(RunEdit.replace(d.runs, prefix, removedEnd, beforeClose, parenMode = true))
+            } else d.runs
+            val caret = (prefix + beforeClose.length).coerceIn(0, rawText(runs).length)
+            return d.copy(
+                runs = runs,
+                selStart = caret,
+                selEnd = caret,
+                parenOpen = false,
+                pendingParenAt = null,
+            ) to DraftEffect.NONE
         }
-        if (inserted.isEmpty() && pending != null) pending = null
+        if (inserted.isEmpty() && pending != null) {
+            pending = null
+            parenOpen = false
+        }
         val parenMode = parenOpen && d.kind == BlockKind.DIALOGUE
         val runs = Runs.normalize(RunEdit.replace(d.runs, prefix, removedEnd, inserted, parenMode = parenMode))
         if (inserted.isNotEmpty()) pending = null
         if (inserted.contains('\n')) parenOpen = false
+        // If all text inside a paren run was deleted, exit paren mode so subsequent typing is normal.
+        if (inserted.isEmpty() && parenOpen && runs.none { it is TextRun.Paren }) {
+            parenOpen = false
+        }
         val caretShift = rawText(runs).length - text.length
         return d.copy(
             runs = runs,
@@ -125,9 +144,19 @@ object Drafts {
         ) to effect
     }
 
-    /** The tool row `( )` (SCR-16, `대사` only): an empty paren at the caret, typing goes inside. */
-    fun openParen(d: Draft): Draft =
-        if (d.kind != BlockKind.DIALOGUE) d else d.copy(parenOpen = true, pendingParenAt = d.selEnd, selStart = d.selEnd)
+    /** (0.4.0) The tool row `( )` (SCR-16, `대사` only): toggles open/close cleanly. */
+    fun openParen(d: Draft): Draft {
+        if (d.kind != BlockKind.DIALOGUE) return d
+        return if (d.parenOpen || d.pendingParenAt != null) {
+            d.copy(parenOpen = false, pendingParenAt = null)
+        } else {
+            d.copy(parenOpen = true, pendingParenAt = d.selEnd, selStart = d.selEnd)
+        }
+    }
+
+    /** (0.4.0) Optional smart scenario punctuation (`--` → `──`, `...` → `…`). */
+    fun applySmartPunctuation(text: String): String =
+        text.replace("...", "…").replace("--", "──")
 
     /** A picked `@` item: a link run at the caret, the caret after it (SCR-55). */
     fun insertLink(d: Draft, link: TextRun.Link): Draft {

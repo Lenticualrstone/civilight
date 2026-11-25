@@ -8,8 +8,12 @@ import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.checks.CheckType
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
+import io.github.lenticualrstone.civilight.model.script.Block
+import io.github.lenticualrstone.civilight.model.script.BlockKind
+import io.github.lenticualrstone.civilight.model.script.CueKind
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.math.roundToInt
 
 /** The `모듈` cards (SCR-35), with the id stored in `_app/view.json` `script.moduleCardOrder`. */
 enum class ModCardId(val stored: String) {
@@ -29,11 +33,83 @@ enum class ModCardId(val stored: String) {
     }
 }
 
-/** One card: `오늘 · 1,240자` + bar + `목표 2,000자`, `이 씬 분량 · …`, `점검 · ▲ …`, `씬 메모` (+ recorder line). */
+/**
+ * (0.4.0) Logical VN/scenario play-time estimator with ±20% error margin:
+ * - Dialogue: ~340 CPM + 0.6s click/beat pause
+ * - Narration: ~420 CPM + 0.5s beat pause
+ * - Direction cues: BG/CG +2.5s, ScreenEffect +1.2s, BGM/SFX +0.8s
+ * - Choice: +4.0s decision time + option reading
+ * - System: ~380 CPM + 0.8s
+ * - Memo: 0s (author-only, excluded)
+ */
+object PlayTimeEstimator {
+    data class Estimate(val centerSeconds: Int, val marginSeconds: Int) {
+        val minSeconds: Int get() = (centerSeconds - marginSeconds).coerceAtLeast(0)
+        val maxSeconds: Int get() = centerSeconds + marginSeconds
+
+        fun formatSummary(): String {
+            if (centerSeconds <= 0) return "0초"
+            return if (centerSeconds < 60) {
+                "약 ${centerSeconds}초 (±${marginSeconds.coerceAtLeast(1)}초)"
+            } else {
+                val mins = (centerSeconds / 60f).roundToInt().coerceAtLeast(1)
+                val errMins = (marginSeconds / 60f).roundToInt().coerceAtLeast(1)
+                val lo = ((centerSeconds - marginSeconds) / 60f).roundToInt().coerceAtLeast(1)
+                val hi = ((centerSeconds + marginSeconds) / 60f).roundToInt().coerceAtLeast(lo)
+                "약 ${mins}분 (±${errMins}분 · ${lo}~${hi}분)"
+            }
+        }
+    }
+
+    fun estimate(blocks: List<Block>): Estimate {
+        var seconds = 0f
+        for (b in blocks) {
+            when (b.kind.known) {
+                BlockKind.DIALOGUE -> {
+                    val chars = b.runs.sumOf { it.shownText.length }
+                    if (chars > 0) seconds += (chars / 340f) * 60f + 0.6f
+                }
+                BlockKind.NARRATION -> {
+                    val chars = b.runs.sumOf { it.shownText.length }
+                    if (chars > 0) seconds += (chars / 420f) * 60f + 0.5f
+                }
+                BlockKind.DIRECTION -> {
+                    if (b.cues.isEmpty()) {
+                        if (b.runs.any { it.shownText.isNotBlank() }) seconds += 1.2f
+                    } else {
+                        for (cue in b.cues) {
+                            seconds += when (cue.kind.known) {
+                                CueKind.BACKGROUND, CueKind.CG -> 2.5f
+                                CueKind.SCREEN_EFFECT -> 1.2f
+                                CueKind.BGM, CueKind.SFX -> 0.8f
+                                null -> 1.0f
+                            }
+                        }
+                    }
+                }
+                BlockKind.CHOICE -> {
+                    val chars = b.options.sumOf { opt -> opt.runs.sumOf { it.shownText.length } }
+                    seconds += 4.0f + (chars / 360f) * 60f
+                }
+                BlockKind.SYSTEM -> {
+                    val chars = b.runs.sumOf { it.shownText.length }
+                    if (chars > 0) seconds += (chars / 380f) * 60f + 0.8f
+                }
+                BlockKind.MEMO, null -> Unit
+            }
+        }
+        val center = seconds.roundToInt()
+        val margin = (seconds * 0.20f).roundToInt()
+        return Estimate(center, margin)
+    }
+}
+
+/** One card: `예상 플레이 타임` (replaces removed daily goal), `이 씬 분량 · …`, `점검 · ▲ …`, `씬 메모`. */
 sealed interface ModCard {
     val id: ModCardId
 
-    data class Today(val written: String, val progress: Float, val goal: String) : ModCard {
+    /** (0.4.0) Estimated play time with logical error margin (replaces daily goal). */
+    data class PlayTime(val sceneSummary: String, val projectSummary: String) : ModCard {
         override val id: ModCardId get() = ModCardId.TODAY
     }
 
@@ -58,9 +134,6 @@ data class ModsTabModel(val sceneKey: Key?, val cards: List<ModCard>) {
 }
 
 object ModsTab {
-    /** `오늘` goal (Q-16 default; where it is set is open). */
-    const val GOAL = 2000
-
     fun of(
         doc: ProjectDoc,
         selected: Key?,
@@ -74,9 +147,15 @@ object ModsTab {
         val block = selected?.let(doc.index::block)?.takeIf { doc.manuscript.isLiveBlock(it.key) }
         val sceneKey = (block?.sceneKey ?: headerScene)?.takeIf { doc.manuscript.isLiveUnit(it) }
             ?.takeIf { doc.index.unit(it)?.hidden != true || unlocked }
-        val todayCard = WritingCounts.todayCard(doc, today, zone, GOAL).let { ModCard.Today(it.written, it.progress, it.goal) }
+        val sceneBlocks = sceneKey?.let(doc.manuscript::liveBlocksOf).orEmpty()
+        val sceneEst = PlayTimeEstimator.estimate(sceneBlocks)
+        val projectEst = PlayTimeEstimator.estimate(doc.manuscript.liveBlocks)
+        val playTimeCard = ModCard.PlayTime(
+            sceneSummary = sceneEst.formatSummary(),
+            projectSummary = "전체 ${projectEst.formatSummary()}",
+        )
         val byId = buildMap<ModCardId, ModCard> {
-            put(ModCardId.TODAY, todayCard)
+            put(ModCardId.TODAY, playTimeCard)
             if (sceneKey != null) {
                 put(ModCardId.SCENE, ModCard.SceneCount(WritingCounts.sceneSpeakers(doc, sceneKey, unlocked)))
                 put(ModCardId.CHECKS, ModCard.Checks(checksLine(doc, sceneKey)))

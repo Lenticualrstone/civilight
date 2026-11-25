@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.text.DecorationRange
 import io.github.lenticualrstone.civilight.designsystem.text.DecoratedText
 import io.github.lenticualrstone.civilight.designsystem.text.InlineDecoration
@@ -172,7 +174,7 @@ fun ListRow(
     }
 }
 
-/** DS-40 settings row: trailing `small` value in `ink2` followed by ` ›` (`보통 ›`). */
+/** DS-40 settings row: optional leading category icon + trailing `small` value in `ink2` + `IconId.Next`. */
 @Composable
 fun SettingsRow(
     title: String,
@@ -181,17 +183,29 @@ fun SettingsRow(
     value: String? = null,
     subtitle: String? = null,
     divider: RowDivider = RowDivider.SOLID,
+    leadingIcon: IconId? = null,
 ) {
     val colors = CivilightTheme.colors
     ListRow(
         title = title,
         modifier = modifier,
         subtitle = subtitle,
+        leading = leadingIcon?.let { icon ->
+            { CivilightIcon(icon, contentDescription = null, size = 18.dp, tint = colors.ink2) }
+        },
         onClick = onClick,
         compact = true,
         divider = divider,
         trailing = {
-            CivilightText(if (value != null) "$value ›" else "›", CivilightTheme.type.small, color = colors.ink2, maxLines = 1)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (value != null) {
+                    CivilightText(value, CivilightTheme.type.small, color = colors.ink2, maxLines = 1)
+                }
+                CivilightIcon(IconId.Next, contentDescription = null, size = 14.dp, tint = colors.ink3)
+            }
         },
     )
 }

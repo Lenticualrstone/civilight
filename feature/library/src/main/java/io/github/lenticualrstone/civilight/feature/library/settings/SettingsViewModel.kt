@@ -5,6 +5,12 @@ import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldTemplates
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.model.app.AnimationPref
+import io.github.lenticualrstone.civilight.model.app.AppSettings
+import io.github.lenticualrstone.civilight.model.app.BlockSpacing
+import io.github.lenticualrstone.civilight.model.app.DragResistance
+import io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem
+import io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem
+import io.github.lenticualrstone.civilight.model.app.ProfileShape
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
 import io.github.lenticualrstone.civilight.model.app.ThemeMode
 import io.github.lenticualrstone.civilight.ui.security.AuthRequest
@@ -146,7 +152,65 @@ internal class SettingsViewModel(private val services: LibraryServices) : ViewMo
         viewModelScope.launch { settingsStore.setHiddenInSearchWhileOpen(on) }
     }
 
+    val settings: StateFlow<AppSettings> = deps.settings
+
     fun setBackupHidden(on: Boolean) {
         viewModelScope.launch { settingsStore.setBackupHidden(on) }
+    }
+
+    fun setDragResistance(value: DragResistance) {
+        viewModelScope.launch { settingsStore.setDragResistance(value) }
+    }
+
+    fun setProfileShape(value: ProfileShape) {
+        viewModelScope.launch { settingsStore.setProfileShape(value) }
+    }
+
+    fun setBlockSpacing(value: BlockSpacing) {
+        viewModelScope.launch { settingsStore.setBlockSpacing(value) }
+    }
+
+    fun setLongPressWiggle(on: Boolean) {
+        viewModelScope.launch { settingsStore.setLongPressWiggle(on) }
+    }
+
+    fun setTypewriterScroll(on: Boolean) {
+        viewModelScope.launch { settingsStore.setTypewriterScroll(on) }
+    }
+
+    fun setSmartPunctuation(on: Boolean) {
+        viewModelScope.launch { settingsStore.setSmartPunctuation(on) }
+    }
+
+    fun setSmartSpeakerSwap(on: Boolean) {
+        viewModelScope.launch { settingsStore.setSmartSpeakerSwap(on) }
+    }
+
+    fun setLifeRecorderEnabled(on: Boolean) {
+        viewModelScope.launch { settingsStore.setLifeRecorderEnabled(on) }
+    }
+
+    fun toggleMiniRailScript(item: MiniRailScriptItem) {
+        viewModelScope.launch {
+            val cur = deps.settings.value.miniRailScript
+            val next = if (item in cur) {
+                if (cur.size <= 1) cur else cur - item
+            } else {
+                MiniRailScriptItem.entries.filter { it in cur || it == item }
+            }
+            settingsStore.setMiniRailScript(next)
+        }
+    }
+
+    fun toggleMiniRailProject(item: MiniRailProjectItem) {
+        viewModelScope.launch {
+            val cur = deps.settings.value.miniRailProject
+            val next = if (item in cur) {
+                if (cur.size <= 1) cur else cur - item
+            } else {
+                MiniRailProjectItem.entries.filter { it in cur || it == item }
+            }
+            settingsStore.setMiniRailProject(next)
+        }
     }
 }

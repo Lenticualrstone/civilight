@@ -68,9 +68,8 @@ object ListDetailPairs {
     }
 
     /**
-     * Details that draw their own frame and bottom bar instead of `CivilightScreen` (the script's editor frame,
-     * the cast profile's `RecordFrame`). Until they hand their command bar to the frame (DS-65, Requests in
-     * `docs/status/shell.md`) their pair keeps one bar per pane, so the frame's bar never covers theirs.
+     * (0.4.0) Only Script draws its own specialized input bar; CharacterProfile shares the unified
+     * List-Detail bottom command bar in unfolded two-pane mode (eliminating duplicate bottom bars).
      */
-    fun detailDrawsOwnBar(detail: NavKey?): Boolean = detail is Script || detail is CharacterProfile
+    fun detailDrawsOwnBar(detail: NavKey?): Boolean = detail is Script
 }

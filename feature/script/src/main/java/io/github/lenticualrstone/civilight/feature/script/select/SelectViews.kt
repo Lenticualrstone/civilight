@@ -90,7 +90,7 @@ fun SelectTopBar(line: String, onAll: () -> Unit, onDone: () -> Unit) {
     }
 }
 
-private val SELECT_BAR: Dp = 104.dp
+private val SELECT_BAR: Dp = 118.dp
 
 /** Drag of one row's grip (SCR-37): the screen moves the row with the finger and maps the drop. */
 class GripDrag(
@@ -200,7 +200,7 @@ fun SelectBottomBar(
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp)) {
                     val labels = SelectRows.BUTTONS
                     val calls = listOf(onMove, onDelete, onCut, onCopy)
-                    val icons = listOf(IconId.Move, IconId.Trash, null, null)
+                    val icons = listOf(IconId.MoveBlock, IconId.Trash, IconId.Cut, IconId.Copy)
                     labels.forEachIndexed { i, label -> BarTool(label, icons[i], bar.enabled, calls[i], Modifier.weight(1f)) }
                     // SCR-49: `/씬` with checked blocks splits below the last one; select mode has no
                     // command field, so the same routing sits here as a visible button (`ED`).

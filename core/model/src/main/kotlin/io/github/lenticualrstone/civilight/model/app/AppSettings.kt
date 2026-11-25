@@ -71,6 +71,26 @@ data class AppSettings(
      * unknown id reads [viewByScreen]; not written while empty.
      */
     val galleryStyle: Map<String, String> = emptyMap(),
+    /** (0.4.0) Mechanical detent drag resistance for Atelier shelves. */
+    val dragResistance: DragResistance = DragResistance.FIRM,
+    /** (0.4.0) Character portrait shape in script & lists (1:1 rounded square or circle). */
+    val profileShape: ProfileShape = ProfileShape.SQUARE,
+    /** (0.4.0) Breathing spacing between script blocks (`좁음 / 중간 / 넓음`). */
+    val blockSpacing: BlockSpacing = BlockSpacing.NORMAL,
+    /** (0.4.0) Subtle floating outline + wiggle on block/card long press. */
+    val longPressWiggle: Boolean = true,
+    /** (0.4.0) Typewriter scrolling keeps active editing block centered vertically. */
+    val typewriterScroll: Boolean = false,
+    /** (0.4.0) Smart scenario punctuation (`--` → `──`, `...` → `…`). */
+    val smartPunctuation: Boolean = true,
+    /** (0.4.0, Experimental) Suggest previous partner speaker on next dialogue block. */
+    val smartSpeakerSwap: Boolean = false,
+    /** (0.4.0, Experimental) Show Life Recorder entry points (off by default for pure writing focus). */
+    val lifeRecorderEnabled: Boolean = false,
+    /** (0.4.0) Customized icon slots on collapsed mini rail in Script Editor. */
+    val miniRailScript: List<MiniRailScriptItem> = MiniRailScriptItem.DEFAULT,
+    /** (0.4.0) Customized icon slots on collapsed mini rail in Project workspace. */
+    val miniRailProject: List<MiniRailProjectItem> = MiniRailProjectItem.DEFAULT,
 ) {
     /**
      * Whether [module]'s side panel (list or script panel) is closed (0.2.3, r3). Without a choice of its own,
@@ -99,17 +119,14 @@ data class AppSettings(
 }
 
 /**
- * (0.3.3, Atelier) 7 handcrafted `서재 보기` styles: 2 hyper-detailed 3D physical object views
- * (CD Jewel Case, 3.5" Floppy + CRT) + 5 tactile kinetic workspace views.
- * Unknown legacy stored values gracefully fall back to [CD_JEWEL_CASE].
+ * (0.4.0, Atelier) 6 handcrafted `서재 보기` styles: 1 hyper-detailed 3D physical object view
+ * (CD Jewel Case) + 5 tactile kinetic workspace views.
+ * Unknown legacy stored values (including retired `floppyCrt`) gracefully fall back to [CD_JEWEL_CASE].
  */
 @Serializable(with = LibraryStyle.Codec::class)
 enum class LibraryStyle {
     /** `CD 케이스` — 3D 플라스틱 주얼 케이스 · 힌지 개폐 · 홀로그램 CD (기본값). */
     CD_JEWEL_CASE,
-
-    /** `플로피 · CRT` — 3.5인치 플로피 디스크 · CRT 모니터 삽입 부팅. */
-    FLOPPY_CRT,
 
     /** `탄성 덱` — 기계식 힌지 텐션 · 부채꼴 덱. */
     KINETIC_DECK,
@@ -128,7 +145,7 @@ enum class LibraryStyle {
 
     val isList: Boolean get() = this == LIST
 
-    val isSpatial: Boolean get() = ordinal < 2
+    val isSpatial: Boolean get() = this == CD_JEWEL_CASE
 
     object Codec : LowerCamelEnumSerializer<LibraryStyle>("LibraryStyle", entries, CD_JEWEL_CASE)
 }
@@ -336,4 +353,68 @@ enum class LargeMapExport {
     K4, K8;
 
     object Codec : LowerCamelEnumSerializer<LargeMapExport>("LargeMapExport", entries, K4)
+}
+
+/** (0.4.0) Mechanical detent drag resistance presets for Atelier shelves. */
+@Serializable(with = DragResistance.Codec::class)
+enum class DragResistance(
+    /** Resistance damping before breakaway threshold (lower = firmer tension). */
+    val preBreakawayGain: Float,
+    /** Distance multiplier per item step (higher = heavier travel). */
+    val stepDistanceScale: Float,
+    /** Normalized position threshold past which the detent releases to the next card. */
+    val breakawayThreshold: Float,
+    /** Spring stiffness for mechanical snap settle. */
+    val springStiffness: Float,
+    /** Spring damping ratio (near-critically damped, zero cheap bounce). */
+    val springDamping: Float,
+) {
+    SOFT(0.72f, 0.92f, 0.30f, 640f, 0.80f),
+    NORMAL(0.52f, 1.15f, 0.36f, 560f, 0.83f),
+    FIRM(0.36f, 1.38f, 0.42f, 490f, 0.86f),
+    HEAVY(0.24f, 1.62f, 0.47f, 420f, 0.90f);
+
+    object Codec : LowerCamelEnumSerializer<DragResistance>("DragResistance", entries, FIRM)
+}
+
+/** (0.4.0) Character portrait frame shape in script & profile views. */
+@Serializable(with = ProfileShape.Codec::class)
+enum class ProfileShape {
+    SQUARE, CIRCLE;
+
+    object Codec : LowerCamelEnumSerializer<ProfileShape>("ProfileShape", entries, SQUARE)
+}
+
+/** (0.4.0) Vertical breathing gap preset between script blocks. */
+@Serializable(with = BlockSpacing.Codec::class)
+enum class BlockSpacing(val sameSpeakerDp: Int, val shiftDp: Int) {
+    COMPACT(8, 18),
+    NORMAL(14, 26),
+    RELAXED(20, 34);
+
+    object Codec : LowerCamelEnumSerializer<BlockSpacing>("BlockSpacing", entries, NORMAL)
+}
+
+/** (0.4.0) Customizable icon shortcuts on the collapsed mini rail in Script Editor. */
+@Serializable(with = MiniRailScriptItem.Codec::class)
+enum class MiniRailScriptItem {
+    TIME, REF, PROPS, MODS, OUTLINE, SPEAKER_FOCUS;
+
+    companion object {
+        val DEFAULT: List<MiniRailScriptItem> = listOf(TIME, REF, PROPS, MODS, OUTLINE, SPEAKER_FOCUS)
+    }
+
+    object Codec : LowerCamelEnumSerializer<MiniRailScriptItem>("MiniRailScriptItem", entries, TIME)
+}
+
+/** (0.4.0) Customizable icon shortcuts on the collapsed mini rail in Project workspace. */
+@Serializable(with = MiniRailProjectItem.Codec::class)
+enum class MiniRailProjectItem {
+    SCRIPT, CAST, WORLD, MAP, TIMELINE, CHECKS, GALLERY, SETTINGS;
+
+    companion object {
+        val DEFAULT: List<MiniRailProjectItem> = listOf(SCRIPT, CAST, WORLD, MAP, TIMELINE, CHECKS)
+    }
+
+    object Codec : LowerCamelEnumSerializer<MiniRailProjectItem>("MiniRailProjectItem", entries, SCRIPT)
 }

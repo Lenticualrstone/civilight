@@ -20,6 +20,9 @@ object StepChoices {
     const val COUNT = "count"
     const val BENDS = "bends"
     const val LAKES = "lakes"
+    const val SCALE = "scale"
+    const val CLIMATE_BAND = "climateBand"
+    const val TOWN_DENSITY = "townDensity"
     const val ON = "on"
     const val OFF = "off"
 
@@ -28,9 +31,17 @@ object StepChoices {
     const val COUNT_DEFAULT = "보통"
     const val BENDS_DEFAULT = "보통"
     const val LAKES_DEFAULT = ON
+    const val SCALE_DEFAULT = "대륙"
+    const val CLIMATE_DEFAULT = "다양"
+    const val TOWN_DENSITY_DEFAULT = "보통"
+
+    val SCALES: List<String> = listOf("동네", "도시", "지방", "대륙", "세계")
 
     /** The chip questions of a step. */
     fun questions(step: GenerationStepKind): List<ChoiceQuestion> = when (step) {
+        GenerationStepKind.COAST -> listOf(
+            ChoiceQuestion(SCALE, "지도 규모", SCALES, SCALE_DEFAULT),
+        )
         GenerationStepKind.MOUNTAIN -> listOf(
             ChoiceQuestion(RANGES, "산맥 수", listOf("1", "2", "3", "흩어짐"), RANGES_DEFAULT),
             ChoiceQuestion(HEIGHT, "높이", listOf("낮게", "보통", "높게"), HEIGHT_DEFAULT),
@@ -40,7 +51,35 @@ object StepChoices {
             ChoiceQuestion(BENDS, "굽이", listOf("곧게", "보통", "많이"), BENDS_DEFAULT),
             ChoiceQuestion(LAKES, "호수 · 막힌 곳에 호수", listOf(ON, OFF), LAKES_DEFAULT),
         )
-        else -> emptyList()
+        GenerationStepKind.FOREST_CLIMATE -> listOf(
+            ChoiceQuestion(CLIMATE_BAND, "기후대", listOf("다양", "온대", "한대", "건조", "열대"), CLIMATE_DEFAULT),
+        )
+        GenerationStepKind.TOWN_ROAD -> listOf(
+            ChoiceQuestion(TOWN_DENSITY, "마을 밀도", listOf("적게", "보통", "많이"), TOWN_DENSITY_DEFAULT),
+        )
+    }
+
+    /**
+     * (0.4.0) Minecraft-style deterministic master seed: turns any text or number string
+     * into 5 reproducible step seeds so writers can share or recreate the exact same world.
+     */
+    fun seedsFromMaster(text: String): List<Int> {
+        val trimmed = text.trim()
+        var h = trimmed.toLongOrNull() ?: run {
+            var acc = -3750763034362895579L // FNV-1a 64-bit offset basis
+            for (ch in trimmed) {
+                acc = acc xor ch.code.toLong()
+                acc *= 1099511628211L
+            }
+            acc
+        }
+        return ORDER.indices.map { idx ->
+            var z = h + (idx + 1).toLong() * -7046029254386353131L
+            z = (z xor (z ushr 30)) * -4658895280553007687L
+            z = (z xor (z ushr 27)) * -7723592293110705685L
+            z = z xor (z ushr 31)
+            Math.floorMod((z xor (z ushr 32)).toInt(), 10_000)
+        }
     }
 
     /** `해안선 · 산 · 강 · 숲 · 기후 · 마을 · 길`. */

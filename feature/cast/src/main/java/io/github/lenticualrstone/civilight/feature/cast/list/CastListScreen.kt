@@ -169,7 +169,9 @@ fun CastListScreen(route: CastList, deps: FeatureDeps) {
         CivilightScreen(
             title = view.title,
             smallLine = view.projectName,
-            back = IconAction(CastUiCopy.BACK) { deps.navigator.pop() },
+            back = IconAction(CastUiCopy.BACK) {
+                if (!deps.navigator.popTo(inclusive = true) { it == route }) deps.navigator.pop()
+            },
             lens = lensChipLabel(doc),
             onLens = { sheets.open(LensSheet(route.projectKey)) },
             actions = {

@@ -69,6 +69,7 @@ fun TwoSidedSwipeRow(
 ) {
     val motion = CivilightTheme.motion
     val colors = CivilightTheme.colors
+    val haptics = io.github.lenticualrstone.civilight.designsystem.theme.rememberHaptics()
     val density = LocalDensity.current
     val refWidth: Dp = (REF_BUTTON * reference.size).dp
     val editWidth: Dp = (EDIT_BUTTON * edit.size).dp
@@ -111,7 +112,10 @@ fun TwoSidedSwipeRow(
                     onDelta = { delta -> drag.onDelta(delta, refPx, editPx, refOn, editOn) },
                     onStop = {
                         val settled = drag.release(refPx, editPx, refOn, editOn)
-                        if (settled != side) onSideChange(settled)
+                        if (settled != side) {
+                            haptics.perform(io.github.lenticualrstone.civilight.designsystem.theme.HapticToken.TICK)
+                            onSideChange(settled)
+                        }
                     },
                 )
                 .offset { IntOffset(drag.offset.roundToInt(), 0) }

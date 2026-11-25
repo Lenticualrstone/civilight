@@ -257,25 +257,8 @@ internal fun LibraryScreen(services: LibraryServices) {
             smallLine = ShelfCopy.SMALL,
             modifier = if (picking) Modifier.clearAndSetSemantics { } else Modifier,
             actions = {
-                // (0.2.3, r3 `viewpick`) `보기 · <style> ▾`: the view picker with its live preview.
+                // (0.4.0) Clean 3-action top bar: [View Picker ▾] [+] [Settings ⚙]
                 io.github.lenticualrstone.civilight.feature.library.shelf.flat.ViewChip(view.shown) { picking = true }
-                // (0.2.0, LIB-93) `목록` · <chosen 3D view> left of `+`; not drawn while the style is `목록` or has no
-                // renderer yet (ShelfViews), so the toggle never switches between two identical lists.
-                view.toggle?.let { toggle ->
-                    ViewToggle(showCards = toggle.styleOn, onChange = vm::showStyle, listLabel = toggle.listLabel, cardLabel = toggle.styleLabel)
-                }
-                // `ED`: no board draws the way into 설정 (LIB-63); a labelled icon button.
-                CivilightIconButton(
-                    IconId.Props,
-                    ShelfCopy.SETTINGS,
-                    { navigator.push(Settings) },
-                    LibraryTourSteps.SETTINGS_FALLBACK.fold(Modifier.tourTarget(LibraryTourSteps.SETTINGS)) { m, step -> m.tourTarget(step, fallback = true) },
-                )
-                // LIB-72 `ED` (§6 Q23, undrawn): 여러 프로젝트 내보내기 from the 서재 header; folds in from the start.
-                FoldReveal(ui.exportable.isNotEmpty(), horizontal = true) {
-                    CivilightIconButton(IconId.Download, ExportCopy.HEADER, { sheets.open(MultiExportSheet) })
-                }
-                // `+` ↔ `다시 잠그기` swap in place (board `LibUnlocked`, §6 Q30).
                 ContentSwap(ui.headerRelock, label = "headerAction") { relock ->
                     if (relock) {
                         CivilightButton(ShelfCopy.RELOCK, vm::relock, variant = ButtonVariant.COMPACT_GHOST, icon = IconId.Lock)
@@ -283,6 +266,12 @@ internal fun LibraryScreen(services: LibraryServices) {
                         CivilightIconButton(IconId.Plus, ShelfCopy.NEW_PROJECT, { services.startNewProject() })
                     }
                 }
+                CivilightIconButton(
+                    IconId.Settings,
+                    ShelfCopy.SETTINGS,
+                    { navigator.push(Settings) },
+                    LibraryTourSteps.SETTINGS_FALLBACK.fold(Modifier.tourTarget(LibraryTourSteps.SETTINGS)) { m, step -> m.tourTarget(step, fallback = true) },
+                )
             },
             commandBar = {
                 CommandBar(
@@ -381,6 +370,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                                         selectedKey = selectedKey,
                                         onRecents = { sheets.open(RecentsSheet) },
                                         tourMenuKey = tourMenuRow,
+                                        dragResistance = view.dragResistance,
                                     ),
                                 )
                             }
@@ -461,17 +451,19 @@ internal fun LibraryScreen(services: LibraryServices) {
                                         }
                                     }
                                 }
-                            // The list ends with the library section (LIB-01); the 3D views keep it in the 최근 연 파일 sheet.
-                            item(key = "librarySection") { SectionLabel(ShelfCopy.LIBRARY_SECTION, civilightItem().padding(top = 30.dp, start = SIDE, end = SIDE)) }
-                            item(key = "recorder") {
-                                ListRow(
-                                    title = ShelfCopy.RECORDER,
-                                    subtitle = ui.recorderSub,
-                                    leading = { RecorderTile() },
-                                    trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = CivilightTheme.colors.ink3) },
-                                    onClick = { navigator.push(RecorderInbox()) },
-                                    modifier = civilightItem().padding(top = 8.dp, start = SIDE, end = SIDE),
-                                )
+                            // (0.4.0) Life Recorder is gated behind experimental setting (off by default).
+                            if (view.lifeRecorderEnabled) {
+                                item(key = "librarySection") { SectionLabel(ShelfCopy.LIBRARY_SECTION, civilightItem().padding(top = 30.dp, start = SIDE, end = SIDE)) }
+                                item(key = "recorder") {
+                                    ListRow(
+                                        title = ShelfCopy.RECORDER,
+                                        subtitle = ui.recorderSub,
+                                        leading = { RecorderTile() },
+                                        trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = CivilightTheme.colors.ink3) },
+                                        onClick = { navigator.push(RecorderInbox()) },
+                                        modifier = civilightItem().padding(top = 8.dp, start = SIDE, end = SIDE),
+                                    )
+                                }
                             }
                         }
                         }

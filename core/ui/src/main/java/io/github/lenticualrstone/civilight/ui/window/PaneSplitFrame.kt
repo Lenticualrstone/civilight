@@ -323,7 +323,8 @@ fun SplitPanes(
             // Under the frame's bottom bar (which blurs it), above the panes.
             if (collapsible) {
                 val top = railTop ?: WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-                PanelRail(panel, PanelSide.START, Modifier.align(Alignment.TopStart), topInset = top)
+                val railActions = rememberProjectMiniRailActions(module, panel)
+                PanelRail(panel, PanelSide.START, Modifier.align(Alignment.TopStart), topInset = top, actions = railActions)
             }
         }
         if (bottomBar != null) {
@@ -369,6 +370,81 @@ fun SplitPanes(
 private fun Modifier.layoutOffset(x: () -> Float): Modifier = layout { measurable, constraints ->
     val p = measurable.measure(constraints)
     layout(p.width, p.height) { p.place(IntOffset((x() * density).roundToInt(), 0)) }
+}
+
+/**
+ * (0.4.0) Builds the user-customized project workspace icons for the collapsed [PanelRail]
+ * inside [SplitPanes], using `AppSettings.miniRailProject` and the current project route.
+ */
+@Composable
+private fun rememberProjectMiniRailActions(module: String, panel: PanelCollapseState): List<MiniRailAction> {
+    val deps = io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps.current ?: return emptyList()
+    val settings by deps.settings.collectAsState()
+    val projectKey = deps.navigator.backStack
+        .filterIsInstance<io.github.lenticualrstone.civilight.navigation.ProjectRoute>()
+        .lastOrNull()?.projectKey
+    if (projectKey == null) {
+        return listOf(
+            MiniRailAction(
+                icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Settings,
+                label = "설정",
+                onClick = { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.Settings) },
+            ),
+        )
+    }
+    return settings.miniRailProject.map { item ->
+        when (item) {
+            io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem.SCRIPT -> MiniRailAction(
+                icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Edit,
+                label = "원고",
+                active = module == PaneSplit.Modules.HOME,
+                onClick = {
+                    panel.setClosed(false)
+                    deps.navigator.push(io.github.lenticualrstone.civilight.navigation.StoryStructure(projectKey))
+                },
+            )
+            io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem.CAST -> MiniRailAction(
+                icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.User,
+                label = "인물",
+                active = module == PaneSplit.Modules.CAST,
+                onClick = { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.CastList(projectKey)) },
+            )
+            io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem.WORLD -> MiniRailAction(
+                icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Book,
+                label = "세계",
+                active = module == PaneSplit.Modules.WORLD,
+                onClick = { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.World(projectKey)) },
+            )
+            io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem.MAP -> MiniRailAction(
+                icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Map,
+                label = "지도",
+                onClick = { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.MapList(projectKey)) },
+            )
+            io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem.TIMELINE -> MiniRailAction(
+                icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Clock,
+                label = "연표",
+                active = module == PaneSplit.Modules.TIMELINE,
+                onClick = { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.Timeline(projectKey)) },
+            )
+            io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem.CHECKS -> MiniRailAction(
+                icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Check,
+                label = "점검",
+                active = module == PaneSplit.Modules.CHECKS,
+                onClick = { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.CheckCenter(projectKey)) },
+            )
+            io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem.GALLERY -> MiniRailAction(
+                icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Image,
+                label = "갤러리",
+                active = module == PaneSplit.Modules.GALLERY,
+                onClick = { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.Gallery.ofProject(projectKey)) },
+            )
+            io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem.SETTINGS -> MiniRailAction(
+                icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Settings,
+                label = "설정",
+                onClick = { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.ProjectSettings(projectKey)) },
+            )
+        }
+    }
 }
 
 /**

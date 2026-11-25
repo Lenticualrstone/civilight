@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
+import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
 import io.github.lenticualrstone.civilight.designsystem.glass.OnGlass
@@ -37,7 +38,7 @@ fun mapBack(deps: FeatureDeps): IconAction = IconAction(MapCopy.BACK) { deps.nav
 @Composable
 fun GlassCard(modifier: Modifier = Modifier, radius: Int = 20, content: @Composable ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(radius.dp)
-    Box(modifier.blockMapTaps()) {
+    Box(modifier.blockMapTaps().insetOutline(CivilightTheme.colors.line, 1.dp, shape)) {
         GlassBackground(GlassSurface.PANEL, Modifier.matchParentSize(), shape = shape)
         OnGlass {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)

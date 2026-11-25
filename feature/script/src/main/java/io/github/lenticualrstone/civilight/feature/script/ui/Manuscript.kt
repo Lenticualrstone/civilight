@@ -9,6 +9,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.zIndex
+import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.tokenShadow
 import io.github.lenticualrstone.civilight.feature.script.motion.blockLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -379,27 +381,41 @@ private class BoundsHolder {
 }
 
 /**
- * (0.2.4) The block whose long-press menu is open lifts: it grows to [CivilightMotion.liftScale] on `enter`
- * (reduced motion: no scale), takes the popover shadow and sits above its neighbours; it settles on `exit`.
+ * (0.4.0) The block whose long-press menu is open lifts with:
+ * - soft elevation shadow + accent outline glow
+ * - subtle floating air-wiggle when [AppSettings.longPressWiggle] is enabled and motion is not reduced
  */
 @Composable
 private fun Modifier.lifted(on: Boolean): Modifier {
     val motion = CivilightTheme.motion
     val colors = CivilightTheme.colors
+    val deps = io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps.current
+    val wiggleEnabled = deps?.settings?.collectAsState()?.value?.longPressWiggle ?: true
     val lift by animateFloatAsState(if (on) 1f else 0f, motion.spec(if (on) CivilightMotion.enter else CivilightMotion.exit), label = "blockLift")
     if (lift <= 0f) return this
+    val wiggle = remember { Animatable(0f) }
+    LaunchedEffect(on, wiggleEnabled, motion.reduced) {
+        if (on && wiggleEnabled && !motion.reduced) {
+            while (true) {
+                wiggle.animateTo(1f, motion.move(CivilightMotion.standard))
+                wiggle.animateTo(-1f, motion.move(CivilightMotion.standard))
+            }
+        } else {
+            wiggle.snapTo(0f)
+        }
+    }
     val shadow = CivilightTheme.elevation.popover(colors).let { it.copy(color = it.color.copy(alpha = it.color.alpha * lift)) }
     val scale = if (motion.reduced) 1f else 1f + (CivilightMotion.liftScale - 1f) * lift
-    // Keep `zIndex` (a layout node) before the scale layer: the row's bounds tracker sits just outside this modifier
-    // and reports through the next layout node, so it reads the row unscaled (0.2.4 review).
     return this
         .zIndex(1f)
         .graphicsLayer {
             scaleX = scale
             scaleY = scale
+            rotationZ = if (wiggleEnabled && !motion.reduced) wiggle.value * 0.65f * lift else 0f
         }
         .tokenShadow(LIFT_SHAPE, shadow)
         .background(colors.bg, LIFT_SHAPE)
+        .insetOutline(colors.acc.copy(alpha = 0.72f * lift), 1.5.dp, LIFT_SHAPE)
 }
 
 private val LIFT_SHAPE = RoundedCornerShape(12.dp)

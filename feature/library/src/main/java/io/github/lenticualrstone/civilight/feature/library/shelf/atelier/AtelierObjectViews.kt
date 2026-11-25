@@ -1,6 +1,5 @@
 package io.github.lenticualrstone.civilight.feature.library.shelf.atelier
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -10,36 +9,27 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -48,23 +38,19 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import io.github.lenticualrstone.civilight.designsystem.card.DeviceTilt
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
-import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
-import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.FixedColors
 import io.github.lenticualrstone.civilight.designsystem.theme.HapticToken
 import io.github.lenticualrstone.civilight.designsystem.theme.rememberHaptics
 import io.github.lenticualrstone.civilight.designsystem.theme.unhide
 import io.github.lenticualrstone.civilight.feature.library.shelf.CoverArt
-import io.github.lenticualrstone.civilight.feature.library.shelf.CoverThumb
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCardItem
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfViewInput
 import kotlin.math.PI
@@ -75,13 +61,14 @@ import kotlin.math.sin
 // ===========================================================================
 // 1. CD 케이스 (CD_JEWEL_CASE) — Hyper-Detailed 3D Polycarbonate Jewel Case
 //    with Ribbed Clear Spine, Hinged Acrylic Lid, Corner Label, and
-//    Iridescent Holographic Compact Disc
+//    Iridescent Holographic Compact Disc (0.4.0: clean floating stage, no
+//    unnatural floor shadow, configurable mechanical 1-step detent resistance)
 // ===========================================================================
 
 @Composable
 internal fun CdJewelCaseView(input: ShelfViewInput) {
     val items = remember(input.ui) { atelierItems(input) }
-    val track = rememberAtelierTrack(items, input.selectedKey, input.preview)
+    val track = rememberAtelierTrack(items, input.selectedKey, input.preview, input.dragResistance)
     val density = LocalDensity.current
     val motion = CivilightTheme.motion
     val haptics = rememberHaptics()
@@ -96,7 +83,7 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
             Modifier
                 .fillMaxSize()
                 .padding(top = input.barTop.dp, bottom = (input.barBottom + 126f).dp)
-                .atelierHorizontalDrag(!input.preview, items.size, with(density) { 185.dp.toPx() }, track),
+                .atelierHorizontalDrag(!input.preview, items.size, with(density) { 195.dp.toPx() }, track),
             contentAlignment = Alignment.Center,
         ) {
             val caseSize = (minOf(maxWidth * 0.70f, maxHeight * 0.72f)).coerceIn(200.dp, 296.dp)
@@ -105,21 +92,6 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
             val targetPx = with(density) { caseSize.roundToPx() }
             val pos = track.position.value
             val impulse = track.dragImpulse.floatValue
-
-            // Soft table contact shadow underneath the active jewel case
-            Canvas(Modifier.fillMaxSize()) {
-                val cx = size.width / 2f
-                val cy = size.height * 0.5f + caseH.toPx() * 0.53f
-                drawOval(
-                    brush = Brush.radialGradient(
-                        listOf(Color.Black.copy(alpha = 0.34f), Color.Transparent),
-                        center = Offset(cx, cy),
-                        radius = caseW.toPx() * 0.62f,
-                    ),
-                    topLeft = Offset(cx - caseW.toPx() * 0.62f, cy - 18.dp.toPx()),
-                    size = Size(caseW.toPx() * 1.24f, 36.dp.toPx()),
-                )
-            }
 
             val visible = items.indices.filter { abs(it - pos) <= 2.5f }
             visible.forEach { i ->
@@ -144,8 +116,8 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                             val spread = caseW.toPx() * 0.86f
                             translationX = d * spread + tilt.x * (10f / (1f + abs(d))) - lidOpen * 26.dp.toPx()
                             translationY = abs(d) * 18.dp.toPx() + tilt.y * (7f / (1f + abs(d)))
-                            // Crisp mechanical tilt responds immediately to live drag impulse
-                            rotationY = (-d * 24f).coerceIn(-52f, 52f) + impulse * 7f + tilt.x * 8f
+                            // Crisp mechanical tilt responds immediately to live detent tension
+                            rotationY = (-d * 24f).coerceIn(-52f, 52f) + impulse * 6f + tilt.x * 8f
                             rotationX = -tilt.y * 6f
                             val s = (1f - abs(d) * 0.14f).coerceIn(0.72f, 1.02f)
                             scaleX = s
@@ -157,7 +129,6 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                     // 1) Sliding Holographic Compact Disc (peeks out right + spins gently on open!)
                     val discDiameter = caseH * 0.88f
                     HolographicCdDisc(
-                        item = item,
                         catalogCode = "CV-%02d".format(i + 1),
                         tilt = tilt,
                         holoBoost = holoEnabled,
@@ -166,7 +137,6 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                             .size(discDiameter)
                             .zIndex(1f)
                             .graphicsLayer {
-                                // Disc stays nestled in tray, slides out smoothly when lid opens (or slightly peeks on focus)
                                 val peek = if (focused) 0.14f + lidOpen * 0.34f else 0.04f
                                 translationX = caseW.toPx() * peek
                             },
@@ -174,7 +144,6 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
 
                     // 2) Inner Dark Polycarbonate Disc Tray + Spindle Rosette
                     JewelCaseTray(
-                        catalogCode = "CV-%02d".format(i + 1),
                         modifier = Modifier
                             .fillMaxSize()
                             .zIndex(2f),
@@ -195,7 +164,7 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                             .zIndex(3f)
                             .graphicsLayer {
                                 cameraDistance = 18f * density.density
-                                transformOrigin = TransformOrigin(0.13f, 0.5f) // Left plastic hinge pins!
+                                transformOrigin = TransformOrigin(0.13f, 0.5f)
                                 rotationY = -lidOpen * 54f
                             }
                             .then(
@@ -225,7 +194,6 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
 /** Procedural 3D Holographic Compact Disc with dynamic gyro diffraction & concentric tracks. */
 @Composable
 private fun HolographicCdDisc(
-    item: ShelfCardItem,
     catalogCode: String,
     tilt: DeviceTilt,
     holoBoost: Boolean,
@@ -239,7 +207,6 @@ private fun HolographicCdDisc(
             val center = Offset(size.width / 2f, size.height / 2f)
             val holoAlpha = if (holoBoost) 0.56f else 0.34f
 
-            // Base brushed metallic aluminum disc
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(Color(0xFFE7EBF0), Color(0xFFBFC8D4), Color(0xFFD5DCE4), Color(0xFF9EA7B3)),
@@ -250,7 +217,6 @@ private fun HolographicCdDisc(
                 center = center,
             )
 
-            // Iridescent rainbow/silver optical diffraction sweep reacting live to device tilt!
             rotate(degrees = spinDegrees + tilt.x * 46f + tilt.y * 24f, pivot = center) {
                 drawCircle(
                     brush = Brush.sweepGradient(
@@ -272,7 +238,6 @@ private fun HolographicCdDisc(
                 )
             }
 
-            // Micro data-track concentric grooves
             for (step in 5..9) {
                 drawCircle(
                     color = Color.White.copy(alpha = 0.11f),
@@ -282,19 +247,14 @@ private fun HolographicCdDisc(
                 )
             }
 
-            // Inner transparent polycarbonate clamping ring + mirror band
             drawCircle(Color(0xFF20242B).copy(alpha = 0.28f), radius = r * 0.34f, center = center, style = Stroke(width = 1.dp.toPx()))
             drawCircle(Color.White.copy(alpha = 0.36f), radius = r * 0.29f, center = center)
             drawCircle(Color(0xFF14161A).copy(alpha = 0.32f), radius = r * 0.25f, center = center, style = Stroke(width = 1.2.dp.toPx()))
 
-            // Spindle center hole
             drawCircle(colors.bg, radius = r * 0.14f, center = center)
             drawCircle(Color.White.copy(alpha = 0.55f), radius = r * 0.14f, center = center, style = Stroke(width = 1.dp.toPx()))
-
-            // Outer chamfered disc rim
             drawCircle(Color.White.copy(alpha = 0.55f), radius = r - 0.8.dp.toPx(), center = center, style = Stroke(width = 1.2.dp.toPx()))
         }
-        // Printed catalog arc label near top of disc
         Column(
             Modifier.align(Alignment.TopCenter).padding(top = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -311,22 +271,19 @@ private fun HolographicCdDisc(
 
 /** Dark charcoal inner polycarbonate tray + 12-tooth center spindle rosette + left ribbed spine. */
 @Composable
-private fun JewelCaseTray(catalogCode: String, modifier: Modifier = Modifier) {
+private fun JewelCaseTray(modifier: Modifier = Modifier) {
     val colors = CivilightTheme.colors
     Canvas(modifier.clip(RoundedCornerShape(8.dp))) {
         val spineW = size.width * 0.13f
-        // Dark charcoal inner tray body
         drawRect(
             color = if (colors.isDark) Color(0xFF131519) else Color(0xFF23262C),
             topLeft = Offset(spineW, 0f),
             size = Size(size.width - spineW, size.height),
         )
-        // Recessed circular disc well + spindle rosette
         val wellCenter = Offset(spineW + (size.width - spineW) * 0.5f, size.height * 0.5f)
         val wellR = size.height * 0.44f
         drawCircle(Color.Black.copy(alpha = 0.45f), radius = wellR, center = wellCenter)
         drawCircle(Color.White.copy(alpha = 0.08f), radius = wellR, center = wellCenter, style = Stroke(1.dp.toPx()))
-        // 12 spindle teeth
         for (t in 0 until 12) {
             val a = (t / 12f) * 2f * PI.toFloat()
             val p0 = Offset(wellCenter.x + cos(a) * wellR * 0.12f, wellCenter.y + sin(a) * wellR * 0.12f)
@@ -334,7 +291,6 @@ private fun JewelCaseTray(catalogCode: String, modifier: Modifier = Modifier) {
             drawLine(Color.White.copy(alpha = 0.22f), p0, p1, strokeWidth = 1.4.dp.toPx())
         }
 
-        // Left clear ribbed polycarbonate spine (14 fine vertical grooves + top/bottom hinge pins)
         drawRect(
             brush = Brush.horizontalGradient(
                 listOf(
@@ -358,12 +314,10 @@ private fun JewelCaseTray(catalogCode: String, modifier: Modifier = Modifier) {
                 strokeWidth = 0.8.dp.toPx(),
             )
         }
-        // Molded hinge pin lugs at top-left & bottom-left
         val pinColor = Color.White.copy(alpha = 0.38f)
         drawRoundRect(pinColor, Offset(spineW - 3.dp.toPx(), 10.dp.toPx()), Size(5.dp.toPx(), 14.dp.toPx()), CornerRadius(2.dp.toPx()))
         drawRoundRect(pinColor, Offset(spineW - 3.dp.toPx(), size.height - 24.dp.toPx()), Size(5.dp.toPx(), 14.dp.toPx()), CornerRadius(2.dp.toPx()))
 
-        // Outer beveled acrylic border
         drawRoundRect(
             color = Color.White.copy(alpha = 0.34f),
             cornerRadius = CornerRadius(8.dp.toPx()),
@@ -398,7 +352,6 @@ private fun JewelCaseFrontLid(
             .drawWithContent {
                 drawContent()
                 val spineW = size.width * 0.13f
-                // Diagonal polycarbonate acrylic reflection streaks (live with tilt + drag)
                 val shift = ((sheenBias * 0.4f) + (tilt.x * 0.35f)).coerceIn(-0.8f, 0.8f)
                 val x0 = spineW + size.width * (0.14f + shift)
                 drawRect(
@@ -414,7 +367,6 @@ private fun JewelCaseFrontLid(
                         end = Offset(x0 + size.width * 0.42f, size.height),
                     ),
                 )
-                // Optional iridescent holo foil shimmer across the acrylic cover
                 if (holoBoost) {
                     drawRect(
                         brush = Brush.linearGradient(
@@ -430,13 +382,11 @@ private fun JewelCaseFrontLid(
                         ),
                     )
                 }
-                // Four tiny molded acrylic booklet-retainer clasps
                 val tab = Color.White.copy(alpha = 0.42f)
                 drawRect(tab, Offset(spineW + 18.dp.toPx(), 2.dp.toPx()), Size(18.dp.toPx(), 2.5.dp.toPx()))
                 drawRect(tab, Offset(size.width - 36.dp.toPx(), 2.dp.toPx()), Size(18.dp.toPx(), 2.5.dp.toPx()))
                 drawRect(tab, Offset(spineW + 18.dp.toPx(), size.height - 4.5.dp.toPx()), Size(18.dp.toPx(), 2.5.dp.toPx()))
                 drawRect(tab, Offset(size.width - 36.dp.toPx(), size.height - 4.5.dp.toPx()), Size(18.dp.toPx(), 2.5.dp.toPx()))
-                // Crisp outer acrylic bevel
                 drawRoundRect(
                     color = if (focused) colors.acc.copy(alpha = 0.65f) else Color.White.copy(alpha = 0.30f),
                     cornerRadius = CornerRadius(8.dp.toPx()),
@@ -444,7 +394,6 @@ private fun JewelCaseFrontLid(
                 )
             },
     ) {
-        // Booklet area sits to the right of the 13% ribbed plastic spine
         Box(
             Modifier
                 .fillMaxSize()
@@ -462,7 +411,6 @@ private fun JewelCaseFrontLid(
                             .align(Alignment.BottomCenter)
                             .background(Brush.verticalGradient(listOf(Color.Transparent, FixedColors.imageShadeBottom))),
                     )
-                    // Printed adhesive catalog sticker on upper-left of the jewel case booklet!
                     Box(
                         Modifier
                             .align(Alignment.TopStart)
@@ -501,527 +449,6 @@ private fun JewelCaseFrontLid(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         CivilightIcon(IconId.Plus, null, size = 26.dp, tint = colors.acc)
                         CivilightText(AtelierCopy.NEW_PROJECT, CivilightTheme.type.heading, color = colors.ink, maxLines = 1)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ===========================================================================
-// 2. 플로피 · CRT (FLOPPY_CRT) — High-Detail 3.5" Floppy Disks + Sculpted CRT
-//    Monitor with Live Drive Slot Insertion & Phosphor Scanline Boot Screen
-// ===========================================================================
-
-@Composable
-internal fun FloppyCrtView(input: ShelfViewInput) {
-    val items = remember(input.ui) { atelierItems(input) }
-    val track = rememberAtelierTrack(items, input.selectedKey, input.preview)
-    val density = LocalDensity.current
-    val motion = CivilightTheme.motion
-    val haptics = rememberHaptics()
-    // Which disk is currently inserted into the CRT drive slot
-    var insertedIdx by remember { mutableIntStateOf(0) }
-    val crtBoot = remember { Animatable(1f) }
-    var driveLedOn by remember { mutableStateOf(false) }
-
-    // Boot flash whenever the inserted disk changes
-    LaunchedEffect(insertedIdx) {
-        if (input.preview) {
-            crtBoot.snapTo(1f)
-            return@LaunchedEffect
-        }
-        driveLedOn = true
-        crtBoot.snapTo(0.05f)
-        crtBoot.animateTo(1f, motion.crispSpring())
-        kotlinx.coroutines.delay(motion.delayMs(260))
-        driveLedOn = false
-    }
-
-    // Keep insertedIdx synced with active carousel selection
-    LaunchedEffect(track.activeIndex) {
-        if (items.isNotEmpty()) {
-            insertedIdx = track.activeIndex.coerceIn(0, items.lastIndex)
-        }
-    }
-
-    AtelierStageFrame(input, items, track.activeIndex, showDock = false) { tilt ->
-        BoxWithConstraints(
-            Modifier
-                .fillMaxSize()
-                .padding(
-                    top = (input.barTop + 8f).dp,
-                    bottom = (input.barBottom + 12f).dp,
-                    start = 16.dp,
-                    end = 16.dp,
-                ),
-        ) {
-            val crtH = (maxHeight * 0.54f).coerceIn(210.dp, 340.dp)
-            val crtW = minOf(maxWidth, crtH * 1.24f)
-            val diskSize = (minOf(maxWidth * 0.44f, maxHeight * 0.34f)).coerceIn(132.dp, 186.dp)
-            val insertedItem = items.getOrNull(insertedIdx)
-            val pos = track.position.value
-            val impulse = track.dragImpulse.floatValue
-
-            Column(
-                Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                // UPPER STAGE: Sculpted 3D CRT Monitor with embedded 3.5" Floppy Drive Slot
-                CrtMonitorUnit(
-                    item = insertedItem,
-                    diskNumber = insertedIdx + 1,
-                    bootProgress = crtBoot.value,
-                    driveLedOn = driveLedOn,
-                    tilt = tilt,
-                    input = input,
-                    modifier = Modifier
-                        .size(crtW, crtH)
-                        .graphicsLayer {
-                            cameraDistance = 16f * density.density
-                            rotationY = tilt.x * 4f
-                            rotationX = -tilt.y * 3f
-                        },
-                )
-
-                // LOWER STAGE: Tactile 3.5" Floppy Disk Carousel (lifts into the CRT slot on focus!)
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .atelierHorizontalDrag(!input.preview, items.size, with(density) { 145.dp.toPx() }, track),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val visible = items.indices.filter { abs(it - pos) <= 2.6f }
-                    visible.forEach { i ->
-                        val d = i - pos
-                        val focused = i == track.activeIndex
-                        val inserted by animateFloatAsState(
-                            targetValue = if (focused && !input.preview) 1f else 0f,
-                            animationSpec = motion.crispSpring(),
-                            label = "floppyInsert_$i",
-                        )
-                        val item = items[i]
-                        val holoEnabled = (item as? ShelfCardItem.Project)?.card?.cover?.holo == true
-
-                        FloppyDisk35(
-                            item = item,
-                            diskCode = "DISK %02d".format(i + 1),
-                            tilt = tilt,
-                            focused = focused,
-                            holoBoost = holoEnabled,
-                            modifier = Modifier
-                                .size(diskSize)
-                                .zIndex(10f - abs(d))
-                                .graphicsLayer {
-                                    cameraDistance = 16f * density.density
-                                    val spread = diskSize.toPx() * 0.92f
-                                    translationX = d * spread + tilt.x * 7f
-                                    // Focused disk lifts upward & tilts back toward the CRT drive slot!
-                                    translationY = -inserted * 18.dp.toPx() + abs(d) * 14.dp.toPx()
-                                    rotationX = inserted * 16f - tilt.y * 5f
-                                    rotationY = (-d * 18f).coerceIn(-40f, 40f) + impulse * 6f + tilt.x * 6f
-                                    val s = (1f - abs(d) * 0.14f + inserted * 0.04f).coerceIn(0.74f, 1.06f)
-                                    scaleX = s
-                                    scaleY = s
-                                    alpha = (1f - abs(d) * 0.30f).coerceIn(0.24f, 1f)
-                                }
-                                .then(
-                                    if (input.preview) Modifier
-                                    else Modifier.clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = {
-                                            if (focused) {
-                                                haptics.perform(HapticToken.TICK)
-                                                item.trigger(input)
-                                            } else {
-                                                track.animateTo(i, items.size)
-                                            }
-                                        },
-                                    ),
-                                ),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** Sculpted Retro-Futuristic CRT Monitor with curved phosphor glass, scanlines, and 3.5" drive slot. */
-@Composable
-private fun CrtMonitorUnit(
-    item: ShelfCardItem?,
-    diskNumber: Int,
-    bootProgress: Float,
-    driveLedOn: Boolean,
-    tilt: DeviceTilt,
-    input: ShelfViewInput,
-    modifier: Modifier = Modifier,
-) {
-    val colors = CivilightTheme.colors
-    val chassisTop = if (colors.isDark) Color(0xFF23262E) else Color(0xFFDCD8CE)
-    val chassisBody = if (colors.isDark) Color(0xFF181A20) else Color(0xFFCFCAC0)
-    val chassisDark = if (colors.isDark) Color(0xFF0E1014) else Color(0xFF9C978C)
-    val phosphor = Color(0xFF8FB8E6) // Civilight cool cyan-blue phosphor glow
-    val screenBg = Color(0xFF080E14)
-    val shape = RoundedCornerShape(18.dp)
-
-    Box(
-        modifier
-            .clip(shape)
-            .drawBehind {
-                // Sculpted 3D monitor chassis bevel
-                drawRect(Brush.verticalGradient(listOf(chassisTop, chassisBody, chassisDark)))
-                // Top & left specular molding rim
-                drawRoundRect(
-                    color = Color.White.copy(alpha = if (colors.isDark) 0.18f else 0.55f),
-                    cornerRadius = CornerRadius(18.dp.toPx()),
-                    style = Stroke(1.5.dp.toPx()),
-                )
-            }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-    ) {
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Curved Phosphor CRT Glass Tube
-            val tubeShape = RoundedCornerShape(12.dp)
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(tubeShape)
-                    .background(screenBg)
-                    .insetOutline(Color.Black.copy(alpha = 0.75f), 2.dp, tubeShape)
-                    .then(
-                        if (input.preview || item == null) Modifier
-                        else Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { item.trigger(input) },
-                        ),
-                    ),
-            ) {
-                // Live CRT content scaled vertically by bootProgress (authentic CRT beam-open!)
-                if (item != null) {
-                    Column(
-                        Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleY = bootProgress.coerceIn(0.04f, 1f)
-                                alpha = bootProgress.coerceIn(0f, 1f)
-                            }
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        // Top terminal header
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            CivilightText(
-                                "CIVILIGHT OS · A:\\DISK_%02d".format(diskNumber),
-                                TextStyle(fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
-                                color = phosphor.copy(alpha = 0.82f),
-                                maxLines = 1,
-                            )
-                            CivilightText(
-                                AtelierCopy.CRT_READY,
-                                TextStyle(fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
-                                color = Color(0xFF7CE8B4),
-                                maxLines = 1,
-                            )
-                        }
-
-                        // Middle: phosphor-tinted cover thumbnail + live project metadata
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(56.dp, 72.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFF0E1B26))
-                                    .insetOutline(phosphor.copy(alpha = 0.45f), 1.dp, RoundedCornerShape(6.dp)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                when (item) {
-                                    is ShelfCardItem.Project -> CoverThumb(item.card.cover, Modifier.fillMaxSize())
-                                    is ShelfCardItem.Lock -> CivilightIcon(IconId.Lock, null, size = 20.dp, tint = phosphor)
-                                    ShelfCardItem.NewProject -> CivilightIcon(IconId.Plus, null, size = 20.dp, tint = phosphor)
-                                }
-                                // Phosphor tint glaze over thumbnail
-                                Box(Modifier.fillMaxSize().background(phosphor.copy(alpha = 0.14f)))
-                            }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                CivilightText(
-                                    item.displayTitle(),
-                                    TextStyle(fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold),
-                                    color = Color(0xFFEAF4FF),
-                                    maxLines = 2,
-                                )
-                                CivilightText(
-                                    item.displayMeta(),
-                                    TextStyle(fontSize = 11.sp, lineHeight = 15.sp, fontFamily = FontFamily.Monospace),
-                                    color = phosphor.copy(alpha = 0.85f),
-                                    maxLines = 1,
-                                )
-                                if (item is ShelfCardItem.Project) {
-                                    val pct = item.card.row.facts?.progress?.percent ?: 12
-                                    val blocks = (pct / 10).coerceIn(1, 10)
-                                    val bar = "█".repeat(blocks) + "░".repeat(10 - blocks)
-                                    CivilightText(
-                                        "[$bar] $pct%",
-                                        TextStyle(fontSize = 10.sp, lineHeight = 13.sp, fontFamily = FontFamily.Monospace),
-                                        color = phosphor.copy(alpha = 0.72f),
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
-                        }
-
-                        // Bottom action line
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            CivilightText(
-                                "> RUN ${AtelierCopy.OPEN}_",
-                                TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace),
-                                color = Color(0xFFEAF4FF).copy(alpha = 0.9f),
-                                maxLines = 1,
-                            )
-                            if (item is ShelfCardItem.Project && !input.preview) {
-                                CivilightText(
-                                    AtelierCopy.MENU,
-                                    TextStyle(fontSize = 10.sp, lineHeight = 14.sp, fontFamily = FontFamily.Monospace),
-                                    color = phosphor.copy(alpha = 0.85f),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .clickable { input.onMenu(item.card.row.key) }
-                                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // CRT Scanlines + Barrel Vignette + Curved Glass Reflection Arc
-                Canvas(Modifier.fillMaxSize()) {
-                    // Fine horizontal phosphor scanlines
-                    val step = 3.dp.toPx()
-                    var y = 0f
-                    while (y < size.height) {
-                        drawLine(Color.Black.copy(alpha = 0.24f), Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
-                        y += step
-                    }
-                    // Radial phosphor glow + dark corner barrel vignette
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(phosphor.copy(alpha = 0.08f), Color.Transparent, Color.Black.copy(alpha = 0.42f)),
-                            center = Offset(size.width * 0.5f, size.height * 0.5f),
-                            radius = size.maxDimension * 0.72f,
-                        ),
-                    )
-                    // Curved glass highlight arc shifted subtly by gyro tilt
-                    val gx = size.width * (0.26f + tilt.x * 0.08f)
-                    val gy = size.height * (0.14f + tilt.y * 0.05f)
-                    drawOval(
-                        brush = Brush.radialGradient(
-                            listOf(Color.White.copy(alpha = 0.14f), Color.Transparent),
-                            center = Offset(gx, gy),
-                            radius = size.width * 0.34f,
-                        ),
-                        topLeft = Offset(gx - size.width * 0.34f, gy - size.height * 0.18f),
-                        size = Size(size.width * 0.68f, size.height * 0.36f),
-                    )
-                }
-            }
-
-            // Lower Bezel: Nameplate + Power LED + Physical 3.5" Floppy Drive Slot
-            Row(
-                Modifier.fillMaxWidth().height(24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF5EE8A4)))
-                    CivilightText(
-                        "CIVILIGHT · CRT",
-                        TextStyle(fontSize = 9.sp, lineHeight = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
-                        color = colors.ink2,
-                        maxLines = 1,
-                    )
-                }
-                // 3.5" Floppy Drive Slot + Amber Activity LED
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(
-                        Modifier
-                            .width(108.dp)
-                            .height(10.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color(0xFF0A0B0E))
-                            .insetOutline(Color.White.copy(alpha = 0.16f), 1.dp, RoundedCornerShape(3.dp)),
-                    ) {
-                        // Inner drive bay notch
-                        Box(
-                            Modifier
-                                .align(Alignment.Center)
-                                .width(24.dp)
-                                .height(4.dp)
-                                .background(Color(0xFF1E222A)),
-                        )
-                    }
-                    // Drive activity LED (glows amber while booting)
-                    Box(
-                        Modifier
-                            .size(width = 10.dp, height = 5.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(if (driveLedOn) Color(0xFFF5B65B) else Color(0xFF3E352A)),
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** Hyper-detailed 3.5" Micro-Floppy Disk with chamfered corner, metallic shutter, holo seal, and paper label. */
-@Composable
-private fun FloppyDisk35(
-    item: ShelfCardItem,
-    diskCode: String,
-    tilt: DeviceTilt,
-    focused: Boolean,
-    holoBoost: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val colors = CivilightTheme.colors
-    val shellBase = spineTone(item.key.toString(), colors.isDark)
-
-    Box(modifier) {
-        // Outer chamfered ABS shell + sliding brushed-steel shutter + embossed hardware details
-        Canvas(Modifier.fillMaxSize()) {
-            val cut = 14.dp.toPx()
-            val r = 6.dp.toPx()
-            val shellPath = Path().apply {
-                moveTo(r, 0f)
-                lineTo(size.width - cut, 0f)
-                lineTo(size.width, cut)
-                lineTo(size.width, size.height - r)
-                lineTo(size.width - r, size.height)
-                lineTo(r, size.height)
-                lineTo(0f, size.height - r)
-                lineTo(0f, r)
-                close()
-            }
-            // Matte molded ABS shell gradient
-            drawPath(
-                path = shellPath,
-                brush = Brush.verticalGradient(
-                    listOf(shellBase.copy(alpha = 0.96f), shellBase, Color.Black.copy(alpha = 0.18f)),
-                ),
-            )
-            // Outer shell rim highlight
-            drawPath(
-                path = shellPath,
-                color = if (focused) colors.acc.copy(alpha = 0.72f) else Color.White.copy(alpha = 0.22f),
-                style = Stroke(width = if (focused) 1.5.dp.toPx() else 1.dp.toPx()),
-            )
-
-            // Top recessed shutter bay + brushed stainless-steel sliding metal shutter
-            val shutterW = size.width * 0.56f
-            val shutterH = size.height * 0.34f
-            val shutterLeft = size.width * 0.22f
-            drawRoundRect(
-                color = Color.Black.copy(alpha = 0.32f),
-                topLeft = Offset(shutterLeft - 3.dp.toPx(), 0f),
-                size = Size(shutterW + 6.dp.toPx(), shutterH + 2.dp.toPx()),
-                cornerRadius = CornerRadius(3.dp.toPx()),
-            )
-            val shimmerShift = (tilt.x * 24f)
-            drawRoundRect(
-                brush = Brush.linearGradient(
-                    colors = if (holoBoost) {
-                        listOf(Color(0xFFB8C2CE), Color(0xFF9AC5F0), Color(0xFFE7ECF2), Color(0xFFD2B4F5), Color(0xFF8A94A0))
-                    } else {
-                        listOf(Color(0xFFA9B2BC), Color(0xFFE6EBF0), Color(0xFF96A0AB), Color(0xFFD5DCE4))
-                    },
-                    start = Offset(shutterLeft + shimmerShift, 0f),
-                    end = Offset(shutterLeft + shutterW + shimmerShift, shutterH),
-                ),
-                topLeft = Offset(shutterLeft, 0f),
-                size = Size(shutterW, shutterH),
-                cornerRadius = CornerRadius(2.dp.toPx()),
-            )
-            // Rectangular read/write aperture window inside metal shutter
-            drawRoundRect(
-                color = Color(0xFF15181E),
-                topLeft = Offset(shutterLeft + shutterW * 0.62f, shutterH * 0.18f),
-                size = Size(shutterW * 0.22f, shutterH * 0.66f),
-                cornerRadius = CornerRadius(1.5.dp.toPx()),
-            )
-
-            // Embossed write-protect notch (bottom-left) & HD hole (bottom-right)
-            val holeSize = 7.dp.toPx()
-            drawRect(colors.bg, Offset(8.dp.toPx(), size.height - 15.dp.toPx()), Size(holeSize, holeSize))
-            drawRect(colors.bg, Offset(size.width - 15.dp.toPx(), size.height - 15.dp.toPx()), Size(holeSize, holeSize))
-        }
-
-        // Recessed printed paper label at bottom-center
-        val labelShape = RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp, bottomStart = 2.dp, bottomEnd = 2.dp)
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(0.76f)
-                .fillMaxHeight(0.56f)
-                .padding(bottom = 5.dp)
-                .clip(labelShape)
-                .background(Color(0xFFF3EFE6))
-                .insetOutline(Color.Black.copy(alpha = 0.16f), 1.dp, labelShape),
-        ) {
-            Column(Modifier.fillMaxSize()) {
-                // Colored top header stripe on floppy label
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(16.dp)
-                        .background(if (focused) colors.acc else Color(0xFF2B3544))
-                        .padding(horizontal = 6.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    CivilightText(
-                        diskCode,
-                        TextStyle(fontSize = 8.sp, lineHeight = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
-                        color = if (focused) colors.onpri else Color(0xFFF3EFE6),
-                        maxLines = 1,
-                    )
-                }
-                Row(
-                    Modifier.fillMaxSize().padding(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.size(30.dp, 38.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFFDAD5CA))) {
-                        when (item) {
-                            is ShelfCardItem.Project -> CoverThumb(item.card.cover, Modifier.fillMaxSize())
-                            is ShelfCardItem.Lock -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                CivilightIcon(IconId.Lock, null, size = 14.dp, tint = Color(0xFF33363E))
-                            }
-                            ShelfCardItem.NewProject -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                CivilightIcon(IconId.Plus, null, size = 14.dp, tint = Color(0xFF1F5590))
-                            }
-                        }
-                    }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        CivilightText(
-                            item.displayTitle(),
-                            TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold),
-                            color = Color(0xFF16171A),
-                            maxLines = 2,
-                        )
-                        CivilightText(
-                            item.displayMeta(),
-                            TextStyle(fontSize = 8.sp, lineHeight = 10.sp),
-                            color = Color(0xFF555860),
-                            maxLines = 1,
-                        )
                     }
                 }
             }

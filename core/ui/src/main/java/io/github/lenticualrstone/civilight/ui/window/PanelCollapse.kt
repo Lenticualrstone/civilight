@@ -4,8 +4,13 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -229,11 +234,20 @@ fun rememberPanelCollapseState(module: String): PanelCollapseState {
 fun Modifier.collapsedPanel(closed: Boolean): Modifier =
     if (!closed) this else clearAndSetSemantics { }.focusProperties { onEnter = { cancelFocusChange() } }.focusGroup()
 
+/** (0.4.0) One icon shortcut displayed on the collapsed mini icon rail. */
+data class MiniRailAction(
+    val icon: IconId,
+    val label: String,
+    val active: Boolean = false,
+    val onClick: () -> Unit,
+)
+
 /**
- * The seam button (r3 `.tgb`): a 20 × 64 `raise` tab with a 1 dp `edge` ring, straddling the seam while the panel is
- * open, moving onto the rail (24 × 64) while closed; its chevron turns with it. Touch area 44 × 72. Place it in a
- * full-size box of the frame; [panelDp] is the panel's open width. Label `패널 닫기` / `패널 열기`.
- * [extraActions] (the CNV-47 ratios) are offered as accessibility actions on the same button.
+ * (0.4.0) Unobtrusive seam control:
+ * - While open: renders an invisible full-height resize drag seam + a compact collapse button tucked cleanly
+ *   at the top of the panel edge (never a giant shadowed pill blocking the center of the viewport).
+ * - While closed: renders nothing (the collapsed [PanelRail] owns the reopen button + mini icon shortcuts,
+ *   eliminating the old duplicate reopen buttons).
  */
 @Composable
 fun PanelSeamButton(
@@ -244,35 +258,40 @@ fun PanelSeamButton(
     extraActions: List<CustomAccessibilityAction> = emptyList(),
     dragModifier: Modifier = Modifier,
 ) {
+    if (state.closed) return
     val colors = CivilightTheme.colors
-    val isLandscape = LocalWindowLayout.current.isLandscape
     val label = PanelRules.label(state.closed)
-    val shape = RoundedCornerShape(12.dp)
-    val tabShape = RoundedCornerShape(PanelRules.tabRadius(state.open).dp)
-    // M3 fold-aware placement: in inner landscape the horizontal crease runs at y = 50%, so shift
-    // the seam tab above the crease (y ≈ 30%) instead of placing it directly on the fold line.
-    val verticalAlignment = if (isLandscape) androidx.compose.ui.BiasAlignment(0f, -0.4f) else Alignment.Center
+    val shape = RoundedCornerShape(10.dp)
+    val statusTop = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(
         modifier
             .fillMaxHeight()
             .layout { measurable, constraints ->
-                val hitW = (PanelRules.TAB_HIT_WIDTH * density).roundToInt()
+                val hitW = (32f * density).roundToInt()
                 val p = measurable.measure(constraints.copy(minWidth = hitW, maxWidth = hitW))
-                val open = state.open
-                // The hit box is centred on the drawn tab.
-                val tabStart = PanelRules.tabInset(panelDp(), open, side) + PanelRules.tabWidth(open) / 2f - PanelRules.TAB_HIT_WIDTH / 2f
-                val x = (tabStart * density).roundToInt()
+                val seamX = ((panelDp() - 16f) * density).roundToInt().coerceAtLeast(0)
                 layout(constraints.maxWidth, p.height) {
-                    val px = if (side == PanelSide.START) x else constraints.maxWidth - x - p.width
+                    val px = if (side == PanelSide.START) seamX else constraints.maxWidth - seamX - p.width
                     p.place(IntOffset(px, 0))
                 }
             },
-        contentAlignment = verticalAlignment,
+        contentAlignment = Alignment.TopCenter,
     ) {
+        // Full-height invisible resize seam drag target
         Box(
             Modifier
-                .size(PanelRules.TAB_HIT_WIDTH.dp, PanelRules.TAB_HIT_HEIGHT.dp)
-                .then(dragModifier)
+                .fillMaxHeight()
+                .width(24.dp)
+                .then(dragModifier),
+        )
+        // Compact, unobtrusive collapse button tucked near the top header corner
+        Box(
+            Modifier
+                .padding(top = statusTop + 14.dp)
+                .size(28.dp)
+                .clip(shape)
+                .background(colors.bg.copy(alpha = 0.88f))
+                .insetOutline(colors.line, 1.dp, shape)
                 .pressable(onClick = state::toggle, scaleOnPress = false, shape = shape)
                 .semantics {
                     contentDescription = label
@@ -280,39 +299,29 @@ fun PanelSeamButton(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                Modifier
-                    .layout { measurable, _ ->
-                        val w = (PanelRules.tabWidth(state.open) * density).roundToInt()
-                        val h = (PanelRules.TAB_HEIGHT * density).roundToInt()
-                        val p = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(w, h))
-                        layout(w, h) { p.place(0, 0) }
-                    }
-                    .tokenShadow(tabShape, TabShadow)
-                    .clip(tabShape)
-                    .background(colors.raise)
-                    .insetOutline(colors.edge, 1.dp, tabShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                CivilightIcon(
-                    IconId.Back,
-                    contentDescription = null,
-                    size = 16.dp,
-                    tint = colors.ink2,
-                    modifier = Modifier.graphicsLayer { rotationZ = PanelRules.chevronDegrees(side, state.open) },
-                )
-            }
+            CivilightIcon(
+                IconId.Back,
+                contentDescription = null,
+                size = 14.dp,
+                tint = colors.ink2,
+                modifier = Modifier.graphicsLayer { rotationZ = PanelRules.chevronDegrees(side, state.open) },
+            )
         }
     }
 }
 
 /**
- * The closed panel's rail (r3 `.rail`): [PanelRules.RAIL] dp of `bg` with a 1 dp `line` toward the main pane and
- * the 44 dp `패널 열기` button 22 dp from the top. It fades in after the panel has gone (and out at once on reopen).
- * Place it at the panel's edge of a full-size box; it draws nothing while the panel is open.
+ * (0.4.0) Customizable mini icon rail shown when a foldable side panel is collapsed:
+ * Top reopen button (`IconId.Panel`) + hairline + user-configured [actions] icons.
  */
 @Composable
-fun PanelRail(state: PanelCollapseState, side: PanelSide, modifier: Modifier = Modifier, topInset: Dp = 0.dp) {
+fun PanelRail(
+    state: PanelCollapseState,
+    side: PanelSide,
+    modifier: Modifier = Modifier,
+    topInset: Dp = 0.dp,
+    actions: List<MiniRailAction> = emptyList(),
+) {
     if (!state.closed && state.open >= 1f) return
     val colors = CivilightTheme.colors
     val alpha = { (1f - state.open).coerceIn(0f, 1f) }
@@ -330,23 +339,51 @@ fun PanelRail(state: PanelCollapseState, side: PanelSide, modifier: Modifier = M
             .then(if (state.closed) Modifier else Modifier.clearAndSetSemantics { }),
     ) {
         if (state.closed) {
-            Box(
-                Modifier
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(PanelRules.RAIL.dp)
                     .align(if (side == PanelSide.START) Alignment.TopStart else Alignment.TopEnd)
-                    .layout { measurable, constraints ->
-                        val p = measurable.measure(constraints)
-                        val x = (PanelRules.REOPEN_INSET * density).roundToInt()
-                        val y = ((PanelRules.REOPEN_TOP * density) + topInset.roundToPx()).roundToInt()
-                        layout(constraints.maxWidth, p.height + y) {
-                            p.place(if (side == PanelSide.START) x else constraints.maxWidth - x - p.width, y)
+                    .padding(top = topInset + 16.dp, bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(PanelRules.REOPEN_SIZE.dp)
+                        .pressable(onClick = { state.setClosed(false) }, scaleOnPress = false, shape = RoundedCornerShape(12.dp))
+                        .semantics { contentDescription = PanelCopy.OPEN },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CivilightIcon(IconId.Panel, contentDescription = null, size = 20.dp, tint = colors.acc)
+                }
+                if (actions.isNotEmpty()) {
+                    Box(
+                        Modifier
+                            .width(24.dp)
+                            .height(1.dp)
+                            .background(colors.line),
+                    )
+                    actions.forEach { action ->
+                        val itemShape = RoundedCornerShape(12.dp)
+                        Box(
+                            Modifier
+                                .size(40.dp)
+                                .clip(itemShape)
+                                .background(if (action.active) colors.sel else androidx.compose.ui.graphics.Color.Transparent)
+                                .pressable(onClick = action.onClick, scaleOnPress = false, shape = itemShape)
+                                .semantics { contentDescription = action.label },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CivilightIcon(
+                                action.icon,
+                                contentDescription = null,
+                                size = 19.dp,
+                                tint = if (action.active) colors.acc else colors.ink2,
+                            )
                         }
                     }
-                    .size(PanelRules.REOPEN_SIZE.dp)
-                    .pressable(onClick = { state.setClosed(false) }, scaleOnPress = false, shape = RoundedCornerShape(12.dp))
-                    .semantics { contentDescription = PanelCopy.OPEN },
-                contentAlignment = Alignment.Center,
-            ) {
-                CivilightIcon(IconId.Panel, contentDescription = null, size = 20.dp, tint = colors.ink)
+                }
             }
         }
     }

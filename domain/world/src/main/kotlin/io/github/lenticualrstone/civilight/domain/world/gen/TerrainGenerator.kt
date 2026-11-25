@@ -332,19 +332,63 @@ object TerrainGenerator {
         }
         val land = (0 until grid.size).filter { coast.land[it] }
         val values = land.map { moisture[it] }
-        val dry = quantile(values, 0.18)
-        val wet = quantile(values, 0.62)
-        val soaked = quantile(values, 0.95)
-        val low = quantile(land.map { m.heights[it].toDouble() }, 0.25)
-        val out = CharArray(grid.size) { i ->
-            if (!coast.land[i]) return@CharArray '.'
-            val rugged = m.relief[i] == 'm' || m.relief[i] == 'p'
-            when {
-                rugged -> 'g'
-                moisture[i] < dry -> 'd'
-                moisture[i] >= soaked && m.heights[i] <= low -> 's'
-                moisture[i] >= wet -> 'f'
-                else -> 'g'
+        val explicitBand = input.choice(GenerationStepKind.FOREST_CLIMATE, StepChoices.CLIMATE_BAND)
+        val explicitScale = input.choice(GenerationStepKind.COAST, StepChoices.SCALE)
+        val out = if (explicitBand == null && explicitScale == null) {
+            // Preserve byte-for-byte determinism for existing stored gen-1 maps without 0.4.0 climate/scale choices
+            val dry = quantile(values, 0.18)
+            val wet = quantile(values, 0.62)
+            val soaked = quantile(values, 0.95)
+            val low = quantile(land.map { m.heights[it].toDouble() }, 0.25)
+            CharArray(grid.size) { i ->
+                if (!coast.land[i]) return@CharArray '.'
+                val rugged = m.relief[i] == 'm' || m.relief[i] == 'p'
+                when {
+                    rugged -> 'g'
+                    moisture[i] < dry -> 'd'
+                    moisture[i] >= soaked && m.heights[i] <= low -> 's'
+                    moisture[i] >= wet -> 'f'
+                    else -> 'g'
+                }
+            }
+        } else {
+            val band = explicitBand ?: StepChoices.CLIMATE_DEFAULT
+            val scale = explicitScale ?: StepChoices.SCALE_DEFAULT
+            val dryQ = when (band) {
+                "건조" -> 0.48
+                "한대" -> 0.08
+                "열대" -> 0.06
+                else -> 0.18
+            }
+            val wetQ = when (band) {
+                "건조" -> 0.84
+                "열대" -> 0.36
+                else -> 0.62
+            }
+            val dry = quantile(values, dryQ)
+            val wet = quantile(values, wetQ)
+            val soaked = quantile(values, if (band == "열대") 0.86 else 0.95)
+            val low = quantile(land.map { m.heights[it].toDouble() }, 0.25)
+            val hasLatGradient = scale == "대륙" || scale == "세계" || band == "다양"
+            CharArray(grid.size) { i ->
+                if (!coast.land[i]) return@CharArray '.'
+                val rugged = m.relief[i] == 'm' || m.relief[i] == 'p'
+                val latDist = kotlin.math.abs(grid.y(i) - 0.5) * 2.0
+                val elev = m.heights[i] / 1000.0
+                val temp = when (band) {
+                    "한대" -> 0.15 - elev * 0.4
+                    "열대" -> 0.90 - elev * 0.35
+                    "건조" -> 0.82 - elev * 0.3
+                    else -> (if (hasLatGradient) 0.95 - latDist * 0.85 else 0.58) - elev * 0.45
+                }
+                when {
+                    temp < 0.18 -> 'n'
+                    rugged -> 'g'
+                    moisture[i] < dry && temp > 0.45 -> 'd'
+                    moisture[i] >= soaked && m.heights[i] <= low && temp > 0.30 -> 's'
+                    moisture[i] >= wet -> 'f'
+                    else -> 'g'
+                }
             }
         }
         // Condition areas take their class where the cell allows it (land, not rugged).

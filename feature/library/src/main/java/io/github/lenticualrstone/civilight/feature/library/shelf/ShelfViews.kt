@@ -7,6 +7,7 @@ import io.github.lenticualrstone.civilight.feature.library.settings.ViewStyles
 import io.github.lenticualrstone.civilight.feature.library.shelf.atelier.AtelierRegistry
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.app.AppSettings
+import io.github.lenticualrstone.civilight.model.app.DragResistance
 import io.github.lenticualrstone.civilight.model.app.LibraryStyle
 import io.github.lenticualrstone.civilight.model.app.ShownView
 
@@ -45,6 +46,8 @@ data class ShelfViewInput(
     val preview: Boolean = false,
     /** (0.2.3) LIB-19 `프로젝트 숨기기`: the project whose `⋯` the tour points at (flat views). */
     val tourMenuKey: io.github.lenticualrstone.civilight.model.Key? = null,
+    /** (0.4.0) Configurable mechanical detent drag resistance for Atelier shelves. */
+    val dragResistance: DragResistance = DragResistance.FIRM,
 )
 
 /** One 서재 3D view (U-16 boards `u16_lib_a` … `c`). Motion only through `CivilightMotion`. */
@@ -79,6 +82,10 @@ data class ShelfViewUi(
     val toggle: ShelfToggleUi?,
     /** `AppSettings.viewTilt` (LIB-94); the screen adds the reduced-motion half of `Tilt.follows`. */
     val viewTilt: Boolean = true,
+    /** (0.4.0) Configurable drag resistance preset. */
+    val dragResistance: DragResistance = DragResistance.FIRM,
+    /** (0.4.0) Experimental Life Recorder visibility flag. */
+    val lifeRecorderEnabled: Boolean = false,
 )
 
 object ShelfViews {
@@ -91,7 +98,15 @@ object ShelfViews {
             null
         }
         val rendered = shown.takeIf { it in available }
-        return ShelfViewUi(chosen, shown, rendered, toggle, settings.viewTilt)
+        return ShelfViewUi(
+            chosen = chosen,
+            shown = shown,
+            rendered = rendered,
+            toggle = toggle,
+            viewTilt = settings.viewTilt,
+            dragResistance = settings.dragResistance,
+            lifeRecorderEnabled = settings.lifeRecorderEnabled,
+        )
     }
 
     /** The 3D view is drawn only with projects to show: 0 projects shows the LIB-70 empty card (V-05). */

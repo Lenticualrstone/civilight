@@ -916,14 +916,51 @@ private fun ScriptFrame(
                             editableEmpty = { _, _ -> },
                             onPanel = { row, tab -> openPanel(row.blockKey, tab) },
                             onReveal = { key -> revealedRow = key; if (key == null) revealedSide = SwipeSide.CLOSED },
-                            onTapTarget = { _, tap ->
+                            onTapTarget = { row, tap ->
                                 when (tap) {
                                     // SCR-59: the record opens in the recorder (audio plays there).
                                     is BlockTap.Source -> {
                                         deps.navigator.push(RecorderRecordDetail(tap.recordKey))
                                         true
                                     }
-                                    // SCR-55, SCR-56: a link or a candidate only selects its block.
+                                    // (0.4.0) Short tap on an `@` mention opens a quick-info sheet or navigates
+                                    // cleanly without interfering with block long-press or horizontal swipe.
+                                    is BlockTap.Link -> {
+                                        val link = tap.link
+                                        val openLive = when (link.target.kind.known) {
+                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.CHARACTER ->
+                                                doc.index.character(link.target.key)?.takeIf { it.deletedAt == null }?.let {
+                                                    deps.navigator.push(io.github.lenticualrstone.civilight.navigation.CharacterProfile(route.projectKey, it.key))
+                                                    true
+                                                } ?: false
+                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.TERM ->
+                                                doc.index.term(link.target.key)?.takeIf { it.deletedAt == null }?.let {
+                                                    deps.navigator.push(io.github.lenticualrstone.civilight.navigation.TermCard(route.projectKey, it.key))
+                                                    true
+                                                } ?: false
+                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.PLACE ->
+                                                doc.index.place(link.target.key)?.takeIf { it.deletedAt == null }?.let {
+                                                    deps.navigator.push(io.github.lenticualrstone.civilight.navigation.PlaceCard(route.projectKey, it.key))
+                                                    true
+                                                } ?: false
+                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.FACTION ->
+                                                doc.index.faction(link.target.key)?.takeIf { it.deletedAt == null }?.let {
+                                                    deps.navigator.push(io.github.lenticualrstone.civilight.navigation.FactionCard(route.projectKey, it.key))
+                                                    true
+                                                } ?: false
+                                            else -> false
+                                        }
+                                        if (!openLive) {
+                                            sheets.open(
+                                                io.github.lenticualrstone.civilight.feature.script.links.LinkCardSheetKey(
+                                                    projectKey = route.projectKey,
+                                                    blockKey = row.blockKey,
+                                                    linkKey = link.linkKey,
+                                                ),
+                                            )
+                                        }
+                                        true
+                                    }
                                     else -> false
                                 }
                             },
@@ -970,22 +1007,68 @@ private fun ScriptFrame(
             }
         }
         val panelWidth = rememberLastNonNull(targetLayout.panelWidth.takeIf { targetLayout.panel }) ?: ScriptLayout.panelWidthFor(widthDp, heightDp)
-        // r3 closed state (`LScriptShut` / `PScriptShut`): the shared rail with `패널 열기`, fading in as the panel leaves.
-        // Not drawn while the panel is out of the way for a while (select mode, tabletop) or does not fit.
         val seamShown = targetLayout.panel || targetLayout.rail
+        val scriptSettings by deps.settings.collectAsState()
         if (seamShown) {
+            val railActions = scriptSettings.miniRailScript.mapNotNull { item ->
+                when (item) {
+                    io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.TIME ->
+                        io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
+                            icon = IconId.Clock,
+                            label = "시간",
+                            active = panelTab == PanelTab.TIME,
+                            onClick = { vm.setPanelTab(PanelTab.TIME); panelState.setClosed(false) },
+                        )
+                    io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.REF ->
+                        io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
+                            icon = IconId.Book,
+                            label = "참고",
+                            active = panelTab == PanelTab.REF,
+                            onClick = { vm.setPanelTab(PanelTab.REF); panelState.setClosed(false) },
+                        )
+                    io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.PROPS ->
+                        io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
+                            icon = IconId.Sliders,
+                            label = "속성",
+                            active = panelTab == PanelTab.PROPS,
+                            onClick = { vm.setPanelTab(PanelTab.PROPS); panelState.setClosed(false) },
+                        )
+                    io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.MODS ->
+                        io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
+                            icon = IconId.Grid,
+                            label = "모듈",
+                            active = panelTab == PanelTab.MODS,
+                            onClick = { vm.setPanelTab(PanelTab.MODS); panelState.setClosed(false) },
+                        )
+                    io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.OUTLINE ->
+                        io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
+                            icon = IconId.Outline,
+                            label = "씬 목차",
+                            onClick = {
+                                header.sceneKey?.let { scene ->
+                                    sheets.open(PositionSheetKey(route.projectKey, scene, header.positionLabel.orEmpty()))
+                                }
+                            },
+                        )
+                    io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.SPEAKER_FOCUS ->
+                        io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
+                            icon = IconId.User,
+                            label = "화자 포커스",
+                            onClick = { sheets.open(LayersSheetKey(route.projectKey)) },
+                        )
+                }
+            }
             PanelRail(
                 panelState,
                 PanelSide.END,
                 Modifier.align(Alignment.TopEnd),
                 topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                actions = railActions,
             )
         }
         AnimatedVisibility(
             visible = targetLayout.panel,
             modifier = Modifier.align(Alignment.TopEnd),
-            // To or from the rail (seam button, rail, a block's panel button) the panel slides out of the frame; any
-            // other arrival (unfold, select mode or tabletop ending) keeps the unfold entrance (CNV-34).
             enter = if (ScriptLayout.slidesFromRail(beforePanel)) motion.panelToggleEnter() else motion.panelEnter(),
             exit = if (ScriptLayout.slidesFromRail(targetLayout)) motion.panelToggleExit() else motion.panelExit(),
         ) {
@@ -999,15 +1082,7 @@ private fun ScriptFrame(
                 panel?.takeIf { it.tab == tab }?.let { PanelBody(it, wide = true, actions = actions, c = c, vm = vm) }
             }
         }
-        if (targetLayout.panel) {
-            // CNV-47 ratio grip: kept, but below the r3 seam tab, which owns the seam's centre (the boards draw no grip).
-            PaneSplitHandle(
-                paneSplit,
-                Modifier.align(Alignment.CenterStart).offset(x = (targetLayout.areaWidth - HANDLE_HALF).dp, y = SPLIT_GRIP_DROP),
-            )
-        }
         if (seamShown) {
-            // r3 `.tgb`: on the seam while open (the panel's width from the right edge), on the rail while closed.
             PanelSeamButton(
                 panelState,
                 PanelSide.END,

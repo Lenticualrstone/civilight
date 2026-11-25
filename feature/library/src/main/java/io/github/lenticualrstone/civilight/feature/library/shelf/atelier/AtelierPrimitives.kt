@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -75,14 +76,16 @@ import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCardItem
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCards
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfCopy
 import io.github.lenticualrstone.civilight.feature.library.shelf.ShelfViewInput
+import io.github.lenticualrstone.civilight.model.app.DragResistance
 import io.github.lenticualrstone.civilight.model.app.LibraryStyle
 import io.github.lenticualrstone.civilight.model.project.ProjectFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
-/** Terse Korean copy for all 7 Atelier library views (CopyLint-verified). */
+/** Terse Korean copy for all 6 Atelier library views (CopyLint-verified). */
 object AtelierCopy {
     const val GROUP_SPATIAL = "오브젝트 · 3D"
     const val GROUP_SPATIAL_SHORT = "3D"
@@ -90,7 +93,6 @@ object AtelierCopy {
     const val GROUP_KINETIC_SHORT = "작업"
 
     const val CD_JEWEL_CASE = "CD 케이스"
-    const val FLOPPY_CRT = "플로피 · CRT"
     const val KINETIC_DECK = "탄성 덱"
     const val BENTO_MOSAIC = "모자이크"
     const val FILM_REEL = "필름 릴"
@@ -98,7 +100,6 @@ object AtelierCopy {
     const val STUDIO_LIST = "스튜디오 목록"
 
     const val FRAG_CD_JEWEL_CASE = "3D 주얼 케이스 · 홀로그램 CD"
-    const val FRAG_FLOPPY_CRT = "3.5인치 플로피 · CRT 삽입"
     const val FRAG_KINETIC_DECK = "기계식 힌지 텐션 · 부채꼴 덱"
     const val FRAG_BENTO_MOSAIC = "에디토리얼 격자 · 포커스"
     const val FRAG_FILM_REEL = "35mm 필름 · 내부 패럴랙스"
@@ -115,22 +116,19 @@ object AtelierCopy {
     const val FORMAT_SHORT = "단편"
     const val FORMAT_SETTING = "설정"
     const val CD_OPEN_LID = "케이스 열기"
-    const val CRT_INSERT = "디스크 넣기"
-    const val CRT_READY = "준비됨"
 
     val all: List<String> = listOf(
         GROUP_SPATIAL, GROUP_SPATIAL_SHORT, GROUP_KINETIC, GROUP_KINETIC_SHORT,
-        CD_JEWEL_CASE, FLOPPY_CRT,
+        CD_JEWEL_CASE,
         KINETIC_DECK, BENTO_MOSAIC, FILM_REEL, PULSE_TIMELINE, STUDIO_LIST,
-        FRAG_CD_JEWEL_CASE, FRAG_FLOPPY_CRT,
+        FRAG_CD_JEWEL_CASE,
         FRAG_KINETIC_DECK, FRAG_BENTO_MOSAIC, FRAG_FILM_REEL, FRAG_PULSE_TIMELINE, FRAG_STUDIO_LIST,
         OPEN, UNLOCK, NEW_PROJECT, LOCKED_PROJECT, RECENT_FILES, MENU,
-        FORMAT_SERIAL, FORMAT_SHORT, FORMAT_SETTING, CD_OPEN_LID, CRT_INSERT, CRT_READY,
+        FORMAT_SERIAL, FORMAT_SHORT, FORMAT_SETTING, CD_OPEN_LID,
     )
 
     fun label(style: LibraryStyle): String = when (style) {
         LibraryStyle.CD_JEWEL_CASE -> CD_JEWEL_CASE
-        LibraryStyle.FLOPPY_CRT -> FLOPPY_CRT
         LibraryStyle.KINETIC_DECK -> KINETIC_DECK
         LibraryStyle.BENTO_MOSAIC -> BENTO_MOSAIC
         LibraryStyle.FILM_REEL -> FILM_REEL
@@ -140,7 +138,6 @@ object AtelierCopy {
 
     fun frag(style: LibraryStyle): String = when (style) {
         LibraryStyle.CD_JEWEL_CASE -> FRAG_CD_JEWEL_CASE
-        LibraryStyle.FLOPPY_CRT -> FRAG_FLOPPY_CRT
         LibraryStyle.KINETIC_DECK -> FRAG_KINETIC_DECK
         LibraryStyle.BENTO_MOSAIC -> FRAG_BENTO_MOSAIC
         LibraryStyle.FILM_REEL -> FRAG_FILM_REEL
@@ -156,42 +153,106 @@ object AtelierCopy {
 }
 
 /**
+ * Pure mechanical 1-step detent physics (0.4.0):
+ * - Builds tangible resistance before [DragResistance.breakawayThreshold]
+ * - Releases smoothly past the breakaway notch with a crisp haptic tick
+ * - Locks settle target to ±1 step (or ±2 only on a deliberate hard flick)
+ */
+object DetentPhysics {
+    fun applyResistance(rawOffset: Float, resistance: DragResistance): Float {
+        val mag = abs(rawOffset)
+        val s = sign(rawOffset)
+        val t = resistance.breakawayThreshold
+        val gain = resistance.preBreakawayGain
+        return if (mag <= t) {
+            s * (mag * gain)
+        } else {
+            val base = t * gain
+            val excess = mag - t
+            // Smooth acceleration once past the mechanical notch
+            val postGain = (gain + (1f - gain) * (excess / (1f - t)).coerceIn(0f, 1f))
+            s * (base + excess * postGain)
+        }
+    }
+
+    fun settleTarget(
+        anchorIndex: Int,
+        rawOffset: Float,
+        velocityItemsPerSec: Float,
+        count: Int,
+        resistance: DragResistance,
+    ): Int {
+        if (count <= 0) return 0
+        val t = resistance.breakawayThreshold
+        val step = when {
+            velocityItemsPerSec >= 6.8f && rawOffset > t * 0.5f -> 2
+            velocityItemsPerSec <= -6.8f && rawOffset < -t * 0.5f -> -2
+            rawOffset >= t || velocityItemsPerSec >= 2.1f -> 1
+            rawOffset <= -t || velocityItemsPerSec <= -2.1f -> -1
+            else -> 0
+        }
+        return (anchorIndex + step).coerceIn(0, count - 1)
+    }
+}
+
+/**
  * Continuous spring-physics position state shared by the spatial & kinetic Atelier stages.
- * Keeps drag deltas in stationary parent coordinates (zero jitter) and fires a subtle haptic
- * tick when crossing an item index.
+ * Applies non-linear breakaway resistance before each detent and locks settle to mechanical 1-step clicks.
  */
 @Stable
 internal class AtelierTrackState(
     initialIndex: Int,
     private val scope: CoroutineScope,
     private val motion: io.github.lenticualrstone.civilight.designsystem.theme.Motion,
+    val resistance: DragResistance,
     private val onTick: () -> Unit,
 ) {
     val position = Animatable(initialIndex.toFloat())
     var lastHapticIndex by mutableIntStateOf(initialIndex)
         private set
 
-    /** Live normalized drag velocity (-1f..1f) for immediate zero-lag mechanical lean while dragging. */
+    private var dragAnchorIndex: Int = initialIndex
+    private var rawDragOffset: Float = 0f
+    private var breakawayFired: Boolean = false
+
+    /** Live normalized drag tension (-1f..1f) for immediate zero-lag mechanical lean while dragging. */
     val dragImpulse = androidx.compose.runtime.mutableFloatStateOf(0f)
 
     val activeIndex: Int
         get() = position.value.roundToInt()
 
+    fun beginDrag() {
+        dragAnchorIndex = position.value.roundToInt()
+        rawDragOffset = 0f
+        breakawayFired = false
+    }
+
     fun dragBy(deltaItems: Float, count: Int) {
         if (count <= 0) return
         val max = (count - 1).toFloat()
-        // Rubber-band resistance past ends so you feel mechanical tension at boundaries.
-        val raw = position.value + deltaItems
+        rawDragOffset = (rawDragOffset + deltaItems).coerceIn(-1.65f, 1.65f)
+        val resisted = DetentPhysics.applyResistance(rawDragOffset, resistance)
+        val target = dragAnchorIndex + resisted
         val next = when {
-            raw < 0f -> (position.value + deltaItems * 0.35f).coerceAtLeast(-0.32f)
-            raw > max -> (position.value + deltaItems * 0.35f).coerceAtMost(max + 0.32f)
-            else -> raw
+            target < 0f -> (target * 0.35f).coerceAtLeast(-0.28f)
+            target > max -> max + ((target - max) * 0.35f).coerceAtMost(0.28f)
+            else -> target
         }
-        dragImpulse.floatValue = (deltaItems * 14f).coerceIn(-1f, 1f)
+        // Tension peaks just before breakaway for authentic mechanical hinge lean
+        dragImpulse.floatValue = (rawDragOffset / resistance.breakawayThreshold.coerceAtLeast(0.1f)).coerceIn(-1f, 1f)
         scope.launch { position.snapTo(next) }
-        val crossed = next.roundToInt().coerceIn(0, count - 1)
-        if (crossed != lastHapticIndex) {
-            lastHapticIndex = crossed
+
+        val pastNotch = abs(rawDragOffset) >= resistance.breakawayThreshold
+        if (pastNotch && !breakawayFired) {
+            breakawayFired = true
+            val intended = (dragAnchorIndex + sign(rawDragOffset).toInt()).coerceIn(0, count - 1)
+            if (intended != dragAnchorIndex) {
+                lastHapticIndex = intended
+                onTick()
+            }
+        } else if (!pastNotch && breakawayFired) {
+            breakawayFired = false
+            lastHapticIndex = dragAnchorIndex
             onTick()
         }
     }
@@ -199,23 +260,36 @@ internal class AtelierTrackState(
     fun settle(count: Int, velocityItemsPerSec: Float = 0f) {
         dragImpulse.floatValue = 0f
         if (count <= 0) return
-        val bias = (velocityItemsPerSec * 0.12f).coerceIn(-0.9f, 0.9f)
-        val target = (position.value + bias).roundToInt().coerceIn(0, count - 1)
-        animateTo(target, count, initialVelocity = velocityItemsPerSec.coerceIn(-8f, 8f))
+        val target = DetentPhysics.settleTarget(
+            anchorIndex = dragAnchorIndex,
+            rawOffset = rawDragOffset,
+            velocityItemsPerSec = velocityItemsPerSec,
+            count = count,
+            resistance = resistance,
+        )
+        rawDragOffset = 0f
+        breakawayFired = false
+        animateTo(target, count, initialVelocity = (velocityItemsPerSec * 0.45f).coerceIn(-4.5f, 4.5f))
     }
 
     fun animateTo(index: Int, count: Int, initialVelocity: Float = 0f) {
         dragImpulse.floatValue = 0f
         if (count <= 0) return
         val target = index.coerceIn(0, count - 1)
-        lastHapticIndex = target
+        if (target != lastHapticIndex) {
+            lastHapticIndex = target
+            onTick()
+        }
         scope.launch {
             if (motion.reduced) {
                 position.snapTo(target.toFloat())
             } else {
                 position.animateTo(
                     targetValue = target.toFloat(),
-                    animationSpec = motion.hingeTension(),
+                    animationSpec = motion.hingeTension(
+                        dampingRatio = resistance.springDamping,
+                        stiffness = resistance.springStiffness,
+                    ),
                     initialVelocity = initialVelocity,
                 )
             }
@@ -228,6 +302,7 @@ internal fun rememberAtelierTrack(
     items: List<ShelfCardItem>,
     selectedKey: String?,
     preview: Boolean,
+    resistance: DragResistance = DragResistance.FIRM,
 ): AtelierTrackState {
     val scope = rememberCoroutineScope()
     val motion = CivilightTheme.motion
@@ -235,8 +310,8 @@ internal fun rememberAtelierTrack(
     val initial = remember(items.size) {
         selectedKey?.let { key -> items.indexOfFirst { (it as? ShelfCardItem.Project)?.card?.row?.key == key }.takeIf { it >= 0 } } ?: 0
     }
-    val state = remember(motion.reduced, preview) {
-        AtelierTrackState(initial, scope, motion) {
+    val state = remember(motion.reduced, preview, resistance) {
+        AtelierTrackState(initial, scope, motion, resistance) {
             if (!preview) haptics.perform(HapticToken.TICK)
         }
     }
@@ -258,22 +333,26 @@ internal fun Modifier.atelierHorizontalDrag(
     track: AtelierTrackState,
 ): Modifier {
     if (!enabled || count <= 1) return this
-    return this.pointerInput(count, pxPerItem, track) {
-        var lastDelta = 0f
+    val effectivePx = (pxPerItem * track.resistance.stepDistanceScale).coerceAtLeast(1f)
+    return this.pointerInput(count, effectivePx, track) {
+        val tracker = VelocityTracker()
         detectHorizontalDragGestures(
+            onDragStart = {
+                tracker.resetTracking()
+                track.beginDrag()
+            },
             onDragEnd = {
-                val vel = (-lastDelta / pxPerItem.coerceAtLeast(1f) * 32f)
-                track.settle(count, vel)
-                lastDelta = 0f
+                val velPx = tracker.calculateVelocity().x
+                val velItems = -velPx / effectivePx
+                track.settle(count, velItems)
             },
             onDragCancel = {
                 track.settle(count, 0f)
-                lastDelta = 0f
             },
             onHorizontalDrag = { change, dragAmount ->
                 change.consume()
-                lastDelta = dragAmount
-                track.dragBy(-dragAmount / pxPerItem.coerceAtLeast(1f), count)
+                tracker.addPosition(change.uptimeMillis, change.position)
+                track.dragBy(-dragAmount / effectivePx, count)
             },
         )
     }
@@ -286,22 +365,26 @@ internal fun Modifier.atelierVerticalDrag(
     track: AtelierTrackState,
 ): Modifier {
     if (!enabled || count <= 1) return this
-    return this.pointerInput(count, pxPerItem, track) {
-        var lastDelta = 0f
+    val effectivePx = (pxPerItem * track.resistance.stepDistanceScale).coerceAtLeast(1f)
+    return this.pointerInput(count, effectivePx, track) {
+        val tracker = VelocityTracker()
         detectVerticalDragGestures(
+            onDragStart = {
+                tracker.resetTracking()
+                track.beginDrag()
+            },
             onDragEnd = {
-                val bias = (-lastDelta / pxPerItem.coerceAtLeast(1f) * 2.2f).coerceIn(-0.85f, 0.85f)
-                track.settle(count, bias)
-                lastDelta = 0f
+                val velPx = tracker.calculateVelocity().y
+                val velItems = -velPx / effectivePx
+                track.settle(count, velItems)
             },
             onDragCancel = {
                 track.settle(count, 0f)
-                lastDelta = 0f
             },
             onVerticalDrag = { change, dragAmount ->
                 change.consume()
-                lastDelta = dragAmount
-                track.dragBy(-dragAmount / pxPerItem.coerceAtLeast(1f), count)
+                tracker.addPosition(change.uptimeMillis, change.position)
+                track.dragBy(-dragAmount / effectivePx, count)
             },
         )
     }

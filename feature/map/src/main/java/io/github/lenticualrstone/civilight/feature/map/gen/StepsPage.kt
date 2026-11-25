@@ -99,7 +99,7 @@ internal fun StepsPage(
             if (inner) CivilightButton(MapCopy.BTN_START_MAP, onStart, variant = ButtonVariant.COMPACT_PRIMARY, enabled = !readOnly)
         },
         bottomBar = if (inner) null else ({
-            BottomGlassBar(barHeight = 92.dp) {
+            BottomGlassBar(barHeight = 92.dp, inner = inner) {
                 ButtonRow(Modifier.fillMaxWidth()) {
                     CivilightButton(ui.historyLabel, { sheets.open(CandidateHistorySheet) }, Modifier.weight(1f), variant = ButtonVariant.GHOST)
                     CivilightButton(MapCopy.BTN_START_MAP, onStart, Modifier.weight(2f), enabled = !readOnly)
@@ -190,12 +190,64 @@ internal fun StepsPage(
     }
 }
 
-/** `기본`: `대륙 · 두 대륙 · 섬 무리 · 한 지역` and `바다 많음 · 반반 · 땅 많음`. */
+/** `기본`: `대륙 · 두 대륙 · 섬 무리 · 한 지역`, `바다 많음 · 반반 · 땅 많음`, 지도 규모, 마스터 시드 입력. */
 @Composable
 private fun BaseSection(ui: GenUi, state: GenFlowState, set: (GenFlowState) -> Unit) {
+    val selectedScale = state.session().step(io.github.lenticualrstone.civilight.model.map.GenerationStepKind.COAST)
+        .choices[io.github.lenticualrstone.civilight.domain.world.gen.StepChoices.SCALE]
+        ?: io.github.lenticualrstone.civilight.domain.world.gen.StepChoices.SCALE_DEFAULT
+    val seedInput = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     SectionLabel(MapCopy.GEN_BASE)
     ChipFlow { ui.kinds.forEachIndexed { i, k -> FilterChip(k, i == ui.kindIndex, { set(GenFlow.kind(state, GeneratedMapKind.entries[i])) }) } }
     ChipFlow { ui.ratios.forEachIndexed { i, r -> FilterChip(r, i == ui.ratioIndex, { set(GenFlow.ratio(state, LandRatio.entries[i])) }) } }
+    SectionLabel("지도 규모", Modifier.padding(top = 6.dp))
+    ChipFlow {
+        io.github.lenticualrstone.civilight.domain.world.gen.StepChoices.SCALES.forEach { scale ->
+            FilterChip(
+                label = scale,
+                selected = scale == selectedScale,
+                onClick = {
+                    set(
+                        GenFlow.choose(
+                            state,
+                            io.github.lenticualrstone.civilight.model.map.GenerationStepKind.COAST,
+                            io.github.lenticualrstone.civilight.domain.world.gen.StepChoices.SCALE,
+                            scale,
+                        ),
+                    )
+                },
+            )
+        }
+    }
+    SectionLabel("시드 값", Modifier.padding(top = 6.dp))
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        io.github.lenticualrstone.civilight.designsystem.component.CivilightTextField(
+            value = seedInput.value,
+            onValueChange = { seedInput.value = it },
+            placeholder = "시드 또는 문구",
+            modifier = Modifier.weight(1f),
+        )
+        CivilightButton(
+            text = "적용",
+            onClick = {
+                if (seedInput.value.isNotBlank()) {
+                    val seeds = io.github.lenticualrstone.civilight.domain.world.gen.StepChoices.seedsFromMaster(seedInput.value)
+                    var next = state
+                    io.github.lenticualrstone.civilight.domain.world.gen.StepChoices.ORDER.forEachIndexed { idx, stepKind ->
+                        next = GenFlow.reroll(next, stepKind, seeds[idx])
+                    }
+                    set(next)
+                }
+            },
+            variant = ButtonVariant.COMPACT_GHOST,
+            icon = IconId.Dice,
+            enabled = seedInput.value.isNotBlank(),
+        )
+    }
 }
 
 /** `상세 지형 그림`: `색면 · 먹선 · 색 · 양피지` and `등고선` (the drawing of styles is WLD-57). */

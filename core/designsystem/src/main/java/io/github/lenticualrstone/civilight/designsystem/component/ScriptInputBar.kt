@@ -519,7 +519,11 @@ private fun InputField(state: ScriptInputState, actions: ScriptInputActions, vis
                     .padding(vertical = 6.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                if (state.text.isEmpty()) CivilightText(ScriptInputCopy.PLACEHOLDER, style, color = colors.ink3, maxLines = 1)
+                val transformedText = if (visualTransformation === VisualTransformation.None) state.text
+                else visualTransformation.filter(androidx.compose.ui.text.AnnotatedString(state.text)).text.text
+                if (state.text.isEmpty() && transformedText.isEmpty()) {
+                    CivilightText(ScriptInputCopy.PLACEHOLDER, style, color = colors.ink3, maxLines = 1)
+                }
                 Box(Modifier.caretFollow(follow)) { inner() }
             }
         },

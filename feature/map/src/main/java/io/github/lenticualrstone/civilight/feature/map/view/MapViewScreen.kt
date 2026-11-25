@@ -224,7 +224,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                                 val to = mv.to ?: return@MovePinBar
                                 vm.movePin(mv.pinKey, to) { movingPin = null; movingTo = null }
                             },
-                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = padding.calculateBottomPadding() + 16.dp).fillMaxWidth(),
                         )
                         pl != null && k == MapBars.PLACE -> PlacePanel(
                             place = pl, inner = false, readOnly = b.readOnly, canMove = b.state.canMovePin, showsAssets = b.state.showsAssets,
@@ -232,7 +232,7 @@ fun MapViewScreen(route: MapViewRoute, deps: FeatureDeps) {
                             onMove = { movingPin = pl.pinKey; movingTo = null },
                             onOpenCard = { deps.navigator.push(PlaceCard(route.projectKey, pl.placeKey)) },
                             onChildMap = { MapNav.open(deps.navigator, d, route.projectKey, it) },
-                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = padding.calculateBottomPadding() + 12.dp).fillMaxWidth(),
                         )
                         else -> BottomTools(
                             state = b.state, readOnly = b.readOnly, scale = b.scale,

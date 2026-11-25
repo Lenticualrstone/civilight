@@ -24,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -193,7 +194,18 @@ private fun EpisodeLine(item: EpisodeItem, onToggle: (Key) -> Unit, onMenu: (Key
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        CivilightIcon(IconId.Grip, contentDescription = null, size = 16.dp, tint = colors.ink3)
+        val chevronDeg by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (row.expanded) 0f else -90f,
+            animationSpec = CivilightTheme.motion.move(io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion.standard),
+            label = "epChevron",
+        )
+        CivilightIcon(
+            IconId.Down,
+            contentDescription = null,
+            size = 15.dp,
+            tint = if (row.expanded) colors.acc else colors.ink3,
+            modifier = Modifier.graphicsLayer { rotationZ = chevronDeg },
+        )
         CivilightText(row.code, type.number, Modifier.widthIn(min = 30.dp), color = colors.ink3, maxLines = 1)
         CivilightText(
             row.title,

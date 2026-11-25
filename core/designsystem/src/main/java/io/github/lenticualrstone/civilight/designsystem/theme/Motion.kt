@@ -120,15 +120,15 @@ class Motion(
         if (reduced) null else tween(token.durationMs, easing = token.easing)
 
     /**
-     * Mechanical hinge-tension spring (0.3.3): high stiffness with crisp detent settle (no underwater lag,
-     * preserves release velocity); snaps immediately when reduced.
+     * Mechanical hinge-tension spring (0.4.0): configurable damping & stiffness for weighted 1-step detent lock
+     * (near-critically damped, zero cheap bounce, zero underwater lag); snaps immediately when reduced.
      */
-    fun <T> hingeTension(): FiniteAnimationSpec<T> =
-        if (reduced) snap() else spring(dampingRatio = 0.74f, stiffness = 920f)
+    fun <T> hingeTension(dampingRatio: Float = 0.86f, stiffness: Float = 490f): FiniteAnimationSpec<T> =
+        if (reduced) snap() else spring(dampingRatio = dampingRatio, stiffness = stiffness)
 
-    /** Crisp tactile spring for physical object articulation (CD lid hinge, floppy insertion); snaps when reduced. */
+    /** Crisp tactile spring for physical object articulation (CD lid hinge); snaps when reduced. */
     fun <T> crispSpring(): FiniteAnimationSpec<T> =
-        if (reduced) snap() else spring(dampingRatio = 0.80f, stiffness = 620f)
+        if (reduced) snap() else spring(dampingRatio = 0.82f, stiffness = 580f)
 
     /**
      * Appear: a fade on [token], plus (full motion only) a slide from [rise] (positive = from below) and an

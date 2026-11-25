@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -117,7 +118,9 @@ fun ScrimDialog(
             // DS-66: a centred dialog sits in the band `[statusTop + 24, H − systemBottom − 24]`; a bottom dialog
             // places itself ([FloatingDialog]).
             val band = if (contentAlignment == Alignment.Center) {
-                Modifier.padding(top = statusTop() + OverlayGaps.dialogBand, bottom = rememberSystemBottom() + OverlayGaps.dialogBand)
+                Modifier
+                    .windowInsetsPadding(KeyboardLift)
+                    .padding(top = statusTop() + OverlayGaps.dialogBand, bottom = rememberSystemBottom() + OverlayGaps.dialogBand)
             } else Modifier
             Box(
                 band.graphicsLayer {
@@ -225,7 +228,7 @@ fun FloatingDialog(
         val y = OverlayGaps.floatingDialogY(wide, maxOf(outside, rememberSystemBottom()).value, keyboardUp())
         FloatingDialogCard(
             title = title,
-            onCancel = onDismissRequest,
+            onCancel = LocalDialogDismiss.current ?: onDismissRequest,
             primaryLabel = primaryLabel,
             onPrimary = onPrimary,
             modifier = modifier

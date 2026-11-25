@@ -7,11 +7,16 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.lenticualrstone.civilight.model.app.AnimationPref
 import io.github.lenticualrstone.civilight.model.app.AppSettings
+import io.github.lenticualrstone.civilight.model.app.BlockSpacing
 import io.github.lenticualrstone.civilight.model.app.CardStyle
+import io.github.lenticualrstone.civilight.model.app.DragResistance
 import io.github.lenticualrstone.civilight.model.app.LibraryStyle
 import io.github.lenticualrstone.civilight.model.app.LargeMapExport
 import io.github.lenticualrstone.civilight.model.app.MapStylePref
+import io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem
+import io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem
 import io.github.lenticualrstone.civilight.model.app.PaneSplit
+import io.github.lenticualrstone.civilight.model.app.ProfileShape
 import io.github.lenticualrstone.civilight.model.app.RatingDefaults
 import io.github.lenticualrstone.civilight.model.app.RelockPolicy
 import io.github.lenticualrstone.civilight.model.app.SceneNotationPref
@@ -106,6 +111,18 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     /** CNV-47: the inner-screen pane ratio of [module] ([PaneSplit.Modules]); [PaneSplit.DEFAULT] clears it. */
     suspend fun setPaneSplit(module: String, value: PaneSplit) = update { it.withPaneSplit(module, value) }
+
+    // (0.4.0) New interaction, script, and mini-rail customization setters
+    suspend fun setDragResistance(value: DragResistance) = update { it.copy(dragResistance = value) }
+    suspend fun setProfileShape(value: ProfileShape) = update { it.copy(profileShape = value) }
+    suspend fun setBlockSpacing(value: BlockSpacing) = update { it.copy(blockSpacing = value) }
+    suspend fun setLongPressWiggle(value: Boolean) = update { it.copy(longPressWiggle = value) }
+    suspend fun setTypewriterScroll(value: Boolean) = update { it.copy(typewriterScroll = value) }
+    suspend fun setSmartPunctuation(value: Boolean) = update { it.copy(smartPunctuation = value) }
+    suspend fun setSmartSpeakerSwap(value: Boolean) = update { it.copy(smartSpeakerSwap = value) }
+    suspend fun setLifeRecorderEnabled(value: Boolean) = update { it.copy(lifeRecorderEnabled = value) }
+    suspend fun setMiniRailScript(value: List<MiniRailScriptItem>) = update { it.copy(miniRailScript = value) }
+    suspend fun setMiniRailProject(value: List<MiniRailProjectItem>) = update { it.copy(miniRailProject = value) }
 
     companion object {
         val KEY = stringPreferencesKey("appSettings")

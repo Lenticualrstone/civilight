@@ -47,12 +47,11 @@ class MainActivity : FragmentActivity() {
         // The process may have started on an earlier activity (e.g. during onboarding); start from today's state.
         locator.refreshStartForNewActivity(restored = savedInstanceState != null)
         splash.setKeepOnScreenCondition { locator.start.value == null }
-        splash.setOnExitAnimationListener(::animateSplashExit)
-        // Only a fresh start shows the splash; a recreated activity draws at once. The content also shows if
-        // the system skips the exit callback, after the mark's own exit time.
+        // (0.4.0) Hand off OS splash immediately; CivilightRoot plays the Compose launch splash motion
+        // deterministically on every fresh launch so One UI / warm starts never skip it.
+        splash.setOnExitAnimationListener { provider -> provider.remove() }
         if (savedInstanceState == null) {
             splashDone.value = false
-            window.decorView.postDelayed({ splashDone.value = true }, SPLASH_FALLBACK_MS)
         }
         enableEdgeToEdge()
 

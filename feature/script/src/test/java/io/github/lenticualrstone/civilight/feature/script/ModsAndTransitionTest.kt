@@ -33,9 +33,9 @@ class ModsAndTransitionTest {
         val model = mods(line = "레코더 · 정리 안 됨 1 ›")
         assertEquals(K.SCENE_1_7_3, model.sceneKey)
         assertEquals(listOf(ModCardId.TODAY, ModCardId.SCENE, ModCardId.CHECKS, ModCardId.MEMO), model.order)
-        val todayCard = model.cards[0] as ModCard.Today
-        assertEquals(WritingCounts.todayCard(doc, today, Fx.zone, 2000).written, todayCard.written)
-        assertEquals("목표 2,000자", todayCard.goal)
+        val playTimeCard = model.cards[0] as ModCard.PlayTime
+        assertTrue(playTimeCard.sceneSummary.isNotBlank())
+        assertTrue(playTimeCard.projectSummary.startsWith("전체 "))
         assertEquals(WritingCounts.sceneSpeakers(doc, K.SCENE_1_7_3), (model.cards[1] as ModCard.SceneCount).text)
         val memo = model.cards[3] as ModCard.Memo
         assertEquals("등불이 두 번째로 깜박이는 타이밍", memo.text)

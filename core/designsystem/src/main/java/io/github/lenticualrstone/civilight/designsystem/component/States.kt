@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -91,6 +93,7 @@ fun EmptyBlock(
     onPrimary: (() -> Unit)? = null,
     secondaryLabel: String? = null,
     onSecondary: (() -> Unit)? = null,
+    icon: IconId? = null,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -102,6 +105,18 @@ fun EmptyBlock(
             .insetOutline(colors.edge, 1.dp, shape)
             .padding(horizontal = 20.dp, vertical = 26.dp),
     ) {
+        if (icon != null) {
+            Box(
+                Modifier
+                    .padding(bottom = 12.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(colors.tint),
+                contentAlignment = Alignment.Center,
+            ) {
+                CivilightIcon(icon, contentDescription = null, size = 20.dp, tint = colors.ink2)
+            }
+        }
         CivilightText(title, type.emptyTitle, color = colors.ink)
         if (subtitle != null) {
             Spacer(Modifier.height(4.dp))
@@ -131,10 +146,23 @@ fun NoResults(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
     similar: (@Composable ColumnScope.() -> Unit)? = null,
+    icon: IconId? = IconId.Search,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Column(modifier.fillMaxWidth().padding(top = 30.dp)) {
+        if (icon != null) {
+            Box(
+                Modifier
+                    .padding(bottom = 10.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(colors.tint),
+                contentAlignment = Alignment.Center,
+            ) {
+                CivilightIcon(icon, contentDescription = null, size = 18.dp, tint = colors.ink3)
+            }
+        }
         CivilightText(title, type.emptyTitle, color = colors.ink)
         if (context != null) CivilightText(context, type.small.merge(TextStyle(fontSize = 13.sp)), color = colors.ink3)
         if (similar != null) {

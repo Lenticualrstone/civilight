@@ -177,6 +177,36 @@ enum class IconId(val pathData: String) {
 
     /** `패널 열기` on the closed side panel's rail (r3 `L*Shut` / `Two*Shut`). */
     Panel("M4 5h16v14H4zM9 5v14"),
+
+    /** (0.4.0) `설정` gear icon (replaces Props in library top bar). */
+    Settings(
+        "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" +
+            "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33" +
+            "a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51a1.65 1.65 0 0 0-1.82.33l-.06.06" +
+            "a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09" +
+            "a1.65 1.65 0 0 0 1.51-1a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06" +
+            "a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51" +
+            "a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08" +
+            "a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+    ),
+
+    /** (0.4.0) Clock icon for time tab, timeline, and estimated play time. */
+    Clock("M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2"),
+
+    /** (0.4.0) Character / speaker silhouette icon. */
+    User("M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0"),
+
+    /** (0.4.0) Folded map icon for world/map shortcuts. */
+    Map("M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"),
+
+    /** (0.4.0) Scene outline / jump list icon. */
+    Outline("M4 6h3M10 6h10M4 12h3M10 12h10M4 18h3M10 18h10"),
+
+    /** (0.4.0) Sliders icon for motion/resistance/tuning settings. */
+    Sliders("M4 7h16M4 17h16M9 4v6M15 14v6"),
+
+    /** (0.4.0) Sparkles / visual cue / direction icon. */
+    Spark("M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"),
     ;
 
     companion object {

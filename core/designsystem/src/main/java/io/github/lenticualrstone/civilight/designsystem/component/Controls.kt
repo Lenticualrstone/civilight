@@ -39,13 +39,17 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.animatedInsetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcons
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.HapticToken
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.animatedAlpha
 import io.github.lenticualrstone.civilight.designsystem.theme.animatedColor
 import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberHaptics
 
 /**
  * DS-32 switch: track 46 × 28 radius 14; off `tint` + 1 dp `line`, thumb `ink3` at x 3; on `acc`, thumb `bg`
@@ -71,9 +75,13 @@ fun CivilightSwitch(
     val thumb = animatedColor(style.thumb, label = "thumbColor")
     val outline = animatedFraction(style.trackOutline != null, label = "trackOutline")
     val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
+    val haptics = rememberHaptics()
     val interactive = if (onCheckedChange != null) {
         Modifier.pressable(
-            PressAction.Toggle(checked, onCheckedChange),
+            PressAction.Toggle(checked) { next ->
+                haptics.perform(HapticToken.TICK)
+                onCheckedChange(next)
+            },
             enabled = enabled,
             role = Role.Switch,
             hitTarget = HitTarget.SWITCH,
@@ -112,8 +120,19 @@ fun RadioMark(selected: Boolean, modifier: Modifier = Modifier, onClick: (() -> 
     val ring = animatedColor(style.ring ?: colors.ink3, label = "radioRing")
     val dot = animatedFraction(selected, if (selected) CivilightMotion.enter else CivilightMotion.exit, label = "radioDot")
     val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
+    val haptics = rememberHaptics()
     val interactive = if (onClick != null) {
-        Modifier.pressable(PressAction.Select(selected, onClick), enabled = enabled, role = Role.RadioButton, hitTarget = HitTarget.RADIO, shape = CircleShape, scaleOnPress = false)
+        Modifier.pressable(
+            PressAction.Select(selected) {
+                haptics.perform(HapticToken.TICK)
+                onClick()
+            },
+            enabled = enabled,
+            role = Role.RadioButton,
+            hitTarget = HitTarget.RADIO,
+            shape = CircleShape,
+            scaleOnPress = false,
+        )
     } else Modifier
     Canvas(modifier.graphicsLayer { alpha = enabledAlpha.value }.then(interactive).size(22.dp)) {
         val w = style.ringWidth.toPx()
@@ -147,8 +166,19 @@ fun CheckboxMark(
     val fill = animatedFraction(checked, label = "checkFill")
     val tick = animatedFraction(checked, if (checked) CivilightMotion.enter else CivilightMotion.exit, label = "checkTick")
     val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
+    val haptics = rememberHaptics()
     val interactive = if (onCheckedChange != null) {
-        Modifier.pressable(PressAction.Toggle(checked, onCheckedChange), enabled = enabled, role = Role.Checkbox, hitTarget = HitTarget.CHECKBOX, shape = shape, scaleOnPress = false)
+        Modifier.pressable(
+            PressAction.Toggle(checked) { next ->
+                haptics.perform(HapticToken.TICK)
+                onCheckedChange(next)
+            },
+            enabled = enabled,
+            role = Role.Checkbox,
+            hitTarget = HitTarget.CHECKBOX,
+            shape = shape,
+            scaleOnPress = false,
+        )
     } else Modifier
     val ringWidth = off.ringWidth
     Box(
@@ -199,12 +229,21 @@ fun RadioRow(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
+    val haptics = rememberHaptics()
     Row(
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer { alpha = enabledAlpha.value }
             .then(if (divider) Modifier.topHairline(colors.line) else Modifier)
-            .pressable(PressAction.Select(selected, onClick), enabled = enabled, role = Role.RadioButton, scaleOnPress = false)
+            .pressable(
+                PressAction.Select(selected) {
+                    haptics.perform(HapticToken.TICK)
+                    onClick()
+                },
+                enabled = enabled,
+                role = Role.RadioButton,
+                scaleOnPress = false,
+            )
             .heightIn(min = 44.dp)
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -234,12 +273,21 @@ fun CheckboxRow(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
+    val haptics = rememberHaptics()
     Row(
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer { alpha = enabledAlpha.value }
             .then(if (divider) Modifier.topHairline(colors.line) else Modifier)
-            .pressable(PressAction.Toggle(checked, onCheckedChange), enabled = enabled, role = Role.Checkbox, scaleOnPress = false)
+            .pressable(
+                PressAction.Toggle(checked) { next ->
+                    haptics.perform(HapticToken.TICK)
+                    onCheckedChange(next)
+                },
+                enabled = enabled,
+                role = Role.Checkbox,
+                scaleOnPress = false,
+            )
             .heightIn(min = 44.dp)
             .padding(vertical = 11.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -264,21 +312,34 @@ fun SwitchRow(
     subtitle: String? = null,
     divider: Boolean = true,
     enabled: Boolean = true,
+    leadingIcon: IconId? = null,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val enabledAlpha = animatedAlpha(if (enabled) 1f else DISABLED_ALPHA, label = "enabled")
+    val haptics = rememberHaptics()
     Row(
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer { alpha = enabledAlpha.value }
             .then(if (divider) Modifier.topHairline(colors.line) else Modifier)
-            .pressable(PressAction.Toggle(checked, onCheckedChange), enabled = enabled, role = Role.Switch, scaleOnPress = false)
+            .pressable(
+                PressAction.Toggle(checked) { next ->
+                    haptics.perform(HapticToken.TICK)
+                    onCheckedChange(next)
+                },
+                enabled = enabled,
+                role = Role.Switch,
+                scaleOnPress = false,
+            )
             .heightIn(min = 44.dp)
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (leadingIcon != null) {
+            CivilightIcon(leadingIcon, contentDescription = null, size = 18.dp, tint = colors.ink2)
+        }
         Column(Modifier.weight(1f)) {
             CivilightText(title, type.itemTitleCompact, color = colors.ink)
             if (subtitle != null) CivilightText(subtitle, type.small, color = colors.ink3)

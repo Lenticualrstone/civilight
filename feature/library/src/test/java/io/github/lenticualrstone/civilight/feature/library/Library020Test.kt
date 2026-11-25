@@ -128,11 +128,11 @@ class Library020Test {
         val libAll = LibraryStyle.entries.toSet()
         val cardAll = CardStyle.entries.toSet()
         val ui = SettingsState.root(
-            AppSettings(libraryStyle = LibraryStyle.FLOPPY_CRT, castCardStyle = CardStyle.ROLODEX, viewTilt = false),
+            AppSettings(libraryStyle = LibraryStyle.KINETIC_DECK, castCardStyle = CardStyle.ROLODEX, viewTilt = false),
             0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = libAll, cardViews = cardAll,
         )
         assertEquals("서재 보기", ui.libraryView!!.title)
-        assertEquals("플로피 · CRT", ui.libraryView!!.value)
+        assertEquals("탄성 덱", ui.libraryView!!.value)
         assertNull(ui.libraryView!!.sub)
         assertEquals("카드 보기", ui.cardView!!.title)
         assertEquals("롤로덱스", ui.cardView!!.value)
@@ -144,13 +144,13 @@ class Library020Test {
 
         val lib = ViewStyles.options(ViewKind.LIBRARY, AppSettings(), library = libAll)
         assertEquals(
-            listOf("CD 케이스", "플로피 · CRT", "탄성 덱", "모자이크", "필름 릴", "시간 축", "스튜디오 목록"),
+            listOf("CD 케이스", "탄성 덱", "모자이크", "필름 릴", "시간 축", "스튜디오 목록"),
             lib.map { it.title },
         )
-        assertEquals(listOf(true) + List(6) { false }, lib.map { it.selected })
+        assertEquals(listOf(true) + List(5) { false }, lib.map { it.selected })
         val cards = ViewStyles.options(ViewKind.CARD, AppSettings(), cards = cardAll)
         assertEquals(listOf("부채꼴 덱", "회전 목마", "겹친 더미", "타로 펼침", "기울어진 벽", "롤로덱스", "목록"), cards.map { it.title })
-        assertEquals(LibraryStyle.FLOPPY_CRT, ViewStyles.libraryStyleOf(LibraryStyle.FLOPPY_CRT.name))
+        assertEquals(LibraryStyle.KINETIC_DECK, ViewStyles.libraryStyleOf(LibraryStyle.KINETIC_DECK.name))
         assertEquals(CardStyle.TAROT, ViewStyles.cardStyleOf(CardStyle.TAROT.name))
         assertNull(ViewStyles.libraryStyleOf("unknown"))
     }
@@ -169,11 +169,11 @@ class Library020Test {
         assertNull(bare.cardView)
         assertNull(bare.tilt)
 
-        val some = SettingsState.root(AppSettings(libraryStyle = LibraryStyle.FLOPPY_CRT), 0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = setOf(LibraryStyle.CD_JEWEL_CASE), cardViews = emptySet())
+        val some = SettingsState.root(AppSettings(libraryStyle = LibraryStyle.KINETIC_DECK), 0, false, null, LibFx.NOW, LibFx.ZONE, libraryViews = setOf(LibraryStyle.CD_JEWEL_CASE), cardViews = emptySet())
         assertEquals("스튜디오 목록", some.libraryView!!.value)
         assertNull(some.cardView)
         assertNotNull(some.tilt)
-        val lib = ViewStyles.options(ViewKind.LIBRARY, AppSettings(libraryStyle = LibraryStyle.FLOPPY_CRT), library = setOf(LibraryStyle.CD_JEWEL_CASE))
+        val lib = ViewStyles.options(ViewKind.LIBRARY, AppSettings(libraryStyle = LibraryStyle.KINETIC_DECK), library = setOf(LibraryStyle.CD_JEWEL_CASE))
         assertEquals(listOf("CD 케이스", "스튜디오 목록"), lib.map { it.title })
         assertEquals(listOf(false, true), lib.map { it.selected })
         assertEquals(listOf("목록"), ViewStyles.options(ViewKind.CARD, AppSettings(), cards = emptySet()).map { it.title })

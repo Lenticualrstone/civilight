@@ -3,6 +3,7 @@ package io.github.lenticualrstone.civilight.feature.script.ui
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,8 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -118,6 +124,15 @@ fun BlockView(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val numbered = selected || look.numbered
+    val deps = io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps.current
+    val store = io.github.lenticualrstone.civilight.ui.project.LocalProjectStore.current
+    val doc = store?.doc?.collectAsState()?.value
+    val settings = deps?.settings?.collectAsState()?.value
+    val profileShape = settings?.profileShape ?: io.github.lenticualrstone.civilight.model.app.ProfileShape.SQUARE
+    val inner = io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout.current.isInner
+    val safeWidth = if (inner) 64.dp else 56.dp
+    val portraitSize = if (inner) 48.dp else 44.dp
+
     val afterLine = if (look.afterTarget) Modifier.drawBehind {
         val y = size.height + 6.dp.toPx()
         drawLine(colors.acc, Offset(8.dp.toPx(), y), Offset(size.width, y), strokeWidth = 2.dp.toPx())
@@ -126,31 +141,109 @@ fun BlockView(
     Box(modifier.then(afterLine)) {
     BlockFrame(selected || look.tag != null, Modifier.pressable(PressAction.Click({ onTapText(null) }), role = Role.Button, scaleOnPress = false)) {
         AddressHints(row.addressHints)
-        if (row.kind == BlockKind.DIALOGUE) {
-            row.speaker?.let { speaker ->
-                ScriptSpeakerLine(
-                    speaker, numbered, row.number.takeIf { numbered }, row.speakerMarks,
-                    extraLabel = look.tag,
-                    onClick = onSpeaker,
-                )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            // (0.4.0) Unified left safe area across all 6 block kinds:
+            // - DIALOGUE: 1:1 square/circle character portrait + name (tapping portrait opens character card)
+            // - Other kinds: visual distinction badge only (no tap action; preserves swipe & long-press)
+            Column(
+                modifier = Modifier.width(safeWidth),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (row.kind == BlockKind.DIALOGUE) {
+                    val speaker = row.speaker
+                    val charKey = speaker?.characterKey
+                    val openCard: (() -> Unit)? = if (charKey != null && doc != null && deps != null) {
+                        { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.CharacterProfile(doc.project.key, charKey)) }
+                    } else null
+                    io.github.lenticualrstone.civilight.ui.image.CharacterPortraitTile(
+                        doc = doc,
+                        characterKey = charKey,
+                        displayName = speaker?.text.orEmpty(),
+                        shape = profileShape,
+                        size = portraitSize,
+                        onClick = openCard,
+                    )
+                    if (speaker != null) {
+                        CivilightText(
+                            speaker.text,
+                            CivilightTheme.type.micro,
+                            color = if (charKey != null) colors.ink2 else colors.ink3,
+                            maxLines = 2,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                } else {
+                    val (badgeIcon, badgeLabel, badgeTint) = when (row.kind) {
+                        BlockKind.NARRATION -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.Text, "지문", colors.ink3)
+                        BlockKind.DIRECTION -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.Spark, "연출", colors.acc)
+                        BlockKind.CHOICE -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.Split, "선택지", colors.acc)
+                        BlockKind.SYSTEM -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.Exclaim, "시스템", colors.ink2)
+                        BlockKind.MEMO -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.Paper, "메모", colors.warn)
+                        else -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.File, "블록", colors.ink3)
+                    }
+                    Box(
+                        Modifier
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(colors.tint),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon(
+                            badgeIcon,
+                            contentDescription = null,
+                            size = 15.dp,
+                            tint = badgeTint,
+                        )
+                    }
+                    CivilightText(
+                        badgeLabel,
+                        CivilightTheme.type.micro,
+                        color = badgeTint,
+                        maxLines = 1,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
             }
-        } else {
-            val slot = row.slot(numbered)
-            if (slot != null) {
-                SlotLine(slot.label, listOfNotNull(slot.sub, look.tag).joinToString(" · ").ifEmpty { null }, slot.number)
-            } else if (look.tag != null) {
-                SlotLine(io.github.lenticualrstone.civilight.domain.script.Labels.kindLabel(row.kind), look.tag, row.number)
-            }
-        }
-        when (row.kind) {
-            BlockKind.DIRECTION -> CivilightText(row.text, type.dir, color = colors.ink3)
-            BlockKind.CHOICE -> row.options.forEach { option ->
-                OptionView(option, selected, onTap = onTapOption?.let { tap -> { tap(option) } })
-            }
-            null -> CivilightText(row.text, type.body, color = colors.ink2)
-            else -> Box {
-                RunsText(row, showParens, onTapText, onTapTarget, openCandidate)
-                popover?.invoke()
+
+            // Right content column: metadata line + block body + inline popover
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (row.kind == BlockKind.DIALOGUE) {
+                    val speaker = row.speaker
+                    if (speaker != null && (numbered || look.tag != null || row.speakerMarks.isNotEmpty() || speaker.realName != null)) {
+                        ScriptSpeakerLine(
+                            speaker, numbered, row.number.takeIf { numbered }, row.speakerMarks,
+                            extraLabel = look.tag,
+                            onClick = onSpeaker,
+                        )
+                    }
+                } else {
+                    val slot = row.slot(numbered)
+                    if (slot != null) {
+                        SlotLine(slot.label, listOfNotNull(slot.sub, look.tag).joinToString(" · ").ifEmpty { null }, slot.number)
+                    } else if (look.tag != null) {
+                        SlotLine(io.github.lenticualrstone.civilight.domain.script.Labels.kindLabel(row.kind), look.tag, row.number)
+                    }
+                }
+                when (row.kind) {
+                    BlockKind.DIRECTION -> CivilightText(row.text, type.dir, color = colors.ink3)
+                    BlockKind.CHOICE -> row.options.forEach { option ->
+                        OptionView(option, selected, onTap = onTapOption?.let { tap -> { tap(option) } })
+                    }
+                    null -> CivilightText(row.text, type.body, color = colors.ink2)
+                    else -> Box {
+                        RunsText(row, showParens, onTapText, onTapTarget, openCandidate)
+                        popover?.invoke()
+                    }
+                }
             }
         }
     }

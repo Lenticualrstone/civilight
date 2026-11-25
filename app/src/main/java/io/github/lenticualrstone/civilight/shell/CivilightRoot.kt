@@ -23,7 +23,9 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -36,11 +38,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.icon.AppMark
+import kotlinx.coroutines.delay
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -251,7 +258,8 @@ fun CivilightRoot(
             )
             val entryViewModels = rememberEntryViewModelDecorator<NavKey>()
             val saveable = rememberSaveableStateHolderNavEntryDecorator<NavKey>()
-            val rise = rememberSplashRise(splashDone, motion)
+            val composeSplashDone = remember { mutableStateOf(splashDone?.value ?: true) }
+            val rise = rememberSplashRise(composeSplashDone, motion)
             Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg)) {
                 if (showContent) {
                     Box(
@@ -284,7 +292,70 @@ fun CivilightRoot(
                         AppLockScreen(shownLock, onBiometric = {}, onDevicePin = {}, interactive = false)
                     }
                 }
+                if (!composeSplashDone.value) {
+                    LaunchSplashOverlay(
+                        motion = motion,
+                        onFinished = { composeSplashDone.value = true },
+                    )
+                }
             }
+        }
+    }
+}
+
+/**
+ * (0.4.0) Deterministic Compose launch splash overlay: always plays on every fresh launch regardless of
+ * OS/One UI `OnExitAnimationListener` skipping. Draws [AppMark] bar sweep + caret pulse, then lifts and fades.
+ */
+@Composable
+private fun LaunchSplashOverlay(
+    motion: Motion,
+    onFinished: () -> Unit,
+) {
+    val bar = remember { Animatable(if (motion.reduced) 1f else 0f) }
+    val alpha = remember { Animatable(1f) }
+    val lift = remember { Animatable(0f) }
+    var showCaret by remember { mutableStateOf(motion.reduced) }
+
+    LaunchedEffect(Unit) {
+        if (motion.reduced) {
+            delay(120)
+            alpha.animateTo(0f, motion.spec(CivilightMotion.exit))
+            onFinished()
+            return@LaunchedEffect
+        }
+        bar.animateTo(1f, motion.move(CivilightMotion.enterLong))
+        showCaret = true
+        delay(motion.delayMs(240))
+        // Lift mark slightly and fade out cleanly
+        lift.animateTo(-28f, motion.move(CivilightMotion.enter))
+        alpha.animateTo(0f, motion.spec(CivilightMotion.exit))
+        onFinished()
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { this.alpha = alpha.value }
+            .background(CivilightTheme.colors.bg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.graphicsLayer {
+                translationY = lift.value * density
+                val s = 1f + (lift.value / -28f) * 0.04f
+                scaleX = s
+                scaleY = s
+            },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            AppMark(size = 88.dp, barProgress = bar.value, showCaret = showCaret)
+            CivilightText(
+                "Civilight",
+                CivilightTheme.type.heading,
+                color = CivilightTheme.colors.ink2.copy(alpha = bar.value),
+            )
         }
     }
 }

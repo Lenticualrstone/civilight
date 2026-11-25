@@ -255,8 +255,21 @@ private fun ShortcutList(shortcuts: List<HomeShortcut>, onShortcut: (HomeShortcu
     val colors = CivilightTheme.colors
     Column(modifier) {
         shortcuts.forEach { shortcut ->
+            val icon = when (shortcut.label) {
+                "인물" -> IconId.User
+                "세계" -> IconId.Book
+                "지도" -> IconId.Map
+                "캔버스" -> IconId.Layers
+                "갤러리" -> IconId.Image
+                "페이지" -> IconId.File
+                "연표" -> IconId.Clock
+                "점검" -> IconId.Check
+                "설정" -> IconId.Settings
+                else -> IconId.Folder
+            }
             ListRow(
                 title = shortcut.label,
+                leading = { CivilightIcon(icon, contentDescription = null, size = 18.dp, tint = colors.ink2) },
                 onClick = { onShortcut(shortcut) },
                 compact = true,
                 trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = colors.ink3) },

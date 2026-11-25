@@ -78,7 +78,7 @@ import kotlin.math.abs
 @Composable
 internal fun KineticDeckView(input: ShelfViewInput) {
     val items = remember(input.ui) { atelierItems(input) }
-    val track = rememberAtelierTrack(items, input.selectedKey, input.preview)
+    val track = rememberAtelierTrack(items, input.selectedKey, input.preview, input.dragResistance)
     val density = LocalDensity.current
 
     AtelierStageFrame(input, items, track.activeIndex) { tilt ->
@@ -86,7 +86,7 @@ internal fun KineticDeckView(input: ShelfViewInput) {
             Modifier
                 .fillMaxSize()
                 .padding(top = input.barTop.dp, bottom = (input.barBottom + 126f).dp)
-                .atelierHorizontalDrag(!input.preview, items.size, with(density) { 155.dp.toPx() }, track),
+                .atelierHorizontalDrag(!input.preview, items.size, with(density) { 185.dp.toPx() }, track),
             contentAlignment = Alignment.Center,
         ) {
             val cardW = (maxWidth * 0.58f).coerceIn(176.dp, 264.dp)

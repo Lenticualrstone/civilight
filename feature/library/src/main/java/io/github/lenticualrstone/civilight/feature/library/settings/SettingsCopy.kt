@@ -114,4 +114,49 @@ object SettingsCopy {
 
     /** Toast when 앱 잠금 is turned on without a device lock (§6 Q19; copy not in sources). */
     const val NO_DEVICE_LOCK = "기기 잠금 필요"
+
+    // (0.4.0) Grouped settings sections & new tactile/script/rail options (CopyLint-verified)
+    const val SECTION_DISPLAY = "화면 · 보기"
+    const val SECTION_FEEL = "움직임 · 손맛"
+    const val SECTION_WORK = "작업 기본값"
+    const val SECTION_KEEP_SECURITY = "보관 · 보안"
+    const val SECTION_EXPERIMENTAL = "실험 기능"
+    const val SECTION_SUPPORT = "관리 · 지원"
+
+    const val DRAG_RESISTANCE = "스크롤 저항감"
+    const val DRAG_RESISTANCE_SUB = "서재 넘김 걸림 강도"
+    const val RESISTANCE_SOFT = "부드럽게"
+    const val RESISTANCE_NORMAL = "보통"
+    const val RESISTANCE_FIRM = "단단하게"
+    const val RESISTANCE_HEAVY = "묵직하게"
+
+    const val PROFILE_SHAPE = "프로필 모양"
+    const val SHAPE_SQUARE = "사각형"
+    const val SHAPE_CIRCLE = "원형"
+
+    const val BLOCK_SPACING = "블록 호흡 여백"
+    const val SPACING_COMPACT = "좁음"
+    const val SPACING_NORMAL = "중간"
+    const val SPACING_RELAXED = "넓음"
+
+    const val LONG_PRESS_WIGGLE = "길게 누르기 떨림"
+    const val LONG_PRESS_WIGGLE_SUB = "윤곽선 강조 · 공중 미세 떨림"
+
+    const val TYPEWRITER_SCROLL = "타자기 스크롤"
+    const val TYPEWRITER_SCROLL_SUB = "입력 중인 블록을 화면 가운데 유지"
+
+    const val SMART_PUNCTUATION = "문장부호 보정"
+    const val SMART_PUNCTUATION_SUB = "-- → ── · ... → …"
+
+    const val MINI_RAIL = "미니 아이콘 레일"
+    const val MINI_RAIL_SUB = "펼친 화면 패널 접힘 시 아이콘 구성 · 미리 보기"
+    const val MINI_RAIL_SCRIPT = "스크립트"
+    const val MINI_RAIL_PROJECT = "작품 작업"
+    const val MINI_RAIL_PREVIEW = "펼친 화면 미리 보기"
+
+    const val SMART_SPEAKER_SWAP = "화자 자동 교대"
+    const val SMART_SPEAKER_SWAP_SUB = "다음 대사 입력 시 직전 상대 화자 제안"
+
+    const val LIFE_RECORDER_EXP = "라이프 레코더 표시"
+    const val LIFE_RECORDER_EXP_SUB = "서재 · 홈에 음성 메모 진입점 표시"
 }
