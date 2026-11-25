@@ -568,17 +568,31 @@ private fun AtelierFocusDock(
                             modifier = Modifier.padding(start = 6.dp),
                         )
                     }
-                    val recents = input.onRecents
-                    if (recents != null && !input.preview) {
-                        CivilightText(
-                            AtelierCopy.RECENT_FILES,
-                            CivilightTheme.type.small,
-                            color = colors.ink2,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .pressable(onClick = recents, role = Role.Button)
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val multiExport = input.onMultiExport
+                        if (multiExport != null && !input.preview) {
+                            CivilightText(
+                                "내보내기",
+                                CivilightTheme.type.small,
+                                color = colors.ink2,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .pressable(onClick = multiExport, role = Role.Button)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                        val recents = input.onRecents
+                        if (recents != null && !input.preview) {
+                            CivilightText(
+                                AtelierCopy.RECENT_FILES,
+                                CivilightTheme.type.small,
+                                color = colors.ink2,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .pressable(onClick = recents, role = Role.Button)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
                     }
                 }
             }

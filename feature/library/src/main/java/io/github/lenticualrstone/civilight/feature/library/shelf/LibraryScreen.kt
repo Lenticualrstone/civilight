@@ -371,6 +371,7 @@ internal fun LibraryScreen(services: LibraryServices) {
                                         onRecents = { sheets.open(RecentsSheet) },
                                         tourMenuKey = tourMenuRow,
                                         dragResistance = view.dragResistance,
+                                        onMultiExport = if (ui.exportable.isNotEmpty()) ({ sheets.open(MultiExportSheet) }) else null,
                                     ),
                                 )
                             }

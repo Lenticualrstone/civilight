@@ -225,20 +225,21 @@ fun SheetScope.ImagePickSheetContent(sheet: ImagePickSheet) {
                 }
             }
         }
-        FoldReveal(view.holoVisible) {
-            SwitchRow(
-                title = ImageCopy.HOLO,
-                checked = holo,
-                onCheckedChange = {
-                    holoChoice = it
-                    if (it) holoSweep++
-                    // Cover kept, no new choice: the switch writes at once (U-08 LIB-84 `[PROPOSED]`).
-                    if (view.coverLine != null && view.current != null && selected == view.initialSource && !readOnly) vm.setHolo(owner, it)
-                },
-                subtitle = ImageCopy.HOLO_SUB,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
+    }
+    // (0.4.1) Keep hologram toggle pinned outside the scroll body right above actions so it is never hidden below tiles.
+    FoldReveal(view.holoVisible) {
+        SwitchRow(
+            title = ImageCopy.HOLO,
+            checked = holo,
+            onCheckedChange = {
+                holoChoice = it
+                if (it) holoSweep++
+                // Cover kept, no new choice: the switch writes at once (U-08 LIB-84 `[PROPOSED]`).
+                if (view.coverLine != null && view.current != null && selected == view.initialSource && !readOnly) vm.setHolo(owner, it)
+            },
+            subtitle = ImageCopy.HOLO_SUB,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
     SheetActions {
         CivilightButton(

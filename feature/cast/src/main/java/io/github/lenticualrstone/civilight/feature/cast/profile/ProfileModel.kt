@@ -156,8 +156,9 @@ object ProfileModel {
                 FixedRow(FixedField.ONE_LINER, CastUiCopy.ONE_LINER, c.oneLiner.orEmpty()),
             ) + images.map { it.first } + tags
         } else {
+            // (0.4.1) Always keep `인물 초상` visible even when empty so users can immediately add a portrait & holo effect.
             listOfNotNull(display.takeIf { reading.isOverridden || hasHistory }) +
-                images.filter { it.second }.map { it.first } +
+                images.filter { it.second || it.first.field == FixedField.PORTRAIT }.map { it.first } +
                 listOfNotNull(tags.takeIf { tagNames.isNotEmpty() })
         }
     }

@@ -84,7 +84,7 @@ class ProfileModelTest {
         val view = build(d)!!
         assertEquals("빈 항목 3 · 보기", view.emptyLabel)
         assertTrue(view.overview.items.none { it.label in setOf("코드네임", "출신지", "특기") })
-        assertEquals(listOf(FixedField.TAGS), view.fixedRows.map { it.field })
+        assertEquals(listOf(FixedField.PORTRAIT, FixedField.TAGS), view.fixedRows.map { it.field })
 
         val shown = build(d, ui = ProfileUi(showEmpty = true))!!
         assertTrue(shown.overview.items.map { it.label }.containsAll(listOf("코드네임", "출신지", "특기")))

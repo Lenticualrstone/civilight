@@ -48,6 +48,8 @@ data class ShelfViewInput(
     val tourMenuKey: io.github.lenticualrstone.civilight.model.Key? = null,
     /** (0.4.0) Configurable mechanical detent drag resistance for Atelier shelves. */
     val dragResistance: DragResistance = DragResistance.FIRM,
+    /** (0.4.1) Restored access to multi-project export sheet without cluttering top bar. */
+    val onMultiExport: (() -> Unit)? = null,
 )
 
 /** One 서재 3D view (U-16 boards `u16_lib_a` … `c`). Motion only through `CivilightMotion`. */

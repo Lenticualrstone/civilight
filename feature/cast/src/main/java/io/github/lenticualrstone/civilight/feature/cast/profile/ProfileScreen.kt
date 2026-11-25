@@ -414,7 +414,16 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                 contentPadding = PaddingValues(start = PROFILE_SIDE, end = PROFILE_SIDE, top = topPad, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
                 item(key = "art") { FoldRevealValue(art) { image -> RecordArt(image, inner = wide, sidePadding = PROFILE_SIDE) } }
-                item(key = "portrait") { FoldRevealValue(portrait) { image -> PortraitHero(image) } }
+                item(key = "portrait") {
+                    FoldRevealValue(portrait) { image ->
+                        androidx.compose.foundation.layout.Box(
+                            Modifier.then(
+                                if (editable) Modifier.pressable(onClick = { actions.onFixed(FixedField.PORTRAIT) }, scaleOnPress = false)
+                                else Modifier,
+                            ),
+                        ) { PortraitHero(image) }
+                    }
+                }
                 item(key = "head") { RecordHead(state, editable, actions) }
                 item(key = "table") { HeaderTable(doc, state, fullState, ui.headerExpanded, actions) { headerExpanded = true } }
                 // One item for the tab body: the tabs swap their content in place (row 3).
