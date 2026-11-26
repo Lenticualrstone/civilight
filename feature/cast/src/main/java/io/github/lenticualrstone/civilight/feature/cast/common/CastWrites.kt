@@ -47,6 +47,29 @@ class CastWrites(private val deps: FeatureDeps, private val projectKey: Key) {
         }
     }
 
+    /**
+     * (2026-11-26) A one-way write: no undo step (so no toast `되돌리기`), and a later undo or redo does not
+     * revert it: [onKeptStep] re-applies it to every kept undo step (`ProjectStore.updateWithoutUndo`), so it
+     * must be a plain write that makes sense on an older document (and leaves it as is otherwise). For
+     * writes whose confirm says they cannot be taken back (`줄일 수 없음`).
+     */
+    fun <R> launchOneWay(
+        compute: (ProjectDoc, ActionContext) -> Step<R>?,
+        onKeptStep: (ProjectDoc, ActionContext) -> ProjectDoc,
+        then: (R) -> Unit = {},
+    ): Job = deps.appScope.launch {
+        val store = deps.projects.acquire(projectKey)
+        try {
+            if (store.readOnly) return@launch
+            val ctx = deps.actionContext()
+            var out: Step<R>? = null
+            store.updateWithoutUndo(carry = { step, _, _ -> onKeptStep(step, ctx) }) { doc -> compute(doc, ctx)?.also { out = it }?.doc ?: doc }
+            out?.let { then(it.value) }
+        } finally {
+            deps.projects.release(projectKey)
+        }
+    }
+
     /** `되돌리기` of exactly [change] (row-level revert), as its own undo step named [label]. */
     fun revert(label: String, change: DocChange): Job = launch(label, { doc, _ -> Step(change.revert(doc), Unit) })
 }

@@ -230,8 +230,9 @@ fun FieldDefEditScreen(route: FieldDefEdit, deps: FeatureDeps) {
                 confirmEnabled = preview != null,
             )
         }
+        // Goes to 휴지통 (undoable): `‘X’ 지우기`, primary `휴지통으로` like the tag confirm (DS-25, 0.5 review).
         Pending.Delete -> ConfirmDialog(
-            title = view.name,
+            title = CastUiCopy.deleteTitle(view.name),
             confirmLabel = TrashCopy.TO_TRASH,
             onConfirm = {
                 pendingText = null
@@ -240,7 +241,6 @@ fun FieldDefEditScreen(route: FieldDefEdit, deps: FeatureDeps) {
             onDismissRequest = { pendingText = null },
             facts = view.deleteLines.map { it to "" } + (TrashCopy.SHEET_FOOTNOTE to ""),
             cancelLabel = TrashCopy.CANCEL,
-            hardToUndo = true,
         )
     }
 }

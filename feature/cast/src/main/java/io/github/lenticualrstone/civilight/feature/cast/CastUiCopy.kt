@@ -323,13 +323,19 @@ object CastUiCopy {
     const val TAG_TRASH_FOOT = "휴지통 · 30일 · 되살리면 다시 이어짐"
 
     /** `‘주연’ 지우기` (tag delete confirm title). */
-    fun tagDeleteTitle(name: String): String = "‘$name’ 지우기"
+    fun tagDeleteTitle(name: String): String = deleteTitle(name)
+
+    /** `‘<name>’ 지우기`: the title of every delete confirm (DS-25 `ConfirmDelete`; tag, field, template, relation kind). */
+    fun deleteTitle(name: String): String = "‘$name’ 지우기"
 
     /** `쓰는 인물 3`. */
     fun tagUsers(count: Int): String = "쓰는 인물 $count"
 
     /** `이미지 1` (only when gallery images hold the tag). */
     fun tagImages(count: Int): String = "이미지 $count"
+
+    /** (2026-11-26) `용어 2`: terms holding a `모든 항목` tag (delete confirm line). */
+    fun tagTerms(count: Int): String = "용어 $count"
 
     /** `태그 주연 지움` (toast, with `되돌리기`). */
     fun tagDeleted(name: String): String = "태그 $name 지움"

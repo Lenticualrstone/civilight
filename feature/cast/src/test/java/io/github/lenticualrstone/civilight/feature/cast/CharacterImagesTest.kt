@@ -51,11 +51,28 @@ class CharacterImagesTest {
             ImageSlot.CHARACTER_BACKGROUND, "def", mapOf(Ratio.R4X3.serialName to wide, Ratio.R9X16.serialName to tall), holo = true,
         )
         assertEquals(square, CharacterImages.image(doc, K.RIEN, ImagePlace.AVATAR)!!.crop)
+        // The card is the first ratio: it is never cut from the avatar (CST-13).
         assertNull(CharacterImages.image(doc, K.RIEN, ImagePlace.CARD)!!.crop)
         assertEquals(tall, CharacterImages.background(doc, K.RIEN, inner = false)!!.crop)
         assertEquals(wide, CharacterImages.background(doc, K.RIEN, inner = true)!!.crop)
         // The background has no holo ("글자 뒤").
         assertFalse(CharacterImages.background(doc, K.RIEN, inner = true)!!.holo)
         assertEquals(0.75f, CharacterImages.aspect(Ratio.R3X4))
+    }
+
+    @Test
+    fun `an avatar without its own crop follows the 4x5 card - top of the card, turned and mirrored with it`() {
+        val card = Crop(x = 100, y = 200, w = 800, h = 1000, rotation = 90, flipH = true, zoom = 1.5f)
+        val doc = withImage(CastFx.doc(), ImageSlot.CHARACTER_PORTRAIT, "abc", mapOf(Ratio.R4X5.serialName to card))
+        val avatar = CharacterImages.image(doc, K.RIEN, ImagePlace.AVATAR)!!.crop!!
+        assertEquals(Crop(x = 100, y = 200, w = 800, h = 800, rotation = 90, flipH = true, zoom = 1.5f), avatar)
+        assertEquals(card, CharacterImages.image(doc, K.RIEN, ImagePlace.CARD)!!.crop)
+        // The background's 4:3 is not cut from its 9:16 (centre fill of the whole picture).
+        val bg = withImage(CastFx.doc(), ImageSlot.CHARACTER_BACKGROUND, "def", mapOf(Ratio.R9X16.serialName to Crop(0, 0, 1701, 3024)))
+        assertNull(CharacterImages.background(bg, K.RIEN, inner = true)!!.crop)
+        // Its own crop wins.
+        val own = Crop(0, 0, 500, 500)
+        val both = withImage(CastFx.doc(), ImageSlot.CHARACTER_PORTRAIT, "abc", mapOf(Ratio.R4X5.serialName to card, Ratio.R1X1.serialName to own))
+        assertEquals(own, CharacterImages.image(both, K.RIEN, ImagePlace.AVATAR)!!.crop)
     }
 }

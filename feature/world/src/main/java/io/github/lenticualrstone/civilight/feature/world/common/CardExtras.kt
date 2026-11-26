@@ -1,8 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.world.common
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -85,28 +83,11 @@ object CardImages {
 
     /**
      * Decodes [file] for a slot about [targetWidth] px wide and applies [crop] (source pixels after
-     * rotation, then the mirror). Runs off the main thread; null when the file cannot be read.
+     * rotation, then the mirror). The shared decoder: EXIF orientation first, like the crop editor and every
+     * other slot. Runs off the main thread; null when the file cannot be read.
      */
-    fun decode(file: File, crop: Crop?, targetWidth: Int): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.path, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        val cropWidth = crop?.w ?: bounds.outWidth
-        var sample = 1
-        while (cropWidth / (sample * 2) >= targetWidth) sample *= 2
-        val raw = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
-        if (crop == null) return raw
-        val matrix = Matrix().apply {
-            if (crop.rotation % 360 != 0) postRotate(crop.rotation.toFloat())
-            if (crop.flipH) postScale(-1f, 1f)
-        }
-        val turned = if (matrix.isIdentity) raw else Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
-        val x = (crop.x / sample).coerceIn(0, turned.width - 1)
-        val y = (crop.y / sample).coerceIn(0, turned.height - 1)
-        val w = (crop.w / sample).coerceIn(1, turned.width - x)
-        val h = (crop.h / sample).coerceIn(1, turned.height - y)
-        return Bitmap.createBitmap(turned, x, y, w, h)
-    }
+    fun decode(file: File, crop: Crop?, targetWidth: Int): Bitmap? =
+        io.github.lenticualrstone.civilight.ui.image.ImageBitmaps.decodeUprightSampled(file, crop, targetWidth)
 }
 
 /**

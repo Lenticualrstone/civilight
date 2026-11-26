@@ -14,8 +14,19 @@ object ScriptCopy {
     /** Accessibility label of the layers icon (header and command row, SCR-01). */
     const val LAYERS_LABEL = "연출 · 메모 표시"
 
-    /** The one row of the position-label menu (SCR-02). */
+    /** The one row of the position-label menu (SCR-02), also the top row of `씬 목차`. */
     const val SET_LENS_TO_SCENE = "렌즈를 이 씬으로 맞추기"
+
+    // --- 씬 목차 (top-bar position chip, mini rail) ---
+
+    /** Title of the scene outline sheet. */
+    const val OUTLINE_TITLE = "씬 목차 · 페이싱"
+
+    /** Second line of an outline row: `블록 12 · 340자 · 예상 약 2분`. */
+    fun outlineStats(blocks: Int, chars: Int, playTime: String): String = "블록 $blocks · ${chars}자 · 예상 $playTime"
+
+    /** Subtitle of the `블록 고르기` row in `표시`: what select mode does. */
+    const val SELECT_BLOCKS_SUB = "지우기 · 옮기기 · 복사"
 
     // --- Bottom bar (SCR-01, SCR-15) ---
 
@@ -143,6 +154,9 @@ object ScriptCopy {
 
     /** `닫기` (the command field while typing; the DS sheet header's default label). */
     const val CLOSE = "닫기"
+
+    /** Fallback header of the quote card (`미리 보기`, spaced per vocabulary). */
+    const val QUOTE_PREVIEW = "인용 미리 보기"
 
     // --- Side panel (decision 0.2.3 · r3, boards `LScript` / `PScript`; the seam and rail copy is core:ui `PanelCopy`) ---
 
@@ -316,7 +330,7 @@ object ScriptCopy {
         DONE, LAYERS_LABEL, SET_LENS_TO_SCENE, LINE_BREAK, MIC_LABEL, TYPING, INHERITED_SPEAKER, NO_SCENES,
         NEW_SCENE, CHOICE_LABEL, CHOICE_REJOIN, SYSTEM_LABEL, SYSTEM_SUB, NO_SPEAKER, DISPLAY_NAME, sceneMenuLabel(4), KIND_CHEVRON.trim(),
         PAREN_TOOL, PAREN_LABEL, LINK_TOOL, CHANGE_TOOL, CHANGE_LABEL, UNDO_LABEL, LINK_PICKER_TITLE,
-        UNDO_ADD_BLOCK, UNDO_SPLIT, UNDO_MERGE, UNDO_DELETE, UNDO_SPEAKER, UNDO_RESTORE, ADD_BELOW, UNDO_LINE_BREAK, UNDO_TYPING, CLOSE,
+        UNDO_ADD_BLOCK, UNDO_SPLIT, UNDO_MERGE, UNDO_DELETE, UNDO_SPEAKER, UNDO_RESTORE, ADD_BELOW, UNDO_LINE_BREAK, UNDO_TYPING, CLOSE, QUOTE_PREVIEW,
         RENUMBER, OPEN_CHECK_CENTER, UNDO_ADD_OPTION, UNDO_KIND, UNDO_CUE, TAB_TIME, TAB_REF, TAB_PROPS, TAB_MODS,
         NO_SELECTED_BLOCK, KIND_FIELD, SPEAKER_FIELD, CHANGE, KIND_CHANGE_TITLE, DIRECTION_TITLE, ADD_CUE, REMOVE_CUE, NO_ASSETS,
         LAYERS_TITLE, LAYERS_SUB, LAYER_DIRECTION, LAYER_DIRECTION_SUB, LAYER_MEMO, LAYER_MEMO_SUB, LAYER_SYSTEM, LAYER_SYSTEM_SUB,
@@ -331,7 +345,7 @@ object ScriptCopy {
         ID_FORMAT, FORMAT_PATTERN, FORMAT_MANUAL, FIXED_ON_EXPORT, patternSub("HRT_0107_043"), MANUAL_SUB,
         RELINK, TRASH_RECORD, LINK_TO_BLOCK, RECORD_CHANGE_ROW, recordTrashed("◆ 관계 · 리엔 → 하르트"), blockRestored("#043"), UNDO_RELINK, MOD_TODAY, MOD_SCENE, MOD_CHECKS, MOD_MEMO, MODS_FOOTER,
         checkPreReveal(1), checkNoSpeaker(1), MODS_NO_CHECKS, MODS_SCENE_EMPTY, UNDO_TRASH_RECORD,
-        PANEL_NAME, BLOCK_MENU,
+        PANEL_NAME, BLOCK_MENU, OUTLINE_TITLE, outlineStats(12, 340, "약 2분"), SELECT_BLOCKS_SUB,
     )
 
     /** Buttons (linted with the button rules). */

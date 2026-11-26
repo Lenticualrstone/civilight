@@ -51,7 +51,32 @@ object WorldCopy {
     const val TAG_INTENDED = "맞음"
 
     // --- 용어 카드 (WLD-08, WLD-19, WLD-25 notices) ---
+    /** (2026-11-26) Term tags (board ImmTermTagSheet): the card's chip row, its add chip and the tag sheet. */
+    const val ROW_TAGS = "태그"
+    const val ADD_TAG = "+ 태그"
+    const val ADD_ALIAS = "+ 별칭"
+    const val TAG_SHEET_SUB = "용어에서 쓸 수 있는 것"
+    const val NEW_TAG = "＋ 새 태그"
     const val NOTICE_SEARCH_OFF = "글자 찾기 꺼짐"
+
+    /** (2026-11-26) Immersive term card (boards `Immersive` kind `term`, `ImmContent`, `ImmTermWhy`): tabs and sections. */
+    const val TAB_OVERVIEW = "개요"
+    const val TAB_USES = "쓰인 곳"
+    const val TAB_LINKS = "연결"
+    const val SEC_DESCRIPTION = "설명"
+    const val SEC_FIELDS = "세부 항목"
+    const val SEC_QUOTES = "작중에서"
+    const val SEC_NEIGHBORS = "같은 씬에 나온 것"
+
+    /** `작중에서` rows: who says it when no character does. */
+    const val WHO_NARRATION = "지문"
+    const val WHO_SYSTEM = "시스템"
+    const val WHO_OPTION = "선택지"
+    const val WHO_TRANSITION = "전환 문구"
+    const val WHO_HIDDEN = "숨긴 인물"
+
+    /** `연결` tab with nothing to show. */
+    const val NO_LINKS = "연결 없음"
     const val BTN_SEARCH_ON = "켜기"
 
     // --- 세력 카드 (WLD-10) ---
@@ -337,6 +362,12 @@ object WorldCopy {
 
     /** Banner line at a past lens: `고치면 1-5부터 적용` (board `LensEdit`). */
     fun lensEditSub(code: String): String = "고치면 ${code}부터 적용"
+
+    /** (2026-11-26) The term card's subtitle: `처음 나옴 1-7 씬 3`. */
+    fun firstSeen(label: String): String = "처음 나옴 $label"
+
+    /** (2026-11-26) A section label with its count: `세부 항목 · 3`, `작중에서 · 3`. */
+    fun counted(label: String, count: Int): String = "$label$SEP$count"
 
     /** The toast after a first `첫 공개` was set: `◇ 첫 공개 1-2`. */
     fun revealSet(label: String): String = "$REVEAL_NOW $label"

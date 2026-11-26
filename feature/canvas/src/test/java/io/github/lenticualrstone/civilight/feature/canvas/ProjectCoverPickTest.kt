@@ -196,7 +196,8 @@ class ProjectCoverPickTest {
         // The cover already shows h1: its own crops win over a hand-off.
         val doc = withCoverOf(g, h1, mapOf(Ratio.R1X1 to Crop(0, 0, 800, 800)))
         val re = CropSession.start(ImageSlot.PROJECT_COVER, PixelSize(1600, 1600), ImageEdits.use(doc, cover), h1, holo = false, initialCrops = p1Crops)
-        assertEquals(setOf(Ratio.R3X4), re.touched)
+        assertEquals(setOf(Ratio.R3X4, Ratio.R1X1), re.touched)
+        assertFalse(re.isAuto(Ratio.R1X1))
     }
 
     @Test

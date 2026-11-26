@@ -71,11 +71,28 @@ data class Tag(
     val deletedAt: Timestamp? = null,
     /** (0.2.0, N-44) The trash row of this tag while trashed. */
     val trashEntryKey: Key? = null,
+    /**
+     * (2026-11-26) Which kind of item may carry this tag. Absent = [TagScope.CHARACTER], so every
+     * older tag keeps its meaning; written only when not the default.
+     *
+     * Rules: the scope is fixed when the tag is made and may only **widen** (a kind's own scope →
+     * [TagScope.ALL]), never narrow, so no item is ever left holding a tag it may not carry. Tag
+     * names stay unique among all **live** tags regardless of scope. Gallery images take tags of
+     * scope [TagScope.CHARACTER] or [TagScope.ALL] (the character tag picker). A scope from a newer
+     * file (unknown) fits no kind: such a tag is never newly attached, and keys already held stay.
+     */
+    val scope: OpenEnum<TagScope> = OpenEnum.of(TagScope.CHARACTER),
     override val ext: JsonObject? = null,
 ) : Entity, Ordered {
     /** Not in the trash. */
     val isLive: Boolean get() = deletedAt == null
 }
+
+/**
+ * `용어 전용 · 모든 항목` and the other own-kind scopes of a [Tag]. Stored as an open enum: a value
+ * from a newer file is kept and written back unchanged.
+ */
+enum class TagScope { CHARACTER, TERM, PLACE, FACTION, ALL }
 
 /** An in-game voice line of a character (`cast.json › voiceLines`); `비어 있음` is derived. */
 @Serializable

@@ -58,8 +58,13 @@ class ProjectSettingsTest {
 
     @Test
     fun `LIB-69 인물 and 스크립트 추가 칸 rows`() {
-        assertEquals(listOf("인물 항목", "관계 종류", "태그"), ui.cast.map { it.title })
+        assertEquals(listOf("인물 항목", "묶음 기준", "관계 종류", "태그"), ui.cast.map { it.title })
         assertEquals("고치기", row(ProjectSettingsTarget.FIELDS).value)
+        // (2026-11-26) `묶음 기준` beside `인물 항목`: each slot's field or `고르기` (board `ImmPlaceRules`).
+        row(ProjectSettingsTarget.AFFILIATION_BASIS).let {
+            assertEquals("묶음 기준", it.title)
+            assertTrue(it.sub, Regex("소속 \\S.* · 거주 \\S.* · 국적 \\S.*").matches(it.sub!!))
+        }
         // (0.2.0, LIB-91) `게임 제작 도구` first; the example holds game data, so it opens on (G-3) and the voice rows show.
         assertEquals(listOf("게임 제작 도구", "무대 위치", "보이스 ID"), ui.script.switches.map { it.title })
         assertEquals(listOf(io.github.lenticualrstone.civilight.feature.library.projectsettings.ProjectSettingsCopy.GAME_TOOLS_SUB, "왼쪽 · 가운데 · 오른쪽", "대사마다 녹음용 ID"), ui.script.switches.map { it.sub })

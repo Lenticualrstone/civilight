@@ -199,8 +199,8 @@ class TransitionTest {
                 HeadMenuRow("장소와 때", "결사의 문 · 2일째 아침 06:10"),
                 HeadMenuRow("전환 문구", "직접 · 결사의 문 앞 · 06:10"),
                 HeadMenuRow("앞 씬과 합치기", "씬 3 · 꺼진 등불"),
-                HeadMenuRow("씬 지우기", "휴지통 · 30일"),
                 HeadMenuRow("앞에 새 씬", "빈 씬 · 씬 4 앞"),
+                HeadMenuRow("씬 지우기", "휴지통 · 30일"),
             ),
             menu.rows,
         )

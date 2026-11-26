@@ -183,7 +183,7 @@ Replaces WLD-11's `+` sheet. The overlay is DS-72's shared create card (D17): sh
 - Fixed fields per type (from the sources; anything else is a project field):
   - 용어: 이름 · 설명 · 참고 이미지 · 별칭 · 첫 공개 · 관련 · 글자 찾기 (on/off). `쓰인 곳` is derived.
   - 장소: 이름 · 설명 · 이미지 · 지역 (parent place). `등장`, `배경 에셋`, `이곳의 시간` are derived. **(0.2.0)** `배경 에셋` is shown only with `게임 제작 도구` on (WLD-76). The create card (WLD-70) calls 지역 `상위 지역` and the term's 별칭 `다른 이름`, as U-15 decision 7 words them; they are the same fields.
-  - 세력: 이름 · 설명 · 이미지 `[PROPOSED]` (no source lists faction fixed fields; Q-10).
+  - 세력: 이름 · 설명 · 이미지 `[PROPOSED]` (no source lists faction fixed fields; Q-10). **(2026-11-26)** 거점 (장소 연결, `Faction.baseKey`; board `ImmPlaceRules`, 00 §14).
 - Examples of project fields the sources give: 장소 `기후 · 인구`, `상태` (with ◆, e.g. 하층 구역 · 상태 `빛 있음 → 대정전 이후`); 세력 `수장 · 규모`.
 - Every non-derived field may carry `◆` history (rule 11-2 two buttons `이 값 고치기 · 여기서부터 바뀜`; past-lens edit banner), engine owned by cast/lens areas.
 - Empty fields are hidden in view; one line `빈 항목 N · 보기`; editing shows all as inputs.

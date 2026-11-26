@@ -68,6 +68,8 @@ data class FactionCard(
     val areas: List<String>,
     /** Events at which a `◆` of this faction changes (event keys). */
     val changeEvents: List<Key>,
+    /** (2026-11-26) `거점` (fixed field) and `소속 인물` by the project's `묶음 기준` ([Affiliations.factionMembers]). */
+    val affiliation: FactionMembers? = null,
 )
 
 /**
@@ -199,12 +201,14 @@ class WorldCards(private val doc: ProjectDoc, private val hiddenUnlocked: Boolea
             linkedCharacters = linkedCharacters(factionKey, lens),
             areas = areas,
             changeEvents = events,
+            affiliation = Affiliations(doc, hiddenUnlocked).factionMembers(factionKey, lens),
         )
     }
 
     // --- Fields ---
 
-    private fun valueAt(kind: EntityKind, entityKey: Key, defKey: Key, base: FieldValue?, lens: LensPoint): FieldValue? {
+    /** A field value at the lens: the live `◆` record in force, else [base] (also used by [Affiliations]). */
+    internal fun valueAt(kind: EntityKind, entityKey: Key, defKey: Key, base: FieldValue?, lens: LensPoint): FieldValue? {
         val record = doc.recordAt(ChangeTarget.Field(kind, entityKey, defKey), lens) ?: return base
         return record.valueAs(FieldValue.serializer())
     }

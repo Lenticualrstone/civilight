@@ -119,8 +119,8 @@ fun CanvasBoardScreen(route: CanvasBoard, deps: FeatureDeps) {
             BoardState.FAILED -> CivilightScreen(title = CanvasCopy.SMALL_LINE, back = back) { pad ->
                 Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
                     io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock(
-                        title = "프로젝트를 불러오지 못했습니다",
-                        subtitle = "뒤로 이동해 다시 열어 주세요.",
+                        title = CanvasCopy.LOAD_FAILED,
+                        subtitle = CanvasCopy.LOAD_FAILED_SUB,
                         icon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Warn,
                     )
                 }

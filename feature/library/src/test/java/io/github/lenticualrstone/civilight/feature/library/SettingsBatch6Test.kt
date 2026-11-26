@@ -193,4 +193,16 @@ class SettingsBatch6Test {
         val trashed = ashen.copy(project = ashen.project.copy(tags = ashen.project.tags.map { if (it.name == "등불 결사") it.copy(deletedAt = 1L) else it }))
         assertEquals("주연 · 하층 구역 · 상층", ProjectSettingsRows.tags(trashed).sub)
     }
+
+    @Test
+    fun `2026-11-26 the 태그 row lists every live tag whatever its scope, in tag order`() {
+        val ashen = LibFx.ashen()
+        fun scoped(name: String, scope: io.github.lenticualrstone.civilight.model.cast.TagScope) = { t: io.github.lenticualrstone.civilight.model.cast.Tag ->
+            if (t.name == name) t.copy(scope = io.github.lenticualrstone.civilight.model.OpenEnum.of(scope)) else t
+        }
+        val term = scoped("하층 구역", io.github.lenticualrstone.civilight.model.cast.TagScope.TERM)
+        val all = scoped("상층", io.github.lenticualrstone.civilight.model.cast.TagScope.ALL)
+        val mixed = ashen.copy(project = ashen.project.copy(tags = ashen.project.tags.map { all(term(it)) }))
+        assertEquals("주연 · 등불 결사 · 하층 구역 · 상층", ProjectSettingsRows.tags(mixed).sub)
+    }
 }

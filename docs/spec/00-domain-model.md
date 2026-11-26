@@ -1224,3 +1224,24 @@ VersionBlock = {
   - **C-34** N-29 storage: scope D20 (project document, travels in every `.civilight`) vs the computed task (working store, `.civilight` only when chosen). Resolution §13.5: working store, Drive backup always, manual export as a row that defaults on while Drive is a stub.
   - **C-35** `viewByScreen["library"]` seeded `LIST` (0.1.0 code, persisted by `encodeDefaults = false` whenever the map changed) vs U-16 (3D view default). Resolution §13.4: new fields `libraryToggle`, `castToggle` (absent = 3D); the old entries are kept and not read.
   - **C-36** Format version rule §8.1 (minor on any addition) vs D29 (move only when the upgrade chain needs it). Resolution §13.1: stay 1.0.
+
+## 14. Addendum (2026-11-26) · Tag scope, term tags, faction 거점, place card order, `묶음 기준`
+
+Additive only: every new property is optional, omitted while at its default, and older files and stores open and write back unchanged. The format stays 1.0 (§13.1). Design sources: boards `ImmTermTagSheet`, `ImmTermWhy`, `ImmPlaceRules`.
+
+- **`Tag.scope`** (`project.json › tags[]`): `character · term · place · faction · all`, open enum; absent = `character` (every older tag). Fixed when the tag is made; may only widen (own kind → `all`), never narrow. Names stay unique among all live tags regardless of scope. Gallery images take tags of scope `character` or `all` (the character tag picker). An unknown scope (newer file) fits no kind: it is kept and written back, never newly attached, and keys an item already holds stay untouched (like trashed tags' keys). Widening is one-way: no undo step, and undoing an earlier step does not narrow it again.
+- **`Term.tagKeys: Key[]`** (`world.json › terms[]`): ordered tag keys, absent = none. Places and factions carry no tags.
+- **`Faction.baseKey: Key?`** (`거점`, a `Place` key; new fixed field of the faction card, WLD-06) and **`Faction.memberOrder: Key[]`** (character keys in the user's order of `소속 인물`; the same on every place card; unlisted members follow in creation order).
+- **`Place.factionOrder: Key[]`** and **`Place.looseOrder: Key[]`**: the user's order of the faction groups and of the unaffiliated people (`무소속`) on that place card; unlisted items follow in creation order.
+- **`CastSettings.affiliationBasis: AffiliationBasis`** (`project.json › cast`): `{ affiliationFieldKey?, residenceFieldKey?, nationalityFieldKey? }`, each a character `FieldDef` of type `link` (소속 → faction, 거주 and 국적 → place). Null = that slot is unused; absent = all unused. Picked by the user, never guessed.
+
+### 14.1 Rows to fold into the body later
+
+- §2.5 `Tag` gains `scope`; §2.6 `Term` gains `tagKeys`, `Place` gains `factionOrder`, `looseOrder`, `Faction` gains `baseKey`, `memberOrder`; §2.1 `cast` gains `affiliationBasis`.
+- §7.4 `project.json › cast` and `tags[]`, §7.6 `world.json` places, terms, factions: the same properties.
+- Rule 20 for these keys (`domain:trash` `AffiliationKeys`):
+  - **Trash / restore** change none of them. A trashed faction or place keeps its own lists; references (`거점`, order entries, basis slots) keep the key, show dotted and come back by key. A hidden faction in the trash stays masked while locked (its people are masked as with a live hidden faction). A trashed basis field leaves its slot set but unused.
+  - **Merge** moves every reference to the target: `거점` of factions based at a merged place, the merged faction's key in `Place.factionOrder`, a merged character's key in `Faction.memberOrder` and `Place.looseOrder` (each recorded as a moved reference). The merged item's own lists carry over to the target: a merged faction's `baseKey` (only when the target has none) and `memberOrder`, a merged place's `factionOrder` and `looseOrder`, appended after the target's entries, duplicates and keys of purged items dropped. `되돌리기` of the merge undoes all of it; the merged item's snapshot keeps its own lists for a restore. A character trashed by a merge is not shown as a dotted member or `무소속` next to the target.
+  - **Purge** drops the key from `factionOrder`, `memberOrder` and `looseOrder`, and clears a basis slot whose field definition is purged. `거점` keeps the key and shows the place's name tag. A purged place's children take its parent as their `지역` (or none when it had none), so places under them stay in the `하위 지역` chain.
+  - **Tags**: a trashed tag's key stays on terms like on characters (N-44); a merge gives the target term the union of both terms' tag keys, in tag order; a purged tag leaves every holder.
+- A character whose `소속` or `거주` basis field is a `비밀` field with a locked secret tab (CST-73) is neither listed in a faction nor `무소속`, and gets no `국적` fallback; when the readable values point at the place, they are counted in `숨긴 인물` instead.

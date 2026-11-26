@@ -1,40 +1,34 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.github.lenticualrstone.civilight.designsystem.component.CheckboxRow
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightTabs
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.component.TabGap
+import io.github.lenticualrstone.civilight.ui.tour.tourTarget
 import io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock
 import io.github.lenticualrstone.civilight.designsystem.component.ListRow
-import io.github.lenticualrstone.civilight.designsystem.component.RadioRow
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
-import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
-import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
@@ -44,28 +38,18 @@ import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.cast.AppearanceBars
 import io.github.lenticualrstone.civilight.domain.cast.Appearances
 import io.github.lenticualrstone.civilight.model.Key
-import io.github.lenticualrstone.civilight.model.app.AppSettings
 import io.github.lenticualrstone.civilight.model.app.ProfileTabConfig
 import io.github.lenticualrstone.civilight.model.app.ProfileTabKind
 import io.github.lenticualrstone.civilight.model.app.ProfileTabPreset
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
-import io.github.lenticualrstone.civilight.model.script.BlockKind
-import io.github.lenticualrstone.civilight.model.text.LinkTargetKind
-import io.github.lenticualrstone.civilight.model.text.TextRun
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-private fun List<TextRun>.flatText(): String = joinToString("") { run ->
-    when (run) {
-        is TextRun.Plain -> run.text
-        is TextRun.Paren -> "(${run.text})"
-        is TextRun.Link -> run.text
-        TextRun.Break -> " "
-        else -> ""
-    }
-}.trim()
 
 /**
- * (0.5.2) Clean horizontal scrollable underline tab bar matching the night-manuscript-r3 Profile aesthetic:
- * transparent background over BottomGlassBar, bold `ink` active label + crisp `2.dp` accent underline.
+ * The record's tab row on the immersive bottom glass (`Immersive.dc.html`): the design-system [CivilightTabs]
+ * (gap 18, `tab` role, selected state, 44 dp targets, sliding underline on Motion tokens) and the 44 dp `탭 구성`
+ * icon button after it. The `관계` tab is the cast tour's `관계` hole (LIB-19).
  */
 @Composable
 internal fun ModularProfileTabBar(
@@ -75,99 +59,26 @@ internal fun ModularProfileTabBar(
     onManageTemplates: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = CivilightTheme.colors
-    val type = CivilightTheme.type
-    val scroll = rememberScrollState()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(scroll)
-            .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        tabs.forEach { tab ->
-            val active = tab.id == selectedId
-            val fg by animateColorAsState(if (active) colors.ink else colors.ink3, label = "profileTabFg")
-            val barColor by animateColorAsState(if (active) colors.acc else Color.Transparent, label = "profileTabBar")
-            Column(
-                Modifier
-                    .pressable(onClick = { onSelect(tab) }, scaleOnPress = false)
-                    .padding(vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                CivilightText(
-                    tab.label,
-                    type.small.copy(fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal),
-                    color = fg,
-                    maxLines = 1,
-                )
-                Box(
-                    Modifier
-                        .height(2.dp)
-                        .size(width = 24.dp, height = 2.dp)
-                        .background(barColor, RoundedCornerShape(1.dp)),
-                )
-            }
-        }
-        Box(
-            Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .pressable(onClick = onManageTemplates, scaleOnPress = false, shape = RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            CivilightIcon(IconId.Sliders, contentDescription = "탭 프리셋 설정", size = 15.dp, tint = colors.ink3)
-        }
+    val labels = remember(tabs) { tabs.map { it.label } }
+    val selected = tabs.indexOfFirst { it.id == selectedId }.coerceAtLeast(0)
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        CivilightTabs(
+            tabs = labels,
+            selectedIndex = selected,
+            onSelect = { i -> tabs.getOrNull(i)?.let(onSelect) },
+            modifier = Modifier.weight(1f),
+            gap = TabGap.Default,
+            tabModifier = { i -> if (tabs.getOrNull(i)?.kind == ProfileTabKind.RELATIONS) Modifier.tourTarget(CastTourSteps.RELATIONS) else Modifier },
+        )
+        CivilightIconButton(IconId.Sliders, ModularTabCopy.TAB_SETUP, onManageTemplates)
     }
 }
 
-/** One script appearance entry extracted automatically from the manuscript for `작중 행적`. */
-internal data class ScriptAppearanceEntry(
-    val sceneKey: Key,
-    val sceneTitle: String,
-    val blockKey: Key,
-    val isDialogue: Boolean,
-    val excerpt: String,
-)
-
-/** Scans the live manuscript for every dialogue spoken by or `@` mention referencing [characterKey]. */
-internal fun scanCharacterAppearances(
-    doc: ProjectDoc,
-    characterKey: Key,
-    hiddenUnlocked: Boolean,
-): List<ScriptAppearanceEntry> {
-    val result = mutableListOf<ScriptAppearanceEntry>()
-    val sceneLevel = doc.project.structure.levels.lastIndex
-    val liveScenes = doc.story.units.filter { unit ->
-        unit.deletedAt == null &&
-            unit.level == sceneLevel &&
-            (hiddenUnlocked || !unit.hidden)
-    }
-
-    for (scene in liveScenes) {
-        val unitBlocks = doc.manuscript.liveBlocksOf(scene.key)
-        val title = scene.title?.takeIf { it.isNotBlank() } ?: "씬"
-        for (block in unitBlocks) {
-            val isSpeaker = block.kind.known == BlockKind.DIALOGUE && block.speakerKey == characterKey
-            val isMentioned = !isSpeaker && block.runs.any { run ->
-                run is TextRun.Link && run.target.kind.known == LinkTargetKind.CHARACTER && run.target.key == characterKey
-            }
-            if (!isSpeaker && !isMentioned) continue
-            val plain = block.runs.flatText()
-            if (plain.isNotBlank()) {
-                result += ScriptAppearanceEntry(
-                    sceneKey = scene.key,
-                    sceneTitle = title,
-                    blockKey = block.key,
-                    isDialogue = isSpeaker,
-                    excerpt = if (plain.length > 96) plain.take(96) + "…" else plain,
-                )
-            }
-        }
-    }
-    return result
+/** The tabs the record shows: the enabled ones; `게임 텍스트` only while `게임 제작 도구` is on (CST-74). */
+internal object ProfileTabSet {
+    fun visible(configured: List<ProfileTabConfig>, gameTools: Boolean): List<ProfileTabConfig> =
+        configured.filter { it.enabled && (gameTools || it.kind != ProfileTabKind.GAME_TEXT) }
+            .ifEmpty { ProfileTabPreset.STANDARD.defaultTabs().filter { it.enabled && (gameTools || it.kind != ProfileTabKind.GAME_TEXT) } }
 }
 
 /**
@@ -184,23 +95,28 @@ internal fun AppearancesTraceTab(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val bars: AppearanceBars = remember(doc, characterKey, hiddenUnlocked) { Appearances.of(doc, characterKey, hiddenUnlocked) }
-    val entries = remember(doc, characterKey, hiddenUnlocked) { scanCharacterAppearances(doc, characterKey, hiddenUnlocked) }
-    val grouped = remember(entries) { entries.groupBy { it.sceneKey to it.sceneTitle } }
-    val dialogueCount = remember(entries) { entries.count { it.isDialogue } }
-    val mentionCount = remember(entries) { entries.count { !it.isDialogue } }
+    // The manuscript scan runs off the main thread; null = not ready yet (no empty state flash).
+    val groups by produceState<List<AppearanceSceneGroup>?>(null, doc, characterKey, hiddenUnlocked) {
+        value = withContext(Dispatchers.Default) { AppearanceTrace.group(AppearanceTrace.scan(doc, characterKey, hiddenUnlocked)) }
+    }
+    var expanded by remember(characterKey, hiddenUnlocked) { mutableStateOf(emptySet<Key>()) }
 
     Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AppearanceSection(bars)
-        if (entries.isEmpty()) {
+        val loaded = groups ?: return@Column
+        if (loaded.isEmpty()) {
             EmptyBlock(
                 icon = IconId.Edit,
-                title = "아직 스크립트에 등장하지 않았습니다",
-                subtitle = "원고에서 이 인물의 대사를 쓰거나 @로 인용하면 작중 행적이 자동으로 정리됩니다.",
+                title = ModularTabCopy.TRACE_EMPTY,
+                subtitle = ModularTabCopy.TRACE_EMPTY_SUB,
             )
         } else {
-            SectionLabel("스크립트 행적 · 대사 ${dialogueCount}회 · 언급 ${mentionCount}회")
-            grouped.forEach { (scenePair, items) ->
-                val (_, sceneTitle) = scenePair
+            val entries = loaded.flatMap { it.entries }
+            val dialogueCount = entries.count { it.isDialogue }
+            val mentionCount = entries.size - dialogueCount
+            SectionLabel(ModularTabCopy.traceTitle(dialogueCount, mentionCount))
+            loaded.forEach { group ->
+                val open = group.sceneKey in expanded
                 val cardShape = RoundedCornerShape(14.dp)
                 Column(
                     Modifier
@@ -216,10 +132,10 @@ internal fun AppearancesTraceTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CivilightText(sceneTitle, type.itemTitleCompact, color = colors.ink, maxLines = 1)
-                        CivilightText("${items.size}건", type.small, color = colors.acc)
+                        CivilightText(group.sceneTitle, type.itemTitleCompact, color = colors.ink, maxLines = 1)
+                        CivilightText(ModularTabCopy.count(group.entries.size), type.small, color = colors.acc)
                     }
-                    items.take(8).forEach { entry ->
+                    group.visible(open).forEach { entry ->
                         val rowShape = RoundedCornerShape(10.dp)
                         Row(
                             Modifier
@@ -248,9 +164,59 @@ internal fun AppearancesTraceTab(
                             CivilightIcon(IconId.Next, contentDescription = null, size = 14.dp, tint = colors.ink3)
                         }
                     }
+                    val more = group.more(open)
+                    if (more > 0) {
+                        TextAction(
+                            ModularTabCopy.more(more),
+                            onClick = { expanded = expanded + group.sceneKey },
+                            color = colors.acc,
+                            style = type.small,
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+/** Terse copy of the modular section tabs' empty state (labels and fragments, no sentences). */
+internal object ModularTabCopy {
+    const val TAB_SETUP = "탭 구성"
+    const val ADD_FIELD = "+ 항목"
+    const val BTN_ADD_FIELD = "항목 더하기"
+    const val TRACE_EMPTY = "등장 없음"
+    const val TRACE_EMPTY_SUB = "대사 · @ 인용"
+    const val SHORTCUTS = "말투 · 비밀 바로가기"
+    const val SPEECH_ROW = "말투 · 호칭"
+    const val SPEECH_ROW_SUB = "말투 요약 · 인물별 호칭"
+    const val SECRET_ROW = "비밀 · 스포일러 노트"
+    const val SECRET_ROW_SUB = "비공개 설정 · 메모 · 잠글 수 있음"
+    const val NEW_VOICE_LINE = "보이스 대사 더하기"
+
+    /** All constant labels (copy lint). */
+    val all: List<String> = listOf(
+        TAB_SETUP, ADD_FIELD, BTN_ADD_FIELD, TRACE_EMPTY, TRACE_EMPTY_SUB, SHORTCUTS,
+        SPEECH_ROW, SPEECH_ROW_SUB, SECRET_ROW, SECRET_ROW_SUB, NEW_VOICE_LINE,
+    )
+
+    fun empty(label: String): String = "$label 없음"
+
+    fun traceTitle(dialogue: Int, mention: Int): String = "스크립트 행적 · 대사 ${dialogue}회 · 언급 ${mention}회"
+
+    fun count(n: Int): String = "${n}건"
+
+    fun more(n: Int): String = "더 보기 · $n"
+
+    /** `← 여담`: back from the 말투 or 비밀 view opened inside another tab (no particle to get wrong). */
+    fun backTo(label: String): String = "← $label"
+
+    /** What the tab collects; a custom tab has none. */
+    fun hint(kind: ProfileTabKind): String? = when (kind) {
+        ProfileTabKind.EQUIPMENT -> "무기 · 의상 · 소지품"
+        ProfileTabKind.ABILITIES -> "스킬 · 특기 · 약점"
+        ProfileTabKind.PAST -> "출신 · 배경 · 과거 사건"
+        ProfileTabKind.TRIVIA -> "버릇 · 취미 · 성격"
+        else -> null
     }
 }
 
@@ -295,22 +261,15 @@ internal fun ModularSectionTab(
         ) {
             SectionLabel(tab.label)
             if (actions.editable) {
-                TextAction("+ 항목 추가", actions.onAddField, color = colors.acc, style = type.small)
+                TextAction(ModularTabCopy.ADD_FIELD, actions.onAddField, color = colors.acc, style = type.small)
             }
         }
         if (matchedRows.isEmpty()) {
-            val hint = when (tab.kind) {
-                ProfileTabKind.EQUIPMENT -> "무기 · 의상 · 소지품 항목을 추가해 정리해 보세요."
-                ProfileTabKind.ABILITIES -> "스킬 · 특기 · 약점 항목을 추가해 정리해 보세요."
-                ProfileTabKind.PAST -> "출신 · 배경 서사 · 과거 사건 항목을 추가해 정리해 보세요."
-                ProfileTabKind.TRIVIA -> "버릇 · 취미 · 성격 여담을 자유롭게 기록해 보세요."
-                else -> "${tab.label} 관련 커스텀 항목을 추가해 보세요."
-            }
             EmptyBlock(
                 icon = IconId.File,
-                title = "${tab.label} 항목이 비어 있습니다",
-                subtitle = hint,
-                primaryLabel = if (actions.editable) "항목 추가" else null,
+                title = ModularTabCopy.empty(tab.label),
+                subtitle = ModularTabCopy.hint(tab.kind),
+                primaryLabel = if (actions.editable) ModularTabCopy.BTN_ADD_FIELD else null,
                 onPrimary = if (actions.editable) actions.onAddField else null,
             )
         } else {
@@ -322,120 +281,20 @@ internal fun ModularSectionTab(
         // Preserve effortless access to speech & secret data inside `여담` when using the default 7-tab preset.
         if (tab.kind == ProfileTabKind.TRIVIA) {
             Spacer(Modifier.height(6.dp))
-            SectionLabel("말투 · 비밀 바로가기")
+            SectionLabel(ModularTabCopy.SHORTCUTS)
             ListRow(
-                title = "말투 · 호칭",
-                subtitle = speechSummary?.takeIf { it.isNotBlank() } ?: "말투 요약 및 인물별 호칭 관리",
+                title = ModularTabCopy.SPEECH_ROW,
+                subtitle = speechSummary?.takeIf { it.isNotBlank() } ?: ModularTabCopy.SPEECH_ROW_SUB,
                 leading = { CivilightIcon(IconId.Edit, contentDescription = null, tint = colors.ink2) },
                 trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = colors.ink3) },
                 onClick = onOpenSpeech,
             )
             ListRow(
-                title = "비밀 · 스포일러 노트",
-                subtitle = "잠금 보호 가능한 비공개 설정 및 메모",
+                title = ModularTabCopy.SECRET_ROW,
+                subtitle = ModularTabCopy.SECRET_ROW_SUB,
                 leading = { CivilightIcon(IconId.Lock, contentDescription = null, tint = colors.ink2) },
                 trailing = { CivilightIcon(IconId.Next, contentDescription = null, tint = colors.ink3) },
                 onClick = onOpenSecret,
-            )
-        }
-    }
-}
-
-/** In-profile bottom sheet to switch character tab presets or toggle/customize tab modules. */
-@Composable
-internal fun ColumnScope.ProfileTabTemplateSheetContent(
-    settings: AppSettings,
-    onSelectPreset: (ProfileTabPreset) -> Unit,
-    onUpdateTabs: (List<ProfileTabConfig>) -> Unit,
-    onClose: () -> Unit,
-) {
-    val colors = CivilightTheme.colors
-    val activeTabs = settings.customProfileTabs.ifEmpty { settings.profileTabPreset.defaultTabs() }
-    var presetTab by remember { mutableStateOf(settings.profileTabPreset) }
-
-    SheetHeader(title = "인물 카드 탭 템플릿", closeLabel = "닫기", onClose = onClose)
-    SheetScrollBody {
-        CivilightText("프리셋 불러오기", CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
-        ProfileTabPreset.entries.forEach { preset ->
-            val label = when (preset) {
-                ProfileTabPreset.STANDARD -> "표준 창작 (기본)"
-                ProfileTabPreset.MODERN_DRAMA -> "현대극 · 드라마"
-                ProfileTabPreset.GAME_VN -> "게임 · VN 제작"
-                ProfileTabPreset.MINIMAL -> "미니멀"
-            }
-            RadioRow(
-                title = label,
-                subtitle = preset.defaultTabs().joinToString(" · ") { it.label },
-                selected = presetTab == preset && settings.customProfileTabs.isEmpty(),
-                onClick = {
-                    presetTab = preset
-                    onSelectPreset(preset)
-                },
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        CivilightText("표시할 탭 모듈 선택 · 순서", CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
-        activeTabs.forEachIndexed { idx, tab ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) {
-                    CheckboxRow(
-                        label = tab.label,
-                        checked = tab.enabled,
-                        onCheckedChange = { checked ->
-                            val next = activeTabs.map { if (it.id == tab.id) it.copy(enabled = checked) else it }
-                            if (next.any { it.enabled }) onUpdateTabs(next)
-                        },
-                    )
-                }
-                if (idx > 0) {
-                    TextAction(
-                        "↑",
-                        onClick = {
-                            val list = activeTabs.toMutableList()
-                            val moved = list.removeAt(idx)
-                            list.add(idx - 1, moved)
-                            onUpdateTabs(list)
-                        },
-                        color = colors.ink2,
-                        style = CivilightTheme.type.small,
-                    )
-                }
-                if (idx < activeTabs.lastIndex) {
-                    TextAction(
-                        "↓",
-                        onClick = {
-                            val list = activeTabs.toMutableList()
-                            val moved = list.removeAt(idx)
-                            list.add(idx + 1, moved)
-                            onUpdateTabs(list)
-                        },
-                        color = colors.ink2,
-                        style = CivilightTheme.type.small,
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        var newTabName by remember { mutableStateOf("") }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            io.github.lenticualrstone.civilight.designsystem.component.CivilightTextField(
-                value = newTabName,
-                onValueChange = { newTabName = it },
-                placeholder = "새 커스텀 탭 이름 (예: 대사집 · 소속)",
-                modifier = Modifier.weight(1f),
-            )
-            TextAction(
-                "추가",
-                onClick = {
-                    val trimmed = newTabName.trim()
-                    if (trimmed.isNotEmpty()) {
-                        val id = "custom_${System.currentTimeMillis()}"
-                        onUpdateTabs(activeTabs + ProfileTabConfig(id = id, label = trimmed, kind = ProfileTabKind.CUSTOM, enabled = true))
-                        newTabName = ""
-                    }
-                },
-                color = colors.acc,
-                style = CivilightTheme.type.small,
             )
         }
     }

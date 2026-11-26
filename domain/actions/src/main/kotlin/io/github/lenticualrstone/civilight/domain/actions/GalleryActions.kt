@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.domain.actions
 
 import io.github.lenticualrstone.civilight.domain.library.hiding.ItemSurfaces
+import io.github.lenticualrstone.civilight.model.cast.fits
 import io.github.lenticualrstone.civilight.domain.trash.DeleteResult
 import io.github.lenticualrstone.civilight.domain.trash.DocChange
 import io.github.lenticualrstone.civilight.domain.trash.ItemId
@@ -208,8 +209,19 @@ object GalleryActions {
     fun setCaption(doc: ProjectDoc, itemKey: Key, caption: RichDoc?, ctx: ActionContext) =
         edit(doc, itemKey, ctx) { it.copy(caption = caption?.takeIf { c -> c.any { b -> b.runs.isNotEmpty() } }) }
 
+    /**
+     * The image's tags. (2026-11-26) Gallery images take tags of scope `인물` or `모든 항목` (the character
+     * tag picker); a live tag of another scope is dropped. Trashed tags' keys stay (N-44). A live tag whose
+     * scope is unknown (newer file) is never attached here, and one already held stays untouched.
+     */
     fun setTags(doc: ProjectDoc, itemKey: Key, tagKeys: List<Key>, ctx: ActionContext) =
-        edit(doc, itemKey, ctx) { it.copy(tagKeys = tagKeys.distinct().filter { k -> doc.index.tag(k) != null }) }
+        edit(doc, itemKey, ctx) {
+            it.copy(
+                tagKeys = io.github.lenticualrstone.civilight.model.cast.TagScopes.settleInPickOrder(
+                    doc, io.github.lenticualrstone.civilight.model.cast.TagScope.CHARACTER, tagKeys, it.tagKeys, keepMissing = false,
+                ),
+            )
+        }
 
     fun setScene(doc: ProjectDoc, itemKey: Key, sceneKey: Key?, ctx: ActionContext) = edit(doc, itemKey, ctx) { it.copy(sceneKey = sceneKey) }
 

@@ -87,8 +87,9 @@ abstract class StoryViewModel(projectKey: Key, protected val services: StoryServ
             result = r
             r?.doc ?: doc
         }
-        val done = result ?: return@launch
         if (applied != EditResult.APPLIED) return@launch
+        // (0.3.2) The transform ran but the scene was no longer live: say so instead of closing silently.
+        val done = result ?: return@launch services.toasts.show(StoryCopy.ALREADY_DELETED_SCENE, actionLabel = null)
         services.toasts.show(done.toast.message, done.toast.action ?: StoryCopy.UNDO) { undoDelete(label, done) }
     }
 

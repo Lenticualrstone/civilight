@@ -13,6 +13,9 @@ object StoryCopy {
     /** `씬 3 지움` (toast subject and undo label, R12 §2). */
     const val DELETED = "지움"
 
+    /** (0.3.2) Toast when `씬 지우기` finds the scene already gone (a stale ⋯ or a double tap). */
+    const val ALREADY_DELETED_SCENE = "이미 지운 씬"
+
     /** Small tag on an unlocked hidden scene's row (R19 §6, STO-11). */
     const val HIDDEN_TAG = "숨김"
 

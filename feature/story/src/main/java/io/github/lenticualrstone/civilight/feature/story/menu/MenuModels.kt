@@ -100,7 +100,7 @@ object UnitMenuModel {
     /**
      * Scene ⋯. On a scene head it is `domain:story` `SceneHeads.menu` as is (SCR-47). In the 스토리
      * list (STO-07): `장소와 때 · 전환 문구 · 앞 씬과 합치기` (disabled for an episode's first scene) `·
-     * 여기서 나누기 · 옮기기 · 씬 지우기`, then `완료 표시` (`완료 표시 빼기` when set).
+     * 여기서 나누기 · 옮기기`, `완료 표시` (`완료 표시 빼기` when set), then (0.3.2) `씬 지우기` last.
      */
     private fun sceneMenu(doc: ProjectDoc, scene: StoryUnit, surface: MenuSurface, readOnly: Boolean): MenuModel? {
         val head = SceneHeads(doc).menu(scene.key, readOnly) ?: return null
@@ -113,8 +113,9 @@ object UnitMenuModel {
             add(from(MenuAction.MERGE_PREVIOUS) ?: MenuRow(MenuAction.MERGE_PREVIOUS, MenuCopy.MERGE_PREVIOUS, null, enabled = false))
             add(mutating(MenuAction.SPLIT_HERE, MenuCopy.SPLIT_HERE, null, readOnly))
             add(mutating(MenuAction.MOVE, MenuCopy.MOVE, null, readOnly).let { if (MoveModel.movable(doc, scene.key)) it else it.copy(enabled = false) })
-            from(MenuAction.DELETE_SCENE)?.let(::add)
             add(doneRow(doc, scene, readOnly))
+            // (0.3.2) The destructive row last, under its own divider (`MenuRowView`).
+            from(MenuAction.DELETE_SCENE)?.let(::add)
         }
         return MenuModel(head.title, rows).drawnOnly()
     }

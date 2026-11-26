@@ -1,5 +1,14 @@
 package io.github.lenticualrstone.civilight.feature.world.term
 
+import io.github.lenticualrstone.civilight.domain.world.term.TermTags
+import io.github.lenticualrstone.civilight.domain.world.term.TermFlow
+import io.github.lenticualrstone.civilight.domain.world.term.TermFlowStrip
+import io.github.lenticualrstone.civilight.domain.world.term.TermSceneNeighbors
+import io.github.lenticualrstone.civilight.domain.world.term.NeighborKind
+import io.github.lenticualrstone.civilight.domain.world.term.TermLink
+import io.github.lenticualrstone.civilight.model.script.BlockKind
+import io.github.lenticualrstone.civilight.navigation.CharacterProfile
+import io.github.lenticualrstone.civilight.navigation.EventDetail
 import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
 import io.github.lenticualrstone.civilight.domain.world.term.CandidateIndex
 import io.github.lenticualrstone.civilight.domain.world.term.CandidateRow
@@ -65,12 +74,33 @@ data class UsageRowUi(
     val linkKey: Key? = null,
     /** A `▲ 공개 전 사용` row not yet marked: `맞음` is offered next to the marker (WLD-24). */
     val canMarkIntended: Boolean = false,
+    /**
+     * (2026-11-26, board `ImmContent` `작중에서`) Who says it: the speaker's name, else the kind of text (`지문`,
+     * `시스템`, `선택지`, `전환 문구`); a hidden speaker reads `숨긴 인물` while locked. Null outside the manuscript
+     * and for masked rows.
+     */
+    val who: String? = null,
+    /** The avatar letter next to [who]. */
+    val initial: String? = null,
 ) {
     val boxed: Boolean get() = boxEnd > boxStart
 }
 
 /** `쓰인 곳 · 2`, `후보 · 1 · 확인 안 함`, `원고 밖 · 메모 · 1`. */
 data class UsageGroupUi(val id: String, val title: String, val rows: List<UsageRowUi>)
+
+/** (2026-11-26) The card's bottom tabs (board `Immersive` kind `term`): `개요 · 쓰인 곳 · 연결`. */
+enum class TermTab(val label: String) {
+    OVERVIEW(WorldCopy.TAB_OVERVIEW),
+    USES(WorldCopy.TAB_USES),
+    LINKS(WorldCopy.TAB_LINKS),
+}
+
+/** (2026-11-26) A chip of `같은 씬에 나온 것` or of the characters linking to the term: `인물 하윤`; [target] opens it. */
+data class TermLinkChipUi(val id: String, val kind: String, val name: String, val target: Route?)
+
+/** (2026-11-26) One tag chip of the term card; [color] is the tag's palette token or null. */
+data class TermTagUi(val key: Key, val name: String, val color: String?)
 
 /** Everything the term card draws (WLD-08, WLD-16 row, WLD-18 row and chip, WLD-19 groups). */
 data class TermCardUi(
@@ -101,6 +131,20 @@ data class TermCardUi(
     val sameName: String? = null,
     /** `모두 잇기 · 모두 아님` over the `후보` group (WLD-23), as two buttons; empty without candidates. */
     val bulkActions: List<String> = emptyList(),
+    /** (2026-11-26) The tag chips at the top of the card: live tags of scope `용어 전용` or `모든 항목`, in tag order. */
+    val tags: List<TermTagUi> = emptyList(),
+    /** (2026-11-26) `+ 태그` is offered (editable project, live term). */
+    val canAddTag: Boolean = false,
+    /** (2026-11-26) The immersive subtitle `처음 나옴 1-7 씬 3` (first reveal, masked like `첫 공개`); null without one. */
+    val subtitle: String? = null,
+    /** (2026-11-26) The aliases as chips (`별칭`). */
+    val aliasChips: List<String> = emptyList(),
+    /** (2026-11-26) `쓰인 흐름`: one cell per episode (domain [TermFlow]). */
+    val flow: TermFlowStrip = TermFlowStrip(emptyList()),
+    /** (2026-11-26) `같은 씬에 나온 것` (domain [TermSceneNeighbors]). */
+    val neighbors: List<TermLinkChipUi> = emptyList(),
+    /** (2026-11-26) Characters whose profile text links to the term (`이 용어로 잇는 인물`). */
+    val linkingCharacters: List<TermLinkChipUi> = emptyList(),
 ) {
     val title: String
         get() = when (access) {
@@ -169,7 +213,83 @@ object TermCardState {
             descriptionLocked = CardText.hasLockedLinks(doc, term.description, hiddenOpen),
             sameName = ItemLifecycle.sameName(doc, WorldKind.TERM, termKey),
             bulkActions = if (card.candidates.rows.isEmpty() || !index.complete) emptyList() else card.candidates.action.split(WorldCopy.SEP),
+            tags = TermTags.tags(doc, termKey).map { TermTagUi(it.key, it.name, it.color) },
+            canAddTag = TermTags.canAdd(doc, termKey, editable),
+            subtitle = subtitle(queries, termKey),
+            aliasChips = term.aliases,
+            flow = TermFlow.of(queries, card),
+            neighbors = TermSceneNeighbors.of(doc, termKey, hiddenOpen).map { n ->
+                TermLinkChipUi("${n.kind.name}:${n.key}", n.kind.label, n.name, neighborTarget(projectKey, n.kind, n.key))
+            },
+            linkingCharacters = linkingCharacters(doc, projectKey, queries.outside(termKey), hiddenOpen),
         )
+    }
+
+    /**
+     * `처음 나옴 1-7 씬 3`: the effective reveal's scene (`처음 나옴 1-7` for a unit anchor, or while its scene is
+     * hidden and locked, as the `첫 공개` row masks it). Null without a reveal and for a planned one (`공개 예정`).
+     */
+    fun subtitle(queries: TermQueries, termKey: Key): String? {
+        val reveal = queries.reveal(termKey) ?: return null
+        if (reveal.planned) return null
+        val doc = queries.doc
+        val block = reveal.blockKey?.let { doc.index.block(it) }
+        val scene = block?.let { doc.index.unit(it.sceneKey) }
+        val sceneHidden = scene != null && (scene.hidden || doc.index.ancestors(scene).any { it.hidden })
+        val label = when {
+            block == null -> reveal.episodeLabel
+            sceneHidden && !queries.access.hiddenUnlocked -> reveal.episodeLabel
+            else -> queries.codes.sceneOfBlock(block.key) ?: reveal.episodeLabel
+        } ?: return null
+        return WorldCopy.firstSeen(label)
+    }
+
+    private fun neighborTarget(projectKey: Key, kind: NeighborKind, key: Key): Route = when (kind) {
+        NeighborKind.CHARACTER -> CharacterProfile(projectKey, key)
+        NeighborKind.PLACE -> WorldTargets.card(projectKey, WorldKind.PLACE, key)
+        NeighborKind.FACTION -> WorldTargets.card(projectKey, WorldKind.FACTION, key)
+        NeighborKind.EVENT -> EventDetail(projectKey, key)
+    }
+
+    /** Characters whose body, game text or field values link the term, in link order; hidden ones only while open. */
+    fun linkingCharacters(doc: ProjectDoc, projectKey: Key, outside: List<TermLink>, hiddenOpen: Boolean): List<TermLinkChipUi> =
+        outside.mapNotNull { link ->
+            when (val spot = link.spot) {
+                is OutsideSpot.CharacterBody -> spot.characterKey
+                is OutsideSpot.VoiceLineText -> spot.characterKey
+                is OutsideSpot.ArchiveText -> spot.characterKey
+                is OutsideSpot.FieldText -> spot.entityKey.takeIf { spot.entityKind == EntityKind.CHARACTER }
+                else -> null
+            }
+        }.distinct().mapNotNull { key ->
+            val c = doc.index.character(key)?.takeIf { it.deletedAt == null && (hiddenOpen || !it.hidden) } ?: return@mapNotNull null
+            TermLinkChipUi("CHARACTER:$key", NeighborKind.CHARACTER.label, c.name, CharacterProfile(projectKey, key))
+        }
+
+    /** `who` and the avatar letter of a manuscript row (see [UsageRowUi.who]); null outside the manuscript. */
+    fun speakerOf(doc: ProjectDoc, spot: TextSpot, hiddenOpen: Boolean): Pair<String, String>? {
+        val block = when (spot) {
+            is ScriptSpot.BlockText -> doc.index.block(spot.blockKey)
+            is ScriptSpot.OptionText -> doc.index.block(spot.blockKey)
+            is ScriptSpot.TransitionText -> return WorldCopy.WHO_TRANSITION to WorldCopy.WHO_TRANSITION.take(1)
+            else -> return null
+        } ?: return null
+        val speakerKey = when (spot) {
+            is ScriptSpot.OptionText -> block.options.firstOrNull { it.key == spot.optionKey }?.speakerKey
+            else -> block.speakerKey.takeIf { block.kind.known == BlockKind.DIALOGUE }
+        }
+        val speaker = speakerKey?.let { doc.index.character(it) }
+        if (speaker != null) {
+            if (speaker.hidden && !hiddenOpen) return WorldCopy.WHO_HIDDEN to WorldCopy.WHO_HIDDEN.take(1)
+            return speaker.name to speaker.name.trim().take(1)
+        }
+        val word = when {
+            spot is ScriptSpot.OptionText -> WorldCopy.WHO_OPTION
+            block.kind.known == BlockKind.SYSTEM -> WorldCopy.WHO_SYSTEM
+            else -> WorldCopy.WHO_NARRATION
+        }
+        // Board `ImmContent`: 지문 shows `문`; the other words their first letter.
+        return word to if (word == WorldCopy.WHO_NARRATION) word.takeLast(1) else word.take(1)
     }
 
     private fun closed(termKey: Key, access: CardAccess) = TermCardUi(
@@ -198,6 +318,8 @@ object TermCardState {
             target = if (locked) null else WorldTargets.of(projectKey, spot),
             linkKey = row.link.linkKey,
             canMarkIntended = row.preReveal && !row.intended && !locked,
+            who = if (locked) null else speakerOf(doc, spot, hiddenOpen)?.first,
+            initial = if (locked) null else speakerOf(doc, spot, hiddenOpen)?.second,
         )
     }
 
@@ -216,6 +338,8 @@ object TermCardState {
             dimmed = row.dimmed,
             target = if (locked) null else WorldTargets.of(projectKey, c.spot),
             candidate = c,
+            who = if (locked) null else speakerOf(doc, c.spot, hiddenOpen)?.first,
+            initial = if (locked) null else speakerOf(doc, c.spot, hiddenOpen)?.second,
         )
     }
 

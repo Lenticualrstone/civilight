@@ -28,7 +28,9 @@ class PlaceCardStateTest {
         assertEquals(CardAccess.Open, ui.access)
         assertEquals("기록실", ui.title)
         assertEquals("장소 · 결사의 문", ui.head!!.eyebrow)
-        assertEquals(listOf("개요", "이곳의 시간", "지도"), ui.tabs)
+        assertEquals(listOf("개요", "소속", "등장"), ui.tabs)
+        // No tags on places (2026-11-26); the subtitle is the structure fact.
+        assertEquals("상위 지역 결사의 문", ui.subtitle)
         assertEquals("결사의 문", ui.parent!!.value)
         assertTrue(ui.parent!!.editable)
         assertTrue(ui.appearance!!.label == "등장" && !ui.appearance!!.editable)
@@ -116,9 +118,9 @@ class PlaceCardStateTest {
     }
 
     @Test
-    fun `route tabs map onto the card tabs`() {
+    fun `route tabs map onto the card tabs - 이곳의 시간 and 지도 live under 등장`() {
         assertEquals(0, PlaceCardUi.tabIndex(PlaceTab.OVERVIEW))
-        assertEquals(PlaceTab.TIME_HERE, PlaceCardUi.tabOf(PlaceCardUi.tabIndex(PlaceTab.TIME_HERE)))
-        assertEquals(PlaceTab.OVERVIEW, PlaceCardUi.tabOf(9))
+        assertEquals(2, PlaceCardUi.tabIndex(PlaceTab.TIME_HERE))
+        assertEquals(2, PlaceCardUi.tabIndex(PlaceTab.MAP))
     }
 }

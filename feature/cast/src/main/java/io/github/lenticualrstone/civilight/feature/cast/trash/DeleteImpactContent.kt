@@ -1,10 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.cast.trash
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,9 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
@@ -27,7 +23,6 @@ import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
-import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.text.DecoratedText
 import io.github.lenticualrstone.civilight.designsystem.text.DecorationRange
 import io.github.lenticualrstone.civilight.designsystem.text.InlineDecoration
@@ -162,19 +157,7 @@ private fun DottedName(name: String) {
     }
 }
 
+/** The shared impact count row (designsystem, also used by the world sheet). */
 @Composable
-private fun ImpactRow(row: ImpactRowView) {
-    val colors = CivilightTheme.colors
-    val type = CivilightTheme.type
-    Row(
-        Modifier.fillMaxWidth().topHairline(colors.line).heightIn(min = 44.dp).padding(vertical = 9.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            CivilightText(row.label, type.command, color = colors.ink)
-            row.sub?.let { CivilightText(it, type.small, color = colors.ink3) }
-        }
-        CivilightText(row.count, type.number.merge(TextStyle(fontSize = 15.sp)), color = colors.ink)
-    }
-}
+private fun ImpactRow(row: ImpactRowView) =
+    io.github.lenticualrstone.civilight.designsystem.component.ImpactCountRow(row.label, row.count, sub = row.sub)

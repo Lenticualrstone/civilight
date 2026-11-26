@@ -250,7 +250,7 @@ class StructureModelTest {
         val d = Fx.mini(listOf("씬"), node("S1", "첫 장", "글"), node("S2"))
         fun scene(ui: io.github.lenticualrstone.civilight.feature.story.structure.StructureUi) =
             ui.items.filterIsInstance<SceneItem>().single { it.row.key == "S2" }
-        fun doneRow(x: ProjectDoc) = UnitMenuModel.build(x, "S2", MenuSurface.STORY_LIST, readOnly = false)!!.rows.last()
+        fun doneRow(x: ProjectDoc) = UnitMenuModel.build(x, "S2", MenuSurface.STORY_LIST, readOnly = false)!!.rows.single { it.action == MenuAction.MARK_DONE || it.action == MenuAction.UNMARK_DONE }
         fun home(x: ProjectDoc) = HomeModel.build(x, readOnly = false, locked = false, today = Fx.today, zone = Fx.zone)
 
         val before = scene(build(d, emptyList()))
@@ -285,7 +285,7 @@ class StructureModelTest {
         val item = build(marked, listOf(K.EPISODE_1_7)).items.filterIsInstance<SceneItem>().single { it.row.key == K.SCENE_1_7_4 }
         assertTrue(item.done)
         assertEquals("완료", item.meta)
-        val menu = UnitMenuModel.build(marked, K.SCENE_1_7_4, MenuSurface.STORY_LIST, readOnly = false)!!.rows.last()
+        val menu = UnitMenuModel.build(marked, K.SCENE_1_7_4, MenuSurface.STORY_LIST, readOnly = false)!!.rows.single { it.action == MenuAction.MARK_DONE || it.action == MenuAction.UNMARK_DONE }
         assertEquals(MenuAction.UNMARK_DONE to "완료", menu.action to menu.value)
         val unmarked = StoryActions.setDone(marked, K.SCENE_1_7_4, false, Fx.ctx())
         assertEquals("—", build(unmarked, listOf(K.EPISODE_1_7)).items.filterIsInstance<SceneItem>().single { it.row.key == K.SCENE_1_7_4 }.meta)

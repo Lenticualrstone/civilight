@@ -2,13 +2,9 @@ package io.github.lenticualrstone.civilight.feature.library.shelf.atelier
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +54,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.foundation.horizontalSwipe
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
@@ -151,6 +148,70 @@ object AtelierCopy {
         ProjectFormat.SHORT -> FORMAT_SHORT
         ProjectFormat.SETTING_ONLY -> FORMAT_SETTING
     }
+}
+
+/** Width × height of a cover window, in dp. */
+internal data class CoverBox(val width: Float, val height: Float)
+
+/**
+ * One sizing rule for every Atelier cover window (board spec: project card 3:4, 222×296).
+ * The box keeps its aspect exactly; when the stage is short, the WIDTH shrinks with the
+ * height (never only the height), so a cover is never squashed toward a square.
+ *
+ * - width wanted = stage width × [widthFraction], clamped to [minWidth]..[maxWidth]
+ * - width allowed by height = stage height × [heightFraction] × aspect
+ * - width = the smaller of the two; height = width ÷ aspect
+ */
+internal object AtelierCoverBox {
+    /** Project cover aspect (width ÷ height). */
+    const val COVER_ASPECT = 3f / 4f
+
+    fun fit(
+        stageWidth: Float,
+        stageHeight: Float,
+        widthFraction: Float,
+        heightFraction: Float,
+        minWidth: Float,
+        maxWidth: Float,
+        aspect: Float = COVER_ASPECT,
+    ): CoverBox {
+        val byWidth = (stageWidth * widthFraction).coerceIn(minWidth, maxWidth)
+        val byHeight = (stageHeight * heightFraction * aspect).coerceAtLeast(0f)
+        val w = minOf(byWidth, byHeight)
+        return CoverBox(w, w / aspect)
+    }
+
+    /** Compose-side wrapper over [fit]. */
+    fun fit(
+        stageWidth: Dp,
+        stageHeight: Dp,
+        widthFraction: Float,
+        heightFraction: Float,
+        minWidth: Dp,
+        maxWidth: Dp,
+        aspect: Float = COVER_ASPECT,
+    ): Pair<Dp, Dp> {
+        val b = fit(stageWidth.value, stageHeight.value, widthFraction, heightFraction, minWidth.value, maxWidth.value, aspect)
+        return b.width.dp to b.height.dp
+    }
+
+    // Per-view rules (fractions of the stage; caps raised so the inner screen gets bigger covers).
+    fun deck(w: Dp, h: Dp) = fit(w, h, 0.58f, 0.82f, 176.dp, 420.dp)
+    fun reelWindow(w: Dp, h: Dp) = fit(w, h, 0.68f, 0.92f, 210.dp, 420.dp)
+
+    /** CD jewel case keeps its real 142×125 mm body; the cover booklet inside is 3:4. */
+    const val JEWEL_CASE_ASPECT = 1.09f
+    fun jewelCase(w: Dp, h: Dp) = fit(w, h, 0.70f, 0.72f, 218.dp, 480.dp, JEWEL_CASE_ASPECT)
+}
+
+/**
+ * Stacking distance of card [index] from track [position], quantised to half steps.
+ * The draw order of two cards only flips when the position crosses a half step, so
+ * reading this through derivedStateOf recomposes a card a few times per swipe, not every frame.
+ */
+internal fun atelierStackDistance(index: Int, position: Float): Float {
+    val q = kotlin.math.floor(position * 2f) / 2f + 0.25f
+    return abs(index - q)
 }
 
 /**
@@ -327,36 +388,24 @@ internal fun rememberAtelierTrack(
     return state
 }
 
+/**
+ * The shelf's sideways drag on the shared [horizontalSwipe] (gesture-axis rules): it only takes a clearly
+ * sideways drag, so a vertical scroll or a long press on the same finger is never stolen.
+ */
+@Composable
 internal fun Modifier.atelierHorizontalDrag(
     enabled: Boolean,
     count: Int,
     pxPerItem: Float,
     track: AtelierTrackState,
 ): Modifier {
-    if (!enabled || count <= 1) return this
     val effectivePx = (pxPerItem * track.resistance.stepDistanceScale).coerceAtLeast(1f)
-    return this.pointerInput(count, effectivePx, track) {
-        val tracker = VelocityTracker()
-        detectHorizontalDragGestures(
-            onDragStart = {
-                tracker.resetTracking()
-                track.beginDrag()
-            },
-            onDragEnd = {
-                val velPx = tracker.calculateVelocity().x
-                val velItems = -velPx / effectivePx
-                track.settle(count, velItems)
-            },
-            onDragCancel = {
-                track.settle(count, 0f)
-            },
-            onHorizontalDrag = { change, dragAmount ->
-                change.consume()
-                tracker.addPosition(change.uptimeMillis, change.position)
-                track.dragBy(-dragAmount / effectivePx, count)
-            },
-        )
-    }
+    return this.horizontalSwipe(
+        enabled = enabled && count > 1,
+        onStart = { track.beginDrag() },
+        onDelta = { dx -> track.dragBy(-dx / effectivePx, count) },
+        onStop = { velocityX -> track.settle(count, -velocityX / effectivePx) },
+    )
 }
 
 internal fun Modifier.atelierVerticalDrag(
@@ -505,6 +554,7 @@ private fun AtelierFocusDock(
     modifier: Modifier = Modifier,
 ) {
     val colors = CivilightTheme.colors
+    val motion = CivilightTheme.motion
     val shape = RoundedCornerShape(22.dp)
     Box(
         modifier
@@ -525,7 +575,7 @@ private fun AtelierFocusDock(
                 ) {
                     AnimatedContent(
                         targetState = item.key to (item.displayTitle() to item.displayMeta()),
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        transitionSpec = { motion.swap() },
                         modifier = Modifier.weight(1f),
                         label = "atelierDockText",
                     ) { (_, pair) ->
@@ -624,7 +674,8 @@ private fun AtelierFocusDock(
 /**
  * High-craft cover card used across the Atelier views:
  * - Renders CoverArt (with shared LRU cache + EXIF upright) or a minimalist typographic cover
- * - Adds a live specular light streak driven by [sheenBias] + [tilt]
+ * - Adds a live specular light streak driven by [sheenBias] + [tilt] ([sheenBias] is read in the draw
+ *   phase only, so a moving track does not recompose the card)
  * - Draws a crisp foil rim highlight when [focused]
  * - Safely masks [ShelfCardItem.Lock] and renders a clean outlined [ShelfCardItem.NewProject] card
  */
@@ -633,7 +684,7 @@ internal fun AtelierCoverCard(
     item: ShelfCardItem,
     tilt: DeviceTilt,
     focused: Boolean,
-    sheenBias: Float,
+    sheenBias: () -> Float,
     targetWidthPx: Int,
     input: ShelfViewInput,
     modifier: Modifier = Modifier,
@@ -664,7 +715,7 @@ internal fun AtelierCoverCard(
             .drawWithContent {
                 drawContent()
                 // Specular sheen sweep driven by scroll angle + gyro tilt (zero recomposition).
-                val shift = ((sheenBias * 0.45f) + (tilt.x * 0.35f)).coerceIn(-0.9f, 0.9f)
+                val shift = ((sheenBias() * 0.45f) +(tilt.x * 0.35f)).coerceIn(-0.9f, 0.9f)
                 val x0 = size.width * (0.25f + shift)
                 val x1 = x0 + size.width * 0.52f
                 drawRect(

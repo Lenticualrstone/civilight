@@ -286,8 +286,9 @@ private fun SheetScope.KindEditContent(sheet: KindEditSheet) {
         CivilightButton(CastUiCopy.BTN_DELETE, { confirm = sheet.kindKey }, Modifier.fillMaxWidth().padding(top = 20.dp), variant = ButtonVariant.GHOST)
     }
     if (confirm != null) {
+        // No trash entry (TC-13-12): `‘X’ 지우기` title form, `danger` confirm (DS-25, 0.5 review).
         ConfirmDialog(
-            title = view.title,
+            title = CastUiCopy.deleteTitle(view.title),
             confirmLabel = CastUiCopy.BTN_DELETE,
             onConfirm = {
                 confirm = null

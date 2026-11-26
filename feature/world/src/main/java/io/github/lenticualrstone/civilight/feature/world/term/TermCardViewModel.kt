@@ -1,5 +1,9 @@
 package io.github.lenticualrstone.civilight.feature.world.term
 
+import io.github.lenticualrstone.civilight.domain.actions.TagActions
+import io.github.lenticualrstone.civilight.domain.actions.TagCreate
+import io.github.lenticualrstone.civilight.domain.world.term.TermTags
+import io.github.lenticualrstone.civilight.model.cast.TagScope
 import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.domain.world.term.CandidateIndex
 import io.github.lenticualrstone.civilight.domain.world.term.RevealTarget
@@ -167,6 +171,36 @@ class TermCardViewModel(projectKey: Key, val termKey: Key, env: WorldEnv) : Worl
     fun toggleRelated(ref: ItemRef) {
         val ctx = editContext()
         viewModelScope.launch { apply(WorldCopy.ROW_RELATED) { d -> ItemEdits.toggleRelated(d, termKey, ref, ctx) } }
+    }
+
+    /** (2026-11-26) Ticks or unticks a tag in the term's tag sheet (one undo step). */
+    fun toggleTag(tagKey: Key) {
+        val ctx = editContext()
+        viewModelScope.launch { apply(WorldCopy.ROW_TAGS) { d -> TermTags.toggle(d, termKey, tagKey, ctx) } }
+    }
+
+    /**
+     * (2026-11-26) `만들기` of the sheet's new-tag card: a `용어 전용` tag (or `모든 항목` when [everywhere] is
+     * chosen) put on this term in the same undo step. A taken name changes nothing and is returned, so the
+     * sheet can offer that tag (or widening it).
+     */
+    suspend fun createTag(name: String, color: String?, everywhere: Boolean): TagCreate {
+        val actx = actionContext()
+        val ectx = editContext()
+        var outcome: TagCreate = TagCreate.Blank
+        apply(WorldCopy.ROW_TAGS) { d ->
+            when (val r = TagActions.createFor(d, name, color, TagScope.TERM, actx, everywhere)) {
+                is TagCreate.Created -> TermTags.attach(r.doc, termKey, r.tag.key, ectx).also { outcome = r }
+                else -> d.also { outcome = r }
+            }
+        }
+        return outcome
+    }
+
+    /** (2026-11-26) `이 태그 쓰기` after a taken name: puts the existing tag on the term (no change when it may not carry it). */
+    fun attachTag(tagKey: Key) {
+        val ctx = editContext()
+        viewModelScope.launch { apply(WorldCopy.ROW_TAGS) { d -> TermTags.attach(d, termKey, tagKey, ctx) } }
     }
 
     override fun onCleared() {

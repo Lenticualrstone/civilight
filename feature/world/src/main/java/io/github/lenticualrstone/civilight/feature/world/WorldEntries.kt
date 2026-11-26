@@ -47,6 +47,10 @@ fun EntryProviderScope<NavKey>.worldEntries(deps: FeatureDeps) {
     entry<TimelineMap> { route -> TimelineMapScreen(route, deps) }
     // (0.3.0, WLD-47, WLD-75) `이동 수단` is back with the distances; its entry is `프로젝트 설정 › 이동 수단`.
     entry<TravelModes> { route -> TravelModesScreen(route, deps) }
+    // (2026-11-26) `묶음 기준` (board `ImmPlaceRules`): from `프로젝트 설정` and the place card's `소속 기준 고르기`.
+    entry<io.github.lenticualrstone.civilight.navigation.AffiliationBasisSettings> { route ->
+        io.github.lenticualrstone.civilight.feature.world.place.BasisSettingsScreen(route, deps)
+    }
     deps.sheets.register<EventCreateSheet> { sheet -> EventCreateSheetContent(sheet) }
     deps.sheets.register<LinkCandidatesSheet> { sheet -> LinkCandidatesSheetContent(sheet) }
     // `공개 시점 옮기기` and its steps read the open project, so they also show over other areas'

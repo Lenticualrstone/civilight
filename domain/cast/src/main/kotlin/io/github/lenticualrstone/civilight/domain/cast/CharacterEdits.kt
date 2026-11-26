@@ -7,6 +7,9 @@ import io.github.lenticualrstone.civilight.model.cast.FieldPayload
 import io.github.lenticualrstone.civilight.model.cast.FieldType
 import io.github.lenticualrstone.civilight.model.cast.FieldValue
 import io.github.lenticualrstone.civilight.model.cast.Tag
+import io.github.lenticualrstone.civilight.model.cast.TagScope
+import io.github.lenticualrstone.civilight.model.cast.TagScopes
+import io.github.lenticualrstone.civilight.model.cast.fits
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.nfc
 import io.github.lenticualrstone.civilight.model.open
@@ -26,9 +29,12 @@ sealed interface CharacterTab {
 }
 
 /** Creating characters and editing their fixed fields (CST-05, CST-11 … CST-13, CST-39, CST-49). */
-/** Tag settings row counts: `인물 0 · 이미지 1` (55 §3.4). */
-data class TagUsage(val characters: Int, val images: Int) {
-    val line: String get() = "인물 $characters · 이미지 $images"
+/**
+ * Tag settings row counts: `인물 0 · 이미지 1` (55 §3.4). (2026-11-26) Terms holding the tag add
+ * `용어 n` after `인물` when any; the line of a tag no term holds is unchanged.
+ */
+data class TagUsage(val characters: Int, val images: Int, val terms: Int = 0) {
+    val line: String get() = if (terms == 0) "인물 $characters · 이미지 $images" else "인물 $characters · 용어 $terms · 이미지 $images"
 }
 
 object CharacterEdits {
@@ -57,7 +63,7 @@ object CharacterEdits {
         val n = name.trim().nfc()
         require(n.isNotEmpty()) { "character name is empty" }
         val counters = doc.project.counters
-        val live = tags(doc).mapTo(HashSet()) { it.key }
+        val live = tags(doc).mapTo(HashSet()) { it.key } // (2026-11-26) character-scope or all only
         val character = Character(
             key = ctx.newKey(),
             recordNo = counters.nextCharacterRecordNo,
@@ -100,19 +106,27 @@ object CharacterEdits {
 
     // --- Tags (CST-12) ---
 
-    /** Ordered tags of the character. */
+    /**
+     * Ordered tags of the character. (2026-11-26) A live tag a character may not carry (scope term, place or
+     * faction) is dropped; trashed tags' keys stay (N-44), as do keys of tags not in the project. A live tag
+     * whose scope is unknown (newer file) is never attached here, and one already held stays untouched.
+     */
     fun setTags(doc: ProjectDoc, key: Key, tagKeys: List<Key>, ctx: EditContext): ProjectDoc =
-        update(doc, key, ctx) { it.copy(tagKeys = tagKeys.distinct()) }
+        update(doc, key, ctx) { c -> c.copy(tagKeys = TagScopes.settleInPickOrder(doc, TagScope.CHARACTER, tagKeys, c.tagKeys, keepMissing = true)) }
 
     /**
      * Adds a project tag (names are unique among live tags: an existing live name returns that tag).
      * (0.2.0, N-44) A trashed tag of the same name is not reused; it stays in the trash. New tags of the
      * create card go through `domain:actions` `TagActions.create` (DECISIONS §1).
+     *
+     * (2026-11-26) Names are unique across every scope, so the returned tag may be one a character may not
+     * carry (a `용어 전용` tag of that name): callers check `tag.fits(TagScope.CHARACTER)` before attaching.
+     * A new tag here is `인물` scope.
      */
     fun addTag(doc: ProjectDoc, name: String, ctx: EditContext): Pair<ProjectDoc, Tag> {
         val n = name.trim().nfc()
         require(n.isNotEmpty()) { "tag name is empty" }
-        tags(doc).firstOrNull { it.name.nfc() == n }?.let { return doc to it }
+        TagScopes.liveNamed(doc, n)?.let { return doc to it }
         val tag = Tag(ctx.newKey(), n, OrderKeys.after(doc.project.tags.maxOfOrNull { it.order }), ctx.now, ctx.device)
         return doc.copy(project = doc.project.copy(tags = doc.project.tags + tag)) to tag
     }
@@ -120,8 +134,12 @@ object CharacterEdits {
     /**
      * Project tags in order. (0.2.0, N-44, CST-75) Live tags only: a trashed tag appears nowhere (no chip,
      * section, field chip, picker chip or tag search hit) until it is restored.
+     *
+     * (2026-11-26) Only tags a character may carry (scope `인물` or `모든 항목`; every older tag is `인물`):
+     * this is what every character list, chip, section and picker shows. Name checks use
+     * `TagScopes.live` / `TagScopes.liveNamed` (all scopes).
      */
-    fun tags(doc: ProjectDoc): List<Tag> = doc.project.tags.filter { it.isLive }.sortedWith(compareBy<Tag>({ it.order }, { it.key }))
+    fun tags(doc: ProjectDoc): List<Tag> = TagScopes.tagsFor(doc, TagScope.CHARACTER)
 
     /** (0.2.0, N-44) The live tag of [tagKey], or null when it is gone or in the trash. */
     fun liveTag(doc: ProjectDoc, tagKey: Key): Tag? = doc.index.tag(tagKey)?.takeIf { it.isLive }
@@ -133,7 +151,7 @@ object CharacterEdits {
     fun renameTag(doc: ProjectDoc, tagKey: Key, name: String, ctx: EditContext): ProjectDoc? {
         val n = name.trim().nfc()
         require(n.isNotEmpty()) { "tag name is empty" }
-        if (tags(doc).any { it.key != tagKey && it.name.nfc() == n }) return null
+        if (TagScopes.liveNamed(doc, n, except = tagKey) != null) return null
         return doc.copy(
             project = doc.project.copy(
                 tags = doc.project.tags.map { if (it.key == tagKey) it.copy(name = n, updatedAt = ctx.now, updatedBy = ctx.device) else it },
@@ -142,11 +160,16 @@ object CharacterEdits {
     }
 
     /**
-     * Removes a tag from the project and, in the same edit, from every character and every gallery
-     * image that holds it (55 §3.4, T-GAL-31); live and trashed rows alike.
+     * Removes a tag from the project and, in the same edit, from every character, every term (2026-11-26)
+     * and every gallery image that holds it (55 §3.4, T-GAL-31); live and trashed rows alike.
      */
     fun removeTag(doc: ProjectDoc, tagKey: Key, ctx: EditContext): ProjectDoc = doc.copy(
         project = doc.project.copy(tags = doc.project.tags.filterNot { it.key == tagKey }),
+        world = if (doc.world.terms.none { tagKey in it.tagKeys }) doc.world else doc.world.copy(
+            terms = doc.world.terms.map {
+                if (tagKey in it.tagKeys) it.copy(tagKeys = it.tagKeys - tagKey, updatedAt = ctx.now, updatedBy = ctx.device) else it
+            },
+        ),
         cast = doc.cast.copy(
             characters = doc.cast.characters.map {
                 if (tagKey in it.tagKeys) it.copy(tagKeys = it.tagKeys - tagKey, updatedAt = ctx.now, updatedBy = ctx.device) else it
@@ -161,10 +184,11 @@ object CharacterEdits {
         },
     )
 
-    /** How many live characters and live gallery images hold [tagKey] (tag settings row, T-GAL-31). */
+    /** How many live characters, live terms (2026-11-26) and live gallery images hold [tagKey] (tag settings row, T-GAL-31). */
     fun tagUsage(doc: ProjectDoc, tagKey: Key): TagUsage = TagUsage(
         characters = doc.cast.characters.count { it.deletedAt == null && tagKey in it.tagKeys },
         images = doc.galleryItems.count { doc.liveness.isLive(it) && tagKey in it.tagKeys },
+        terms = doc.world.terms.count { it.deletedAt == null && tagKey in it.tagKeys },
     )
 
     // --- Recorder (CST-49) ---

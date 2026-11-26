@@ -1,6 +1,5 @@
 package io.github.lenticualrstone.civilight.feature.canvas.image.crop
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +63,8 @@ import io.github.lenticualrstone.civilight.model.asset.ImageSlot
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.navigation.ImageCrop
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
+import io.github.lenticualrstone.civilight.ui.image.ExifOrientation
+import io.github.lenticualrstone.civilight.ui.image.ImageBitmaps
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 import io.github.lenticualrstone.civilight.ui.project.EditResult
 import io.github.lenticualrstone.civilight.ui.project.ProjectLoad
@@ -86,7 +87,8 @@ private data class OriginalLoad(val original: Original?)
 /**
  * `자르기` (CNV-28, board `ImageCrop`): full screen. Top bar `취소` · `<owner> · <slot>` over `자르기` ·
  * `적용`; the stage; the controls (ratio chips + `규격 고정`, `확대` slider with its value, `90° 회전 ·
- * 좌우 반전 · 처음대로`, the holo row for holo-capable slots). Each ratio chip edits its own crop. `적용`
+ * 좌우 반전 · 처음대로`, the holo row for holo-capable slots). The other ratios show as previews (`아바타 1:1 · 자동`):
+ * they follow the first ratio until edited, and a chip or preview opens one to edit it (CST-13). `적용`
  * writes once; `취소` and back drop the session. Inner screens keep the stage full and the controls in
  * the 560 column (Q-IM-01 default).
  */
@@ -115,6 +117,7 @@ fun ImageCropScreen(route: ImageCrop, deps: FeatureDeps) {
             val holo = handOff?.holo ?: HoloRules.initial(route.slot, existing, settings.holoDefaultForNewImages)
             CropSession.start(route.slot, size, existing, route.blobHash, holo, handOff?.crops.orEmpty())
         },
+        showPreviews = true,
         onCancel = { deps.navigator.pop() },
         onApply = { s ->
             vm.apply(owner, route.blobHash, s) { r ->
@@ -143,6 +146,8 @@ internal fun CropEditor(
     onCancel: () -> Unit,
     onApply: (CropSession) -> Unit,
     handleBack: Boolean = false,
+    /** Show the other ratios as previews (the `ImageCrop` route; the gallery's in-screen crop does not). */
+    showPreviews: Boolean = false,
 ) {
     if (handleBack) LocalBackHandler.current(true, onCancel)
     var played by rememberSaveable { mutableStateOf(false) }
@@ -157,10 +162,12 @@ internal fun CropEditor(
         if (doc == null) return@produceState
         value = OriginalLoad(withContext(Dispatchers.IO) {
             val file = deps.stores.blobs.fileOf(blobHash) ?: return@withContext null
-            val size = knownSize ?: BitmapFactory.Options().apply { inJustDecodeBounds = true }.let { o ->
-                BitmapFactory.decodeFile(file.path, o)
-                if (o.outWidth > 0 && o.outHeight > 0) PixelSize(o.outWidth, o.outHeight) else null
-            } ?: return@withContext null
+            // The stored size is the raw header size; crops live in the upright (EXIF-applied) pixel space the
+            // displays decode, so the editor uses that space too (same decoder, same orientation).
+            val size = (
+                knownSize?.let { k -> ExifOrientation.uprightSize(k.w, k.h, ImageBitmaps.exifOrientation(file)) }
+                    ?: ImageBitmaps.uprightSize(file)
+                )?.let { (w, h) -> PixelSize(w, h) } ?: return@withContext null
             runCatching { SlotImages.decode(file, null, STAGE_SIDE) }.getOrNull()?.let { Original(size, it.asImageBitmap()) }
         })
     }
@@ -186,6 +193,8 @@ internal fun CropEditor(
                 Box(Modifier.graphicsLayer { alpha = appear }.then(if (live) Modifier else Modifier.blockTouches())) {
                     CropControls(
                         session = shown,
+                        bitmap = original?.bitmap,
+                        showPreviews = showPreviews,
                         inner = inner,
                         note = note,
                         onChange = {
@@ -270,7 +279,7 @@ private fun CropTopBar(header: String, onCancel: () -> Unit, onApply: () -> Unit
 
 /** The `bg` control panel (16 × 20 padding): ratio chips, zoom, tools, holo. */
 @Composable
-private fun CropControls(session: CropSession, inner: Boolean, note: String?, onChange: (CropSession) -> Unit, onHolo: (Boolean) -> Unit) {
+private fun CropControls(session: CropSession, bitmap: ImageBitmap?, showPreviews: Boolean, inner: Boolean, note: String?, onChange: (CropSession) -> Unit, onHolo: (Boolean) -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     Box(Modifier.fillMaxWidth().background(colors.bg).navigationBarsPadding(), contentAlignment = Alignment.TopCenter) {
@@ -289,6 +298,8 @@ private fun CropControls(session: CropSession, inner: Boolean, note: String?, on
                 onSelect = { i -> onChange(session.select(session.ratios[i])) },
                 note = ImageCopy.FIXED_RATIOS,
             )
+            // The other ratios stay in sight (CST-13): `아바타 1:1 · 자동` follows the card until it is edited.
+            if (showPreviews) CropPreviews(session, bitmap, onSelect = onChange)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StepSlider(
                     value = CropMath.stepOfZoom(session.edit.zoom),

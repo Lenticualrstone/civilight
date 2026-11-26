@@ -39,6 +39,10 @@ object ProjectSettingsCopy {
     // 인물
     const val RELATION_KINDS = "관계 종류"
 
+    /** (2026-11-26) `묶음 기준` (board `ImmPlaceRules`): the character fields read as 소속 · 거주 · 국적. */
+    const val AFFILIATION_BASIS = "묶음 기준"
+    const val BASIS_PICK = "고르기"
+
     /** CST-12 `TagSettings` title (cast lane); the row is not on the `ProjSettings` board. */
     const val TAGS = "태그"
 

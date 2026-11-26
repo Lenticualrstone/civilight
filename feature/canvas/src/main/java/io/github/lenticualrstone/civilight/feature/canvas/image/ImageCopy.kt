@@ -105,6 +105,13 @@ object ImageCopy {
     const val BTN_RESET = "처음대로"
     const val HOLO_SUB_CROP = "은빛 · 기울이면 흐름 · 애니메이션 줄이기면 고정"
 
+    // Crop previews of the other ratios (CST-13; no board yet): `아바타 1:1 · 자동` follows the first ratio.
+    const val CROP_AUTO = "자동"
+    const val CROP_OWN = "직접"
+
+    /** `아바타 1:1 · 자동`: a preview's label. */
+    fun cropPreview(chip: String, auto: Boolean): String = "$chip · ${if (auto) CROP_AUTO else CROP_OWN}"
+
     // Copy no board gives (Q-EM-01, Q-IM-05): the nearest existing words, listed under Requests.
     const val MY_IMAGES_EMPTY = "내 이미지 없음"
     const val IMAGE_IMPORT_FAILED = "이미지 가져오기 실패"

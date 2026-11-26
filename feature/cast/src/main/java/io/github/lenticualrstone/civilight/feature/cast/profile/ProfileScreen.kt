@@ -22,18 +22,42 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveDetailScaffold
+import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveHeaderButton
+import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveMath
+import io.github.lenticualrstone.civilight.designsystem.component.LensChip
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.component.ToastHost
+import io.github.lenticualrstone.civilight.designsystem.component.rememberImmersiveDetailState
+import io.github.lenticualrstone.civilight.designsystem.icon.IconId
+import io.github.lenticualrstone.civilight.domain.cast.DisplayNames
+import io.github.lenticualrstone.civilight.domain.cast.field.FieldRow
+import io.github.lenticualrstone.civilight.model.app.ProfileTabKind
+import io.github.lenticualrstone.civilight.ui.lens.LensChipLabel
+import io.github.lenticualrstone.civilight.ui.profile.ProfileTabSetup
+import io.github.lenticualrstone.civilight.ui.profile.ProfileTabSetupContent
+import io.github.lenticualrstone.civilight.ui.scaffold.CommandScope
+import io.github.lenticualrstone.civilight.ui.scaffold.LocalCommandBarHost
+import io.github.lenticualrstone.civilight.ui.scaffold.LocalToasts
+import io.github.lenticualrstone.civilight.ui.scaffold.SheetHostLayout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,13 +67,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.lenticualrstone.civilight.designsystem.component.CivilightTabs
-import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
-import io.github.lenticualrstone.civilight.designsystem.component.IconAction
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
-import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
-import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.designsystem.theme.rememberLastNonNull
@@ -58,20 +77,16 @@ import io.github.lenticualrstone.civilight.feature.cast.gallery.GallerySection
 import io.github.lenticualrstone.civilight.navigation.Gallery
 import io.github.lenticualrstone.civilight.navigation.GalleryAddSheet
 import io.github.lenticualrstone.civilight.model.gallery.GalleryOwnerKind
-import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
 import io.github.lenticualrstone.civilight.domain.cast.field.Profile
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationViews
 import io.github.lenticualrstone.civilight.domain.cast.voice.ArchiveDocs
 import io.github.lenticualrstone.civilight.domain.cast.voice.VoiceLines
-import io.github.lenticualrstone.civilight.domain.story.search.CommandScreen
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.feature.cast.common.CastViewModel
-import io.github.lenticualrstone.civilight.feature.cast.common.RecordFrame
 import io.github.lenticualrstone.civilight.feature.cast.common.castLens
 import io.github.lenticualrstone.civilight.feature.cast.common.editContext
-import io.github.lenticualrstone.civilight.feature.cast.common.recordTopInset
 import io.github.lenticualrstone.civilight.feature.cast.field.DisplayNameEditSheet
 import io.github.lenticualrstone.civilight.feature.cast.field.DisplayNameHistoryContent
 import io.github.lenticualrstone.civilight.feature.cast.field.DisplayNameHistorySheet
@@ -110,7 +125,6 @@ import io.github.lenticualrstone.civilight.navigation.FieldValueEditSheet
 import io.github.lenticualrstone.civilight.navigation.LensSheet
 import io.github.lenticualrstone.civilight.navigation.ProfileTab
 import io.github.lenticualrstone.civilight.ui.tour.tourTarget
-import io.github.lenticualrstone.civilight.navigation.ProjectSearch
 import io.github.lenticualrstone.civilight.navigation.Recording
 import io.github.lenticualrstone.civilight.navigation.RelationEditSheet
 import io.github.lenticualrstone.civilight.navigation.RelationMap
@@ -125,8 +139,6 @@ import io.github.lenticualrstone.civilight.ui.project.ProjectSessions
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
 import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 import io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout
-import io.github.lenticualrstone.civilight.designsystem.component.CommandBar as CommandBarView
-import io.github.lenticualrstone.civilight.domain.story.search.CommandBar as CommandHints
 
 /** The character record (CST-07 … CST-12, CST-28); its sheets carry the edits. */
 class ProfileViewModel(
@@ -173,18 +185,20 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     val p = route.projectKey
     val c = route.characterKey
     val appSettings by deps.settings.collectAsState()
-    val modularTabs = remember(appSettings) {
-        (appSettings.customProfileTabs.ifEmpty { appSettings.profileTabPreset.defaultTabs() }).filter { it.enabled }
-            .ifEmpty { io.github.lenticualrstone.civilight.model.app.ProfileTabPreset.STANDARD.defaultTabs() }
-    }
-    var selectedModularId by rememberSaveable(c) { mutableStateOf(modularTabs.first().id) }
-    val activeModularTab = modularTabs.firstOrNull { it.id == selectedModularId } ?: modularTabs.first()
     var speechOverride by remember(c) { mutableStateOf(false) }
     var secretOverride by remember(c) { mutableStateOf(false) }
+    // The modular tab before the 비밀 tab was picked: a cancelled prompt goes back to it (no empty body).
+    var beforeSecretId by rememberSaveable(c) { mutableStateOf<String?>(null) }
     val gate = rememberHiddenGate(p)
     val context = LocalContext.current
     // CST-74: 4 tabs while `게임 제작 도구` is off. CST-73: the 비밀 tab behind the device lock while locked.
     val gameTools = GameTools.on(doc)
+    // CST-74: `게임 텍스트` only while `게임 제작 도구` is on, whatever the preset says.
+    val modularTabs = remember(appSettings, gameTools) {
+        ProfileTabSet.visible(ProfileTabSetup.active(appSettings), gameTools)
+    }
+    var selectedModularId by rememberSaveable(c) { mutableStateOf(modularTabs.first().id) }
+    val activeModularTab = modularTabs.firstOrNull { it.id == selectedModularId } ?: modularTabs.first()
     val storedLocked = doc.index.character(c)?.secretTabLocked == true
     // CST-73: the lock turned off by anything but the confirmed `이 탭 잠그기` switch asks for the device lock first
     // (since 0.2.0 the lock is written without an undo step, so undo and redo cannot; this guards any other writer); the tab is treated as locked while that prompt is on screen, and a cancel locks it again.
@@ -194,6 +208,16 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     vm.ensureTabs { SecretTabGate.open(route.tab, gameTools, secretLocked) }
     val tabState = vm.tabs.collectAsState().value ?: SecretTabGate.open(route.tab, gameTools, secretLocked)
     LaunchedEffect(gameTools) { vm.updateTabs { SecretTabGate.gameToolsChanged(it, gameTools) } }
+    // N-43: a cancelled or failed prompt (or a relock that moved the gate off 비밀) drops the 비밀 selection.
+    LaunchedEffect(SecretTabGate.secretSelected(tabState)) {
+        if (SecretTabGate.secretSelected(tabState)) return@LaunchedEffect
+        secretOverride = false
+        if (activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SECRET) {
+            selectedModularId = beforeSecretId?.takeIf { id -> modularTabs.any { it.id == id && it.kind != io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SECRET } }
+                ?: modularTabs.firstOrNull { it.kind != io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SECRET }?.id
+                ?: selectedModularId
+        }
+    }
     val shownTabs = ProfileTabs.shown(gameTools)
     val shownTab = tabState.shown(secretLocked)
     val prompting = tabState.prompting(secretLocked)
@@ -278,9 +302,6 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
     if (leaving) LaunchedEffect(c) { deps.navigator.pop() }
     val motion = CivilightTheme.motion
     val sheets = rememberSheetHost()
-    val list = rememberLazyListState()
-    val collapsed by remember { derivedStateOf { list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 160 } }
-    val inDetailPane = LocalPaneRole.current == PaneRole.DETAIL
     val editable = !state.readOnly && !leaving
     val trash = rememberItemTrash(p)
     val writes = remember(deps, p) { CastWrites(deps, p) }
@@ -328,49 +349,55 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
         // The gallery screen opens in its remembered view (card, grid or list) with this item picked (GAL-08).
         onGalleryCard = { item -> deps.navigator.push(Gallery.ofCharacter(p, c, pickKey = item)) },
     )
-    CenterColumn {
-        RecordFrame(
-            back = if (inDetailPane) null else IconAction(CastUiCopy.BACK) { deps.navigator.pop() },
-            lens = lensChipLabel(doc),
-            onLens = { sheets.open(LensSheet(p)) },
-            add = if (editable && gameTools && ui.tab == ProfileTab.GAME_TEXT) IconAction(CastUiCopy.NEW_VOICE_LINE) { sheets.open(VoiceLineSheet(p, c)) } else null,
-            menu = if (editable) IconAction(CastUiCopy.MENU) { sheets.open(RecordMenuSheet(p, c)) } else null,
-            collapsed = collapsed,
-            collapsedTitle = state.name,
-            collapsedSmallLine = state.header.title.substringBefore(CastCopy.SEP),
-            // LIB-19 cast tour: the lens and the `관계` tab are the holes of `시점 렌즈` and `관계` (CastTourSteps);
-            // the lens backs up `값이 바뀌는 때` when the header has no field row.
-            lensModifier = Modifier.tourTarget(CastTourSteps.LENS).tourTarget(CastTourSteps.TIMED_VALUE, fallback = true),
-            tabs = {
-                ModularProfileTabBar(
-                    tabs = modularTabs,
-                    selectedId = activeModularTab.id,
-                    onSelect = { picked ->
-                        speechOverride = false
-                        secretOverride = false
-                        selectedModularId = picked.id
-                        val mapped = when (picked.kind) {
-                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.OVERVIEW -> ProfileTab.OVERVIEW
-                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.RELATIONS -> ProfileTab.RELATIONS
-                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SPEECH -> ProfileTab.SPEECH
-                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.GAME_TEXT -> ProfileTab.GAME_TEXT
-                            io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SECRET -> ProfileTab.SECRET
-                            else -> ProfileTab.OVERVIEW
+    val gallery = remember(doc, c, gate.open) { CastGallery.section(doc, c, gate.open) }
+    val secret = SecretTabExtras(
+        summaryEdit = if (editable) ({ sheets.open(SpeechSummarySheet(p, c)) }) else null,
+        locked = secretLocked,
+        // CST-73: shown when the device can authenticate, or when the lock is already on (never hidden while set).
+        showLock = canAuthenticate || secretLocked,
+        lockEnabled = editable && canAuthenticate,
+        onLock = { on ->
+            if (on) {
+                vm.updateTabs(SecretTabGate::lockedFromInside)
+                ownUnlock = false
+                vm.actWithoutUndo { d, ctx -> CharacterFieldActions.setSecretTabLocked(d, c, true, ctx.toAction()) }
+            } else {
+                // Turning it off asks for the device lock first; a cancel leaves it on.
+                scope.launch {
+                    if (CastAuth.confirm(deps, AuthRequest(ProfileTabs.label(ProfileTab.SECRET)))) {
+                        ownUnlock = true
+                        vm.actWithoutUndo(then = { if (it != EditResult.APPLIED) ownUnlock = false }) { d, ctx ->
+                            CharacterFieldActions.setSecretTabLocked(d, c, false, ctx.toAction())
                         }
-                        vm.updateTabs { SecretTabGate.select(it, mapped, secretLocked) }
-                    },
-                    onManageTemplates = { sheets.open(ProfileTabTemplatesSheetKey) },
-                    modifier = Modifier.weight(1f),
-                )
-            },
-            commandBar = {
-                CommandBarView(
-                    hint = CommandHints.placeholder(CommandScreen.PROFILE),
-                    onClick = { deps.navigator.push(ProjectSearch(p)) },
-                    // S-8: the recorder opens only from home; no mic on this bar.
-                )
-            },
-            sheets = sheets,
+                    }
+                }
+            }
+        },
+    )
+    // Title: the display name at the lens (`???` while it is overridden, CST-11); subtitle: the one-line head info.
+    val titleCard = remember(doc, c) { DisplayNames.card(doc, c, doc.castLens) }
+    val title = titleCard.first
+    // The title opens `이름` (or `표시 이름` while it reads `???`) only on an editable, unmasked record.
+    val titleField = RecordHeroTaps.titleField(editable, hidden = state.hidden, hiddenUnlocked = gate.open, overridden = titleCard.second != null)
+    // The subtitle line (the one-liner, else head values) opens `한 줄 소개` on the same terms.
+    val subtitleField = RecordHeroTaps.subtitleField(editable, hidden = state.hidden, hiddenUnlocked = gate.open)
+    val subtitle = remember(state) { ProfileHeadLine.subtitle(state.oneLiner, state.header.rows) }
+    // Saved per record: the inner pane swaps records under one entry, and each opens at its own scroll.
+    val scroll = rememberSaveable(c, saver = ScrollState.Saver) { ScrollState(0) }
+    val immersive = rememberImmersiveDetailState(scroll)
+    val lens = lensChipLabel(doc)
+    val toasts = LocalToasts.current
+    val toast by toasts.current.collectAsState()
+    // Two-pane inner screen: the shared command bar sits under the pane; the record stops above it.
+    val paneHost = if (CommandScope.of(LocalPaneRole.current) != null) LocalCommandBarHost.current else null
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // The pane's padding below already holds the frame bar and the navigation inset: the scaffold adds none.
+    val bottomInset = if (paneHost != null && paneHost.panePadding > 0.dp) 0.dp else null
+    // `목록 + 상세`: the record in the detail pane has no back (the list is beside it).
+    val inDetailPane = LocalPaneRole.current == PaneRole.DETAIL
+    CenterColumn {
+        SheetHostLayout(
+            sheets,
             localSheets = { key ->
                 when (key) {
                     is NameEditSheet -> { { NameSheetContent(key) } }
@@ -384,14 +411,10 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                     is RelationSlotSheet -> { { RelationSlotContent(key) } }
                     ProfileTabTemplatesSheetKey -> {
                         {
-                            ProfileTabTemplateSheetContent(
+                            ProfileTabSetupContent(
                                 settings = appSettings,
-                                onSelectPreset = { preset ->
-                                    deps.appScope.launch { deps.stores.settings.setProfileTabPreset(preset) }
-                                },
-                                onUpdateTabs = { next ->
-                                    deps.appScope.launch { deps.stores.settings.setCustomProfileTabs(next) }
-                                },
+                                onSelectPreset = { preset -> deps.appScope.launch { deps.stores.settings.setProfileTabPreset(preset) } },
+                                onUpdateTabs = { next -> deps.appScope.launch { deps.stores.settings.setCustomProfileTabs(next) } },
                                 onClose = { close() },
                             )
                         }
@@ -415,83 +438,78 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                     else -> null
                 }
             },
-        ) { padding ->
-            val bgArt = remember(doc, c, wide) { CharacterImages.background(doc, c, inner = wide) }
-            val cardPortrait = remember(doc, c) { CharacterImages.image(doc, c, ImagePlace.CARD) }
-            // (0.5.2) Match night-manuscript-r3 Profile hero: full-bleed FadingHeaderArt (22dp edge blur fade)
-            // for background art OR non-holo portrait; only use tilting HoloCard when holo is explicitly enabled.
-            val art = bgArt ?: cardPortrait?.takeIf { !it.holo }
-            val portrait = if (bgArt == null && cardPortrait?.holo == true) cardPortrait else null
-            val artSlotField = if (bgArt != null) FixedField.BACKGROUND else FixedField.PORTRAIT
-            val gallery = remember(doc, c, gate.open) { CastGallery.section(doc, c, gate.open) }
-            val secret = SecretTabExtras(
-                summaryEdit = if (editable) ({ sheets.open(SpeechSummarySheet(p, c)) }) else null,
-                locked = secretLocked,
-                // CST-73: shown when the device can authenticate, or when the lock is already on (never hidden while set).
-                showLock = canAuthenticate || secretLocked,
-                lockEnabled = editable && canAuthenticate,
-                onLock = { on ->
-                    if (on) {
-                        vm.updateTabs(SecretTabGate::lockedFromInside)
-                        ownUnlock = false
-                        vm.actWithoutUndo { d, ctx -> CharacterFieldActions.setSecretTabLocked(d, c, true, ctx.toAction()) }
-                    } else {
-                        // Turning it off asks for the device lock first; a cancel leaves it on.
-                        scope.launch {
-                            if (CastAuth.confirm(deps, AuthRequest(ProfileTabs.label(ProfileTab.SECRET)))) {
-                                ownUnlock = true
-                                vm.actWithoutUndo(then = { if (it != EditResult.APPLIED) ownUnlock = false }) { d, ctx ->
-                                    CharacterFieldActions.setSecretTabLocked(d, c, false, ctx.toAction())
-                                }
-                            }
+        ) {
+            // Sized from the pane (BoxWithConstraints), never from the window: the record works in the inner right pane.
+            BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = paneHost?.panePadding ?: 0.dp)) {
+                val paneWide = ImmersiveMath.isWide(maxWidth.value)
+                val bgArt = remember(doc, c, paneWide) { CharacterImages.background(doc, c, inner = paneWide) }
+                val cardPortrait = remember(doc, c) { CharacterImages.image(doc, c, ImagePlace.CARD) }
+                // Hero: the back layer (background, else the portrait while `초상 앰비언트 블러` is on) and the portrait
+                // card (holo on: the tilting holo card) are independent; both draw when both apply.
+                val hero = RecordHeroLayout.layers(bgArt, cardPortrait, portraitBack = appSettings.portraitAmbientBlur)
+                val artSlotField = RecordHeroTaps.artField(hasBackground = bgArt != null)
+                val artTaps = RecordHeroTaps.artTaps(editable)
+                val hasSubtitle = !subtitle.isNullOrEmpty()
+                ImmersiveDetailScaffold(
+                    title = title,
+                    subtitle = subtitle,
+                    onBack = if (inDetailPane) null else ({ deps.navigator.pop() }),
+                    backLabel = CastUiCopy.BACK,
+                    bottomInset = bottomInset,
+                    onHeroClick = if (artTaps) ({ actions.onFixed(artSlotField) }) else null,
+                    heroLabel = RecordHeroTaps.label(artSlotField),
+                    onTitleClick = titleField?.let { f -> { actions.onFixed(f) } },
+                    titleClickLabel = titleField?.let(RecordHeroTaps::label),
+                    onSubtitleClick = subtitleField?.let { f -> { actions.onFixed(f) } },
+                    subtitleClickLabel = subtitleField?.let(RecordHeroTaps::label),
+                    heroTargets = if (artTaps) ({
+                        RecordHeroTargets(hero, hasSubtitle, bottomInset) { actions.onFixed(RecordHeroTaps.cardField) }
+                    }) else null,
+                    hero = { RecordImmersiveHero(hero, hasSubtitle = hasSubtitle, navInset = bottomInset) },
+                    actions = {
+                        // Board deviation: the board's header has only back and `⋯`; the lens stays on screen here
+                        // (values follow it), as the record's floating header had it.
+                        RecordHeaderLens(lens) { sheets.open(LensSheet(p)) }
+                        if (editable && gameTools && ui.tab == ProfileTab.GAME_TEXT) {
+                            ImmersiveHeaderButton(IconId.Plus, ModularTabCopy.NEW_VOICE_LINE, { sheets.open(VoiceLineSheet(p, c)) })
                         }
-                    }
-                },
-            )
-            // The art's top edge: the content starts under the floating buttons, or at the art (no inset).
-            val topPad by animateDpAsState(if (art == null) recordTopInset() else 0.dp, motion.move(CivilightMotion.standard), label = "recordTop")
-            LazyColumn(
-                state = list,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = PROFILE_SIDE, end = PROFILE_SIDE, top = topPad, bottom = padding.calculateBottomPadding() + 24.dp),
-            ) {
-                item(key = "art") {
-                    FoldRevealValue(art) { image ->
-                        androidx.compose.foundation.layout.Box(
-                            Modifier.then(
-                                if (editable) Modifier.pressable(onClick = { actions.onFixed(artSlotField) }, scaleOnPress = false)
-                                else Modifier,
-                            ),
-                        ) { RecordArt(image, inner = wide, sidePadding = PROFILE_SIDE) }
-                    }
-                }
-                item(key = "portrait") {
-                    FoldRevealValue(portrait) { image ->
-                        androidx.compose.foundation.layout.Box(
-                            Modifier.then(
-                                if (editable) Modifier.pressable(onClick = { actions.onFixed(FixedField.PORTRAIT) }, scaleOnPress = false)
-                                else Modifier,
-                            ),
-                        ) { PortraitHero(image) }
-                    }
-                }
-                item(key = "head") { RecordHead(state, editable, actions) }
-                item(key = "table") { HeaderTable(doc, state, fullState, ui.headerExpanded, actions) { headerExpanded = true } }
-                // One item for the tab body: the tabs swap their content in place (row 3).
-                item(key = "tab") {
-                    // No clip: the gallery row runs past the list's side padding and must not be cut while the tabs swap.
+                    },
+                    bottomBar = {
+                        ModularProfileTabBar(
+                            tabs = modularTabs,
+                            selectedId = activeModularTab.id,
+                            onSelect = { picked ->
+                                speechOverride = false
+                                secretOverride = false
+                                if (picked.kind == ProfileTabKind.SECRET && activeModularTab.kind != picked.kind) {
+                                    beforeSecretId = activeModularTab.id
+                                }
+                                selectedModularId = picked.id
+                                val mapped = ProfileTabs.gateTab(picked.kind)
+                                vm.updateTabs { SecretTabGate.select(it, mapped, secretLocked) }
+                            },
+                            onManageTemplates = { sheets.open(ProfileTabTemplatesSheetKey) },
+                        )
+                    },
+                    state = immersive,
+                    onMore = if (editable) ({ sheets.open(RecordMenuSheet(p, c)) }) else null,
+                ) {
+                    RecordTopLine(state)
+                    HeaderTable(doc, state, fullState, ui.headerExpanded, actions) { headerExpanded = true }
+                    // One body for the tabs: they swap their content in place (row 3).
                     val tabKey = when {
                         secretOverride -> "secret_override"
                         speechOverride -> "speech_override"
                         else -> activeModularTab.id
                     }
+                    // No clip: the gallery row runs past the side padding and must not be cut while the tabs swap.
                     AnimatedContent(tabKey, transitionSpec = { motion.swap(clip = false) }, label = "recordTab") { currentKey ->
                         when {
-                            currentKey == "speech_override" || activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SPEECH -> {
-                                androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) {
+                            currentKey == "speech_override" || activeModularTab.kind == ProfileTabKind.SPEECH -> {
+                                Column(Modifier.fillMaxWidth()) {
                                     if (currentKey == "speech_override") {
                                         TextAction(
-                                            "← ${activeModularTab.label}으로 돌아가기",
+                                            ModularTabCopy.backTo(activeModularTab.label),
                                             onClick = { speechOverride = false },
                                             color = CivilightTheme.colors.acc,
                                             style = CivilightTheme.type.small,
@@ -501,13 +519,17 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                                     TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.SPEECH), gate.open, gallery, wide, actions, recorderLink, secret)
                                 }
                             }
-                            currentKey == "secret_override" || activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.SECRET -> {
+                            currentKey == "secret_override" || activeModularTab.kind == ProfileTabKind.SECRET -> {
                                 if (SecretTabGate.composesBody(ProfileTab.SECRET, tabState, secretLocked)) {
-                                    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) {
+                                    Column(Modifier.fillMaxWidth()) {
                                         if (currentKey == "secret_override") {
                                             TextAction(
-                                                "← ${activeModularTab.label}으로 돌아가기",
-                                                onClick = { secretOverride = false },
+                                                ModularTabCopy.backTo(activeModularTab.label),
+                                                onClick = {
+                                                    // N-43: leaving the 비밀 view locks it again; the next opening asks.
+                                                    secretOverride = false
+                                                    vm.updateTabs { SecretTabGate.leave(it, ProfileTabs.gateTab(activeModularTab.kind), secretLocked) }
+                                                },
                                                 color = CivilightTheme.colors.acc,
                                                 style = CivilightTheme.type.small,
                                                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
@@ -517,26 +539,20 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                                     }
                                 }
                             }
-                            activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.OVERVIEW -> {
+                            activeModularTab.kind == ProfileTabKind.OVERVIEW ->
                                 TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.OVERVIEW), gate.open, gallery, wide, actions, recorderLink, secret)
-                            }
-                            activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.RELATIONS -> {
+                            activeModularTab.kind == ProfileTabKind.RELATIONS ->
                                 TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.RELATIONS), gate.open, gallery, wide, actions, recorderLink, secret)
-                            }
-                            activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.GAME_TEXT -> {
+                            activeModularTab.kind == ProfileTabKind.GAME_TEXT ->
                                 TabBody(doc, c, state, fullState, ui.copy(tab = ProfileTab.GAME_TEXT), gate.open, gallery, wide, actions, recorderLink, secret)
-                            }
-                            activeModularTab.kind == io.github.lenticualrstone.civilight.model.app.ProfileTabKind.APPEARANCES -> {
+                            activeModularTab.kind == ProfileTabKind.APPEARANCES ->
                                 AppearancesTraceTab(
                                     doc = doc,
                                     characterKey = c,
                                     hiddenUnlocked = gate.open,
-                                    onJumpToBlock = { blockKey ->
-                                        deps.navigator.push(io.github.lenticualrstone.civilight.navigation.Script(p, blockKey = blockKey))
-                                    },
+                                    onJumpToBlock = { blockKey -> deps.navigator.push(io.github.lenticualrstone.civilight.navigation.Script(p, blockKey = blockKey)) },
                                 )
-                            }
-                            else -> {
+                            else ->
                                 ModularSectionTab(
                                     doc = doc,
                                     tab = activeModularTab,
@@ -554,44 +570,53 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                                         vm.updateTabs { SecretTabGate.select(it, ProfileTab.SECRET, secretLocked) }
                                     },
                                 )
-                            }
                         }
                     }
+                }
+                // Toasts (e.g. `기기 잠금 필요 · 설정`, N-43) sit above the tab bar.
+                Box(
+                    Modifier.fillMaxSize().padding(bottom = (bottomInset ?: navBottom) + ImmersiveMath.BAR_ROW_DP.dp + 6.dp),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    ToastHost(message = toast?.text, actionLabel = toast?.actionLabel, onAction = toast?.onAction?.let { { toasts.act() } })
                 }
             }
         }
     }
 }
 
-/** `인물 기록 007 · 최신 1-7`, the name (40 / 48) and the one-liner; tapping them edits them. */
+/** The top line of the panel: `인물 기록 007 · 최신 1-7` and the `숨김` tag. Name and one-liner are the title and subtitle. */
 @Composable
-private fun RecordHead(state: ProfileState, editable: Boolean, actions: RecordActions) {
-    val colors = CivilightTheme.colors
-    val type = CivilightTheme.type
-    Column(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionLabel(state.header.title, Modifier.weight(1f, fill = false))
-            FoldReveal(state.hidden, horizontal = true) { HiddenMark() }
-        }
-        CivilightText(
-            state.name,
-            type.display,
-            Modifier
-                .padding(top = 8.dp)
-                .then(if (editable) Modifier.pressable(onClick = { actions.onFixed(FixedField.NAME) }, scaleOnPress = false, onClickLabel = CastUiCopy.NAME) else Modifier),
-            color = colors.ink,
-        )
-        state.oneLiner?.let { line ->
-            CivilightText(
-                line,
-                type.lead,
-                Modifier
-                    .padding(top = 10.dp)
-                    .then(if (editable) Modifier.pressable(onClick = { actions.onFixed(FixedField.ONE_LINER) }, scaleOnPress = false, onClickLabel = CastUiCopy.ONE_LINER) else Modifier),
-                color = colors.ink2,
-            )
-        }
+private fun RecordTopLine(state: ProfileState) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(state.header.title, Modifier.weight(1f, fill = false))
+        FoldReveal(state.hidden, horizontal = true) { HiddenMark() }
     }
+}
+
+/**
+ * The lens in the immersive header: the shared [LensChip] on a 44 dp chip pill (glass, or its scrim inside the
+ * header glass), the cast tour's `시점 렌즈` hole and the `값이 바뀌는 때` fallback.
+ */
+@Composable
+private fun RecordHeaderLens(lens: LensChipLabel, onLens: () -> Unit) {
+    val shape = RoundedCornerShape(22.dp)
+    Box(
+        Modifier.heightIn(min = 44.dp).tourTarget(CastTourSteps.LENS).tourTarget(CastTourSteps.TIMED_VALUE, fallback = true),
+        contentAlignment = Alignment.Center,
+    ) {
+        GlassBackground(GlassSurface.CHIP, Modifier.matchParentSize(), shape = shape)
+        LensChip(lens.text, lens.state, onLens, Modifier.padding(horizontal = 6.dp), small = true)
+    }
+}
+
+/** The immersive subtitle: the one-liner, else the first head field values (`서고 관리인 · 28세`). */
+internal object ProfileHeadLine {
+    const val MAX_FIELDS = 2
+
+    fun subtitle(oneLiner: String?, rows: List<FieldRow>): String? =
+        oneLiner?.trim()?.takeIf { it.isNotEmpty() }
+            ?: rows.map { it.value.trim() }.filter { it.isNotEmpty() }.take(MAX_FIELDS).joinToString(CastCopy.SEP).takeIf { it.isNotEmpty() }
 }
 
 /**

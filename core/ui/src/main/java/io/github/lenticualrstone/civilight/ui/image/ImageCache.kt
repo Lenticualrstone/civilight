@@ -91,28 +91,64 @@ object ImageBitmaps {
         return decoded
     }
 
+    /** The file's EXIF orientation (1–8); [ExifOrientation.NORMAL] when unreadable or absent. */
+    fun exifOrientation(file: File): Int = runCatching {
+        ExifInterface(file.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+    }.getOrDefault(ExifOrientation.NORMAL)
+
+    /**
+     * Size of the original as every decoder here draws it (EXIF orientation applied): the pixel space crop
+     * rectangles refer to. Null when the header cannot be read.
+     */
+    fun uprightSize(file: File): Pair<Int, Int>? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        return ExifOrientation.uprightSize(bounds.outWidth, bounds.outHeight, exifOrientation(file))
+    }
+
     private fun applyExifOrientation(file: File, bitmap: Bitmap): Bitmap {
-        val orientation = runCatching {
-            ExifInterface(file.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-        }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
-        val matrix = Matrix()
-        when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
-            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
-            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
-            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
-            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
-            ExifInterface.ORIENTATION_TRANSPOSE -> {
-                matrix.postRotate(90f)
-                matrix.postScale(-1f, 1f)
-            }
-            ExifInterface.ORIENTATION_TRANSVERSE -> {
-                matrix.postRotate(270f)
-                matrix.postScale(-1f, 1f)
-            }
-            else -> return bitmap
+        val turn = ExifOrientation.transform(exifOrientation(file))
+        if (turn.isIdentity) return bitmap
+        val matrix = Matrix().apply {
+            if (turn.rotation != 0) postRotate(turn.rotation.toFloat())
+            if (turn.mirror) postScale(-1f, 1f)
         }
         return runCatching { Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true) }
             .getOrDefault(bitmap)
     }
+}
+
+/** Turn that makes stored pixels upright: rotate clockwise by [rotation], then mirror left–right when [mirror]. */
+data class UprightTurn(val rotation: Int, val mirror: Boolean) {
+    val isIdentity: Boolean get() = rotation == 0 && !mirror
+    val swapsSides: Boolean get() = rotation % 180 == 90
+}
+
+/** EXIF orientation tag (TIFF 274, values 1–8) as an [UprightTurn]; pure, so it is unit-tested on the JVM. */
+object ExifOrientation {
+    const val NORMAL = 1
+    const val FLIP_HORIZONTAL = 2
+    const val ROTATE_180 = 3
+    const val FLIP_VERTICAL = 4
+    const val TRANSPOSE = 5
+    const val ROTATE_90 = 6
+    const val TRANSVERSE = 7
+    const val ROTATE_270 = 8
+
+    fun transform(orientation: Int): UprightTurn = when (orientation) {
+        FLIP_HORIZONTAL -> UprightTurn(0, mirror = true)
+        ROTATE_180 -> UprightTurn(180, mirror = false)
+        // A vertical flip is a half turn followed by a left–right mirror.
+        FLIP_VERTICAL -> UprightTurn(180, mirror = true)
+        TRANSPOSE -> UprightTurn(90, mirror = true)
+        ROTATE_90 -> UprightTurn(90, mirror = false)
+        TRANSVERSE -> UprightTurn(270, mirror = true)
+        ROTATE_270 -> UprightTurn(270, mirror = false)
+        else -> UprightTurn(0, mirror = false)
+    }
+
+    /** Stored [width]×[height] as drawn upright. */
+    fun uprightSize(width: Int, height: Int, orientation: Int): Pair<Int, Int> =
+        if (transform(orientation).swapsSides) height to width else width to height
 }

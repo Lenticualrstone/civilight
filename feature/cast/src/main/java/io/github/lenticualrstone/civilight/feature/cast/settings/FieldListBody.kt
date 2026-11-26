@@ -51,6 +51,7 @@ import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalBackHandler
 import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.cast.CastCopy
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldSettingRow
@@ -62,7 +63,7 @@ import io.github.lenticualrstone.civilight.model.Key
  * The stateless field list of `인물 항목` (CST-19), shared by the project screen and `템플릿 고치기`
  * (CST-59): kind tabs, the `고정 항목` box, [afterFixed] (the project's header switches), the field
  * rows with grip drag and the `순서 바꾸기` mode (CST-54), `+ 항목`, then [trailing] rows. Order mode
- * ends when the tab changes or the screen is left.
+ * ends with `완료`, with system back (first press closes the mode), when the tab changes or the screen is left.
  */
 @Composable
 internal fun FieldListBody(
@@ -85,6 +86,8 @@ internal fun FieldListBody(
     // Ends with the tab (keyed) and with the screen (state of this entry only).
     var orderMode by rememberSaveable(kindIndex) { mutableStateOf(false) }
     val ordering = orderMode && editable
+    // An in-progress mode is a back layer (BackPolicy CLOSE_LAYER): back ends `순서 바꾸기` before it leaves the screen.
+    LocalBackHandler.current(ordering) { orderMode = false }
     val listState = rememberLazyListState()
     val reorder = rememberFieldReorder(screen.rows.map { it.key }, listState) { key, from, to -> onMove(key, from, to) }
     val shownRows = remember(screen.rows, reorder.order) {

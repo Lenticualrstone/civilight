@@ -351,6 +351,9 @@ class ScriptViewModel(
 
     /** This screen's identity for [DraftMemory.claim]. */
     internal val draftOwner = Any()
+
+    /** The last smart-punctuation substitution, taken back by an immediate backspace ([onDraftText]). */
+    internal var smartUndo: io.github.lenticualrstone.civilight.feature.script.input.Drafts.SmartUndo? = null
     val draft: StateFlow<io.github.lenticualrstone.civilight.feature.script.input.Draft> = draftFlow.asStateFlow()
 
     /** The scene the last `다음 씬` tap made (double-tap guard, `NextScene.emptyAfter`). */

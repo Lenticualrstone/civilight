@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -53,6 +54,27 @@ import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /**
+ * Rule 19: a hidden character's portrait is never drawn while the project's hidden items are locked.
+ * Hidden = the row's `숨기기`, or the name tag's for a trashed or purged speaker. Pure, for JVM tests.
+ */
+object PortraitGate {
+    fun isHidden(doc: ProjectDoc, characterKey: Key): Boolean =
+        doc.index.character(characterKey)?.hidden == true || doc.index.nameTag(characterKey)?.hidden == true
+
+    /** The portrait (and anything that opens the card from it) is held back. */
+    fun isLocked(doc: ProjectDoc?, characterKey: Key?, itemsOpen: Boolean): Boolean =
+        doc != null && characterKey != null && !itemsOpen && isHidden(doc, characterKey)
+}
+
+/** [PortraitGate.isLocked] with the shell's unlock state; no shell (previews) counts as locked. */
+@Composable
+fun rememberPortraitLocked(doc: ProjectDoc?, characterKey: Key?): Boolean {
+    val deps = LocalFeatureDeps.current
+    val open = deps?.unlock?.state?.collectAsState()?.value?.let { s -> doc?.key?.let(s::itemsOpen) } ?: false
+    return PortraitGate.isLocked(doc, characterKey, open)
+}
+
+/**
  * (0.5.3) Shared 1:1 character portrait painter usable across `:core:ui`, `:feature:cast`, `:feature:script`, and `:feature:map`.
  * Resolves both built-in preset portraits (`presetId`) and uploaded blob portraits (`blobHash` with `Ratio.R1X1` crop)
  * via [ImageCache] / [ImageBitmaps] with zero main-thread I/O. Returns null when the character has no live portrait.
@@ -64,8 +86,10 @@ fun rememberCharacterAvatarPainter(
     targetPx: Int = 192,
 ): Painter? {
     val deps = LocalFeatureDeps.current
-    val imageUse = remember(doc, characterKey) {
-        if (doc != null && characterKey != null) {
+    // Rule 19: a locked hidden character has no portrait at the source, so every caller is covered.
+    val locked = rememberPortraitLocked(doc, characterKey)
+    val imageUse = remember(doc, characterKey, locked) {
+        if (doc != null && characterKey != null && !locked) {
             doc.index.imageUse(ImageOwnerKind.CHARACTER, characterKey, ImageSlot.CHARACTER_PORTRAIT)
                 ?.takeIf { doc.liveness.isLive(it) }
         } else null
@@ -123,9 +147,12 @@ fun CharacterPortraitTile(
     val density = LocalDensity.current
     val targetPx = with(density) { (size * 2).roundToPx().coerceAtLeast(96) }
     val painter = rememberCharacterAvatarPainter(doc, characterKey, targetPx)
+    // Rule 19: a locked hidden character shows the plain icon on a neutral tone and opens nothing.
+    val locked = rememberPortraitLocked(doc, characterKey)
+    val click = onClick.takeUnless { locked }
 
-    val tone = remember(characterKey, displayName, colors.isDark) {
-        portraitTone(characterKey ?: displayName, colors.isDark)
+    val tone = remember(characterKey, displayName, colors.isDark, locked) {
+        if (locked) colors.tint else portraitTone(characterKey ?: displayName, colors.isDark)
     }
 
     Box(
@@ -135,12 +162,12 @@ fun CharacterPortraitTile(
             .background(tone)
             .insetOutline(colors.line, 1.dp, tileShape)
             .then(
-                if (onClick != null) {
+                if (click != null) {
                     Modifier.clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         role = Role.Button,
-                        onClick = onClick,
+                        onClick = click,
                     )
                 } else Modifier,
             ),
@@ -153,7 +180,7 @@ fun CharacterPortraitTile(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-        } else if (characterKey == null || displayName.isBlank()) {
+        } else if (locked || characterKey == null || displayName.isBlank()) {
             CivilightIcon(IconId.User, contentDescription = null, size = size * 0.44f, tint = colors.ink3)
         } else {
             val initial = displayName.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"

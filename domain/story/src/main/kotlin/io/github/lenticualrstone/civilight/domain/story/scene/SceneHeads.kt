@@ -56,7 +56,7 @@ class SceneHeads(
 
     /**
      * Rows `장소와 때`, `전환 문구`, `앞 씬과 합치기` (absent for the first scene of an episode),
-     * `씬 지우기 | 휴지통 · 30일`, `앞에 새 씬 | 빈 씬 · 씬 4 앞` (`[PROPOSED]`). Read-only projects
+     * `앞에 새 씬 | 빈 씬 · 씬 4 앞` (`[PROPOSED]`), then (0.3.2) `씬 지우기 | 휴지통 · 30일` last. Read-only projects
      * get every mutating row disabled with the value `읽기 전용`.
      */
     fun menu(sceneKey: Key, readOnly: Boolean = false): HeadMenu? {
@@ -70,8 +70,9 @@ class SceneHeads(
             add(row("장소와 때", placeAndTime(sceneKey)))
             add(row("전환 문구", transitions.menuValue(sceneKey)))
             previous?.let { add(row("앞 씬과 합치기", "${codes.sceneLabel(it)} · ${it.title ?: "미정"}")) }
-            add(row("씬 지우기", "휴지통 · 30일"))
             add(row("앞에 새 씬", "빈 씬 · $label 앞"))
+            // (0.3.2) The destructive row comes last, under its own divider (drawn by the menu sheet).
+            add(row("씬 지우기", "휴지통 · 30일"))
         }
         return HeadMenu(listOfNotNull(label, episode).joinToString(" · "), rows)
     }

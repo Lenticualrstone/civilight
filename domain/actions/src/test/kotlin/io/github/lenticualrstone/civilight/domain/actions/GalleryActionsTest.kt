@@ -201,6 +201,19 @@ class GalleryActionsTest {
     }
 
     @Test
+    fun `a held tag of an unknown scope (newer file) stays, one not held is never attached`() {
+        val future = io.github.lenticualrstone.civilight.model.OpenEnum.unknown<io.github.lenticualrstone.civilight.model.cast.TagScope>("somethingNew")
+        val d0 = g0.copy(project = g0.project.copy(tags = g0.project.tags.map { if (it.key == ExampleGallery.TAG_PROP) it.copy(scope = future) else it }))
+        val held = GalleryActions.setTags(d0, ITEM_4, listOf(ExampleGallery.TAG_PROP), ctx)!!.doc
+        // Not held before: an unknown scope fits no kind, so it is not attached.
+        assertEquals(emptyList<Key>(), held.index.galleryItem(ITEM_4)!!.tagKeys)
+        val holding = d0.copy(gallery = d0.gallery.mapValues { (_, f) -> f.copy(items = f.items.map { if (it.key == ITEM_4) it.copy(tagKeys = listOf(ExampleGallery.TAG_PROP)) else it }) })
+        // Held: an edit that leaves it out keeps it untouched.
+        val kept = GalleryActions.setTags(holding, ITEM_4, emptyList(), ctx)!!.doc
+        assertEquals(listOf(ExampleGallery.TAG_PROP), kept.index.galleryItem(ITEM_4)!!.tagKeys)
+    }
+
+    @Test
     fun `T-GAL-38 gallery bytes count each distinct blob once and presets as zero`() {
         val f = g0.gallery.getValue(K.RIEN)
         val doc = g0.copy(gallery = g0.gallery + (K.RIEN to f.copy(items = f.items.map { if (it.key == ITEM_8) it.copy(source = "preset:fog") else it })))

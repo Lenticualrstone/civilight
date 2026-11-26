@@ -22,7 +22,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -32,6 +31,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.SheetHeader
 import io.github.lenticualrstone.civilight.designsystem.component.SheetScrollBody
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
+import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
@@ -72,16 +72,23 @@ fun DraftCueChips(doc: ProjectDoc, cues: List<DirectionCue>, onRemove: (Key) -> 
     ) {
         cues.forEach { cue ->
             val shape = RoundedCornerShape(10.dp)
+            // No clip on the chip: the `✕` touch area reaches 44 × 44 past its 30 × 36 drawing (DS-11).
             Row(
-                Modifier.height(36.dp).clip(shape).background(colors.tint).border(1.dp, colors.line, shape).padding(start = 10.dp),
+                Modifier.height(36.dp).background(colors.tint, shape).border(1.dp, colors.line, shape).padding(start = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CivilightText(cueChipText(doc, cue), type.number, color = colors.ink2, maxLines = 1)
                 Box(
                     Modifier
+                        .pressable(
+                            PressAction.Click({ onRemove(cue.key) }),
+                            role = Role.Button,
+                            hitTarget = HitTarget.ICON_BUTTON,
+                            shape = RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp),
+                            scaleOnPress = false,
+                        )
                         .width(30.dp)
                         .height(36.dp)
-                        .pressable(PressAction.Click({ onRemove(cue.key) }), role = Role.Button, scaleOnPress = false)
                         .semantics { contentDescription = WriteCopy.CUE_REMOVE },
                     contentAlignment = Alignment.Center,
                 ) { CivilightIcon(IconId.X, null, size = 14.dp, tint = colors.ink3) }
@@ -89,10 +96,9 @@ fun DraftCueChips(doc: ProjectDoc, cues: List<DirectionCue>, onRemove: (Key) -> 
         }
         Box(
             Modifier
+                .pressable(PressAction.Click(onAdd), role = Role.Button, hitTarget = HitTarget.ICON_BUTTON, shape = CircleShape, scaleOnPress = false)
                 .size(36.dp)
-                .clip(CircleShape)
                 .border(1.dp, colors.acc, CircleShape)
-                .pressable(PressAction.Click(onAdd), role = Role.Button, scaleOnPress = false)
                 .semantics { contentDescription = WriteCopy.CUE_ADD },
             contentAlignment = Alignment.Center,
         ) { CivilightIcon(IconId.Plus, null, size = 16.dp, tint = colors.acc) }

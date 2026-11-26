@@ -9,15 +9,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.ui.unit.Dp
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -86,22 +91,29 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                 .atelierHorizontalDrag(!input.preview, items.size, with(density) { 195.dp.toPx() }, track),
             contentAlignment = Alignment.Center,
         ) {
-            val caseSize = (minOf(maxWidth * 0.70f, maxHeight * 0.72f)).coerceIn(200.dp, 296.dp)
-            val caseW = caseSize * 1.09f // Authentic 142mm x 125mm jewel case ratio
-            val caseH = caseSize
-            val targetPx = with(density) { caseSize.roundToPx() }
-            val pos = track.position.value
-            val impulse = track.dragImpulse.floatValue
+            // Case body keeps the real 142×125 mm jewel-case ratio; the cover booklet inside is 3:4.
+            // A short stage shrinks the case width with its height (never flattens).
+            val (caseW, caseH) = AtelierCoverBox.jewelCase(maxWidth, maxHeight)
+            val bookletH = caseH - 8.dp
+            val bookletW = bookletH * AtelierCoverBox.COVER_ASPECT
+            val targetPx = with(density) { bookletW.roundToPx() }
 
-            val visible = items.indices.filter { abs(it - pos) <= 2.5f }
+            val visible by remember(items.size, track) {
+                derivedStateOf { items.indices.filter { abs(it - track.position.value) <= 2.5f } }
+            }
             visible.forEach { i ->
-                val d = i - pos
+                key(items[i].key) {
+                // Offset is read in layer/draw lambdas only, so the moving track does not recompose every frame.
+                val offset = { i - track.position.value }
+                val stackDepth by remember(i, track) {
+                    derivedStateOf { atelierStackDistance(i, track.position.value) }
+                }
                 val focused = i == track.activeIndex
                 val isOpen = focused && openedIdx == i && !input.preview
-                val lidOpen by animateFloatAsState(
+                val lidOpenState = animateFloatAsState(
                     targetValue = if (isOpen) 1f else 0f,
                     animationSpec = motion.crispSpring(),
-                    label = "cdLid_$i",
+                    label = "cdLid",
                 )
 
                 val item = items[i]
@@ -110,8 +122,11 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                 Box(
                     Modifier
                         .size(caseW, caseH)
-                        .zIndex(10f - abs(d))
+                        .zIndex(10f - stackDepth)
                         .graphicsLayer {
+                            val d = offset()
+                            val lidOpen = lidOpenState.value
+                            val impulse = track.dragImpulse.floatValue
                             cameraDistance = 16f * density.density
                             val spread = caseW.toPx() * 0.86f
                             translationX = d * spread + tilt.x * (10f / (1f + abs(d))) - lidOpen * 26.dp.toPx()
@@ -132,12 +147,12 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                         catalogCode = "CV-%02d".format(i + 1),
                         tilt = tilt,
                         holoBoost = holoEnabled,
-                        spinDegrees = lidOpen * 42f + d * 18f,
+                        spinDegrees = { lidOpenState.value * 42f + offset() * 18f },
                         modifier = Modifier
                             .size(discDiameter)
                             .zIndex(1f)
                             .graphicsLayer {
-                                val peek = if (focused) 0.14f + lidOpen * 0.34f else 0.04f
+                                val peek = if (focused) 0.14f + lidOpenState.value * 0.34f else 0.04f
                                 translationX = caseW.toPx() * peek
                             },
                     )
@@ -154,9 +169,10 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                         item = item,
                         catalogCode = "CV-%02d".format(i + 1),
                         tilt = tilt,
-                        sheenBias = d + lidOpen * 0.6f,
+                        sheenBias = { offset() + lidOpenState.value * 0.6f },
                         holoBoost = holoEnabled,
                         focused = focused,
+                        bookletWidth = bookletW,
                         targetWidthPx = targetPx,
                         input = input,
                         modifier = Modifier
@@ -165,7 +181,7 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                             .graphicsLayer {
                                 cameraDistance = 18f * density.density
                                 transformOrigin = TransformOrigin(0.13f, 0.5f)
-                                rotationY = -lidOpen * 54f
+                                rotationY = -lidOpenState.value * 54f
                             }
                             .then(
                                 if (input.preview) Modifier
@@ -186,6 +202,7 @@ internal fun CdJewelCaseView(input: ShelfViewInput) {
                             ),
                     )
                 }
+                }
             }
         }
     }
@@ -197,7 +214,7 @@ private fun HolographicCdDisc(
     catalogCode: String,
     tilt: DeviceTilt,
     holoBoost: Boolean,
-    spinDegrees: Float,
+    spinDegrees: () -> Float,
     modifier: Modifier = Modifier,
 ) {
     val colors = CivilightTheme.colors
@@ -217,7 +234,7 @@ private fun HolographicCdDisc(
                 center = center,
             )
 
-            rotate(degrees = spinDegrees + tilt.x * 46f + tilt.y * 24f, pivot = center) {
+            rotate(degrees = spinDegrees() + tilt.x * 46f + tilt.y * 24f, pivot = center) {
                 drawCircle(
                     brush = Brush.sweepGradient(
                         colorStops = arrayOf(
@@ -332,9 +349,10 @@ private fun JewelCaseFrontLid(
     item: ShelfCardItem,
     catalogCode: String,
     tilt: DeviceTilt,
-    sheenBias: Float,
+    sheenBias: () -> Float,
     holoBoost: Boolean,
     focused: Boolean,
+    bookletWidth: Dp,
     targetWidthPx: Int,
     input: ShelfViewInput,
     modifier: Modifier = Modifier,
@@ -352,7 +370,7 @@ private fun JewelCaseFrontLid(
             .drawWithContent {
                 drawContent()
                 val spineW = size.width * 0.13f
-                val shift = ((sheenBias * 0.4f) + (tilt.x * 0.35f)).coerceIn(-0.8f, 0.8f)
+                val shift = ((sheenBias() * 0.4f) + (tilt.x * 0.35f)).coerceIn(-0.8f, 0.8f)
                 val x0 = spineW + size.width * (0.14f + shift)
                 drawRect(
                     brush = Brush.linearGradient(
@@ -394,10 +412,17 @@ private fun JewelCaseFrontLid(
                 )
             },
     ) {
+        // 3:4 cover booklet tucked under the clear lid (right of the spine); the tray shows at the sides.
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(start = 28.dp, top = 4.dp, end = 4.dp, bottom = 4.dp)
+                .padding(start = 28.dp, top = 4.dp, end = 4.dp, bottom = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+        Box(
+            Modifier
+                .width(bookletWidth)
+                .fillMaxHeight()
                 .clip(RoundedCornerShape(3.dp))
                 .background(colors.raise),
         ) {
@@ -452,6 +477,7 @@ private fun JewelCaseFrontLid(
                     }
                 }
             }
+        }
         }
     }
 }

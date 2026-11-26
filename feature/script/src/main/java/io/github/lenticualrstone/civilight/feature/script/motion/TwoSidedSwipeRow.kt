@@ -90,7 +90,27 @@ fun TwoSidedSwipeRow(
         drag.place(target)
     }
     LaunchedEffect(enabled) { if (!enabled) drag.cancel() }
-    Box(modifier.clipToBounds()) {
+    // (0.3.2) The swipe sits on this stationary outer row, not on the sliding block. Pointer deltas are read in
+    // coordinates that never move (no jitter, the 0.3.1 fix), and the revealed buttons and the block are its
+    // children: their own taps and the block's long press see each touch first (Main pass runs child → parent),
+    // and the swipe takes over only once a drag reads sideways (`GestureRules`). In 0.3.1 the swipe sat on the
+    // block before `.offset`, so its hit area stayed on the whole row above the buttons and swallowed their taps.
+    Box(
+        modifier
+            .clipToBounds()
+            .horizontalSwipe(
+                enabled = enabled,
+                canStart = { dx -> drag.canStart(dx, refPx, editPx, refOn, editOn) },
+                onDelta = { delta -> drag.onDelta(delta, refPx, editPx, refOn, editOn) },
+                onStop = {
+                    val settled = drag.release(refPx, editPx, refOn, editOn)
+                    if (settled != side) {
+                        haptics.perform(io.github.lenticualrstone.civilight.designsystem.theme.HapticToken.TICK)
+                        onSideChange(settled)
+                    }
+                },
+            ),
+    ) {
         // Only the side being revealed is composed: the two layers overlap on a cover screen (192 + 300 > 390).
         if (BlockSwipe.showsReference(drag.offset, refOn)) {
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterStart) {
@@ -102,22 +122,9 @@ fun TwoSidedSwipeRow(
                 ButtonsRow(edit, editWidth, EDIT_BUTTON.dp, progress = BlockSwipe.editProgress(drag.offset, editPx), reduced = motion.reduced, atStart = false)
             }
         }
+        // The block only slides; its hit area moves with it, so it never covers the revealed buttons.
         Box(
             Modifier
-                // 0.2.3 gesture rules (core `GestureRules`): horizontalSwipe runs before offset so pointer
-                // deltas stay in stationary coordinates instead of oscillating with the sliding child.
-                .horizontalSwipe(
-                    enabled = enabled,
-                    canStart = { dx -> drag.canStart(dx, refPx, editPx, refOn, editOn) },
-                    onDelta = { delta -> drag.onDelta(delta, refPx, editPx, refOn, editOn) },
-                    onStop = {
-                        val settled = drag.release(refPx, editPx, refOn, editOn)
-                        if (settled != side) {
-                            haptics.perform(io.github.lenticualrstone.civilight.designsystem.theme.HapticToken.TICK)
-                            onSideChange(settled)
-                        }
-                    },
-                )
                 .offset { IntOffset(drag.offset.roundToInt(), 0) }
                 .background(colors.bg),
         ) { content() }

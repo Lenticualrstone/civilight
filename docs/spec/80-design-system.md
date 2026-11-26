@@ -646,7 +646,7 @@ Two drawn forms; both sit above the `shade` scrim.
 | --- | --- | --- | --- |
 | `primary` | `pri` / `onpri` | 44 tall, padding 0 × 18, radius 22, `button` role 600 13 / 16 | the one main action of a screen or sheet (`쓰기 시작`, `줄바꿈`, `이 시점으로 보기`) |
 | `ghost` (보조) | `tint` / `ink` | same | secondary actions (`닫기`, `취소`, `최신으로 돌아가기`) |
-| `danger` (지우기 확인) | `r18` / `onr18` | same | confirm of a hard-to-undo action only (`휴지통으로`) |
+| `danger` (지우기 확인) | `r18` / `onr18` | same | confirm of a hard-to-undo action only, as DS-25: permanent delete (`영구 삭제`) and moving a whole project to trash (`휴지통으로`). An item that goes to 휴지통 with `되돌리기` (impact sheets `RCDeleteImpact`, tag · field · template confirms) uses `primary` `휴지통으로` (0.5 interface review, 2026-11-26) |
 | `primaryLarge` | `pri` / `onpri` | 52 tall, radius 26, 15 sp (welcome `시작하기`: 54 / 27) | onboarding / wizard bottom action (`다음`) |
 | `compact` | primary or ghost | 36–40 tall drawn, padding 0 × 12–14, 12 sp; touch area 44 | inside banners, tooltips, lock rows (`최신으로`, `다음`, `지문으로 보기`) |
 | `twoLine` (`.btn2`) | `pri` / `onpri`; ghost: `tint` / `ink` + 1 dp `edge` inset | min height 56, padding 8 × 18, radius 16; title 600 14 / 19; sub-line 400 12 / 16 at 80 % opacity, left-aligned | choices that need a consequence line (`이 값 고치기` · `1-3 기록을 고침 · 1-3부터 새 값`; `여기서부터 바뀜 · 1-7` · `새 ◆ · 집필 선 1-7 씬 3 뒤`) |

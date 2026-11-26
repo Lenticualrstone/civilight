@@ -1,22 +1,13 @@
 package io.github.lenticualrstone.civilight.feature.world.place
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
-import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
-import io.github.lenticualrstone.civilight.feature.world.common.CardBodySwap
-import io.github.lenticualrstone.civilight.feature.world.common.dimmed
-import io.github.lenticualrstone.civilight.feature.world.common.stageOf
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,48 +20,47 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
-import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
-import io.github.lenticualrstone.civilight.designsystem.component.CivilightTabs
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.component.FilterChip
 import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
-import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.domain.world.item.OrderList
 import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
 import io.github.lenticualrstone.civilight.feature.world.common.CardAccess
-import io.github.lenticualrstone.civilight.feature.world.common.CardImageSlot
-import io.github.lenticualrstone.civilight.feature.world.common.CardImages
-import io.github.lenticualrstone.civilight.feature.world.common.MergePickSheet
-import io.github.lenticualrstone.civilight.feature.world.common.SameNameLine
-import io.github.lenticualrstone.civilight.feature.world.common.WorldGoneCard
-import io.github.lenticualrstone.civilight.feature.world.common.CardDescription
-import io.github.lenticualrstone.civilight.feature.world.common.CardHead
+import io.github.lenticualrstone.civilight.feature.world.common.DescriptionSheet
 import io.github.lenticualrstone.civilight.feature.world.common.FieldSection
 import io.github.lenticualrstone.civilight.feature.world.common.FixedRow
 import io.github.lenticualrstone.civilight.feature.world.common.ItemMenuSheet
 import io.github.lenticualrstone.civilight.feature.world.common.LensBanner
-import io.github.lenticualrstone.civilight.feature.world.common.lensBannerSlot
 import io.github.lenticualrstone.civilight.feature.world.common.LockedCard
-import io.github.lenticualrstone.civilight.feature.world.common.WorldCommandBar
+import io.github.lenticualrstone.civilight.feature.world.common.MergePickSheet
+import io.github.lenticualrstone.civilight.feature.world.common.SameNameLine
 import io.github.lenticualrstone.civilight.feature.world.common.WorldEnv
-import io.github.lenticualrstone.civilight.feature.world.common.cardPadding
+import io.github.lenticualrstone.civilight.feature.world.common.WorldGoneCard
+import io.github.lenticualrstone.civilight.feature.world.common.dimmed
 import io.github.lenticualrstone.civilight.feature.world.common.itemSheet
 import io.github.lenticualrstone.civilight.feature.world.common.openFromWorld
 import io.github.lenticualrstone.civilight.feature.world.common.worldBack
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
-import io.github.lenticualrstone.civilight.model.recorder.EntrySurface
-import io.github.lenticualrstone.civilight.model.recorder.RecorderTargetKind
 import io.github.lenticualrstone.civilight.navigation.AddFieldSheet
+import io.github.lenticualrstone.civilight.navigation.AffiliationBasisSettings
+import io.github.lenticualrstone.civilight.navigation.CharacterProfile
+import io.github.lenticualrstone.civilight.navigation.DeleteImpactSheet
+import io.github.lenticualrstone.civilight.navigation.FactionCard
 import io.github.lenticualrstone.civilight.navigation.FieldValueEditSheet
 import io.github.lenticualrstone.civilight.navigation.LensSheet
+import io.github.lenticualrstone.civilight.navigation.PlaceCard
 import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.FeatureDeps
 import io.github.lenticualrstone.civilight.ui.feature.SheetScope
@@ -81,9 +71,9 @@ import io.github.lenticualrstone.civilight.ui.picker.ItemPickerSheet
 import io.github.lenticualrstone.civilight.ui.picker.PickerModels
 import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.project.EditResult
-import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
+import io.github.lenticualrstone.civilight.ui.reorder.ReorderBackHandler
+import io.github.lenticualrstone.civilight.ui.reorder.rememberReorderState
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
-import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import io.github.lenticualrstone.civilight.navigation.PlaceCard as PlaceCardRoute
@@ -93,9 +83,9 @@ import io.github.lenticualrstone.civilight.navigation.PlaceCard as PlaceCardRout
 data class ParentPlaceSheet(val placeKey: Key) : SheetKey
 
 /**
- * 장소 카드, full shape (WLD-09, board `PlaceTime`): header `세계 · 장소` · name · lens chip · `⋯`;
- * image slot, eyebrow `장소 · <지역>`, name, tabs `개요 · 이곳의 시간 · 지도`. The summary shape on
- * the map (sheet / side card) is feature:map's.
+ * 장소 카드 (WLD-09) on the immersive scaffold (boards `Immersive` kind place, `ImmContent` place branch,
+ * `ImmPlaceRules`): hero image or colour field, title = name, subtitle = `상위 지역 X · 하위 지역 N`; header lens
+ * chip and `⋯`; bottom tabs `개요 · 소속 · 등장`. No tags on places. The summary shape on the map is feature:map's.
  */
 @Composable
 fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
@@ -107,28 +97,24 @@ fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
     val gate = rememberHiddenGate(route.projectKey)
     var tab by rememberSaveable(route.placeKey) { mutableIntStateOf(PlaceCardUi.tabIndex(route.tab)) }
     var showEmpty by rememberSaveable(route.placeKey) { mutableStateOf(false) }
+    var expanded by rememberSaveable(route.placeKey) { mutableStateOf(listOf<String>()) }
+    val reorder = rememberReorderState()
+    ReorderBackHandler(reorder)
+    val scope = rememberCoroutineScope()
     val card = ui
+    val open = card?.access == CardAccess.Open
+    val p = route.projectKey
+    val back = worldBack(route, deps)
 
-    CivilightScreen(
+    fun move(list: OrderList, key: Key, to: Int) {
+        scope.launch { vm.move(list, key, to)?.let { label -> deps.toasts.showFor(p, label) { vm.undoLast() } } }
+    }
+
+    WorldImmersiveFrame(
+        itemKey = route.placeKey,
         title = card?.title.orEmpty(),
-        smallLine = WorldCopy.SMALL_PLACE,
-        back = worldBack(route, deps),
-        lens = doc?.let(::lensChipLabel),
-        onLens = { sheets.open(LensSheet(route.projectKey)) },
-        banner = lensBannerSlot(doc?.let { LensBanner.of(it, readOnly) }, vm::backToLatest),
-        actions = {
-            val name = card?.head?.name
-            if (card?.access == CardAccess.Open && name != null) {
-                CivilightIconButton(
-                    icon = IconId.More,
-                    contentDescription = WorldCopy.menuLabel(name),
-                    onClick = { sheets.open(ItemMenuSheet(WorldKind.PLACE.name, route.placeKey)) },
-                )
-            }
-        },
-        commandBar = {
-            WorldCommandBar(deps, route.projectKey, WorldCopy.SEARCH_CARD, EntrySurface.PLACE, RecorderTargetKind.PLACE, route.placeKey)
-        },
+        subtitle = card?.subtitle,
+        image = card?.image,
         sheets = sheets,
         localSheets = { key ->
             when (key) {
@@ -136,102 +122,145 @@ fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
                 else -> itemSheet(key, doc, vm, readOnly, gate)
             }
         },
-    ) { padding ->
-        CenterColumn {
-            CardBodySwap(card, { stageOf(it?.access) }) { shown ->
-                val card = shown
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
-                    if (card == null) return@LazyColumn
-                    when (val access = card.access) {
-                        is CardAccess.Locked -> item(key = "locked") { Box(civilightItem()) { LockedCard(access.text, gate.unlock) } }
-                        is CardAccess.Gone -> item(key = "gone") { Box(civilightItem()) { WorldGoneCard(access, doc, vm, WorldKind.PLACE, route.placeKey, readOnly, gate) } }
-                        CardAccess.Open -> placeBody(
-                            card = card,
-                            tab = tab,
-                            onTab = { tab = it },
-                            readOnly = readOnly,
-                            showEmpty = showEmpty,
-                            onShowEmpty = { showEmpty = true },
-                            onParent = { sheets.open(ParentPlaceSheet(route.placeKey)) },
-                            onField = { def -> sheets.open(FieldValueEditSheet(route.projectKey, EntityKind.PLACE, route.placeKey, def)) },
-                            onAddField = { sheets.open(AddFieldSheet(route.projectKey, EntityKind.PLACE, route.placeKey)) },
-                            onOpen = { deps.navigator.openFromWorld(it) },
-                            art = { name ->
-                                doc?.let { d ->
-                                    CardImageSlot(d, WorldKind.PLACE, route.placeKey, name, label = null, readOnly = readOnly) {
-                                        sheets.open(CardImages.pickSheet(route.projectKey, WorldKind.PLACE, route.placeKey))
-                                    }
-                                }
-                            },
-                            sameName = { SameNameLine(doc, WorldKind.PLACE, route.placeKey, readOnly) { sheets.open(MergePickSheet(WorldKind.PLACE.name, route.placeKey)) } },
-                        )
+        onBack = { back?.onClick?.invoke() ?: deps.navigator.pop() },
+        tabs = if (open) card!!.tabs else emptyList(),
+        tab = tab,
+        onTab = {
+            reorder.exit()
+            tab = it
+        },
+        onMore = if (open) ({ sheets.open(ItemMenuSheet(WorldKind.PLACE.name, route.placeKey)) }) else null,
+        actions = { doc?.let { d -> WorldHeaderLens(lensChipLabel(d)) { sheets.open(LensSheet(p)) } } },
+        onHeroClick = if (open && !readOnly) ({ sheets.open(io.github.lenticualrstone.civilight.feature.world.common.CardImages.pickSheet(p, WorldKind.PLACE, route.placeKey)) }) else null,
+    ) {
+        WorldLensBanner(doc?.let { LensBanner.of(it, readOnly) }, vm::backToLatest)
+        if (card == null) return@WorldImmersiveFrame
+        when (val access = card.access) {
+            is CardAccess.Locked -> LockedCard(access.text, gate.unlock)
+            is CardAccess.Gone -> WorldGoneCard(access, doc, vm, WorldKind.PLACE, route.placeKey, readOnly, gate)
+            CardAccess.Open -> ContentSwap(tab, Modifier.fillMaxWidth(), label = "placeTab") { shownTab ->
+                when (shownTab) {
+                    PlaceCardUi.TAB_AFFILIATION -> {
+                        val aff = card.affiliation
+                        if (aff != null) {
+                            AffiliationSectionView(
+                                doc = doc,
+                                ui = aff,
+                                expanded = expanded.toSet(),
+                                onExpand = { k, on -> expanded = if (on) expanded + k else expanded - k },
+                                reorder = reorder,
+                                editable = !readOnly,
+                                actions = AffiliationActionsUi(
+                                    onFaction = { f ->
+                                        if (f.deleted) sheets.open(DeleteImpactSheet(p, EntityKind.FACTION, f.key))
+                                        else deps.navigator.openFromWorld(FactionCard(p, f.key))
+                                    },
+                                    onMember = { m ->
+                                        if (m.deleted) sheets.open(DeleteImpactSheet(p, EntityKind.CHARACTER, m.key))
+                                        else deps.navigator.push(CharacterProfile(p, m.key))
+                                    },
+                                    onLoose = { m ->
+                                        if (m.deleted) sheets.open(DeleteImpactSheet(p, EntityKind.CHARACTER, m.key))
+                                        else deps.navigator.push(CharacterProfile(p, m.key))
+                                    },
+                                    onIncludeSubPlaces = vm::setIncludeSubPlaces,
+                                    onPickBasis = { deps.navigator.push(AffiliationBasisSettings(p)) },
+                                    onUnlock = gate.unlock,
+                                    onMoveFaction = { k, to -> move(OrderList.Factions(route.placeKey), k, to) },
+                                    onMoveMember = { f, k, to -> move(OrderList.Members(f), k, to) },
+                                    onMoveLoose = { k, to -> move(OrderList.Loose(route.placeKey), k, to) },
+                                ),
+                            )
+                        }
                     }
+                    PlaceCardUi.TAB_APPEARANCE -> AppearanceTab(card) { deps.navigator.openFromWorld(it) }
+                    else -> OverviewTab(
+                        card = card,
+                        doc = doc,
+                        readOnly = readOnly,
+                        showEmpty = showEmpty,
+                        onShowEmpty = { showEmpty = true },
+                        onDescription = { sheets.open(DescriptionSheet(WorldKind.PLACE.name, route.placeKey)) },
+                        onParent = { sheets.open(ParentPlaceSheet(route.placeKey)) },
+                        onField = { def -> sheets.open(FieldValueEditSheet(p, EntityKind.PLACE, route.placeKey, def)) },
+                        onAddField = { sheets.open(AddFieldSheet(p, EntityKind.PLACE, route.placeKey)) },
+                        onSubPlace = { deps.navigator.openFromWorld(PlaceCard(p, it)) },
+                        onUnlock = gate.unlock,
+                        onMerge = { sheets.open(MergePickSheet(WorldKind.PLACE.name, route.placeKey)) },
+                    )
                 }
             }
         }
     }
 }
 
-private fun LazyListScope.placeBody(
+/** `개요` (board `ImmContent` place branch): `설명`, `세부 항목 · N` with `지역` and `+ 항목`, `하위 지역 · N` chips. */
+@Composable
+private fun OverviewTab(
     card: PlaceCardUi,
-    tab: Int,
-    onTab: (Int) -> Unit,
+    doc: ProjectDoc?,
     readOnly: Boolean,
     showEmpty: Boolean,
     onShowEmpty: () -> Unit,
+    onDescription: () -> Unit,
     onParent: () -> Unit,
     onField: (Key) -> Unit,
     onAddField: () -> Unit,
-    onOpen: (io.github.lenticualrstone.civilight.navigation.Route) -> Unit,
-    art: @Composable (String) -> Unit,
-    sameName: @Composable () -> Unit,
+    onSubPlace: (Key) -> Unit,
+    onUnlock: () -> Unit,
+    onMerge: () -> Unit,
 ) {
     val head = card.head ?: return
-    item(key = "art") { Box(civilightItem()) { art(head.name) } }
-    item(key = "head") {
-        Column(civilightItem()) {
-            CardHead(head.copy(description = emptyList()))
-            sameName()
-            CivilightTabs(tabs = card.tabs, selectedIndex = tab, onSelect = onTab, modifier = Modifier.padding(top = 12.dp))
+    val colors = CivilightTheme.colors
+    Column(Modifier.fillMaxWidth()) {
+        WorldSection(PlaceCopy.SEC_DESCRIPTION, first = true)
+        if (head.description.isNotEmpty()) {
+            LeadDescription(head.description)
+        } else if (!readOnly) {
+            TextAction(WorldCopy.EDIT_DESCRIPTION, onDescription, color = colors.acc)
+        }
+        SameNameLine(doc, WorldKind.PLACE, card.placeKey, readOnly, onMerge)
+        WorldSection(PlaceCopy.fieldsTitle(card.fields.filled.size))
+        card.parent?.let { FixedRow(it, onParent) }
+        FieldSection(
+            section = card.fields,
+            showEmpty = showEmpty,
+            readOnly = readOnly,
+            onShowEmpty = onShowEmpty,
+            onEdit = { onField(it.fieldDefKey) },
+            onAdd = onAddField,
+        )
+        if (card.subPlaces.isNotEmpty() || card.hiddenSubPlaces > 0) {
+            WorldSection(PlaceCopy.subPlacesTitle(card.subPlaces.size + card.hiddenSubPlaces))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                card.subPlaces.forEach { sub -> FilterChip(label = sub.name, selected = false, onClick = { onSubPlace(sub.key) }) }
+                if (card.hiddenSubPlaces > 0) {
+                    FilterChip(label = WorldCopy.hiddenRow(WorldKind.PLACE, card.hiddenSubPlaces), selected = false, onClick = onUnlock)
+                }
+            }
         }
     }
-    // One swap for the three tabs (the lists are short): the body crossfades and its size follows.
-    item(key = "tabBody") {
-        ContentSwap(tab, civilightItem().fillMaxWidth(), label = "placeTab") { shownTab ->
-            when (PlaceCardUi.tabOf(shownTab)) {
-                io.github.lenticualrstone.civilight.navigation.PlaceTab.OVERVIEW -> Column(Modifier.fillMaxWidth()) {
-                    CardDescription(head.description, Modifier.padding(top = 6.dp))
-                    Column(Modifier.padding(top = 14.dp)) {
-                        card.appearance?.let { FixedRow(it) {} }
-                        card.parent?.let { FixedRow(it, onParent) }
-                        card.assets?.let { FixedRow(it) {} }
-                        FieldSection(
-                            section = card.fields,
-                            showEmpty = showEmpty,
-                            readOnly = readOnly,
-                            onShowEmpty = onShowEmpty,
-                            onEdit = { onField(it.fieldDefKey) },
-                            onAdd = onAddField,
-                        )
-                    }
+}
+
+/** `등장`: `등장 · 배경 에셋` rows, `이곳의 시간` and the maps holding a pin of the place. */
+@Composable
+private fun AppearanceTab(card: PlaceCardUi, onOpen: (io.github.lenticualrstone.civilight.navigation.Route) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        card.appearance?.let { FixedRow(it) {} }
+        card.assets?.let { FixedRow(it) {} }
+        if (card.timeRows.isNotEmpty()) {
+            WorldSection(PlaceCopy.SEC_TIME_HERE)
+            card.timeRows.forEach { row ->
+                when (row) {
+                    is PlaceTimeItemUi.Row -> PlaceTimeRowView(row, row.target?.let { { onOpen(it) } })
+                    is PlaceTimeItemUi.Divider -> PlaceTimeDivider(row.text)
                 }
-                io.github.lenticualrstone.civilight.navigation.PlaceTab.TIME_HERE -> Column(Modifier.fillMaxWidth()) {
-                    card.timeRows.forEach { row ->
-                        when (row) {
-                            is PlaceTimeItemUi.Row -> PlaceTimeRowView(row, row.target?.let { { onOpen(it) } })
-                            is PlaceTimeItemUi.Divider -> PlaceTimeDivider(row.text)
-                        }
-                    }
-                }
-                io.github.lenticualrstone.civilight.navigation.PlaceTab.MAP -> Column(Modifier.fillMaxWidth()) {
-                    card.maps.forEach { row ->
-                        ListRow(
-                            title = row.title,
-                            subtitle = row.sub,
-                            onClick = row.target?.let { { onOpen(it) } },
-                        )
-                    }
-                }
+            }
+        }
+        if (card.maps.isNotEmpty()) {
+            WorldSection(PlaceCopy.SEC_MAPS)
+            card.maps.forEach { row ->
+                ListRow(title = row.title, subtitle = row.sub, onClick = row.target?.let { { onOpen(it) } })
             }
         }
     }

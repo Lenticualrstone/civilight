@@ -81,8 +81,11 @@ data class AppSettings(
     val longPressWiggle: Boolean = true,
     /** (0.4.0) Typewriter scrolling keeps active editing block centered vertically. */
     val typewriterScroll: Boolean = false,
-    /** (0.4.0) Smart scenario punctuation (`--` → `──`, `...` → `…`). */
-    val smartPunctuation: Boolean = true,
+    /**
+     * (0.4.0) Smart scenario punctuation (`--` → `──`, `...` → `…`) on the just-typed span. Default OFF since 0.5
+     * (review item 7); a stored `true` (written explicitly, the old default was never stored) is kept.
+     */
+    val smartPunctuation: Boolean = false,
     /** (0.4.0, Experimental) Suggest previous partner speaker on next dialogue block. */
     val smartSpeakerSwap: Boolean = false,
     /** (0.4.0, Experimental) Show Life Recorder entry points (off by default for pure writing focus). */
@@ -91,7 +94,10 @@ data class AppSettings(
     val miniRailScript: List<MiniRailScriptItem> = MiniRailScriptItem.DEFAULT,
     /** (0.4.0) Customized icon slots on collapsed mini rail in Project workspace. */
     val miniRailProject: List<MiniRailProjectItem> = MiniRailProjectItem.DEFAULT,
-    /** (0.5.0) Subtle portrait-based ambient blur backdrop behind PortraitHero (default ON). */
+    /**
+     * (0.5.0) The portrait as the record hero's back layer when there is no background image (default ON): full-bleed
+     * with the faded edge blur, fully blurred behind its own card. Off: no back layer; the portrait shows as the card.
+     */
     val portraitAmbientBlur: Boolean = true,
     /** (0.5.0) Side placement of the collapsed mini icon rail & script side panel (default LEFT). */
     val miniRailSide: MiniRailSide = MiniRailSide.LEFT,

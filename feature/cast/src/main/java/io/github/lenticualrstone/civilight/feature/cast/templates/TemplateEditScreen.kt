@@ -157,9 +157,10 @@ fun TemplateEditScreen(route: TemplateEdit, deps: FeatureDeps) {
     }
 
     if (confirmDelete) {
+        // Goes to `지운 템플릿` (undoable): `‘X’ 지우기`, primary `휴지통으로` (DS-25, 0.5 review).
         ConfirmDialog(
-            title = template.name,
-            confirmLabel = TemplateCopy.BTN_DELETE,
+            title = io.github.lenticualrstone.civilight.feature.cast.CastUiCopy.deleteTitle(template.name),
+            confirmLabel = io.github.lenticualrstone.civilight.feature.cast.CastUiCopy.BTN_TO_TRASH,
             onConfirm = {
                 confirmDelete = false
                 val name = template.name

@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import io.github.lenticualrstone.civilight.ui.tags.TagNameCheck
+import io.github.lenticualrstone.civilight.ui.tags.TagTakenLine
+import io.github.lenticualrstone.civilight.model.cast.TagScope
 import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.component.CreateCard
 import io.github.lenticualrstone.civilight.designsystem.component.CreateCardCopy
@@ -179,6 +182,15 @@ fun SheetScope.TagsSheetContent(sheet: TagsEditSheet) {
                 }) { d, ctx -> CastCreate.createTagOn(d, sheet.characterKey, made, ctx.toAction())?.let { (next, k) -> created = k; next } ?: d }
             },
             canCreate = !tagBusy && CastCreate.canCreateTag(doc, card),
+            // (2026-11-26) A taken name (any scope) shows `이미 있음 · <이름>`; `이 태그 쓰기` only when a character may
+            // carry that tag (it is then checked here, saved with `저장`). A `용어 전용` name shows the line alone.
+            extra = {
+                val taken = TagNameCheck.taken(doc, card.name, TagScope.CHARACTER)
+                TagTakenLine(taken, TagNameCheck.action(taken), onAction = { t ->
+                    picks = FixedFieldEdits.useExisting(picks, t.key, t.name)
+                    creating = null
+                })
+            },
         )
     }
     if (editable) {

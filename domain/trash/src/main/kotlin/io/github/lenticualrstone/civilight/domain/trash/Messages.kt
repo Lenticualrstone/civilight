@@ -262,6 +262,7 @@ object Messages {
         RefKind.ROUTE_END to "경로 끝",
         RefKind.SUB_MAP to "하위 지도",
         RefKind.CHILD_PLACE to "하위 장소",
+        RefKind.BASE_PLACE to "거점",
         RefKind.EVENT_PLACE to "사건 장소",
         RefKind.EVENT_TERM to "사건 용어",
         RefKind.EVENT_ANCHOR to "사건 기록",

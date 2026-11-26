@@ -12,6 +12,17 @@ import io.github.lenticualrstone.civilight.designsystem.component.CreateKind
 import io.github.lenticualrstone.civilight.designsystem.component.ListCreateRow
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.domain.actions.TagActions
+import io.github.lenticualrstone.civilight.domain.actions.TagCreate
+import io.github.lenticualrstone.civilight.domain.actions.TagWiden
+import io.github.lenticualrstone.civilight.model.cast.TagScope
+import io.github.lenticualrstone.civilight.ui.tags.ScopeRadio
+import io.github.lenticualrstone.civilight.ui.tags.TagNameCheck
+import io.github.lenticualrstone.civilight.ui.tags.TagScopeMark
+import io.github.lenticualrstone.civilight.ui.tags.TagTakenLine
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.domain.trash.TagRestore
 import io.github.lenticualrstone.civilight.domain.trash.TrashCopy
 import io.github.lenticualrstone.civilight.feature.cast.common.CastWrites
@@ -78,6 +89,9 @@ data class TagNameSheet(val projectKey: Key, val tagKey: Key? = null) : SheetKey
  * `취소 · 만들고 열기 · 만들기`. A tag opens its sheet: `이름` with `저장` (U-10) and the ghost `지우기`
  * (N-44), which confirms with `쓰는 인물 n` and sends only the tag to the trash. Read-only projects show
  * neither the create row nor `지우기`.
+ * (2026-11-26) Every live tag of every scope is listed (the one place that manages tags): the scope word
+ * (`인물` · `용어` · `전체` pill), the impact line `인물 3 · 용어 2`, and on a kind's own scope a visible
+ * `모든 항목으로 넓히기` (confirm, `줄일 수 없음`). The create card adds `범위` radios (`인물 전용` default).
  */
 @Composable
 fun TagSettingsScreen(route: TagSettings, deps: FeatureDeps) {
@@ -91,6 +105,11 @@ fun TagSettingsScreen(route: TagSettings, deps: FeatureDeps) {
     val writes = remember(deps, route.projectKey) { CastWrites(deps, route.projectKey) }
     var creating by rememberSaveable(stateSaver = TagCardSaver) { mutableStateOf<CreateCardState?>(null) }
     var deleting by rememberSaveable { mutableStateOf<String?>(null) }
+    // (2026-11-26) The new tag's scope (radios: `인물 전용` default · `용어 전용` · `모든 항목`), beside the card state.
+    var newScope by rememberSaveable { mutableStateOf(TagNewScope.DEFAULT.name) }
+    var widening by rememberSaveable { mutableStateOf<String?>(null) }
+    // One terse line when a widen wrote nothing (`범위 넓히기 안 됨`); cleared by the next action.
+    var notice by remember { mutableStateOf<String?>(null) }
     CenterColumn {
         CivilightScreen(
             title = CastUiCopy.TAGS,
@@ -109,7 +128,15 @@ fun TagSettingsScreen(route: TagSettings, deps: FeatureDeps) {
                 contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 8.dp, bottom = padding.calculateBottomPadding() + 24.dp),
             ) {
                 if (editable) {
-                    item(key = "create") { ListCreateRow(CreateKind.TAG, { creating = CreateCardState.open(CreateKind.TAG, CreateCardMode.LIST) }, civilightItem()) }
+                    item(key = "create") {
+                        ListCreateRow(CreateKind.TAG, {
+                            newScope = TagNewScope.DEFAULT.name
+                            creating = CreateCardState.open(CreateKind.TAG, CreateCardMode.LIST)
+                        }, civilightItem())
+                    }
+                }
+                notice?.let { line ->
+                    item(key = "notice") { CivilightText(line, CivilightTheme.type.small, civilightItem().padding(vertical = 8.dp), color = CivilightTheme.colors.warn) }
                 }
                 items(rows, key = { it.key }) { row ->
                     ListRow(
@@ -117,8 +144,18 @@ fun TagSettingsScreen(route: TagSettings, deps: FeatureDeps) {
                         civilightItem(),
                         subtitle = row.line,
                         // CST-75: the tag's colour dot before its name (none without a colour).
-                        leading = ready.doc.index.tag(row.key)?.color?.takeIf { io.github.lenticualrstone.civilight.designsystem.component.TagColor.of(it) != null }?.let { c ->
+                        leading = row.color?.takeIf { io.github.lenticualrstone.civilight.designsystem.component.TagColor.of(it) != null }?.let { c ->
                             { io.github.lenticualrstone.civilight.designsystem.component.TagDot(c) }
+                        },
+                        // (2026-11-26) The scope word (`인물` · `용어` · `전체` pill) and, on a kind's own scope, the
+                        // visible `모든 항목으로 넓히기` (confirm first; one way).
+                        trailing = {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                if (editable && row.canWiden) {
+                                    TextAction(TagSettingsCopy.WIDEN, { widening = row.key }, color = CivilightTheme.colors.acc, style = CivilightTheme.type.small)
+                                }
+                                row.scopeLabel?.let { TagScopeMark(it, everywhere = row.everywhere) }
+                            }
                         },
                         compact = true,
                         onClick = if (editable) ({ sheets.open(TagNameSheet(route.projectKey, row.key)) }) else null,
@@ -128,11 +165,18 @@ fun TagSettingsScreen(route: TagSettings, deps: FeatureDeps) {
         }
         creating?.takeIf { editable }?.let { card ->
             var busy by remember { mutableStateOf(false) }
+            val scope = TagNewScope.of(newScope)
+            // Same name (any scope): the line `이미 있음 · <이름>`; `만들기` stays off. The list already shows that tag.
+            val taken = TagNameCheck.taken(ready.doc, card.name, scope.kind)
             val finish: (Boolean) -> Unit = { openAfter ->
                 val made = card
+                val picked = scope
                 busy = true
+                notice = null
                 // The card closes only once the write made the tag; otherwise the typed name stays.
-                writes.launch(CreateCardCopy.CREATE, { d, ctx -> CastCreate.createTag(d, made, ctx)?.let { (next, key) -> Step(next, key) } }) { key ->
+                writes.launch(CreateCardCopy.CREATE, { d, ctx ->
+                    (TagSettingsModel.create(d, made.name, CastCreate.tagColor(made), picked, ctx) as? TagCreate.Created)?.let { Step(it.doc, it.tag.key) }
+                }) { key ->
                     creating = null
                     if (openAfter) sheets.open(TagNameSheet(route.projectKey, key))
                 }.invokeOnCompletion { busy = false }
@@ -144,7 +188,47 @@ fun TagSettingsScreen(route: TagSettings, deps: FeatureDeps) {
                 onCreate = { finish(false) },
                 onCreateAndOpen = { finish(true) },
                 canCreate = !busy && CastCreate.canCreateTag(ready.doc, card),
+                extra = {
+                    TagTakenLine(taken, action = null, onAction = {})
+                    CivilightText(TagSettingsCopy.SCOPE, CivilightTheme.type.label, color = CivilightTheme.colors.ink2)
+                    Column {
+                        for (option in TagNewScope.entries) {
+                            ScopeRadio(option.label, option.trailing, selected = option == scope) { newScope = option.name }
+                        }
+                    }
+                    CivilightText(TagSettingsCopy.NOTE, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
+                },
             )
+        }
+        widening?.let { tagKey ->
+            val confirm = TagSettingsModel.widenConfirm(ready.doc, tagKey)
+            if (confirm == null || !editable) {
+                widening = null
+            } else {
+                ConfirmDialog(
+                    title = confirm.title,
+                    confirmLabel = TagSettingsCopy.WIDEN_CONFIRM,
+                    onConfirm = {
+                        widening = null
+                        notice = null
+                        var refused: String? = null
+                        // One-way (`줄일 수 없음`): no undo step, and no undo of an earlier step narrows it again.
+                        writes.launchOneWay(
+                            compute = { d, ctx ->
+                                val result = TagActions.widen(d, tagKey, TagScope.ALL, ctx)
+                                refused = TagSettingsModel.widenNotice(result)
+                                (result as? TagWiden.Widened)?.let { Step(it.doc, Unit) }
+                            },
+                            onKeptStep = { d, ctx -> TagSettingsModel.widenOnStep(d, tagKey, ctx) },
+                        ).invokeOnCompletion { notice = refused }
+                    },
+                    onDismissRequest = { widening = null },
+                    cancelLabel = CastUiCopy.BTN_CANCEL,
+                    hardToUndo = true,
+                ) {
+                    for (line in confirm.lines) CivilightText(line, CivilightTheme.type.body, color = CivilightTheme.colors.ink)
+                }
+            }
         }
         deleting?.let { tagKey ->
             val confirm = TagDeleteModel.confirm(ready.doc, tagKey, gate.open)
@@ -185,7 +269,15 @@ object TagDeleteModel {
     /** Null when [tagKey] is not a live tag. Counts follow the settings row (locked hidden characters are not counted). */
     fun confirm(doc: ProjectDoc, tagKey: String, hiddenUnlocked: Boolean): TagDeleteConfirm? {
         val row = TagSettingsModel.rows(doc, hiddenUnlocked).firstOrNull { it.key == tagKey } ?: return null
-        val lines = listOf(CastUiCopy.tagUsers(row.usage.characters)) + listOfNotNull(row.usage.images.takeIf { it > 0 }?.let(CastUiCopy::tagImages))
+        // (2026-11-26) One line per kind the tag may be on: `쓰는 인물 n` (N-44) for `인물` · `모든 항목` tags,
+        // `용어 n` for `용어 전용` · `모든 항목` tags (or any held), then `이미지 n` only when held.
+        val onCharacters = row.scope == TagScope.CHARACTER || row.scope == TagScope.ALL || row.usage.characters > 0
+        val onTerms = row.scope == TagScope.TERM || row.scope == TagScope.ALL || row.usage.terms > 0
+        val lines = listOfNotNull(
+            CastUiCopy.tagUsers(row.usage.characters).takeIf { onCharacters },
+            CastUiCopy.tagTerms(row.usage.terms).takeIf { onTerms },
+            row.usage.images.takeIf { it > 0 }?.let(CastUiCopy::tagImages),
+        )
         return TagDeleteConfirm(row.name, CastUiCopy.tagDeleteTitle(row.name), lines)
     }
 }
@@ -210,7 +302,8 @@ private fun SheetScope.TagNameContent(key: TagNameSheet, doc: ProjectDoc, vm: Ta
     val usable = (renamed || recoloured) && name.isNotBlank() && TagSettingsModel.canName(doc, name, except = key.tagKey)
     val scope = this
     SheetHeader(current.name, onClose = ::close, closeLabel = CastUiCopy.BTN_CLOSE)
-    CivilightTextField(name, { name = it }, Modifier.fillMaxWidth().padding(top = 14.dp), label = CastUiCopy.NAME)
+    // (2026-11-26) Names are unique across every scope: a taken name shows `이미 있음 · <이름>` under the field.
+    CivilightTextField(name, { name = it }, Modifier.fillMaxWidth().padding(top = 14.dp), label = CastUiCopy.NAME, error = TagSettingsModel.nameError(doc, name, except = key.tagKey))
     // CST-75: the colour is set or cleared here too (primary `저장`, U-10).
     CivilightText(io.github.lenticualrstone.civilight.designsystem.component.CreateCardCopy.FIELD_COLOR, CivilightTheme.type.label, Modifier.padding(top = 14.dp, bottom = 6.dp), color = CivilightTheme.colors.ink2)
     io.github.lenticualrstone.civilight.designsystem.component.TagColorRow(selected = color, onPick = { color = it })

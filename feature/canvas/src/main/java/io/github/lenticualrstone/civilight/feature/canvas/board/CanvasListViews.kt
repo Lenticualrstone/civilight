@@ -159,7 +159,7 @@ internal fun SheetScope.CanvasRowMenuContent(
     val actions = buildList {
         if (row != null) {
             add(SheetAction(CanvasCopy.BTN_RENAME, onRename))
-            if (row.canDelete) add(SheetAction(CanvasCopy.BTN_DELETE, onDelete))
+            if (row.canDelete) add(SheetAction(CanvasCopy.BTN_DELETE, onDelete, destructive = true))
         }
     }
     ActionRows(row?.name.orEmpty(), CanvasCopy.SMALL_LINE.takeIf { row != null }, actions, ::close)

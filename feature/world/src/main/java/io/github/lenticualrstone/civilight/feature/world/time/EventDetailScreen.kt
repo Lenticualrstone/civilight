@@ -219,11 +219,10 @@ private fun SheetScope.EventMenuContent(name: String, readOnly: Boolean, onEdit:
             onClick = if (readOnly) null else ({ sheet.close(); onEdit() }),
             compact = true,
         )
-        ListRow(
-            title = WorldCopy.MENU_DELETE,
+        io.github.lenticualrstone.civilight.designsystem.component.MenuDeleteRow(
+            label = WorldCopy.MENU_DELETE,
             subtitle = if (readOnly) WorldCopy.READ_ONLY else null,
             onClick = if (readOnly) null else ({ sheet.close(); onDelete() }),
-            compact = true,
         )
     }
 }

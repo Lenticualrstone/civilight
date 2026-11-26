@@ -32,7 +32,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -89,32 +92,42 @@ internal fun KineticDeckView(input: ShelfViewInput) {
                 .atelierHorizontalDrag(!input.preview, items.size, with(density) { 185.dp.toPx() }, track),
             contentAlignment = Alignment.Center,
         ) {
-            val cardW = (maxWidth * 0.58f).coerceIn(176.dp, 264.dp)
-            val cardH = (cardW * 1.34f).coerceAtMost(maxHeight * 0.82f)
+            // 3:4 cover; a short stage shrinks width with height (never flattens).
+            val (cardW, cardH) = AtelierCoverBox.deck(maxWidth, maxHeight)
             val targetPx = with(density) { cardW.roundToPx() }
-            val pos = track.position.value
-            val impulse = track.dragImpulse.floatValue
             // Subtle mechanical detent notch curve: pulls firmly into each integer stop (like a physical hinge detent).
-            val frac = pos - kotlin.math.floor(pos)
-            val detentPull = kotlin.math.sin(frac * 2f * kotlin.math.PI.toFloat()) * 0.055f
+            // Read in layer/draw lambdas only, so the moving track does not recompose every frame.
+            fun offsetOf(i: Int): Float {
+                val pos = track.position.value
+                val frac = pos - kotlin.math.floor(pos)
+                val detentPull = kotlin.math.sin(frac * 2f * kotlin.math.PI.toFloat()) * 0.055f
+                return (i - pos) + detentPull
+            }
 
-            val visible = items.indices.filter { abs(it - pos) <= 3.5f }
+            val visible by remember(items.size, track) {
+                derivedStateOf { items.indices.filter { abs(it - track.position.value) <= 3.5f } }
+            }
             visible.forEach { i ->
+                key(items[i].key) {
                 // 1:1 immediate position tracking (zero underwater lag!) + live velocity torsion lean.
-                val d = (i - pos) + detentPull
-                val depth = abs(d).coerceIn(0f, 3.5f)
+                val stackDepth by remember(i, track) {
+                    derivedStateOf { atelierStackDistance(i, track.position.value).coerceIn(0f, 3.5f) }
+                }
                 val focused = i == track.activeIndex
                 AtelierCoverCard(
                     item = items[i],
                     tilt = tilt,
                     focused = focused,
-                    sheenBias = d * 0.75f + impulse * 0.35f,
+                    sheenBias = { offsetOf(i) * 0.75f + track.dragImpulse.floatValue * 0.35f },
                     targetWidthPx = targetPx,
                     input = input,
                     modifier = Modifier
                         .size(cardW, cardH)
-                        .zIndex(15f - depth)
+                        .zIndex(15f - stackDepth)
                         .graphicsLayer {
+                            val d = offsetOf(i)
+                            val depth = abs(d).coerceIn(0f, 3.5f)
+                            val impulse = track.dragImpulse.floatValue
                             cameraDistance = 15f * density.density
                             // Immediate 1:1 translation + crisp velocity-coupled torsion on trailing cards
                             val torsion = impulse * (1f + depth * 0.45f)
@@ -132,6 +145,7 @@ internal fun KineticDeckView(input: ShelfViewInput) {
                         if (focused) items[i].trigger(input) else track.animateTo(i, items.size)
                     },
                 )
+                }
             }
         }
     }
@@ -149,8 +163,9 @@ internal fun BentoMosaicView(input: ShelfViewInput) {
     AtelierStageFrame(input, items, focusedIdx, showDock = false) { tilt ->
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val cols = if (maxWidth >= 560.dp) 3 else 2
-            val heroHeight = if (maxWidth >= 560.dp) 220.dp else 196.dp
-            val tileHeight = if (maxWidth >= 560.dp) 186.dp else 168.dp
+            // Every tile is a 3:4 cover. The hero spans (cols − 1) columns at 3:4 with a side
+            // panel in the last column, so it reads as featured without becoming a flat banner.
+            val heroCols = (cols - 1).coerceAtLeast(1)
             val targetPx = with(density) { (maxWidth / cols).roundToPx() }
 
             val motion = CivilightTheme.motion
@@ -168,26 +183,34 @@ internal fun BentoMosaicView(input: ShelfViewInput) {
                 items.firstOrNull()?.let { hero ->
                     item(key = "hero_${hero.key}") {
                         val isFocused = focusedIdx == 0
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .animateContentSize(motion.move(CivilightMotion.standard)),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Bottom,
                         ) {
                             AtelierCoverCard(
                                 item = hero,
                                 tilt = tilt,
                                 focused = isFocused,
-                                sheenBias = 0f,
-                                targetWidthPx = targetPx * 2,
+                                sheenBias = { 0f },
+                                targetWidthPx = targetPx * heroCols,
                                 input = input,
-                                modifier = Modifier.fillMaxWidth().height(heroHeight),
+                                modifier = Modifier.weight(heroCols.toFloat()).aspectRatio(AtelierCoverBox.COVER_ASPECT),
                                 onClick = {
                                     if (isFocused) hero.trigger(input) else focusedIdx = 0
                                 },
                             )
-                            AnimatedVisibility(visible = isFocused && !input.preview) {
-                                BentoActionStrip(hero, input)
+                            Column(
+                                Modifier
+                                    .weight(1f)
+                                    .animateContentSize(motion.move(CivilightMotion.standard)),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                CivilightText(hero.displayTitle(), CivilightTheme.type.heading, color = CivilightTheme.colors.ink, maxLines = 3)
+                                CivilightText(hero.displayMeta(), CivilightTheme.type.small, color = CivilightTheme.colors.ink3, maxLines = 2)
+                                AnimatedVisibility(visible = isFocused && !input.preview, enter = motion.enter(expand = true), exit = motion.exit(shrink = true)) {
+                                    BentoActionStrip(hero, input)
+                                }
                             }
                         }
                     }
@@ -214,16 +237,16 @@ internal fun BentoMosaicView(input: ShelfViewInput) {
                                     item = item,
                                     tilt = tilt,
                                     focused = isFocused,
-                                    sheenBias = (cIdx - 0.5f) * 0.4f,
+                                    sheenBias = { (cIdx - 0.5f) * 0.4f },
                                     targetWidthPx = targetPx,
                                     input = input,
                                     cornerRadius = 16.dp,
-                                    modifier = Modifier.fillMaxWidth().height(tileHeight),
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(AtelierCoverBox.COVER_ASPECT),
                                     onClick = {
                                         if (isFocused) item.trigger(input) else focusedIdx = globalIdx
                                     },
                                 )
-                                AnimatedVisibility(visible = isFocused && !input.preview) {
+                                AnimatedVisibility(visible = isFocused && !input.preview, enter = motion.enter(expand = true), exit = motion.exit(shrink = true)) {
                                     BentoActionStrip(item, input, compact = true)
                                 }
                             }
@@ -280,8 +303,11 @@ internal fun FilmReelView(input: ShelfViewInput) {
             contentAlignment = Alignment.Center,
         ) {
             val containerW = maxWidth
-            val frameW = (containerW * 0.68f).coerceIn(210.dp, 320.dp)
-            val frameH = (frameW * 1.15f).coerceAtMost(maxHeight * 0.78f)
+            // Strip chrome around each window: sprocket rows (2 × 26dp padding + 4dp) + frame label (~18dp).
+            val stripChrome = 56.dp
+            val labelH = 18.dp
+            // 3:4 aperture window; a short stage shrinks width with height.
+            val (frameW, windowH) = AtelierCoverBox.reelWindow(containerW, maxHeight - stripChrome - labelH)
             val targetPx = with(density) { frameW.roundToPx() }
             val stripBg = if (colors.isDark) Color(0xFF101216) else Color(0xFFE5E2D9)
 
@@ -289,7 +315,7 @@ internal fun FilmReelView(input: ShelfViewInput) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(frameH + 56.dp)
+                    .height(windowH + labelH + stripChrome)
                     .background(stripBg),
             ) {
                 Canvas(Modifier.fillMaxSize()) {
@@ -314,8 +340,6 @@ internal fun FilmReelView(input: ShelfViewInput) {
                 ) {
                     itemsIndexed(items, key = { _, it -> it.key }) { index, item ->
                         val frameCode = "%02dA".format(index + 1)
-                        val scrollBias = (index - listState.firstVisibleItemIndex) -
-                            (listState.firstVisibleItemScrollOffset / with(density) { frameW.toPx() }.coerceAtLeast(1f))
                         Column(
                             horizontalAlignment = Alignment.Start,
                             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -328,7 +352,7 @@ internal fun FilmReelView(input: ShelfViewInput) {
                             // Optical aperture window: cover scales slightly larger and shifts inside clip bounds!
                             Box(
                                 Modifier
-                                    .size(frameW, frameH - 18.dp)
+                                    .size(frameW, windowH)
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(colors.raise)
                                     .insetOutline(colors.edge.copy(alpha = 0.4f), 1.dp, RoundedCornerShape(10.dp))
@@ -345,6 +369,9 @@ internal fun FilmReelView(input: ShelfViewInput) {
                                     Modifier
                                         .fillMaxSize()
                                         .graphicsLayer {
+                                            // Scroll state read here (layer phase), not in composition.
+                                            val scrollBias = (index - listState.firstVisibleItemIndex) -
+                                                (listState.firstVisibleItemScrollOffset / frameW.toPx().coerceAtLeast(1f))
                                             // Internal optical parallax opposite to scroll direction
                                             scaleX = 1.14f
                                             scaleY = 1.14f
@@ -404,7 +431,6 @@ internal fun PulseTimelineView(input: ShelfViewInput) {
             kotlinx.coroutines.delay(900L)
         }
     }
-    val pulse = pulseAnim.value
 
     AtelierStageFrame(input, items, activeIdx, showDock = false) { tilt ->
         LazyColumn(
@@ -434,6 +460,8 @@ internal fun PulseTimelineView(input: ShelfViewInput) {
                         if (index > 0) drawLine(colors.line, Offset(cx, 0f), Offset(cx, cy - 8.dp.toPx()), 1.5.dp.toPx())
                         if (index < items.lastIndex) drawLine(colors.line, Offset(cx, cy + 8.dp.toPx()), Offset(cx, size.height), 1.5.dp.toPx())
                         if (isSelected && loops) {
+                            // Read in the draw phase only: the pulse redraws, the list does not recompose.
+                            val pulse = pulseAnim.value
                             drawCircle(
                                 color = colors.acc.copy(alpha = (1f - pulse) * 0.45f),
                                 radius = 6.dp.toPx() + pulse * 11.dp.toPx(),

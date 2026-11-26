@@ -293,7 +293,10 @@ private fun scriptSheet(
                         close()
                         startReadAloud()
                     } else vm.setPreview(p)
-                }, readAloudEnabled = readAloud)
+                }, readAloudEnabled = readAloud, onSelectBlocks = if (c.readOnly) null else ({
+                    // As the `속성` entry (ScriptPanelWiring): the current rows, not a stale capture.
+                    vm.content.value?.rows?.let(vm::enterSelect)
+                }))
             }
         }
         is PanelSheetKey -> {
@@ -468,6 +471,7 @@ private fun scriptSheet(
             {
                 io.github.lenticualrstone.civilight.feature.script.synergy.MentionPreviewSheetContent(
                     doc = doc,
+                    hiddenUnlocked = rememberHiddenGate(key.projectKey).open,
                     targetKindName = key.targetKind,
                     targetKey = key.targetKey,
                     onOpenDetail = {
@@ -499,11 +503,18 @@ private fun scriptSheet(
                     doc = doc,
                     unitKey = key.unitKey,
                     hiddenUnlocked = open,
-                    onJumpScene = { sceneKey ->
-                        doc.manuscript.liveBlocksOf(sceneKey).firstOrNull()?.let { b ->
-                            deps.navigator.push(Script(route.projectKey, blockKey = b.key))
-                        }
+                    lensScene = vm.sceneInViewKey,
+                    // Rules-time 4: the position sheet's `렌즈를 이 씬으로 맞추기`, reached from here.
+                    onSetLens = { scene, _ ->
+                        open(PositionSheetKey(route.projectKey, scene, Labels.sceneLocation(doc, scene)))
                     },
+                    // Scroll within this screen (as `/씬 3`), no new Script route; blank scenes land on their head.
+                    // The scene's first drawn block sits above the input bar (its head shows above it); blank → the head.
+                    onJumpScene = { row ->
+                        vm.aboveInput.tryEmit(c.rows.firstOrNull { it is BlockRow && it.sceneKey == row.sceneKey }?.key ?: row.jumpRowKey)
+                    },
+                    // The scene head's `⋯` menu (STO-07 · SCR-47): `지우기` and the rest.
+                    onSceneMenu = { scene -> open(UnitMenuSheet(route.projectKey, scene)) },
                     onClose = { close() },
                 )
             }
@@ -512,6 +523,7 @@ private fun scriptSheet(
             {
                 io.github.lenticualrstone.civilight.feature.script.synergy.SpeakerFocusSheetContent(
                     doc = doc,
+                    hiddenUnlocked = rememberHiddenGate(key.projectKey).open,
                     unitKey = key.unitKey,
                     focusedSpeakerKey = null,
                     onSelectSpeaker = { speakerKey ->
@@ -1011,32 +1023,18 @@ private fun ScriptFrame(
                                     // (`자세히 열기` / `참고 패널`) without breaking reading flow or long-press.
                                     is BlockTap.Link -> {
                                         val link = tap.link
-                                        val known = link.target.kind.known
-                                        val live = when (known) {
-                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.CHARACTER ->
-                                                doc.index.character(link.target.key)?.deletedAt == null
-                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.TERM ->
-                                                doc.index.term(link.target.key)?.deletedAt == null
-                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.PLACE ->
-                                                doc.index.place(link.target.key)?.deletedAt == null
-                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.FACTION ->
-                                                doc.index.faction(link.target.key)?.deletedAt == null
-                                            io.github.lenticualrstone.civilight.model.text.LinkTargetKind.EVENT ->
-                                                doc.world.events.any { it.key == link.target.key && it.deletedAt == null }
-                                            else -> false
-                                        }
-                                        val openLive = if (live && known != null) {
-                                            sheets.open(
+                                        // Rules 19 and 20: preview only a LIVE target; a locked hidden one asks
+                                        // for the unlock; trashed, name-tagged or missing ones get the link card.
+                                        when (val act = io.github.lenticualrstone.civilight.feature.script.synergy.MentionTap.decide(doc, link.target, gate.open)) {
+                                            is io.github.lenticualrstone.civilight.feature.script.synergy.MentionTap.Action.Preview -> sheets.open(
                                                 io.github.lenticualrstone.civilight.feature.script.synergy.MentionPreviewSheetKey(
                                                     projectKey = route.projectKey,
-                                                    targetKind = known.name,
+                                                    targetKind = act.kind.name,
                                                     targetKey = link.target.key,
                                                 ),
                                             )
-                                            true
-                                        } else false
-                                        if (!openLive) {
-                                            sheets.open(
+                                            io.github.lenticualrstone.civilight.feature.script.synergy.MentionTap.Action.Unlock -> gate.unlock()
+                                            io.github.lenticualrstone.civilight.feature.script.synergy.MentionTap.Action.Card -> sheets.open(
                                                 io.github.lenticualrstone.civilight.feature.script.links.LinkCardSheetKey(
                                                     projectKey = route.projectKey,
                                                     blockKey = row.blockKey,

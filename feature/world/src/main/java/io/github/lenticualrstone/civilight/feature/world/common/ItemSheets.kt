@@ -125,12 +125,16 @@ private fun SheetScope.ItemMenuContent(kind: WorldKind, key: Key, doc: ProjectDo
             onClick = if (readOnly) null else ({ sheet.close(); sheet.open(MergePickSheet(kind.name, key)) }),
             compact = true,
         )
-        ListRow(
-            title = WorldCopy.MENU_DELETE,
-            subtitle = roSub,
-            onClick = if (readOnly) null else ({ delete(sheet) }),
-            compact = true,
-        )
+        // (2026-11-26) Place and faction cards are immersive: the image slot is the hero, so its picker is here.
+        if (kind != WorldKind.TERM) {
+            ListRow(
+                title = WorldCopy.PICK_IMAGE,
+                subtitle = roSub,
+                onClick = if (readOnly) null else ({ sheet.close(); sheet.open(CardImages.pickSheet(vm.projectKey, kind, key)) }),
+                compact = true,
+            )
+        }
+        DeleteMenuRow(WorldCopy.MENU_DELETE, roSub, if (readOnly) null else ({ delete(sheet) }))
     }
 }
 

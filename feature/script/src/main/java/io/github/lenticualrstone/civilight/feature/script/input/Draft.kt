@@ -154,9 +154,76 @@ object Drafts {
         }
     }
 
-    /** (0.4.0) Optional smart scenario punctuation (`--` → `──`, `...` → `…`). */
-    fun applySmartPunctuation(text: String): String =
-        text.replace("...", "…").replace("--", "──")
+    /** A smart-punctuation result: the field's [text] and caret, and how to take it back ([undo]). */
+    data class Smart(val text: String, val selStart: Int, val selEnd: Int, val undo: SmartUndo?)
+
+    /**
+     * The last substitution: an immediate backspace that turns [result] into [backspaced] restores [literal]
+     * (the typed `...` / `--`) with the caret at [literalCaret].
+     */
+    data class SmartUndo(val backspaced: String, val literal: String, val literalCaret: Int)
+
+    private val SMART_PAIRS = listOf("..." to "…", "--" to "──")
+
+    /**
+     * (0.5, review item 7) Optional smart scenario punctuation (`...` → `…`, `--` → `──`) on the just-typed span
+     * only: [old] is the draft's text before, [text] the field's report. A match must overlap the inserted span
+     * (up to two letters of context before it complete a pattern), so text already in the draft (loaded by
+     * `고치기`, pasted earlier, restored by an undo) is never rewritten. The caret moves only by replacements
+     * that end at or before it. [undo] is the previous substitution: when [text] is exactly its backspace,
+     * the typed literal comes back and is not substituted again.
+     */
+    fun smartPunctuation(old: String, text: String, selStart: Int, selEnd: Int, undo: SmartUndo?): Smart {
+        if (undo != null && text == undo.backspaced) {
+            return Smart(undo.literal, undo.literalCaret, undo.literalCaret, null)
+        }
+        if (text == old) return Smart(text, selStart, selEnd, undo)
+        var prefix = 0
+        val max = minOf(old.length, text.length)
+        while (prefix < max && old[prefix] == text[prefix]) prefix++
+        var suffix = 0
+        while (suffix < max - prefix && old[old.length - 1 - suffix] == text[text.length - 1 - suffix]) suffix++
+        val insEnd = text.length - suffix
+        if (insEnd <= prefix) return Smart(text, selStart, selEnd, null)
+        val from = (prefix - 2).coerceAtLeast(0)
+        val out = StringBuilder(text.length)
+        out.append(text, 0, from)
+        var s = selStart
+        var e = selEnd
+        var last: Pair<Int, Int>? = null // (start in out, replacement length) of the last substitution
+        var lastLiteral = ""
+        var i = from
+        while (i < text.length) {
+            val hit = if (i < insEnd) {
+                SMART_PAIRS.firstOrNull { (lit, _) -> text.startsWith(lit, i) && i + lit.length > prefix && i + lit.length <= insEnd }
+            } else null
+            if (hit == null) {
+                out.append(text[i]); i++; continue
+            }
+            val (lit, rep) = hit
+            val end = i + lit.length
+            val shift = rep.length - lit.length
+            if (end <= selStart) s += shift
+            if (end <= selEnd) e += shift
+            last = out.length to rep.length
+            lastLiteral = lit
+            out.append(rep)
+            i = end
+        }
+        val result = out.toString()
+        if (last == null) return Smart(text, selStart, selEnd, null)
+        val caret = s.coerceIn(0, result.length)
+        val (at, len) = last
+        // Only a substitution that ends at a collapsed caret can be taken back by the next backspace.
+        val nextUndo = if (s == e && at + len == caret) {
+            SmartUndo(
+                backspaced = result.removeRange(caret - 1, caret),
+                literal = result.substring(0, at) + lastLiteral + result.substring(at + len),
+                literalCaret = at + lastLiteral.length,
+            )
+        } else null
+        return Smart(result, caret, e.coerceIn(0, result.length), nextUndo)
+    }
 
     /** A picked `@` item: a link run at the caret, the caret after it (SCR-55). */
     fun insertLink(d: Draft, link: TextRun.Link): Draft {

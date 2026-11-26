@@ -43,6 +43,32 @@ import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
+import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
+import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
+import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
+import io.github.lenticualrstone.civilight.domain.actions.TagCreate
+import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
+import io.github.lenticualrstone.civilight.domain.world.term.TermTags
+import io.github.lenticualrstone.civilight.feature.world.common.CardImages
+import io.github.lenticualrstone.civilight.feature.world.common.DescriptionSheet
+import io.github.lenticualrstone.civilight.feature.world.common.ItemLifecycle
+import io.github.lenticualrstone.civilight.feature.world.common.MergePickSheet
+import io.github.lenticualrstone.civilight.feature.world.common.RenameSheet
+import io.github.lenticualrstone.civilight.feature.world.common.rememberDeleteAction
+import io.github.lenticualrstone.civilight.model.cast.TagScope
+import io.github.lenticualrstone.civilight.ui.tags.TagSheet
+import io.github.lenticualrstone.civilight.ui.tags.TagSheetCreate
+import io.github.lenticualrstone.civilight.ui.tags.TagSheetRow
 
 /** `관련` (term fixed field): tick terms, places and factions. */
 @Serializable
@@ -55,6 +81,14 @@ data class AliasSheet(val termKey: Key) : SheetKey
 /** `⋯ › 아님으로 둔 것` (WLD-22): the term's `아님` records with `되돌리기`. */
 @Serializable
 data class RejectionsSheet(val termKey: Key) : SheetKey
+
+/** (2026-11-26) The immersive card's `⋯`: the shared rows, `지우기` last under its own divider (as feature/story `MenuSheets`). */
+@Serializable
+data class TermMenuSheet(val termKey: Key) : SheetKey
+
+/** (2026-11-26) `+ 태그`: the shared [TagSheet] for a term. */
+@Serializable
+data class TermTagSheet(val termKey: Key) : SheetKey
 
 /** The term card's own sheets besides the reveal sheets ([revealSheet]); null for other keys. */
 fun termSheet(
@@ -69,6 +103,8 @@ fun termSheet(
         is RelatedSheet -> { { RelatedContent(key.termKey, doc, readOnly, gate, vm::toggleRelated) } }
         is AliasSheet -> { { AliasContent(key.termKey, doc, readOnly, vm) } }
         is RejectionsSheet -> { { RejectionsContent(key.termKey, doc, readOnly, gate, vm) } }
+        is TermMenuSheet -> { { TermMenuContent(key.termKey, doc, readOnly, vm) } }
+        is TermTagSheet -> { { TermTagContent(key.termKey, doc, readOnly, vm) } }
         else -> null
     }
 }
@@ -186,6 +222,84 @@ private fun SheetScope.RelatedContent(
                     onAction = gate.unlock,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SheetScope.TermTagContent(termKey: Key, doc: ProjectDoc, readOnly: Boolean, vm: TermCardViewModel) {
+    val held = doc.index.term(termKey)?.tagKeys?.toSet().orEmpty()
+    val rows = TermTags.choices(doc).map { TagSheetRow(it.key, it.name, it.key in held, it.scope.known == TagScope.ALL) }
+    TagSheet(
+        kindWord = WorldCopy.TAB_TERMS,
+        rows = rows,
+        readOnly = readOnly,
+        onToggle = vm::toggleTag,
+        onCreate = { name, everywhere ->
+            when (val r = vm.createTag(name, null, everywhere)) {
+                is TagCreate.Created -> TagSheetCreate.Created
+                is TagCreate.NameTaken -> TagSheetCreate.Taken(r.existing.key, r.existing.name, r.fits)
+                TagCreate.Blank -> TagSheetCreate.Blank
+            }
+        },
+        onUseExisting = vm::attachTag,
+        // `모든 항목으로 넓히기` is one-way and not on the board: not offered from the term card (caller's call).
+        onWiden = null,
+    )
+}
+
+/**
+ * The term's `⋯` (board rows as the shared world menu): `이미지 고르기 · 이름 바꾸기 · 설명 고치기 · (아님으로 둔 것) ·
+ * 숨기기 · 합치기`, then `지우기` in `warn` with the trash icon under a divider (feature/story `MenuSheets`).
+ */
+@Composable
+private fun SheetScope.TermMenuContent(termKey: Key, doc: ProjectDoc, readOnly: Boolean, vm: TermCardViewModel) {
+    val kind = WorldKind.TERM
+    val name = doc.index.term(termKey)?.name.orEmpty()
+    val sheet = this
+    val delete = rememberDeleteAction(vm, kind, termKey)
+    val hidden = ItemLifecycle.isHidden(doc, kind, termKey)
+    val sub = if (readOnly) WorldCopy.READ_ONLY else null
+    SheetHeader(title = name, onClose = ::close)
+    SheetScrollBody(Modifier.padding(top = 8.dp)) {
+        MenuRow(WorldCopy.PICK_IMAGE, sub, enabled = !readOnly) { sheet.close(); sheet.open(CardImages.pickSheet(vm.projectKey, kind, termKey)) }
+        MenuRow(WorldCopy.RENAME, sub, enabled = !readOnly) { sheet.close(); sheet.open(RenameSheet(kind.name, termKey)) }
+        MenuRow(WorldCopy.EDIT_DESCRIPTION, sub, enabled = !readOnly) { sheet.close(); sheet.open(DescriptionSheet(kind.name, termKey)) }
+        // (0.2.0, WLD-73) Only while `용어 후보` is on; read-only projects may still look at the list.
+        if (doc.project.termCandidates) {
+            MenuRow(WorldCopy.MENU_REJECTIONS, null, enabled = true) { sheet.close(); sheet.open(RejectionsSheet(termKey)) }
+        }
+        MenuRow(if (hidden) WorldCopy.MENU_UNHIDE else WorldCopy.MENU_HIDE, sub, enabled = !readOnly) { sheet.close(); vm.setHidden(kind, termKey, !hidden) }
+        MenuRow(WorldCopy.MENU_MERGE, sub, enabled = !readOnly) { sheet.close(); sheet.open(MergePickSheet(kind.name, termKey)) }
+        MenuRow(WorldCopy.MENU_DELETE, sub, enabled = !readOnly, destructive = true) { delete(sheet) }
+    }
+}
+
+/** A `⋯` row: min 52, `line` top, medium label; the destructive one sits under a 12 dp gap closed by a line. */
+@Composable
+private fun MenuRow(label: String, sub: String?, enabled: Boolean, destructive: Boolean = false, onClick: () -> Unit) {
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    if (destructive) {
+        // The shared ⋯ `지우기` row (designsystem `MenuDeleteRow`).
+        io.github.lenticualrstone.civilight.designsystem.component.MenuDeleteRow(label, onClick, subtitle = sub, enabled = enabled)
+        return
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .topHairline(colors.line)
+            .pressable(PressAction.Click(onClick), enabled = enabled, role = Role.Button, scaleOnPress = false)
+            .alpha(if (enabled) 1f else 0.38f)
+            .heightIn(min = 52.dp)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (destructive) CivilightIcon(IconId.Trash, contentDescription = null, tint = colors.warn)
+        Column {
+            CivilightText(label, type.itemTitleCompact.merge(TextStyle(fontWeight = FontWeight.Medium)), color = if (destructive) colors.warn else colors.ink, maxLines = 1)
+            sub?.let { CivilightText(it, type.small, color = colors.ink3, maxLines = 1) }
         }
     }
 }

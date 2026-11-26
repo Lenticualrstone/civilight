@@ -153,4 +153,8 @@ object CanvasCopy {
     const val UNDO_REMOVE = TOOL_NODE
     const val UNDO_RENAME = BTN_RENAME
     const val UNDO_DELETE = BTN_DELETE
+
+    /** The board's load-failure state (terse fragments, 0.5 interface review). */
+    const val LOAD_FAILED = "프로젝트 열지 못함"
+    const val LOAD_FAILED_SUB = "뒤로 · 다시 열기"
 }

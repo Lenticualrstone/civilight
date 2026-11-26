@@ -1,5 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
+import io.github.lenticualrstone.civilight.model.cast.TagScope
+import io.github.lenticualrstone.civilight.model.cast.TagScopes
+import io.github.lenticualrstone.civilight.model.cast.fits
 import io.github.lenticualrstone.civilight.domain.actions.TagActions
 import io.github.lenticualrstone.civilight.feature.cast.common.toAction
 import io.github.lenticualrstone.civilight.domain.cast.CharacterEdits
@@ -35,6 +38,10 @@ object FixedFieldEdits {
     fun toggle(picks: List<TagPick>, key: Key, name: String): List<TagPick> =
         if (picks.any { it.key == key }) picks.filterNot { it.key == key } else picks + TagPick(key, name)
 
+    /** (2026-11-26) `이 태그 쓰기` of the same-name line: the existing tag is checked (kept in place when already on). */
+    fun useExisting(picks: List<TagPick>, key: Key, name: String): List<TagPick> =
+        if (picks.any { it.key == key }) picks else picks + TagPick(key, name)
+
     /**
      * A tag created from the sheet's `＋ 새 태그` card: that write already checked it on the character, so it
      * joins both the picks and the baseline `저장` compares against (untapping it then enables `저장`).
@@ -42,17 +49,26 @@ object FixedFieldEdits {
     fun created(picks: List<TagPick>, key: Key, name: String): List<TagPick> =
         if (picks.any { it.key == key }) picks else picks + TagPick(key, name)
 
-    /** `넣기` under the name line: an existing tag of that name is picked, else a new name is queued. */
+    /**
+     * `넣기` under the name line: an existing tag of that name is picked, else a new name is queued.
+     * (2026-11-26) Names are unique across scopes: a name held by a tag a character may not carry (`용어 전용`)
+     * adds nothing ([takenElsewhere] says so for the line).
+     */
     fun addName(doc: ProjectDoc, picks: List<TagPick>, name: String): List<TagPick> {
         val n = name.trim().nfc()
         if (n.isEmpty()) return picks
-        val existing = CharacterEdits.tags(doc).firstOrNull { it.name.nfc() == n }
+        val existing = TagScopes.liveNamed(doc, n)
         return when {
+            existing != null && !existing.fits(TagScope.CHARACTER) -> picks
             existing != null -> if (picks.any { it.key == existing.key }) picks else picks + TagPick(existing.key, existing.name)
             picks.any { it.key == null && it.name == n } -> picks
             else -> picks + TagPick(null, n)
         }
     }
+
+    /** (2026-11-26) The live tag of [name] when a character may not carry it (`같은 이름 태그 · 광물 · 용어`), else null. */
+    fun takenElsewhere(doc: ProjectDoc, name: String): io.github.lenticualrstone.civilight.model.cast.Tag? =
+        TagScopes.liveNamed(doc, name)?.takeUnless { it.fits(TagScope.CHARACTER) }
 
     /**
      * Saves the picks: new names become project tags (`TagActions.create`; an existing live name picks that
@@ -62,13 +78,14 @@ object FixedFieldEdits {
     fun apply(doc: ProjectDoc, characterKey: Key, picks: List<TagPick>, ctx: EditContext): ProjectDoc {
         var next = doc
         val keys = picks.mapNotNull { pick ->
-            pick.key ?: CharacterEdits.tags(next).firstOrNull { it.name.nfc() == pick.name.trim().nfc() }?.key
+            pick.key ?: TagScopes.liveNamed(next, pick.name)?.let { if (it.fits(TagScope.CHARACTER)) it.key else return@mapNotNull null }
                 ?: TagActions.create(next, pick.name, null, ctx.toAction())?.let { (d, tag) ->
                     next = d
                     tag.key
                 }
         }
-        val trashed = doc.index.character(characterKey)?.tagKeys.orEmpty().filter { CharacterEdits.liveTag(doc, it) == null && doc.index.tag(it) != null }
+        // Held keys no edit takes off: trashed tags' and (2026-11-26) unknown-scope tags' (newer file).
+        val trashed = doc.index.character(characterKey)?.tagKeys.orEmpty().filter { k -> doc.index.tag(k)?.let(TagScopes::keepsHeld) == true }
         return CharacterEdits.setTags(next, characterKey, keys + trashed, ctx)
     }
 }

@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.focusProperties
@@ -38,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.tokenShadow
@@ -284,15 +284,14 @@ fun PanelSeamButton(
                 .width(24.dp)
                 .then(dragModifier),
         )
-        // Compact, unobtrusive collapse button tucked near the top header corner
+        // Compact, unobtrusive collapse button tucked near the top header corner: drawn 28, touched 44 × 44 (DS-11).
         Box(
             Modifier
                 .padding(top = statusTop + 14.dp)
+                .pressable(onClick = state::toggle, scaleOnPress = false, shape = shape, hitTarget = HitTarget.ICON_BUTTON)
                 .size(28.dp)
-                .clip(shape)
-                .background(colors.bg.copy(alpha = 0.88f))
+                .background(colors.bg.copy(alpha = 0.88f), shape)
                 .insetOutline(colors.line, 1.dp, shape)
-                .pressable(onClick = state::toggle, scaleOnPress = false, shape = shape)
                 .semantics {
                     contentDescription = label
                     if (extraActions.isNotEmpty()) customActions = extraActions
@@ -369,12 +368,12 @@ fun PanelRail(
                     )
                     actions.forEach { action ->
                         val itemShape = RoundedCornerShape(12.dp)
+                        // Drawn 40 inside the 56 rail, touched 44 × 44 (DS-11); no clip, so the touch area is not cut.
                         Box(
                             Modifier
+                                .pressable(onClick = action.onClick, scaleOnPress = false, shape = itemShape, hitTarget = HitTarget.ICON_BUTTON)
                                 .size(40.dp)
-                                .clip(itemShape)
-                                .background(if (action.active) colors.sel else androidx.compose.ui.graphics.Color.Transparent)
-                                .pressable(onClick = action.onClick, scaleOnPress = false, shape = itemShape)
+                                .background(if (action.active) colors.sel else androidx.compose.ui.graphics.Color.Transparent, itemShape)
                                 .semantics { contentDescription = action.label },
                             contentAlignment = Alignment.Center,
                         ) {

@@ -376,7 +376,7 @@ private fun pageSheet(
                             vm.setHidden(key.pageKey, true, done)
                         }))
                     }
-                    add(SheetAction(PageCopy.BTN_DELETE, {
+                    add(SheetAction(PageCopy.BTN_DELETE, destructive = true, onClick = {
                         close()
                         vm.delete(key.pageKey) { r, toast ->
                             done(r)

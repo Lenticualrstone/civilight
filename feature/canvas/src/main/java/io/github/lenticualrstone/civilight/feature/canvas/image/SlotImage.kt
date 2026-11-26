@@ -1,8 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.image
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.clip
@@ -24,7 +22,6 @@ import io.github.lenticualrstone.civilight.ui.feature.LocalFeatureDeps
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import kotlin.math.max
 
 /**
  * What an image slot shows: the placed image (a picked original cut by the slot's crop for [ratio], or a
@@ -51,7 +48,7 @@ fun BoxScope.SlotImage(
             if (preset == null) ImagePlaceholder(ownerName, onPick, compactPlaceholder)
             else Box(Modifier.matchParentSize().then(holo)) { PresetArt(preset, imageModifier) }
         }
-        else -> BlobImage(use.blobHash, use.cropFor(ratio), SLOT_MAX_SIDE, contentDescription, imageModifier, Modifier.then(holo)) {
+        else -> BlobImage(use.blobHash, io.github.lenticualrstone.civilight.ui.image.ImageCrops.cropFor(use, ratio), SLOT_MAX_SIDE, contentDescription, imageModifier, Modifier.then(holo)) {
             ImagePlaceholder(ownerName, onPick = null, compact = compactPlaceholder)
         }
     }
@@ -109,31 +106,12 @@ fun BoxScope.BlobImage(
     }
 }
 
-/** Decoding of a stored original with its crop (rotation, mirror, rectangle in rotated source pixels). */
+/**
+ * Decoding of a stored original with its crop (rotation, mirror, rectangle in rotated source pixels). The same
+ * decoder as every display ([io.github.lenticualrstone.civilight.ui.image.ImageBitmaps.decodeUprightSampled]):
+ * EXIF orientation is applied first, so the crop editor and the slots share one pixel space.
+ */
 object SlotImages {
-    fun decode(file: File, crop: Crop?, maxSide: Int): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.path, bounds)
-        val longest = max(bounds.outWidth, bounds.outHeight)
-        if (longest <= 0) return null
-        val wanted = if (crop != null) maxSide * longest / max(1, max(crop.w, crop.h)) else maxSide
-        var sample = 1
-        while (longest / (sample * 2) >= wanted) sample *= 2
-        val source = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
-        if (crop == null) return source
-        val matrix = Matrix().apply {
-            if (crop.rotation % 360 != 0) postRotate(crop.rotation.toFloat())
-            if (crop.flipH) postScale(-1f, 1f)
-        }
-        val turned = if (matrix.isIdentity) source else Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true).also {
-            if (it !== source) source.recycle()
-        }
-        val x = (crop.x / sample).coerceIn(0, turned.width - 1)
-        val y = (crop.y / sample).coerceIn(0, turned.height - 1)
-        val w = (crop.w / sample).coerceIn(1, turned.width - x)
-        val h = (crop.h / sample).coerceIn(1, turned.height - y)
-        val cropped = Bitmap.createBitmap(turned, x, y, w, h)
-        if (cropped !== turned) turned.recycle()
-        return cropped
-    }
+    fun decode(file: File, crop: Crop?, maxSide: Int): Bitmap? =
+        io.github.lenticualrstone.civilight.ui.image.ImageBitmaps.decodeUprightSampled(file, crop, maxSide)
 }

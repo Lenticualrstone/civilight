@@ -4,18 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
@@ -27,21 +24,22 @@ import io.github.lenticualrstone.civilight.designsystem.component.TextAction
 import androidx.compose.ui.text.style.TextDecoration
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.CommandBar
-import io.github.lenticualrstone.civilight.designsystem.component.IconAction
+import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveDetailScaffold
+import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveHeaderButton
+import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveMath
+import io.github.lenticualrstone.civilight.designsystem.component.ReportBottomChrome
 import io.github.lenticualrstone.civilight.designsystem.component.ListRow
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.foundation.bottomHairline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
-import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonCopy
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
-import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.feature.story.common.ChapterHeaderText
 import io.github.lenticualrstone.civilight.feature.story.common.StoryCopy
 import io.github.lenticualrstone.civilight.feature.story.common.storyServices
@@ -63,10 +61,19 @@ import io.github.lenticualrstone.civilight.ui.nav.LocalPaneRole
 import io.github.lenticualrstone.civilight.ui.nav.PaneRole
 import io.github.lenticualrstone.civilight.ui.nav.openDetail
 import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
+import io.github.lenticualrstone.civilight.ui.scaffold.CommandScope
+import io.github.lenticualrstone.civilight.ui.scaffold.LocalCommandBarHost
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
 import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 
-/** 프로젝트 홈 (STO-01; cover `Home`, inner `TwoHome` list pane, `ColHome` column). */
+/**
+ * 프로젝트 홈 (STO-01) on the immersive detail frame (`Immersive.dc.html` kind `project`): the cover fills the
+ * screen (LIB-83), the name is the title that docks into the head, the meta line the subtitle, and the home
+ * sections sit on the glass panel. Cover `Home` 475 × 751, inner 704 × 933.
+ *
+ * Command bar (DS-65): alone in the window it is the immersive bottom bar, so the resting title sits above it;
+ * in a `목록 + 상세` pane it goes to the frame's one bar, and the frame is inset by that bar's height.
+ */
 @Composable
 fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
     val vm = entryViewModel { HomeViewModel(route.projectKey, deps.storyServices()) }
@@ -74,21 +81,24 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
     val settings by deps.settings.collectAsState()
     val sheets = rememberSheetHost()
     val navigator = deps.navigator
-    val inDetailPane = LocalPaneRole.current == PaneRole.DETAIL
+    // DS-65: a pane of `목록 + 상세` hands its command bar to the frame host (as `CivilightScreen` decides).
+    val inPane = LocalCommandBarHost.current != null && CommandScope.of(LocalPaneRole.current) != null
+    val inDetailPane = inPane && LocalPaneRole.current == PaneRole.DETAIL
+    val commandBar: @Composable () -> Unit = {
+        CommandBar(
+            hint = ui?.commandHint.orEmpty(),
+            onClick = { navigator.push(ProjectSearch(route.projectKey)) },
+            // S-8 + 0.5.0 Labs gate: recorder opens from home only when Life Recorder is enabled in Labs.
+            onMic = if (settings.lifeRecorderEnabled) ({ navigator.push(Recording(projectKey = route.projectKey)) }) else null,
+        )
+    }
     CenterColumn {
         CivilightScreen(
             // The head always names the project (QA U-06), also right after the wizard; empty only while loading.
             title = ui?.name.orEmpty(),
-            // DS-70 A13: icon only, read `서재로`. No rating badge (S-4) and no lens chip (S-1): home is always 최신.
-            back = if (inDetailPane) null else IconAction(IconButtonCopy.TO_LIBRARY) { if (!navigator.popTo(Library)) navigator.resetTo(Library) },
-            commandBar = {
-                CommandBar(
-                    hint = ui?.commandHint.orEmpty(),
-                    onClick = { navigator.push(ProjectSearch(route.projectKey)) },
-                    // S-8 + 0.5.0 Labs gate: recorder opens from home only when Life Recorder is enabled in Labs.
-                    onMic = if (settings.lifeRecorderEnabled) ({ navigator.push(Recording(projectKey = route.projectKey)) }) else null,
-                )
-            },
+            // The immersive frame draws its own head; the common glass head stays empty.
+            topBar = {},
+            commandBar = if (inPane) commandBar else null,
             sheets = sheets,
         ) { padding ->
             // Loading -> content swaps on the kind (loaded or not), never on the data, so an edit does
@@ -98,77 +108,87 @@ fun HomeScreen(route: ProjectHome, deps: FeatureDeps) {
                 if (!loaded || u == null) {
                     Box(Modifier.fillMaxSize().background(CivilightTheme.colors.bg))
                 } else {
-                    HomeContent(
-                        ui = u,
-                        padding = padding,
-                        onResume = { navigator.push(Script(u.projectKey, blockKey = it.blockKey, caretAtEnd = true)) },
-                        onEpisode = { navigator.openDetail(StoryStructure(u.projectKey, focusUnitKey = it.key)) },
-                        onShortcut = { shortcut ->
-                            when (val target = shortcut.route(u.projectKey)) {
-                                null -> Unit
-                                is StoryStructure -> navigator.openDetail(target)
-                                else -> navigator.push(target)
+                    if (!inPane) ReportBottomChrome(ImmersiveMath.BAR_ROW_DP.dp)
+                    ImmersiveDetailScaffold(
+                        // Masked as before: home is reachable only while a hidden project is open (STO-01, LIB-89).
+                        title = u.name,
+                        subtitle = u.meta,
+                        // DS-70 A13: back leads to the 서재; the `목록 + 상세` detail pane has no back (the list is beside it).
+                        onBack = if (inDetailPane) null else ({ if (!navigator.popTo(Library)) navigator.resetTo(Library) }),
+                        backLabel = HomeCopy.BACK_TO_LIBRARY,
+                        modifier = if (inPane) Modifier.padding(bottom = padding.calculateBottomPadding()) else Modifier,
+                        // In a pane the padding above already holds the frame bar and the navigation inset.
+                        bottomInset = if (inPane) 0.dp else null,
+                        hero = { HomeHero(u.cover) },
+                        actions = {
+                            // U-08 LIB-83: the visible way to the cover picker (never on the read-only example).
+                            if (u.coverEditable) {
+                                ImmersiveHeaderButton(IconId.Pencil, u.coverLabel, {
+                                    sheets.open(ImagePickSheet(u.projectKey, ImageOwnerKind.PROJECT, u.projectKey, ImageSlot.PROJECT_COVER))
+                                })
                             }
                         },
-                        onStartRoute = { navigator.push(it) },
-                        onDismissStart = { vm.dismissStart() },
-                        selectedKey = HomeModel.selectedKey(navigator.backStack, route.projectKey),
-                        // U-08 LIB-83: the head cover opens the shared cover picker over home.
-                        onCover = { sheets.open(ImagePickSheet(u.projectKey, ImageOwnerKind.PROJECT, u.projectKey, ImageSlot.PROJECT_COVER)) },
-                    )
+                        bottomBar = if (inPane) null else commandBar,
+                    ) {
+                        HomeContent(
+                            ui = u,
+                            onResume = { navigator.push(Script(u.projectKey, blockKey = it.blockKey, caretAtEnd = true)) },
+                            onEpisode = { navigator.openDetail(StoryStructure(u.projectKey, focusUnitKey = it.key)) },
+                            onShortcut = { shortcut ->
+                                when (val target = shortcut.route(u.projectKey)) {
+                                    null -> Unit
+                                    is StoryStructure -> navigator.openDetail(target)
+                                    else -> navigator.push(target)
+                                }
+                            },
+                            onStartRoute = { navigator.push(it) },
+                            onDismissStart = { vm.dismissStart() },
+                            selectedKey = HomeModel.selectedKey(navigator.backStack, route.projectKey),
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+/** The home sections on the immersive panel, in [HomeModel.slots] order (the panel scrolls; gutters are its). */
 @Composable
 private fun HomeContent(
     ui: HomeUi,
-    padding: PaddingValues,
     onResume: (HomeResume) -> Unit,
     onEpisode: (HomeRow) -> Unit,
     onShortcut: (HomeShortcut) -> Unit,
     onStartRoute: (Route) -> Unit,
     onDismissStart: () -> Unit,
     selectedKey: String? = null,
-    onCover: () -> Unit = {},
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val start = ui.start
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(colors.bg),
-        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 24.dp),
-    ) {
+    Column(Modifier.fillMaxWidth()) {
         HomeModel.slots(ui).forEach { slot ->
-            item(key = slot.key) {
+            key(slot.key) {
                 when (slot) {
-                    // U-08 LIB-83: the cover (3:4, 84 × 112) left of the name, 16 apart.
-                    HomeSlot.Name -> Row(civilightItem(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        HomeCoverImage(ui, onCover)
-                        Column(Modifier.weight(1f)) {
-                            CivilightText(ui.name, type.displayM, color = colors.ink)
-                            // The summary line and the one-liner fold, so the name item changes height smoothly
-                            // when `NewReady` ends (`목록 닫기`).
-                            FoldRevealValue(start?.takeIf { ui.newReady }, label = "startSummary") { s -> StartSummary(ui, s) }
-                            FoldRevealValue(ui.oneLiner?.takeIf { !ui.newReady }, label = "oneLiner") { line ->
-                                CivilightText(line, type.leadCompact, Modifier.padding(top = 12.dp), color = colors.ink2)
-                            }
+                    // The name is the immersive title; its item keeps the summary line and the one-liner, which
+                    // fold so the item changes height smoothly when `NewReady` ends (`목록 닫기`).
+                    HomeSlot.Name -> Column(Modifier.fillMaxWidth()) {
+                        FoldRevealValue(start?.takeIf { ui.newReady }, label = "startSummary") { s -> StartSummary(ui, s) }
+                        FoldRevealValue(ui.oneLiner?.takeIf { !ui.newReady }, label = "oneLiner") { line ->
+                            CivilightText(line, type.leadCompact, color = colors.ink2)
                         }
                     }
-                    HomeSlot.Stats -> HomeStats(ui, civilightItem())
-                    HomeSlot.Resume -> ui.resume?.let { ResumeBlock(it, onResume, civilightItem()) }
-                    // The block folds away on `목록 닫기` and back in on a new project (P1, fold tokens). The
-                    // item itself stays, so its height shrinks with the fold and the rows below follow it.
-                    HomeSlot.Start -> FoldRevealValue(start, civilightItem(fadeIn = null, fadeOut = null), label = "startBlock") { s ->
+                    HomeSlot.Stats -> HomeStats(ui)
+                    HomeSlot.Resume -> ui.resume?.let { ResumeBlock(it, onResume) }
+                    // The block folds away on `목록 닫기` and back in on a new project (P1, fold tokens).
+                    HomeSlot.Start -> FoldRevealValue(start, label = "startBlock") { s ->
                         StartBlockView(s, onStartRoute, onDismissStart)
                     }
-                    HomeSlot.ListHeader -> Column(civilightItem().padding(top = 28.dp, bottom = 6.dp)) {
+                    HomeSlot.ListHeader -> Column(Modifier.padding(top = 28.dp, bottom = 6.dp)) {
                         ui.listHeader?.let { ChapterHeaderLabel(it) }
                     }
-                    is HomeSlot.Episode -> EpisodeLine(slot.row, onEpisode, selected = slot.row.key == selectedKey, modifier = civilightItem())
-                    HomeSlot.Work -> Column(civilightItem().padding(top = 28.dp)) {
+                    is HomeSlot.Episode -> EpisodeLine(slot.row, onEpisode, selected = slot.row.key == selectedKey)
+                    HomeSlot.Work -> Column(Modifier.padding(top = 28.dp)) {
                         SectionLabel(HomeCopy.WORK)
                         ShortcutList(ui.shortcuts, onShortcut, Modifier.padding(top = 4.dp))
                     }
@@ -282,7 +302,7 @@ private fun ShortcutList(shortcuts: List<HomeShortcut>, onShortcut: (HomeShortcu
 /** `연재 장편 · 장 › 에피소드 › 씬 · 1200년` under the name (board `NewReady`); no rating badge (S-4). */
 @Composable
 private fun StartSummary(ui: HomeUi, start: HomeStart) {
-    CivilightText(start.summary, CivilightTheme.type.small, Modifier.padding(top = 8.dp), color = CivilightTheme.colors.ink3)
+    CivilightText(start.summary, CivilightTheme.type.small, color = CivilightTheme.colors.ink3)
 }
 
 /**

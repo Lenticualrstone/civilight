@@ -1,5 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.canvas.gallery
 
+import io.github.lenticualrstone.civilight.ui.tags.TagNameCheck
+import io.github.lenticualrstone.civilight.ui.tags.TagTakenLine
 import io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -493,13 +495,23 @@ private fun InfoTags(c: SheetCtx, item: GalleryItem, editable: Boolean) {
             if (editable) AddChip(GalleryUiCopy.FIELD_TAGS, { adding = !adding })
         }
         FoldReveal(adding && editable, label = "galleryNewTag") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                CivilightTextField(name, { name = it }, Modifier.weight(1f).keepInViewWhileFocused(), label = GalleryUiCopy.FIELD_NAME)
-                CivilightButton(GalleryUiCopy.BTN_ADD, {
-                    c.vm.addTag(listOf(item.key), name)
+            // (2026-11-26) A taken name (any scope) shows `이미 있음 · <이름>` and `넣기` stays off; `이 태그 쓰기` puts
+            // the existing tag on only when images may carry it (a `용어 전용` name shows the line alone).
+            val taken = GalleryTagName.taken(doc, name)
+            Column {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                    CivilightTextField(name, { name = it }, Modifier.weight(1f).keepInViewWhileFocused(), label = GalleryUiCopy.FIELD_NAME)
+                    CivilightButton(GalleryUiCopy.BTN_ADD, {
+                        c.vm.addTag(listOf(item.key), name)
+                        name = ""
+                        adding = false
+                    }, variant = ButtonVariant.GHOST, enabled = GalleryTagName.canAdd(doc, name))
+                }
+                TagTakenLine(taken, TagNameCheck.action(taken), onAction = { t ->
+                    c.vm.setTags(listOf(item.key)) { keys -> GalleryTagName.withTag(keys, t.key) }
                     name = ""
                     adding = false
-                }, variant = ButtonVariant.GHOST, enabled = name.isNotBlank())
+                })
             }
         }
     }
@@ -658,8 +670,8 @@ fun SheetScope.GalleryMenuSheetContent(sheet: GalleryMenuSheet) {
             subtitle = GalleryUiCopy.HIDE_SUB,
             enabled = editable,
         )
-        ListRow(
-            title = GalleryUiCopy.BTN_DELETE,
+        io.github.lenticualrstone.civilight.designsystem.component.MenuDeleteRow(
+            label = GalleryUiCopy.BTN_DELETE,
             subtitle = GalleryUiCopy.DELETE_SUB,
             onClick = {
                 guarded {
@@ -776,10 +788,30 @@ fun SheetScope.GalleryTagsSheetContent(sheet: GalleryTagsSheet) {
                 CivilightButton(GalleryUiCopy.BTN_ADD, {
                     c.vm.addTag(sheet.itemKeys, name)
                     name = ""
-                }, variant = ButtonVariant.GHOST, enabled = name.isNotBlank())
+                }, variant = ButtonVariant.GHOST, enabled = GalleryTagName.canAdd(doc, name))
             }
+            // (2026-11-26) Same-name line, as on the info sheet.
+            val taken = GalleryTagName.taken(doc, name)
+            TagTakenLine(taken, TagNameCheck.action(taken), onAction = { t ->
+                c.vm.setTags(sheet.itemKeys) { keys -> GalleryTagName.withTag(keys, t.key) }
+                name = ""
+            })
         }
     }
+}
+
+/**
+ * (2026-11-26) The `+ 태그` name line: images list the character-scope tags (`인물` · `모든 항목`), so a typed name
+ * held by any live tag is "taken"; `이 태그 쓰기` only when that tag fits. `넣기` makes a new tag, so it needs a free name.
+ */
+object GalleryTagName {
+    fun taken(doc: ProjectDoc, name: String): io.github.lenticualrstone.civilight.ui.tags.TagSheetCreate.Taken? =
+        TagNameCheck.taken(doc, name, io.github.lenticualrstone.civilight.model.cast.TagScope.CHARACTER)
+
+    fun canAdd(doc: ProjectDoc, name: String): Boolean = name.isNotBlank() && taken(doc, name) == null
+
+    /** The item's keys with [tagKey] added once (kept in place when already there). */
+    fun withTag(keys: List<Key>, tagKey: Key): List<Key> = if (tagKey in keys) keys else keys + tagKey
 }
 
 /** Multi-select `지우기` and `숨기기` from the screen (GAL-18): the same paths as the menu, one undo step each. */

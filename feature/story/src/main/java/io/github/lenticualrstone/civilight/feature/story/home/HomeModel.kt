@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.story.home
 
+import io.github.lenticualrstone.civilight.domain.library.newproject.StartBlock
 import io.github.lenticualrstone.civilight.domain.story.search.CommandBar
 import io.github.lenticualrstone.civilight.domain.story.search.CommandScreen
 import io.github.lenticualrstone.civilight.domain.story.structure.SceneStatus
@@ -104,10 +105,15 @@ data class HomeUi(
      * was hidden while `시작해 볼 것` was open); empty for deeper structures, as the board draws no stats.
      */
     val newReadyStats: List<HomeStat> = emptyList(),
-    /** The project cover left of the name (U-08 LIB-83): 3:4 crop, a preset, or the initial-letter card. */
+    /** The project cover (U-08 LIB-83): the immersive hero, 3:4 crop or a preset; none = a plain colour field. */
     val cover: CoverUi = CoverUi(null, null, null, "", holo = false),
-    /** The cover opens the cover picker and draws the pencil badge; never for the read-only example. */
+    /** The head's pencil button opens the cover picker; never for the read-only example. */
     val coverEditable: Boolean = false,
+    /**
+     * The line under the name on the immersive head: `연재 장편 · 에피소드 10개 · 최신 1-7 씬 3` (format, count of
+     * the episode level, the scene of the 집필 선). No rating badge (S-4). A locked hidden scene never shows.
+     */
+    val meta: String = "",
 ) {
     /** `표지 이미지 · 바꾸기` while a cover is drawn, `표지 이미지 · 고르기` on the initial-letter card. */
     val coverLabel: String get() = if (cover.hash != null || cover.presetId != null) HomeCopy.COVER_CHANGE else HomeCopy.COVER_PICK
@@ -186,7 +192,8 @@ object HomeModel {
     ): HomeUi {
         val view = StoryOverview(doc, locked = locked)
         val levels = doc.project.structure.levels.size
-        val resume = view.resumeTarget()?.let { HomeResume(it.where, it.quote, it.blockKey) }
+        val target = view.resumeTarget()
+        val resume = target?.let { HomeResume(it.where, it.quote, it.blockKey) }
         val (header, rows) = when {
             levels >= 3 -> {
                 val chapter = view.currentChapter
@@ -215,7 +222,34 @@ object HomeModel {
             newReadyStats = if (levels <= 1) listOfNotNull(progress) else emptyList(),
             cover = ProjectCovers.cover(doc, doc.project.name, fileExists),
             coverEditable = !readOnly,
+            meta = meta(view, levels, latestScene(doc, locked)?.let(view.codes::sceneRef)),
         )
+    }
+
+    /**
+     * The 최신 scene (written so far = the 집필 선, memory rules-time 1; as the 서재 row `RowMeta.position`), or
+     * null without one, or while it or a unit above it is a locked hidden unit (never leaks, STO-01).
+     */
+    private fun latestScene(doc: ProjectDoc, locked: Boolean): StoryUnit? {
+        val scene = doc.manuscript.writingLineSceneKey?.let(doc.index::unit) ?: return null
+        val hidden = scene.hidden || doc.index.ancestors(scene).any { it.hidden }
+        return scene.takeUnless { hidden && locked }
+    }
+
+    /**
+     * `<format> · <episode level> <n>개 · 최신 <scene ref>`; parts without a value drop out (a project with no
+     * unit is the format word alone). Episodes counted: 3+ levels every episode of every chapter, else the
+     * top-level units (2 levels: episodes; 1 level: scenes).
+     */
+    private fun meta(view: StoryOverview, levels: Int, latest: String?): String {
+        val names = view.doc.project.structure.levels
+        val units = if (levels >= 3) view.chapters.flatMap(view::episodesOf) else view.chapters
+        val levelName = if (levels >= 2) names[levels - 2] else names.firstOrNull()
+        return listOfNotNull(
+            StartBlock.formatLabel(view.doc.project.format.known),
+            levelName?.takeIf { units.isNotEmpty() }?.let { HomeCopy.metaCount(it, units.size) },
+            latest?.let(HomeCopy::metaLatest),
+        ).joinToString(HomeCopy.META_SEPARATOR)
     }
 
     /** The `작업` shortcuts; `연표` is left out in `시간 없이` (WLD-29 `[PROPOSED]`, the 연표 is off there). */

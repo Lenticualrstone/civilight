@@ -301,7 +301,7 @@ Replaces CST-04. It covers the character card list only (D2). The 서재 views a
 - Two image slots per character:
   - **인물 초상** (portrait): crops `카드 4:5` and `아바타 1:1`; holo effect optional (default off).
   - **인물 배경** (background): crops `커버 9:16` (cover) and `펼친 화면 4:3` (inner); no holo ("글자 뒤"); shown at the top of the record, fading downward.
-- Each slot takes one of the 8 built-in presets (`잿빛 새벽 · 등불 · 심해 · 안개 숲 · 사막 유적 · 성운 · 붉은 성채 · 설원`) or a gallery/file image. The original is kept; each ratio is cropped separately with fixed ratios and can be re-cropped any time. No image → first-letter card + `이미지 고르기`.
+- Each slot takes one of the 8 built-in presets (`잿빛 새벽 · 등불 · 심해 · 안개 숲 · 사막 유적 · 성운 · 붉은 성채 · 설원`) or a gallery/file image. The original is kept and is cut once: one picture, one crop per fixed ratio. For the portrait, `카드 4:5` is set first and `아바타 1:1` follows it automatically (the largest square inside that crop, top-aligned so the avatar keeps the face; rotation and mirror inherited) and is saved on `적용`. The crop screen always shows the avatar as a preview (`아바타 1:1 · 자동`); tapping it opens it to adjust its own crop (`· 직접`), and `처음대로` there returns it to `자동`. A portrait with only the 4:5 crop stored draws the avatar derived the same way. The background's two ratios are cropped separately (a 4:3 cut from the 9:16 would be a thin band). Any ratio can be re-cropped any time. No image → first-letter card + `이미지 고르기`.
 - Picking, cropping, presets and holo belong to the image area (`ImagePick`, `ImageCrop`, `ImageSlots`). This feature defines the slots and where each crop is used.
 - Sources: planning `카드 보기 · 이미지`; boards `ImageSlots`, `CastCards`, `Profile`.
 

@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.canvas.gallery
 
+import io.github.lenticualrstone.civilight.model.cast.fits
 import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.viewModelScope
@@ -141,6 +142,8 @@ class GalleryViewModel(
         if (name.isBlank()) return
         act(GalleryUiCopy.FIELD_TAGS) { doc, ctx ->
             val (withTag, tag) = CharacterEdits.addTag(doc, name, ctx)
+            // (2026-11-26) Names are unique across scopes: a `용어 전용` tag of that name is not put on images.
+            if (!tag.fits(io.github.lenticualrstone.civilight.model.cast.TagScope.CHARACTER)) return@act doc
             itemKeys.fold(withTag) { d, k ->
                 val item = d.index.galleryItem(k) ?: return@fold d
                 if (tag.key in item.tagKeys) d else GalleryActions.setTags(d, k, item.tagKeys + tag.key, ctx.actions())?.doc ?: d

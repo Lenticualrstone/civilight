@@ -27,7 +27,7 @@ class MenuModelTest {
         val menu = UnitMenuModel.build(doc, K.SCENE_1_7_4, MenuSurface.STORY_LIST, readOnly = false)!!
         assertEquals("씬 4 · 1-7", menu.title)
         assertEquals(
-            listOf(MenuAction.PLACE_TIME, MenuAction.TRANSITION, MenuAction.MERGE_PREVIOUS, MenuAction.SPLIT_HERE, MenuAction.MOVE, MenuAction.DELETE_SCENE, MenuAction.MARK_DONE),
+            listOf(MenuAction.PLACE_TIME, MenuAction.TRANSITION, MenuAction.MERGE_PREVIOUS, MenuAction.SPLIT_HERE, MenuAction.MOVE, MenuAction.MARK_DONE, MenuAction.DELETE_SCENE),
             menu.rows.map { it.action },
         )
         val byAction = menu.rows.associateBy { it.action }
@@ -57,7 +57,7 @@ class MenuModelTest {
         assertEquals(head.title, menu.title)
         assertEquals(head.rows.map { it.label to it.value }, menu.rows.map { it.label to it.value })
         assertEquals(
-            listOf(MenuAction.PLACE_TIME, MenuAction.TRANSITION, MenuAction.MERGE_PREVIOUS, MenuAction.DELETE_SCENE, MenuAction.NEW_SCENE_BEFORE),
+            listOf(MenuAction.PLACE_TIME, MenuAction.TRANSITION, MenuAction.MERGE_PREVIOUS, MenuAction.NEW_SCENE_BEFORE, MenuAction.DELETE_SCENE),
             menu.rows.map { it.action },
         )
     }

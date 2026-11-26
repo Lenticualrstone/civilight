@@ -50,8 +50,9 @@ import io.github.lenticualrstone.civilight.model.app.MiniRailProjectItem
 import io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem
 import io.github.lenticualrstone.civilight.model.app.MiniRailSide
 import io.github.lenticualrstone.civilight.model.app.ProfileShape
-import io.github.lenticualrstone.civilight.model.app.ProfileTabConfig
 import io.github.lenticualrstone.civilight.model.app.ProfileTabPreset
+import io.github.lenticualrstone.civilight.ui.profile.ProfileTabSetupContent
+import io.github.lenticualrstone.civilight.ui.profile.ProfileTabSetupCopy
 import io.github.lenticualrstone.civilight.navigation.SheetKey
 import io.github.lenticualrstone.civilight.ui.feature.entryViewModel
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
@@ -110,8 +111,9 @@ internal fun SettingsScreen(services: LibraryServices) {
                         onClose = { close() },
                     )
                 }
+                // One tab setup sheet, shared with the character record's tab bar.
                 ProfileTabsSheet -> sheetBody {
-                    ProfileTabPresetContent(
+                    ProfileTabSetupContent(
                         settings = settings,
                         onSelectPreset = vm::setProfileTabPreset,
                         onUpdateTabs = vm::setCustomProfileTabs,
@@ -206,8 +208,8 @@ internal fun SettingsScreen(services: LibraryServices) {
                     leadingIcon = IconId.Spark,
                 )
                 SettingsValueRow(
-                    title = SettingsCopy.PROFILE_TABS,
-                    subtitle = SettingsCopy.PROFILE_TABS_SUB,
+                    title = ProfileTabSetupCopy.TITLE,
+                    subtitle = ProfileTabSetupCopy.SUB,
                     value = profilePresetLabel(settings.profileTabPreset),
                     leadingIcon = IconId.User,
                     onClick = { sheets.open(ProfileTabsSheet) },
@@ -470,48 +472,7 @@ private fun projectRailLabel(item: MiniRailProjectItem): String = when (item) {
     MiniRailProjectItem.SETTINGS -> "설정"
 }
 
-private fun profilePresetLabel(preset: ProfileTabPreset): String = when (preset) {
-    ProfileTabPreset.STANDARD -> SettingsCopy.PRESET_STANDARD
-    ProfileTabPreset.MODERN_DRAMA -> SettingsCopy.PRESET_MODERN
-    ProfileTabPreset.GAME_VN -> SettingsCopy.PRESET_GAME_VN
-    ProfileTabPreset.MINIMAL -> SettingsCopy.PRESET_MINIMAL
-}
-
-@Composable
-private fun androidx.compose.foundation.layout.ColumnScope.ProfileTabPresetContent(
-    settings: AppSettings,
-    onSelectPreset: (ProfileTabPreset) -> Unit,
-    onUpdateTabs: (List<ProfileTabConfig>) -> Unit,
-    onClose: () -> Unit,
-) {
-    val colors = CivilightTheme.colors
-    val activeTabs = settings.customProfileTabs.ifEmpty { settings.profileTabPreset.defaultTabs() }
-    SheetHeader(title = SettingsCopy.PROFILE_TABS, closeLabel = "닫기", onClose = onClose)
-    SheetScrollBody {
-        CivilightText("프리셋 불러오기", CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
-        ProfileTabPreset.entries.forEach { preset ->
-            val preview = preset.defaultTabs().joinToString(" · ") { it.label }
-            RadioRow(
-                title = profilePresetLabel(preset),
-                subtitle = preview,
-                selected = settings.profileTabPreset == preset && settings.customProfileTabs.isEmpty(),
-                onClick = { onSelectPreset(preset) },
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        CivilightText("활성 탭 모듈", CivilightTheme.type.sec, color = colors.ink3, modifier = Modifier.padding(bottom = 6.dp))
-        activeTabs.forEach { tab ->
-            CheckboxRow(
-                label = tab.label,
-                checked = tab.enabled,
-                onCheckedChange = { checked ->
-                    val next = activeTabs.map { if (it.id == tab.id) it.copy(enabled = checked) else it }
-                    if (next.any { it.enabled }) onUpdateTabs(next)
-                },
-            )
-        }
-    }
-}
+private fun profilePresetLabel(preset: ProfileTabPreset): String = ProfileTabSetupCopy.presetLabel(preset)
 
 /**
  * (0.2.0, LIB-94) 설정 › 서재 보기 / 카드 보기 (routes `SettingsLibraryView`, `SettingsCardView`): head `설정` /

@@ -72,6 +72,7 @@ object RouteSamples {
         TimelineMap(P),
         WorldCalendar(P),
         TravelModes(P),
+        AffiliationBasisSettings(P),
         MapList(P),
         MapView(P, K, K),
         MapEdit(P, K),

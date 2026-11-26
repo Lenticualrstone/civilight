@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.feature.canvas.image
 
 import io.github.lenticualrstone.civilight.model.asset.Crop
 import io.github.lenticualrstone.civilight.model.asset.Ratio
+import io.github.lenticualrstone.civilight.ui.image.ImageCrops
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -134,6 +135,13 @@ object CropMath {
         val (fw, fh) = if (availW / availH > ratio) (availH * ratio) to availH else availW to (availW / ratio)
         return FrameRect((stageW - fw) / 2, (stageH - fh) / 2, fw, fh)
     }
+
+    /**
+     * The [to]-ratio crop cut from the [from] crop of an original of [sourceW] × [sourceH] (CST-13: one picture,
+     * the avatar follows the card): inside [from], top-aligned when [top], rotation and mirror inherited.
+     */
+    fun derived(sourceW: Int, sourceH: Int, from: Crop, to: Ratio, top: Boolean = true): Crop =
+        ImageCrops.derived(from, to, top, sourceW, sourceH)
 
     /** True when two crops cut the same pixels. */
     fun same(a: Crop?, b: Crop?): Boolean =

@@ -73,8 +73,12 @@ fun ProjectEntryFrame(projectKey: Key, deps: FeatureDeps, content: @Composable (
     val motion = CivilightTheme.motion
     val entry = deps.stores.library.state.collectAsState().value.entry(projectKey)
     val projectTitle = entry?.name?.takeUnless { entry.hidden } ?: ""
-    var load by remember(projectKey) { mutableStateOf<FrameLoad>(FrameLoad.Loading) }
+    // A store that is already open (another route of the same project) shows at once: no loading frame.
+    var load by remember(projectKey) {
+        mutableStateOf<FrameLoad>(deps.projects.peek(projectKey)?.let { FrameLoad.Ready(it) } ?: FrameLoad.Loading)
+    }
     LaunchedEffect(projectKey) {
+        val wasOpen = deps.projects.peek(projectKey) != null
         val started = System.currentTimeMillis()
         val store = try {
             deps.projects.acquire(projectKey)
@@ -84,13 +88,16 @@ fun ProjectEntryFrame(projectKey: Key, deps: FeatureDeps, content: @Composable (
             load = FrameLoad.Failed(e)
             return@LaunchedEffect
         }
-        // (0.4.0) Intentional brief project-opening transition beat so opening feels tactile instead of a harsh flash.
-        if (!motion.reduced) {
-            val elapsed = System.currentTimeMillis() - started
-            val minBeatMs = motion.delayMs(260)
-            if (elapsed < minBeatMs) delay(minBeatMs - elapsed)
-        }
+        // Released however the effect ends, including a cancel during the opening beat.
         try {
+            // (0.4.0) Opening beat on the first open of a project only, so opening feels tactile.
+            val wait = ProjectOpenBeat.remainingMs(
+                wasOpen = wasOpen,
+                reduced = motion.reduced,
+                beatMs = motion.delayMs(OPEN_BEAT_MS),
+                elapsedMs = System.currentTimeMillis() - started,
+            )
+            if (wait > 0) delay(wait)
             load = FrameLoad.Ready(store)
             awaitCancellation()
         } finally {
@@ -165,6 +172,19 @@ private fun ReadyFrame(store: ProjectStore, deps: FeatureDeps, content: @Composa
             }
         }
     }
+}
+
+/** Minimum opening beat (ms, before animator scaling) when a project is first opened. */
+private const val OPEN_BEAT_MS = 260
+
+/** How long the opening beat still waits after the store is open (pure; see `ProjectOpenBeatTest`). */
+object ProjectOpenBeat {
+    /**
+     * 0 when the project was already open ([wasOpen]: its content shows at once) or motion is reduced;
+     * otherwise what is left of [beatMs] after [elapsedMs] spent opening.
+     */
+    fun remainingMs(wasOpen: Boolean, reduced: Boolean, beatMs: Long, elapsedMs: Long): Long =
+        if (wasOpen || reduced) 0L else (beatMs - elapsedMs).coerceAtLeast(0L)
 }
 
 /**

@@ -150,6 +150,28 @@ class HomeModelTest {
         assertEquals("Ⅰ 1부 · 첫 부", ui.listHeader)
         assertEquals(listOf("1-1-1", "1-1-2"), ui.rows.map { it.code })
         assertEquals("1/2" to "1부 화", ui.stats.first().let { it.value to it.label })
+        assertEquals("연재 장편 · 화 2개 · 최신 1-1-1 씬 1", ui.meta)
+    }
+
+    /** Immersive head subtitle: format · episode count · latest scene; no rating badge (S-4). */
+    @Test
+    fun metaLineUnderTheImmersiveTitle() {
+        val meta = home().meta
+        assertTrue(meta, Regex("""연재 장편 · 에피소드 \d+개 · 최신 1-7 씬 3""").matches(meta))
+        assertFalse(meta, meta.contains("R-"))
+
+        val two = Fx.mini(listOf("막", "장면"), node("A1", "첫 막", null, node("S1", "들판", "바람이 불었다.")), node("A2", null, null, node("S3")))
+        assertEquals("연재 장편 · 막 2개 · 최신 1막 장면 1", home(two).meta)
+        val one = Fx.mini(listOf("씬"), node("S1", "첫 장", "바람이 불었다."), node("S2"))
+        assertEquals("연재 장편 · 씬 2개 · 최신 씬 1", home(one).meta)
+    }
+
+    /** A locked hidden scene never reaches the subtitle (최신 = the 집필 선 scene, STO-01). */
+    @Test
+    fun metaLineSkipsALockedHiddenScene() {
+        val hidden = doc.withUnit(K.SCENE_1_7_3) { it.copy(hidden = true) }
+        assertFalse(home(hidden, locked = true).meta.endsWith("1-7 씬 3"))
+        assertTrue(home(hidden, locked = false).meta.endsWith("최신 1-7 씬 3"))
     }
 }
 

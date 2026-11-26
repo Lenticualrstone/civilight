@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,6 +20,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.Avatar
 import io.github.lenticualrstone.civilight.designsystem.component.AvatarSize
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
+import io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.EmptyBlock
 import io.github.lenticualrstone.civilight.designsystem.component.ListRow
@@ -30,10 +32,16 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.domain.script.Labels
+import io.github.lenticualrstone.civilight.feature.script.ScriptCopy
+import io.github.lenticualrstone.civilight.feature.script.input.WriteCopy
 import io.github.lenticualrstone.civilight.feature.script.panel.PlayTimeEstimator
+import io.github.lenticualrstone.civilight.feature.script.scenes.SceneCopy
+import io.github.lenticualrstone.civilight.feature.script.state.ScriptRowKeys
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
 import io.github.lenticualrstone.civilight.model.script.BlockKind
+import io.github.lenticualrstone.civilight.model.text.LinkTarget
 import io.github.lenticualrstone.civilight.model.text.LinkTargetKind
 import io.github.lenticualrstone.civilight.model.text.RichDoc
 import io.github.lenticualrstone.civilight.model.text.TextRun
@@ -72,6 +80,7 @@ private fun RichDoc.firstLine(): String? =
 @Composable
 internal fun MentionPreviewSheetContent(
     doc: ProjectDoc,
+    hiddenUnlocked: Boolean,
     targetKindName: String,
     targetKey: Key,
     onOpenDetail: () -> Unit,
@@ -81,8 +90,13 @@ internal fun MentionPreviewSheetContent(
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val kind = LinkTargetKind.entries.firstOrNull { it.name == targetKindName }
-    val info: Triple<String, String, String>? = remember(doc, kind, targetKey) {
-        when (kind) {
+    // Rules 19 and 20: re-checked while open (the gate can relock, the target can go to the trash).
+    val previewable = remember(doc, kind, targetKey, hiddenUnlocked) {
+        kind != null && MentionTap.previewable(doc, LinkTarget(kind, targetKey), hiddenUnlocked)
+    }
+    LaunchedEffect(previewable) { if (!previewable) onClose() }
+    val info: Triple<String, String, String>? = remember(doc, kind, targetKey, previewable) {
+        if (!previewable) null else when (kind) {
             LinkTargetKind.CHARACTER -> doc.index.character(targetKey)?.let { c ->
                 Triple("인물", c.name, c.oneLiner?.takeIf { it.isNotBlank() } ?: c.speechSummary?.takeIf { it.isNotBlank() } ?: "등록된 인물 카드")
             }
@@ -102,11 +116,8 @@ internal fun MentionPreviewSheetContent(
         }
     }
 
-    SheetHeader(title = info?.second ?: "인용 미리보기", closeLabel = "닫기", onClose = onClose)
-    if (info == null) {
-        CivilightText("항목을 찾을 수 없거나 삭제되었습니다.", type.small, color = colors.ink3, modifier = Modifier.padding(vertical = 12.dp))
-        return
-    }
+    SheetHeader(title = info?.second ?: io.github.lenticualrstone.civilight.feature.script.ScriptCopy.QUOTE_PREVIEW, closeLabel = io.github.lenticualrstone.civilight.feature.script.ScriptCopy.CLOSE, onClose = onClose)
+    if (info == null) return
     val (kindLabel, title, summary) = info
     val cardShape = RoundedCornerShape(16.dp)
     Row(
@@ -147,36 +158,85 @@ internal fun MentionPreviewSheetContent(
     }
 }
 
+/**
+ * One row of `씬 목차`: the real scene code (`씬 3`, as the scene head, so hiding a scene leaves a
+ * gap instead of renumbering), the title (`미정` without one) and the pacing line.
+ */
+internal data class OutlineRow(
+    val sceneKey: Key,
+    val ordinal: Int,
+    val title: String,
+    val blocks: Int,
+    val chars: Int,
+    val playTime: String,
+) {
+    val label: String get() = WriteCopy.sceneLabel(ordinal)
+
+    /** The manuscript row a tap scrolls to: the scene head, drawn for every listed scene (blank ones too). */
+    val jumpRowKey: String get() = ScriptRowKeys.head(sceneKey)
+}
+
+/**
+ * `씬 목차` model (ordinal = the scene head's `Labels.sceneOrdinal`): the live scenes of the numbering unit [unitKey] in manuscript order (the scenes
+ * the manuscript draws). Rule 19: while hidden items are locked, scenes hidden themselves or under a
+ * hidden episode or chapter are left out (the same check as [SpeakerFocus]).
+ */
+internal object ScriptOutline {
+    fun rows(doc: ProjectDoc, unitKey: Key, hiddenUnlocked: Boolean): List<OutlineRow> =
+        doc.manuscript.liveScenes
+            .filter { s -> (doc.index.numberingUnitKeyOfScene(s.key) ?: doc.project.key) == unitKey }
+            .filter { s -> hiddenUnlocked || !(s.hidden || doc.index.ancestors(s).any { it.hidden }) }
+            .map { scene ->
+                val blocks = doc.manuscript.liveBlocksOf(scene.key)
+                OutlineRow(
+                    sceneKey = scene.key,
+                    ordinal = Labels.sceneOrdinal(doc, scene.key) ?: 0,
+                    title = scene.title?.takeIf { it.isNotBlank() } ?: SceneCopy.UNTITLED,
+                    blocks = blocks.size,
+                    chars = blocks.sumOf { it.runs.flatText().length },
+                    playTime = PlayTimeEstimator.estimate(blocks).formatSummary(),
+                )
+            }
+}
+
+/**
+ * `씬 목차` sheet: `렌즈를 이 씬으로 맞추기` for the scene in view (opens the position sheet), then
+ * one row per scene. Tap a row → scroll to its head in this screen; `⋯` → the scene menu (`지우기` …).
+ */
 @Composable
 internal fun ScriptOutlineSheetContent(
     doc: ProjectDoc,
     unitKey: Key,
     hiddenUnlocked: Boolean,
-    onJumpScene: (Key) -> Unit,
+    /** The scene in view, for the lens row; null hides the row. */
+    lensScene: Key?,
+    onSetLens: (sceneKey: Key, label: String) -> Unit,
+    onJumpScene: (OutlineRow) -> Unit,
+    onSceneMenu: (Key) -> Unit,
     onClose: () -> Unit,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val sceneLevel = doc.project.structure.levels.lastIndex
-    val scenes = remember(doc, unitKey, hiddenUnlocked, sceneLevel) {
-        doc.story.units.filter { u ->
-            u.deletedAt == null &&
-                u.level == sceneLevel &&
-                (u.parentKey == unitKey || u.key == unitKey) &&
-                (hiddenUnlocked || !u.hidden)
-        }
-    }
+    val rows = remember(doc, unitKey, hiddenUnlocked) { ScriptOutline.rows(doc, unitKey, hiddenUnlocked) }
+    val lensRow = lensScene?.let { k -> rows.firstOrNull { it.sceneKey == k } }
 
     Column(Modifier.fillMaxWidth()) {
-        SheetHeader(title = "씬 목차 · 페이싱", closeLabel = "닫기", onClose = onClose)
+        SheetHeader(title = ScriptCopy.OUTLINE_TITLE, closeLabel = ScriptCopy.CLOSE, onClose = onClose)
         SheetScrollBody {
-            if (scenes.isEmpty()) {
-                EmptyBlock(title = "표시할 씬이 없습니다", icon = IconId.Outline)
+            if (lensRow != null) {
+                ListRow(
+                    title = ScriptCopy.SET_LENS_TO_SCENE,
+                    subtitle = lensRow.label,
+                    compact = true,
+                    leading = { CivilightIcon(IconId.Clock, contentDescription = null, size = 18.dp, tint = colors.acc) },
+                    onClick = { onSetLens(lensRow.sceneKey, lensRow.label) },
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+            if (rows.isEmpty()) {
+                EmptyBlock(title = ScriptCopy.NO_SCENES, icon = IconId.Outline)
             } else {
-                scenes.forEachIndexed { idx, scene ->
-                    val blocks = doc.manuscript.liveBlocksOf(scene.key)
-                    val chars = blocks.sumOf { it.runs.flatText().length }
-                    val playTime = PlayTimeEstimator.estimate(blocks).formatSummary()
+                rows.forEach { row ->
                     val shape = RoundedCornerShape(14.dp)
                     Row(
                         Modifier
@@ -185,17 +245,21 @@ internal fun ScriptOutlineSheetContent(
                             .clip(shape)
                             .background(colors.tint.copy(alpha = 0.55f))
                             .insetOutline(colors.line, 1.dp, shape)
-                            .pressable(onClick = { onClose(); onJumpScene(scene.key) }, scaleOnPress = false, shape = shape)
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .pressable(onClick = { onClose(); onJumpScene(row) }, scaleOnPress = false, shape = shape)
+                            .padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            val title = scene.title?.takeIf { it.isNotBlank() } ?: "제목 없음"
-                            CivilightText("씬 ${idx + 1} · $title", type.itemTitleCompact, color = colors.ink, maxLines = 1)
-                            CivilightText("블록 ${blocks.size} · ${chars}자 · 예상 $playTime", type.small, color = colors.ink3, maxLines = 1)
+                            CivilightText("${row.label} · ${row.title}", type.itemTitleCompact, color = colors.ink, maxLines = 1)
+                            CivilightText(ScriptCopy.outlineStats(row.blocks, row.chars, row.playTime), type.small, color = colors.ink3, maxLines = 1)
                         }
-                        CivilightIcon(IconId.Next, contentDescription = null, size = 16.dp, tint = colors.ink3)
+                        CivilightIconButton(
+                            IconId.More,
+                            ScriptCopy.sceneMenuLabel(row.ordinal),
+                            { onSceneMenu(row.sceneKey) },
+                            tint = colors.ink2,
+                        )
                     }
                 }
             }
@@ -206,6 +270,7 @@ internal fun ScriptOutlineSheetContent(
 @Composable
 internal fun SpeakerFocusSheetContent(
     doc: ProjectDoc,
+    hiddenUnlocked: Boolean,
     unitKey: Key,
     focusedSpeakerKey: Key?,
     onSelectSpeaker: (Key?) -> Unit,
@@ -213,20 +278,7 @@ internal fun SpeakerFocusSheetContent(
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    val stats = remember(doc, unitKey) {
-        val sceneKeys = doc.story.units
-            .filter { it.deletedAt == null && (it.parentKey == unitKey || it.key == unitKey) }
-            .mapTo(HashSet()) { it.key }
-        val dialogues = sceneKeys.flatMap { doc.manuscript.liveBlocksOf(it) }
-            .filter { it.kind.known == BlockKind.DIALOGUE && it.speakerKey != null }
-        val total = dialogues.size.coerceAtLeast(1)
-        dialogues.groupBy { it.speakerKey!! }
-            .mapNotNull { (key, list) ->
-                val ch = doc.index.character(key)?.takeIf { it.deletedAt == null } ?: return@mapNotNull null
-                Triple(ch, list.size, (list.size * 100f / total).toInt())
-            }
-            .sortedByDescending { it.second }
-    }
+    val stats = remember(doc, unitKey, hiddenUnlocked) { SpeakerFocus.stats(doc, unitKey, hiddenUnlocked) }
 
     Column(Modifier.fillMaxWidth()) {
         SheetHeader(title = "화자 포커스 · 대사 비중", closeLabel = "닫기", onClose = onClose)
@@ -240,7 +292,7 @@ internal fun SpeakerFocusSheetContent(
                 )
             }
             if (stats.isEmpty()) {
-                EmptyBlock(title = "아직 대사가 작성되지 않았습니다", icon = IconId.User)
+                EmptyBlock(title = "대사 없음", icon = IconId.User)
             } else {
                 SectionLabel("이 회차 화자별 대사 비중")
                 Spacer(Modifier.height(6.dp))
@@ -274,5 +326,32 @@ internal fun SpeakerFocusSheetContent(
                 }
             }
         }
+    }
+}
+
+/** One row of the speaker focus sheet. */
+internal data class SpeakerShare(val character: io.github.lenticualrstone.civilight.model.cast.Character, val lines: Int, val percent: Int)
+
+/**
+ * (0.5.0) Dialogue share per speaker in the live scenes directly under [unitKey] (or [unitKey] itself).
+ * Rule 19: while hidden items are locked, scenes hidden themselves or under a hidden episode/chapter and
+ * hidden speakers are left out, and the share is taken over what remains, so no number reveals them.
+ */
+internal object SpeakerFocus {
+    fun stats(doc: ProjectDoc, unitKey: Key, hiddenUnlocked: Boolean): List<SpeakerShare> {
+        val scenes = doc.manuscript.liveScenes.filter { s ->
+            (s.parentKey == unitKey || s.key == unitKey) &&
+                (hiddenUnlocked || !(s.hidden || doc.index.ancestors(s).any { it.hidden }))
+        }
+        val dialogues = scenes.flatMap { doc.manuscript.liveBlocksOf(it.key) }
+            .filter { it.kind.known == BlockKind.DIALOGUE && it.speakerKey != null }
+            .mapNotNull { b ->
+                val ch = doc.index.character(b.speakerKey!!)?.takeIf { it.deletedAt == null } ?: return@mapNotNull null
+                if (!hiddenUnlocked && ch.hidden) null else ch
+            }
+        val total = dialogues.size.coerceAtLeast(1)
+        return dialogues.groupBy { it.key }
+            .map { (_, list) -> SpeakerShare(list.first(), list.size, (list.size * 100f / total).toInt()) }
+            .sortedByDescending { it.lines }
     }
 }

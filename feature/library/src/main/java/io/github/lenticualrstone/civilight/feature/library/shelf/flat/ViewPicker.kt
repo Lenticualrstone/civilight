@@ -6,7 +6,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.foundation.horizontalSwipe
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
@@ -243,20 +244,16 @@ private fun Stage(s: PickState, modifier: Modifier) {
             }
         }
         // The drag layer over the scenes (they are inert): a horizontal drag previews the next or previous style.
+        val dens = LocalDensity.current.density
         Box(
-            Modifier.fillMaxSize().pointerInput(s.n) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        val now = current.value
-                        now.select(ViewPick.afterSwipe(now.sel, drag, now.n))
-                        drag = 0f
-                    },
-                    onDragCancel = { drag = 0f },
-                ) { change, amount ->
-                    change.consume()
-                    drag += amount / density
-                }
-            },
+            Modifier.fillMaxSize().horizontalSwipe(
+                onDelta = { amount -> drag += amount / dens },
+                onStop = {
+                    val now = current.value
+                    now.select(ViewPick.afterSwipe(now.sel, drag, now.n))
+                    drag = 0f
+                },
+            ),
         )
         // Board `.hint`: `밀어서 바꾸기`.
         Row(
@@ -474,20 +471,16 @@ private fun InnerStage(s: PickState, nativeW: Float, nativeH: Float, k: Float, m
                 Scaled(nativeW, nativeH, k, radius = 28f) { StylePreview(s.picked.style, s.ui, nativeW.dp, nativeH.dp) }
             }
         }
+        val dens = LocalDensity.current.density
         Box(
-            Modifier.matchParentSize().pointerInput(s.n) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        val now = current.value
-                        now.select(ViewPick.afterSwipe(now.sel, drag, now.n))
-                        drag = 0f
-                    },
-                    onDragCancel = { drag = 0f },
-                ) { change, amount ->
-                    change.consume()
-                    drag += amount / density
-                }
-            },
+            Modifier.matchParentSize().horizontalSwipe(
+                onDelta = { amount -> drag += amount / dens },
+                onStop = {
+                    val now = current.value
+                    now.select(ViewPick.afterSwipe(now.sel, drag, now.n))
+                    drag = 0f
+                },
+            ),
         )
     }
 }

@@ -151,6 +151,25 @@ data class CastSettings(
     @EncodeDefault val showFirstAppearanceInHeader: Boolean = true,
     @EncodeDefault val showVoiceProgressInHeader: Boolean = true,
     @EncodeDefault val relationExportAddress: Boolean = false,
+    /** (2026-11-26) `묶음 기준` of place and faction cards. Absent = all unused; not written while unused. */
+    val affiliationBasis: AffiliationBasis = AffiliationBasis(),
+    override val ext: JsonObject? = null,
+) : HasExt
+
+/**
+ * (2026-11-26) `묶음 기준`: which character project fields (type `연결`) group people on place and
+ * faction cards. The user picks each one in 프로젝트 설정; nothing is guessed. Each slot is separate;
+ * null = that slot is not used. Keys point at [io.github.lenticualrstone.civilight.model.cast.FieldDef]s
+ * of entity kind character.
+ */
+@Serializable
+data class AffiliationBasis(
+    /** `소속`: a link field whose target is a faction. */
+    val affiliationFieldKey: Key? = null,
+    /** `거주`: a link field whose target is a place. */
+    val residenceFieldKey: Key? = null,
+    /** `국적`: a link field whose target is a place. */
+    val nationalityFieldKey: Key? = null,
     override val ext: JsonObject? = null,
 ) : HasExt
 

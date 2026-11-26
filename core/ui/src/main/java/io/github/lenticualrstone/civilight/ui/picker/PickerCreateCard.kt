@@ -120,8 +120,12 @@ object PickerCreateCards {
     /** `만들기` is on while the name is not blank. */
     fun canCreate(state: CreateCardState): Boolean = CreateCard.canCreate(state.name)
 
-    /** Live project tags in tag order (trashed tags are never offered, N-44). */
-    fun liveTags(doc: ProjectDoc): List<Tag> = doc.project.tags.filter { it.deletedAt == null }.sortedBy { it.order }
+    /**
+     * Live project tags in tag order (trashed tags are never offered, N-44). (2026-11-26) Character pickers
+     * only: tags of scope `인물` or `모든 항목` (every older tag is `인물`).
+     */
+    fun liveTags(doc: ProjectDoc): List<Tag> =
+        io.github.lenticualrstone.civilight.model.cast.TagScopes.tagsFor(doc, io.github.lenticualrstone.civilight.model.cast.TagScope.CHARACTER)
 }
 
 /** Saves an open picker card with its sheet (`rememberSaveable` of a string). */

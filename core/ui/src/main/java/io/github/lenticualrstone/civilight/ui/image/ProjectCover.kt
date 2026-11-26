@@ -92,7 +92,7 @@ object ProjectCovers {
         }
         val hash = use.blobHash ?: return none
         if (!fileExists(hash)) return none
-        return CoverUi(hash, use.cropFor(ratio), null, initial, use.holo)
+        return CoverUi(hash, ImageCrops.cropFor(use, ratio), null, initial, use.holo)
     }
 }
 

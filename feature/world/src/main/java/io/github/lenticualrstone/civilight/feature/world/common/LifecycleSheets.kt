@@ -21,7 +21,9 @@ import androidx.compose.ui.unit.dp
 import io.github.lenticualrstone.civilight.designsystem.component.ButtonVariant
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightButton
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
-import io.github.lenticualrstone.civilight.designsystem.component.FieldTableRow
+import io.github.lenticualrstone.civilight.designsystem.component.ImpactCountRow
+import io.github.lenticualrstone.civilight.designsystem.component.ListRow
+import io.github.lenticualrstone.civilight.designsystem.component.RowDivider
 import io.github.lenticualrstone.civilight.designsystem.component.RadioRow
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.SheetActions
@@ -98,19 +100,26 @@ fun SheetScope.DeleteSheetContent(key: DeleteSheet, vm: WorldViewModel, readOnly
     val type = CivilightTheme.type
     SheetHeader(title = ui.title, onClose = ::close, subtitle = ui.sub)
     SheetScrollBody {
+        // Same rows as cast's `DeleteImpactContent` (0.5 interface review): shared count rows, then the check
+        // and duplicate rows as compact list rows with `다른 … 합치기 ›` at the right.
         if (ui.owned.isNotEmpty()) {
-            SectionLabel(ui.ownedTitle, Modifier.padding(top = 14.dp, bottom = 2.dp))
-            ui.owned.forEach { FieldTableRow(it.head, it.count + (it.sub?.let { s -> WorldCopy.SEP + s } ?: "")) }
+            SectionLabel(ui.ownedTitle, Modifier.padding(top = 16.dp, bottom = 4.dp))
+            ui.owned.forEach { ImpactCountRow(it.head, it.count, sub = it.sub) }
         }
         if (ui.staying.isNotEmpty()) {
-            SectionLabel(ui.stayingTitle, Modifier.padding(top = 14.dp, bottom = 2.dp))
-            ui.staying.forEach { FieldTableRow(it.head, it.count + (it.sub?.let { s -> WorldCopy.SEP + s } ?: "")) }
-            FieldTableRow(ui.checkRow.first, ui.checkRow.second)
+            SectionLabel(ui.stayingTitle, Modifier.padding(top = 16.dp, bottom = 4.dp))
+            ui.staying.forEach { ImpactCountRow(it.head, it.count, sub = it.sub) }
+            ListRow(ui.checkRow.first, subtitle = ui.checkRow.second, compact = true, divider = RowDivider.NONE)
         }
-        FieldTableRow(ui.duplicateRow.first, ui.duplicateRow.second)
-        ui.mergeAction?.let { label ->
-            TextAction(label, onClick = { sheet.close(); sheet.open(MergePickSheet(key.kind, key.key)) }, color = colors.acc, style = type.small)
-        }
+        ListRow(
+            ui.duplicateRow.first,
+            subtitle = ui.duplicateRow.second,
+            compact = true,
+            divider = RowDivider.NONE,
+            trailing = ui.mergeAction?.let { label ->
+                { TextAction(label, onClick = { sheet.close(); sheet.open(MergePickSheet(key.kind, key.key)) }, color = colors.acc, style = type.small) }
+            },
+        )
         CivilightText(ui.footnote, type.small, Modifier.padding(top = 10.dp), color = colors.ink3)
     }
     SheetActions {
@@ -124,8 +133,8 @@ fun SheetScope.DeleteSheetContent(key: DeleteSheet, vm: WorldViewModel, readOnly
                     deps.toasts.show(deleted.toast.message, actionLabel = deleted.toast.action) { vm.undoLast() }
                 }
             },
+            // Undoable (휴지통 · 되돌리기): primary, as the cast sheet (DS-25).
             modifier = Modifier.weight(1f),
-            variant = ButtonVariant.DANGER,
             enabled = !readOnly,
         )
     }

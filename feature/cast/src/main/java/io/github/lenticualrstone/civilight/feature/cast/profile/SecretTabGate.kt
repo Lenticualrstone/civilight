@@ -1,6 +1,7 @@
 package io.github.lenticualrstone.civilight.feature.cast.profile
 
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
+import io.github.lenticualrstone.civilight.model.app.ProfileTabKind
 import io.github.lenticualrstone.civilight.navigation.ProfileTab
 import io.github.lenticualrstone.civilight.ui.security.AuthResult
 
@@ -16,6 +17,16 @@ object ProfileTabs {
     fun label(tab: ProfileTab): String = CastUiCopy.TABS[tab.ordinal]
 
     fun labels(gameTools: Boolean): List<String> = shown(gameTools).map(::label)
+
+    /** The gate tab of a modular tab (0.5.0 tab presets); tabs without a gate tab count as `개요`. */
+    fun gateTab(kind: ProfileTabKind): ProfileTab = when (kind) {
+        ProfileTabKind.OVERVIEW -> ProfileTab.OVERVIEW
+        ProfileTabKind.RELATIONS -> ProfileTab.RELATIONS
+        ProfileTabKind.SPEECH -> ProfileTab.SPEECH
+        ProfileTabKind.GAME_TEXT -> ProfileTab.GAME_TEXT
+        ProfileTabKind.SECRET -> ProfileTab.SECRET
+        else -> ProfileTab.OVERVIEW
+    }
 
     /** A remembered `게임 텍스트` while the switch is off opens `개요`. */
     fun allowed(tab: ProfileTab, gameTools: Boolean): ProfileTab = if (tab in shown(gameTools)) tab else ProfileTab.OVERVIEW
@@ -110,6 +121,20 @@ object SecretTabGate {
      */
     fun composesBody(slot: ProfileTab, state: TabGateState, locked: Boolean): Boolean =
         slot != ProfileTab.SECRET || !locked || state.shown(locked) == ProfileTab.SECRET
+
+    /**
+     * (N-43) `← 돌아가기` from the 비밀 view opened inside another tab (`여담 › 비밀`): back to [to] with the
+     * gate locked, so the next opening asks again.
+     */
+    fun leave(state: TabGateState, to: ProfileTab, locked: Boolean): TabGateState =
+        if (to == ProfileTab.SECRET) state else select(state, to, locked)
+
+    /**
+     * Whether the 비밀 view (the tab or the view opened inside another tab) is still the selection. False
+     * after a cancelled or failed prompt ([cancel] went back to the previous tab): the screen drops the
+     * 비밀 selection and draws the previous tab instead of an empty body.
+     */
+    fun secretSelected(state: TabGateState): Boolean = state.tab == ProfileTab.SECRET
 
     /** `게임 제작 도구` switched off while `게임 텍스트` was selected. */
     fun gameToolsChanged(state: TabGateState, gameTools: Boolean): TabGateState =

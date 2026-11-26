@@ -39,6 +39,7 @@ fun CastCreateCard(
     canCreate: Boolean = CastCreate.canCreate(state),
     tags: List<Tag> = emptyList(),
     fields: List<CreateField> = CastCreate.fields(state.kind),
+    extra: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     CreateCardOverlay(
         title = CreateCard.title(state.kind),
@@ -50,6 +51,8 @@ fun CastCreateCard(
         dismissOnScrim = CreateCard.dismissOnScrim(state),
     ) {
         CastCardFields(state, fields, onChange, tags)
+        // (2026-11-26) Below the fields: the same-name line and, in tag settings, the scope radios.
+        extra?.invoke(this)
     }
 }
 

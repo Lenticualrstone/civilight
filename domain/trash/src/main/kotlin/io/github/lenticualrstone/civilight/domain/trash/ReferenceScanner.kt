@@ -55,6 +55,9 @@ enum class RefKind {
     /** A place whose `지역/소속` parent is the place. */
     CHILD_PLACE,
 
+    /** (2026-11-26) A faction whose `거점` is the place. */
+    BASE_PLACE,
+
     /** Timeline event place. */
     EVENT_PLACE,
 
@@ -140,7 +143,7 @@ class ReferenceScanner(private val doc: ProjectDoc, private val recorder: Record
             canvasNodes(item.key, CanvasNodeKind.CHARACTER) + recorderLinks(item.key, RecorderTargetKind.CHARACTER)
         ItemKind.PLACE -> scenePlaces(PlaceRefKind.PLACE) { it == item.key } + linkRefs(item.key, LinkTargetKind.PLACE) +
             fieldLinks(item.key) + related(item.key, ItemRefKind.PLACE) + placeMapLinks(item.key) + routeEnds(item.key) +
-            subMapsOfPlace(item.key) + childPlaces(item.key) + eventPlaces(PlaceRefKind.PLACE) { it == item.key } +
+            subMapsOfPlace(item.key) + childPlaces(item.key) + basedFactions(item.key) + eventPlaces(PlaceRefKind.PLACE) { it == item.key } +
             recorderLinks(item.key, RecorderTargetKind.PLACE)
         ItemKind.TERM -> linkRefs(item.key, LinkTargetKind.TERM) + fieldLinks(item.key) + related(item.key, ItemRefKind.TERM) +
             eventTerms(item.key) + canvasNodes(item.key, CanvasNodeKind.TERM) + recorderLinks(item.key, RecorderTargetKind.TERM)
@@ -223,6 +226,10 @@ class ReferenceScanner(private val doc: ProjectDoc, private val recorder: Record
     private fun childPlaces(key: Key): List<RefSite> = doc.world.places
         .filter { it.deletedAt == null && it.parentPlaceKey == key }
         .map { RefSite(RefKind.CHILD_PLACE, it.key) }
+
+    private fun basedFactions(key: Key): List<RefSite> = doc.world.factions
+        .filter { it.deletedAt == null && it.baseKey == key }
+        .map { RefSite(RefKind.BASE_PLACE, it.key, slot = "baseKey") }
 
     private fun canvasNodes(key: Key, kind: CanvasNodeKind): List<RefSite> = doc.canvases.values
         .filter { it.deletedAt == null }

@@ -1,6 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.story.menu
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -139,12 +141,20 @@ private fun SheetScope.replaceWith(next: SheetKey) {
     open(next)
 }
 
-/** A ⋯ row as `RSHeadMenu` draws it: min 52, `line` top, label 15 / 21 medium, value `small`. */
+/**
+ * A ⋯ row as `RSHeadMenu` draws it: min 52, `line` top, label 15 / 21 medium, value `small`. (0.3.2) `씬 지우기`
+ * (always the last row) sits under its own divider (a 12 dp gap closed by a `line`), in `warn` with the trash icon.
+ */
 @Composable
 private fun MenuRowView(row: MenuRow, onClick: () -> Unit) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
-    Column(
+    if (row.action == MenuAction.DELETE_SCENE) {
+        // The shared ⋯ `지우기` row (0.5 interface review): divider, trash icon, `warn`, always last.
+        io.github.lenticualrstone.civilight.designsystem.component.MenuDeleteRow(row.label, onClick, subtitle = row.value, enabled = row.enabled)
+        return
+    }
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .topHairline(colors.line)
@@ -152,11 +162,18 @@ private fun MenuRowView(row: MenuRow, onClick: () -> Unit) {
             .alpha(if (row.enabled) 1f else DISABLED_ALPHA)
             .heightIn(min = 52.dp)
             .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CivilightText(row.label, type.itemTitleCompact.merge(TextStyle(fontWeight = FontWeight.Medium)), color = colors.ink, maxLines = 1)
-        row.value?.let { CivilightText(it, type.small, color = colors.ink3, maxLines = 1) }
+        Column(horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.Center) {
+            CivilightText(
+                row.label,
+                type.itemTitleCompact.merge(TextStyle(fontWeight = FontWeight.Medium)),
+                color = colors.ink,
+                maxLines = 1,
+            )
+            row.value?.let { CivilightText(it, type.small, color = colors.ink3, maxLines = 1) }
+        }
     }
 }
 

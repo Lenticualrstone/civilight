@@ -39,6 +39,11 @@ data class Term(
     override val trashEntryKey: Key? = null,
     @EncodeDefault override val updatedAt: Timestamp = 0L,
     @EncodeDefault override val updatedBy: String = "",
+    /**
+     * (2026-11-26) Ordered project [io.github.lenticualrstone.civilight.model.cast.Tag] keys (scope
+     * `term` or `all`). Written only when not empty, so older files stay byte-identical.
+     */
+    val tagKeys: List<Key> = emptyList(),
     override val ext: JsonObject? = null,
 ) : Entity, Ordered, Trashable
 
@@ -92,6 +97,16 @@ data class Place(
     override val trashEntryKey: Key? = null,
     @EncodeDefault override val updatedAt: Timestamp = 0L,
     @EncodeDefault override val updatedBy: String = "",
+    /**
+     * (2026-11-26) `소속 세력 및 인물`: the user's order of the faction groups on this place card
+     * (faction keys). Unlisted factions follow in creation order. Written only when not empty.
+     */
+    val factionOrder: List<Key> = emptyList(),
+    /**
+     * (2026-11-26) The user's order of the unaffiliated people (`무소속`) on this place card
+     * (character keys). Unlisted people follow in creation order. Written only when not empty.
+     */
+    val looseOrder: List<Key> = emptyList(),
     override val ext: JsonObject? = null,
 ) : Entity, Ordered, Trashable
 
@@ -108,6 +123,13 @@ data class Faction(
     override val trashEntryKey: Key? = null,
     @EncodeDefault override val updatedAt: Timestamp = 0L,
     @EncodeDefault override val updatedBy: String = "",
+    /** (2026-11-26) `거점`: fixed field, a [Place] key; null = none. Not written while null. */
+    val baseKey: Key? = null,
+    /**
+     * (2026-11-26) `소속 인물` in the user's order (character keys); the same on every place card.
+     * Unlisted members follow in creation order. Written only when not empty.
+     */
+    val memberOrder: List<Key> = emptyList(),
     override val ext: JsonObject? = null,
 ) : Entity, Ordered, Trashable
 

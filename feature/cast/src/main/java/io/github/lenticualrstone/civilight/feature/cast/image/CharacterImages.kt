@@ -1,5 +1,6 @@
 package io.github.lenticualrstone.civilight.feature.cast.image
 
+import io.github.lenticualrstone.civilight.ui.image.ImageCrops
 import io.github.lenticualrstone.civilight.feature.cast.CastUiCopy
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.asset.Crop
@@ -52,7 +53,7 @@ object CharacterImages {
         return SlotImage(
             presetId = use.presetId,
             blobHash = use.blobHash,
-            crop = use.cropFor(place.ratio),
+            crop = ImageCrops.cropFor(use, place.ratio),
             holo = place.slot == ImageSlot.CHARACTER_PORTRAIT && use.holo,
             ratio = place.ratio,
         )

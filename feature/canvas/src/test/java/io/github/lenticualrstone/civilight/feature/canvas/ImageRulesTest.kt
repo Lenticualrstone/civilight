@@ -94,7 +94,8 @@ class ImageRulesTest {
         assertNotNull(before.cropFor(Ratio.R3X4))
 
         session = CropSession.start(ImageSlot.PROJECT_COVER, original, before, b.hash, holo = false).zoom(1.4f)
-        assertEquals(setOf(Ratio.R3X4), session.touched)
+        // The stored square was edited on its own, so it keeps its place (not automatic).
+        assertEquals(setOf(Ratio.R3X4, Ratio.R1X1), session.touched)
         doc = ImageEdits.placeBlob(doc, cover, b.hash, session.crops(), session.holo, ctx)
         val after = ImageEdits.use(doc, cover)!!
         assertTrue(CropMath.same(square, after.cropFor(Ratio.R1X1)))
@@ -192,9 +193,12 @@ class ImageRulesTest {
         val flipped = turned.flip()
         assertTrue(flipped.edit.flipH)
         assertEquals(CropEdit(), flipped.reset().edit)
+        // The other ratio follows the edited one (CST-13): it opens on the derived crop, turned and mirrored too.
         val other = flipped.select(Ratio.R1X1)
-        assertEquals(CropEdit(), other.edit)
-        assertEquals(setOf(Ratio.R3X4, Ratio.R1X1), other.touched)
+        assertEquals(90, other.edit.rotation)
+        assertTrue(other.edit.flipH)
+        assertTrue(other.isAuto(Ratio.R1X1))
+        assertEquals(setOf(Ratio.R3X4), other.touched)
         // Background: holo is refused.
         assertFalse(CropSession.start(ImageSlot.CHARACTER_BACKGROUND, original, null, "h", holo = true).holo)
         // Saved state round trip (CNV-35).

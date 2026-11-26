@@ -20,7 +20,7 @@ sealed interface TagRestore {
 
 /**
  * (0.2.0, N-44, CST-75) Tags in the trash. A trashed tag keeps its row in `project.json › tags` with
- * `deletedAt`; characters and gallery images keep its key, so a restore shows it on them again. A
+ * `deletedAt`; characters, terms (2026-11-26) and gallery images keep its key, so a restore shows it on them again. A
  * purge (`영구 삭제` or the 30-day purge, through [PurgeOps]) removes the key everywhere.
  */
 object TagTrash {
@@ -37,6 +37,13 @@ object TagTrash {
     /** `쓰는 인물 n`: live characters holding [tagKey] (the caller leaves out locked hidden ones by [counted]). */
     fun usingCharacters(doc: ProjectDoc, tagKey: Key, counted: (io.github.lenticualrstone.civilight.model.cast.Character) -> Boolean = { true }): Int =
         doc.cast.characters.count { it.deletedAt == null && tagKey in it.tagKeys && counted(it) }
+
+    /**
+     * (2026-11-26) `용어 n`: live terms holding [tagKey] (the caller leaves out locked hidden ones by [counted]).
+     * Only a live tag of scope term or all can be on a term.
+     */
+    fun usingTerms(doc: ProjectDoc, tagKey: Key, counted: (io.github.lenticualrstone.civilight.model.world.Term) -> Boolean = { true }): Int =
+        doc.world.terms.count { it.deletedAt == null && tagKey in it.tagKeys && counted(it) }
 
     /** `이미지 n`: live gallery images holding [tagKey]. */
     fun usingImages(doc: ProjectDoc, tagKey: Key): Int =
@@ -81,9 +88,14 @@ object TagTrash {
         return nameFree(doc, tag.name, except = tag.key)
     }
 
-    /** Removes [tagKey] from the project, every character and every gallery image (live and trashed rows). */
+    /** Removes [tagKey] from the project, every character, every term (2026-11-26) and every gallery image (live and trashed rows). */
     fun removeEverywhere(doc: ProjectDoc, tagKey: Key, ctx: TrashContext): ProjectDoc = doc.copy(
         project = doc.project.copy(tags = doc.project.tags.filterNot { it.key == tagKey }),
+        world = if (doc.world.terms.none { tagKey in it.tagKeys }) doc.world else doc.world.copy(
+            terms = doc.world.terms.map {
+                if (tagKey in it.tagKeys) it.copy(tagKeys = it.tagKeys - tagKey, updatedAt = ctx.now, updatedBy = ctx.deviceId) else it
+            },
+        ),
         cast = doc.cast.copy(
             characters = doc.cast.characters.map {
                 if (tagKey in it.tagKeys) it.copy(tagKeys = it.tagKeys - tagKey, updatedAt = ctx.now, updatedBy = ctx.deviceId) else it

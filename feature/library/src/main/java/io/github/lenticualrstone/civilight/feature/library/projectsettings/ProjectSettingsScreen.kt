@@ -44,6 +44,7 @@ import io.github.lenticualrstone.civilight.domain.library.rating.ProtectionSetti
 import io.github.lenticualrstone.civilight.feature.library.LibraryServices
 import io.github.lenticualrstone.civilight.feature.library.common.sheetBody
 import io.github.lenticualrstone.civilight.navigation.DayBandSettings
+import io.github.lenticualrstone.civilight.navigation.AffiliationBasisSettings
 import io.github.lenticualrstone.civilight.navigation.ProjectSettings
 import io.github.lenticualrstone.civilight.navigation.RelationKindSettings
 import io.github.lenticualrstone.civilight.navigation.Route
@@ -136,6 +137,7 @@ internal fun routeOf(target: ProjectSettingsTarget, projectKey: Key): Route = wh
     ProjectSettingsTarget.VOICE_FORMAT -> ScriptFieldSettings(projectKey)
     ProjectSettingsTarget.TRANSITION -> TransitionTextSettings(projectKey)
     ProjectSettingsTarget.TAGS -> TagSettings(projectKey)
+    ProjectSettingsTarget.AFFILIATION_BASIS -> AffiliationBasisSettings(projectKey)
 }
 
 @Composable

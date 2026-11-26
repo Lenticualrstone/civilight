@@ -101,6 +101,7 @@ object PurgeOps {
             if (!doc.exists(item)) return
             val name = doc.itemName(item)
             val hidden = doc.itemHidden(item)
+            val parentPlace = if (item.kind == ItemKind.PLACE) doc.index.place(item.key)?.parentPlaceKey else null
             when (item.kind) {
                 ItemKind.CHARACTER -> purgeEntity(item, EntityKind.CHARACTER, RelationEndKind.CHARACTER)
                 ItemKind.PLACE -> {
@@ -174,6 +175,7 @@ object PurgeOps {
                     removed += item.key
                 }
             }
+            doc = AffiliationKeys.onPurge(doc, item, ctx.now, ctx.deviceId, parentPlace)
             log += DeletionLogEntry(item.key, logKind(item.kind), ctx.now)
             item.kind.nameTagKind?.takeIf { item.kind.isNamedItem }?.let { tagKind ->
                 val tag = NameTag(

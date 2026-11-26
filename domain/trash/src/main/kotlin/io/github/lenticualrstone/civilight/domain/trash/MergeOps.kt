@@ -286,6 +286,10 @@ object MergeOps {
 
         // 4. Terms: first reveal and aliases.
         if (kind == ItemKind.TERM) d = mergeTermReveal(d, mergedKey, targetKey, choices.revealFromMerged, ctx, chosen)
+        // 4b. (2026-11-26) Term tags: the target gets the union (trashed tags' keys too, so a restore shows them), in tag order.
+        if (kind == ItemKind.TERM) d = mergeTermTags(d, mergedKey, targetKey, ctx)
+        // 4c. (2026-11-26) A merged faction's 거점 and member order, a merged place's faction and 무소속 orders.
+        d = AffiliationKeys.carryOwnLists(d, kind, mergedKey, targetKey, ctx.now, ctx.deviceId)
 
         // 5. The merged item goes to the trash as `합침 → <target>`.
         val today = ctx.today
@@ -528,6 +532,8 @@ object MergeOps {
                 },
             )
         }
+        // (2026-11-26) 거점, faction order, member order and 무소속 order follow the merge.
+        d = AffiliationKeys.onMerge(d, kind, from, to, at, by, moved)
         return d
     }
 
@@ -582,6 +588,16 @@ object MergeOps {
             if (aliases == t.aliases) t else t.copy(aliases = aliases, updatedAt = ctx.now, updatedBy = ctx.deviceId)
         }
         return doc.copy(changes = doc.changes.copy(records = records), world = doc.world.copy(terms = terms))
+    }
+
+    private fun mergeTermTags(doc: ProjectDoc, from: Key, to: Key, ctx: TrashContext): ProjectDoc {
+        val merged = doc.index.term(from) ?: return doc
+        if (merged.tagKeys.isEmpty()) return doc
+        return doc.copy(world = doc.world.copy(terms = doc.world.terms.map { t ->
+            if (t.key != to) return@map t
+            val union = io.github.lenticualrstone.civilight.model.cast.TagScopes.inTagOrder(doc, t.tagKeys + merged.tagKeys)
+            if (union == t.tagKeys) t else t.copy(tagKeys = union, updatedAt = ctx.now, updatedBy = ctx.deviceId)
+        }))
     }
 
     internal fun liveReveal(doc: ProjectDoc, termKey: Key) = doc.changes.records.firstOrNull {

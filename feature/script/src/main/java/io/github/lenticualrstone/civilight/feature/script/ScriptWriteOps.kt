@@ -148,10 +148,19 @@ fun ScriptViewModel.claimDraft() {
 /** A change of the field's text or caret; returns what the screen opens (the `@` picker). */
 fun ScriptViewModel.onDraftText(text: String, selStart: Int, selEnd: Int, smartPunctuation: Boolean = false): DraftEffect {
     if (readOnly) return DraftEffect.NONE
-    val transformed = if (smartPunctuation) Drafts.applySmartPunctuation(text) else text
-    val delta = text.length - transformed.length
-    val adjStart = (selStart - delta).coerceIn(0, transformed.length)
-    val adjEnd = (selEnd - delta).coerceIn(0, transformed.length)
+    var transformed = text
+    var adjStart = selStart
+    var adjEnd = selEnd
+    if (smartPunctuation) {
+        // Only the just-typed span; text loaded by 고치기 or already in the draft stays as it is.
+        val smart = Drafts.smartPunctuation(draftFlow.value.text, text, selStart, selEnd, smartUndo)
+        transformed = smart.text
+        adjStart = smart.selStart
+        adjEnd = smart.selEnd
+        smartUndo = smart.undo
+    } else {
+        smartUndo = null
+    }
     val (next, effect) = Drafts.textChanged(draftFlow.value, transformed, adjStart, adjEnd)
     setDraft(next)
     return effect

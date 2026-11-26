@@ -3,7 +3,6 @@ package io.github.lenticualrstone.civilight.feature.canvas.gallery
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
+import io.github.lenticualrstone.civilight.designsystem.foundation.horizontalSwipe
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
@@ -340,20 +340,14 @@ private fun Stage(raw: Int, data: StylePreviewData?, screenW: Dp, screenH: Dp, i
             .background(Brush.verticalGradient(listOf(colors.tint, Color.Transparent)))
             .insetOutline(colors.line, 1.dp, shape)
             .semantics { role = Role.Image; contentDescription = GalleryStyleCopy.preview(picked.label) }
-            .pointerInput(raw) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        val step = StylePickRules.swipeStep(drag, threshold)
-                        drag = 0f
-                        if (step != 0) onPick(raw + step)
-                    },
-                    onDragCancel = { drag = 0f },
-                    onHorizontalDrag = { change, amount ->
-                        drag += amount
-                        change.consume()
-                    },
-                )
-            },
+            .horizontalSwipe(
+                onDelta = { amount -> drag += amount },
+                onStop = {
+                    val step = StylePickRules.swipeStep(drag, threshold)
+                    drag = 0f
+                    if (step != 0) onPick(raw + step)
+                },
+            ),
     ) {
         val stageW = maxWidth.value
         val stageH = maxHeight.value

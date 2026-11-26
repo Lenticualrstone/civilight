@@ -108,30 +108,43 @@ fun SwipeRevealBox(
     LaunchedEffect(revealed, widthPx) {
         offset.animateTo(if (revealed) -widthPx else 0f, CivilightMotion.spec(CivilightMotion.swipe, reduced))
     }
-    Box(modifier.clipToBounds()) {
-        Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
-            Box(Modifier.graphicsLayer { alpha = (-offset.value / widthPx).coerceIn(0f, 1f) }) { actions() }
+    // Hidden buttons are not composed, so a tap on the closed block never falls through to them.
+    val showActions by remember { derivedStateOf { offset.value < -SWIPE_EDGE_PX } }
+    // The swipe sits on this stationary outer box, not on the sliding block: deltas are read in coordinates that
+    // never move, and the revealed buttons (its children) see their taps first. On the block before `.offset`,
+    // its hit area stayed over the whole row and swallowed the buttons' taps.
+    Box(
+        modifier
+            .clipToBounds()
+            .horizontalSwipe(
+                enabled = enabled,
+                canStart = { dx -> GestureRules.canMove(dx, offset.value, -widthPx, 0f) },
+                onDelta = { delta -> scope.launch { offset.snapTo((offset.value + delta).coerceIn(-widthPx, 0f)) } },
+                onStop = {
+                    scope.launch {
+                        val open = offset.value < -widthPx / 2
+                        offset.animateTo(if (open) -widthPx else 0f, CivilightMotion.spec(CivilightMotion.swipe, reduced))
+                        if (open != revealed) onRevealedChange(open)
+                    }
+                },
+            ),
+    ) {
+        if (showActions) {
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+                Box(Modifier.graphicsLayer { alpha = (-offset.value / widthPx).coerceIn(0f, 1f) }) { actions() }
+            }
         }
+        // The block only slides; its hit area moves with it, so it never covers the revealed buttons.
         Box(
             Modifier
-                // 0.2.3: horizontalSwipe sits before offset so drag deltas stay in stationary coordinates.
-                .horizontalSwipe(
-                    enabled = enabled,
-                    canStart = { dx -> GestureRules.canMove(dx, offset.value, -widthPx, 0f) },
-                    onDelta = { delta -> scope.launch { offset.snapTo((offset.value + delta).coerceIn(-widthPx, 0f)) } },
-                    onStop = {
-                        scope.launch {
-                            val open = offset.value < -widthPx / 2
-                            offset.animateTo(if (open) -widthPx else 0f, CivilightMotion.spec(CivilightMotion.swipe, reduced))
-                            if (open != revealed) onRevealedChange(open)
-                        }
-                    },
-                )
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
                 .background(CivilightTheme.colors.bg),
         ) { content() }
     }
 }
+
+/** Offset (px) past which a slid block counts as off rest (its buttons are composed). */
+private const val SWIPE_EDGE_PX: Float = 0.5f
 
 /** Which side of a two-sided swipe row is open (SCR-30). */
 enum class SwipeSide {
@@ -274,7 +287,34 @@ fun TwoSidedSwipeRow(
     val editOn by rememberUpdatedState(editEnabled)
     val showRef by remember { derivedStateOf { SwipeReveal.showsReference(offset.value, refOn) } }
     val showEdit by remember { derivedStateOf { SwipeReveal.showsEdit(offset.value, editOn) } }
-    Box(modifier.clipToBounds()) {
+    // As in [SwipeRevealBox]: the swipe on the stationary outer box, only the block slides.
+    Box(
+        modifier
+            .clipToBounds()
+            .horizontalSwipe(
+                enabled = referenceEnabled || editEnabled,
+                canStart = { dx ->
+                    GestureRules.canMove(
+                        dx,
+                        offset.value,
+                        if (refOn) -refPx else minOf(offset.value, 0f),
+                        if (editOn) editPx else maxOf(offset.value, 0f),
+                    )
+                },
+                onDelta = { delta ->
+                    scope.launch {
+                        offset.snapTo(SwipeReveal.clamp(offset.value + delta, refPx, editPx, referenceEnabled, editEnabled))
+                    }
+                },
+                onStop = {
+                    scope.launch {
+                        val next = SwipeReveal.settle(offset.value, refPx, editPx, referenceEnabled, editEnabled)
+                        offset.animateTo(SwipeReveal.restOffset(next, refPx, editPx), motion.move(CivilightMotion.swipe))
+                        if (next != side) onSideChange(next)
+                    }
+                },
+            ),
+    ) {
         if (showRef) {
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
                 Box(Modifier.graphicsLayer { alpha = (-offset.value / refPx).coerceIn(0f, 1f) }) { referenceActions() }
@@ -287,29 +327,6 @@ fun TwoSidedSwipeRow(
         }
         Box(
             Modifier
-                .horizontalSwipe(
-                    enabled = referenceEnabled || editEnabled,
-                    canStart = { dx ->
-                        GestureRules.canMove(
-                            dx,
-                            offset.value,
-                            if (refOn) -refPx else minOf(offset.value, 0f),
-                            if (editOn) editPx else maxOf(offset.value, 0f),
-                        )
-                    },
-                    onDelta = { delta ->
-                        scope.launch {
-                            offset.snapTo(SwipeReveal.clamp(offset.value + delta, refPx, editPx, referenceEnabled, editEnabled))
-                        }
-                    },
-                    onStop = {
-                        scope.launch {
-                            val next = SwipeReveal.settle(offset.value, refPx, editPx, referenceEnabled, editEnabled)
-                            offset.animateTo(SwipeReveal.restOffset(next, refPx, editPx), motion.move(CivilightMotion.swipe))
-                            if (next != side) onSideChange(next)
-                        }
-                    },
-                )
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
                 .background(CivilightTheme.colors.bg),
         ) { content() }

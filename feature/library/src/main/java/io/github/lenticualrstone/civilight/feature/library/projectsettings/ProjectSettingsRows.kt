@@ -1,6 +1,8 @@
 package io.github.lenticualrstone.civilight.feature.library.projectsettings
 
 import io.github.lenticualrstone.civilight.domain.world.map.Travel
+import io.github.lenticualrstone.civilight.domain.world.item.AffiliationSettings
+import io.github.lenticualrstone.civilight.domain.world.item.BasisSlot
 import io.github.lenticualrstone.civilight.domain.library.newproject.CoverSummary
 import io.github.lenticualrstone.civilight.domain.cast.field.FieldSettings
 import io.github.lenticualrstone.civilight.domain.cast.relation.RelationKinds
@@ -28,6 +30,9 @@ enum class ProjectSettingsTarget {
 
     /** `태그` (CST-12, cast's `TagSettings`; not on the `ProjSettings` board, see Spec conflicts). */
     TAGS,
+
+    /** (2026-11-26) `묶음 기준` (board `ImmPlaceRules`), beside `인물 항목`; the world area owns the screen. */
+    AFFILIATION_BASIS,
 }
 
 /**
@@ -74,9 +79,21 @@ object ProjectSettingsRows {
         val (title, sub, value) = FieldSettings.entryRow(doc)
         return listOf(
             ProjectLinkRow(ProjectSettingsTarget.FIELDS, title, sub, value.removeSuffix("›").trim()),
+            affiliationBasis(doc),
             ProjectLinkRow(ProjectSettingsTarget.RELATION_KINDS, ProjectSettingsCopy.RELATION_KINDS, RelationKinds.summary(doc), ProjectSettingsCopy.CHANGE),
             tags(doc),
         )
+    }
+
+    /**
+     * (2026-11-26) `묶음 기준` · `소속 소속 · 거주 고르기 · 국적 국적` · `바꾸기`: each slot's usable field, else `고르기`
+     * (a stored field that is trashed or no longer a fitting `연결` reads `고르기`, as the place card treats it).
+     */
+    fun affiliationBasis(doc: ProjectDoc): ProjectLinkRow {
+        val sub = BasisSlot.entries.joinToString(" · ") { slot ->
+            "${slot.label} ${AffiliationSettings.usableDef(doc, slot)?.name ?: ProjectSettingsCopy.BASIS_PICK}"
+        }
+        return ProjectLinkRow(ProjectSettingsTarget.AFFILIATION_BASIS, ProjectSettingsCopy.AFFILIATION_BASIS, sub, ProjectSettingsCopy.CHANGE)
     }
 
     /**
@@ -84,7 +101,8 @@ object ProjectSettingsRows {
      * names in their order, no value word, no sub while there is no tag).
      */
     fun tags(doc: ProjectDoc): ProjectLinkRow {
-        val names = doc.project.tags.filter { it.isLive }.sortedBy { it.order }.joinToString(" · ") { it.name }
+        // (2026-11-26) Every live tag whatever its scope (`인물` · `용어 전용` · `모든 항목`), in tag order (order, then key).
+        val names = io.github.lenticualrstone.civilight.model.cast.TagScopes.live(doc).joinToString(" · ") { it.name }
         return ProjectLinkRow(ProjectSettingsTarget.TAGS, ProjectSettingsCopy.TAGS, names.ifEmpty { null }, null)
     }
 

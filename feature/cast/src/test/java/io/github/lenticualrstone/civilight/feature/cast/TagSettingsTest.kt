@@ -20,14 +20,15 @@ class TagSettingsTest {
         val first = rows.first()
         val live = doc.cast.characters.count { it.deletedAt == null && first.key in it.tagKeys }
         assertEquals(live, first.count)
-        // 55 §3.4: the row reads `인물 n · 이미지 m`; no gallery yet means no images.
-        assertEquals("인물 $live · 이미지 0", first.line)
+        // (2026-11-26) The impact line: `인물 n`, then `이미지 m` only when images hold it (none without a gallery).
+        assertEquals("인물 $live", first.line)
+        assertEquals("인물", first.scopeLabel)
     }
 
     @Test
     fun `55 3_4 rows count gallery images, hidden ones only while hidden items are open`() {
         val g0 = ExampleGallery.build()
-        fun line(tag: String, unlocked: Boolean) = TagSettingsModel.rows(g0, unlocked).single { it.key == tag }.line.substringAfter(" · ")
+        fun line(tag: String, unlocked: Boolean) = TagSettingsModel.rows(g0, unlocked).single { it.key == tag }.line!!.substringAfter(" · ")
         assertEquals("이미지 4", line(ExampleGallery.TAG_ILLUSTRATION, unlocked = false))
         assertEquals("이미지 5", line(ExampleGallery.TAG_ILLUSTRATION, unlocked = true))
         assertEquals("이미지 2", line(ExampleGallery.TAG_SETTING, unlocked = false))

@@ -157,6 +157,20 @@ class CanvasCopyLintTest {
         assertEquals(MotionLint.report(issues), 0, issues.size)
     }
 
+    /** 0.5 interface review: no sentence-form (`~습니다`, `~주세요`) string literal in main sources; copy is fragments in the Copy objects. */
+    @Test
+    fun `no sentence-form literal is left in main sources`() {
+        val sentence = Regex(""""[^"]*(습니다|주세요)[^"]*"""")
+        val left = File("src/main").walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .filter { f -> f.readLines().any { line -> !line.trimStart().startsWith("*") && !line.trimStart().startsWith("//") && sentence.containsMatchIn(line) } }
+            .map { it.name }
+            .toList()
+        assertEquals(emptyList<String>(), left)
+        assertEquals("프로젝트 열지 못함", CanvasCopy.LOAD_FAILED)
+        assertEquals("뒤로 · 다시 열기", CanvasCopy.LOAD_FAILED_SUB)
+    }
+
     /** Hard rule: no placeholder copy may remain where it can reach the screen (the shell has the same guard). */
     @Test
     fun `no TODO_COPY string is left in main sources`() {

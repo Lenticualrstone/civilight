@@ -57,3 +57,7 @@ data class WorldCalendar(override val projectKey: Key) : WorldRoute, ProjectRout
 /** 프로젝트 설정 › 이동 수단 (WLD-30, STO-28). */
 @Serializable
 data class TravelModes(override val projectKey: Key) : WorldRoute, ProjectRoute
+
+/** (2026-11-26) 프로젝트 설정 › 묶음 기준 (board `ImmPlaceRules`): the character fields read as 소속 · 거주 · 국적. */
+@Serializable
+data class AffiliationBasisSettings(override val projectKey: Key) : WorldRoute, ProjectRoute
