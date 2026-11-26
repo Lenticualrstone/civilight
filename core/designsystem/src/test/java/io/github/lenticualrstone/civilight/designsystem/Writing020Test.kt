@@ -148,7 +148,7 @@ class Writing020Test {
         // 15 a-rows less A2 (kept as text); every b-row B1 … B33 but B26 (terrain palette, no r2 key).
         assertEquals(14, IconButtonSpec.entries.filter { it.cls == IconClass.A }.map { it.row }.distinct().size)
         assertEquals((1..33).map { "B$it" } - "B26", IconButtonSpec.entries.filter { it.cls == IconClass.B }.map { it.row }.distinct().sortedBy { it.drop(1).toInt() })
-        assertEquals("시점 추가", IconButtons.nameOf(IconButtonSpec.ADD_POINT))
+        assertEquals("시점 더하기", IconButtons.nameOf(IconButtonSpec.ADD_POINT))
         assertEquals("시점", IconButtonSpec.ADD_POINT.text)
         assertEquals("여러 장 고르기", IconButtons.nameOf(IconButtonSpec.MULTI_SELECT))
         assertEquals("고르기", IconButtonSpec.MULTI_SELECT.text)

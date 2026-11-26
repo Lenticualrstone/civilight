@@ -394,7 +394,7 @@ class Cast020SweepTest {
         assertEquals("뒤로", CastUiCopy.BACK)
         assertEquals("항목 넣기", io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.ADD_FIELD.accessibilityName)
         assertEquals(listOf("목록", "관계도"), listOf(io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.CAST_LIST.accessibilityName, io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.CAST_GRAPH.accessibilityName))
-        assertEquals("시점 추가", io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.ADD_POINT.accessibilityName)
+        assertEquals("시점 더하기", io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.ADD_POINT.accessibilityName)
     }
 
     // --- review fixes (CST-73, CST-76, CST-66, merge) ---

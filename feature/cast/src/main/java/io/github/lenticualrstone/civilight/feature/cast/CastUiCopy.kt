@@ -33,7 +33,7 @@ object CastUiCopy {
     const val HIDDEN_EXCLUDED = "숨긴 항목 제외"
 
     // --- 인물 목록 (CST-01, CST-02, CST-05) ---
-    const val NEW_CHARACTER = "인물 추가"
+    const val NEW_CHARACTER = "인물 더하기"
 
     /** The first row's segmented control `목록 | 관계도` (`Cast`). */
     val VIEW_MODES = listOf("목록", "관계도")
@@ -67,7 +67,7 @@ object CastUiCopy {
     /** Kept for source compatibility (U-10): plain saves read [BTN_SAVE], the lens button [BTN_LENS_CORRECT]. */
     @Deprecated("U-10: a plain save is BTN_SAVE; the lens edit button is BTN_LENS_CORRECT", ReplaceWith("CastUiCopy.BTN_SAVE"))
     const val BTN_CORRECT = BTN_SAVE
-    const val BTN_ADD_POINT = "시점 추가"
+    const val BTN_ADD_POINT = "시점 더하기"
     const val HISTORY_OPEN = "변화 기록"
     const val SPEECH = "말투"
 
@@ -325,8 +325,14 @@ object CastUiCopy {
     /** `‘주연’ 지우기` (tag delete confirm title). */
     fun tagDeleteTitle(name: String): String = deleteTitle(name)
 
-    /** `‘<name>’ 지우기`: the title of every delete confirm (DS-25 `ConfirmDelete`; tag, field, template, relation kind). */
+    /** `‘<name>’ 지우기`: the title of every trash confirm (DS-25 `ConfirmDelete`; tag, field, template). */
     fun deleteTitle(name: String): String = "‘$name’ 지우기"
+
+    /** Permanent delete without trash (relation kind, TC-13-12). */
+    const val BTN_PERMANENT_DELETE = "영구 삭제"
+
+    /** `‘<name>’ 영구 삭제`: title of a permanent delete confirm. */
+    fun permanentDeleteTitle(name: String): String = "‘$name’ 영구 삭제"
 
     /** `쓰는 인물 3`. */
     fun tagUsers(count: Int): String = "쓰는 인물 $count"

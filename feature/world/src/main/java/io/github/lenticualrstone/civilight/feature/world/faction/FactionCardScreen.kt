@@ -1,11 +1,14 @@
 package io.github.lenticualrstone.civilight.feature.world.faction
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,6 +36,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldReveal
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.actions.AffiliationActions
 import io.github.lenticualrstone.civilight.domain.world.common.Copy
 import io.github.lenticualrstone.civilight.domain.world.item.BaseResult
@@ -49,6 +53,7 @@ import io.github.lenticualrstone.civilight.feature.world.common.SameNameLine
 import io.github.lenticualrstone.civilight.feature.world.common.WorldEnv
 import io.github.lenticualrstone.civilight.feature.world.common.WorldGoneCard
 import io.github.lenticualrstone.civilight.feature.world.common.WorldViewModel
+import io.github.lenticualrstone.civilight.feature.world.common.cardPadding
 import io.github.lenticualrstone.civilight.feature.world.common.itemSheet
 import io.github.lenticualrstone.civilight.feature.world.common.openFromWorld
 import io.github.lenticualrstone.civilight.feature.world.common.worldBack
@@ -85,7 +90,9 @@ import io.github.lenticualrstone.civilight.ui.reorder.ReorderBackHandler
 import io.github.lenticualrstone.civilight.ui.reorder.ReorderList
 import io.github.lenticualrstone.civilight.ui.reorder.ReorderState
 import io.github.lenticualrstone.civilight.ui.reorder.rememberReorderState
+import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
+import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -143,7 +150,7 @@ class FactionCardViewModel(projectKey: Key, val factionKey: Key, env: WorldEnv) 
  */
 @Composable
 fun FactionCardScreen(route: FactionCardRoute, deps: FeatureDeps) {
-    val vm = entryViewModel { FactionCardViewModel(route.projectKey, route.factionKey, WorldEnv.of(deps)) }
+    val vm = entryViewModel(key = "faction:${route.factionKey}") { FactionCardViewModel(route.projectKey, route.factionKey, WorldEnv.of(deps)) }
     val ui by vm.ui.collectAsState()
     val doc by vm.doc.collectAsState()
     val readOnly by vm.readOnly.collectAsState()
@@ -151,13 +158,33 @@ fun FactionCardScreen(route: FactionCardRoute, deps: FeatureDeps) {
     val gate = rememberHiddenGate(route.projectKey)
     var showEmpty by rememberSaveable(route.factionKey) { mutableStateOf(false) }
     var tab by rememberSaveable(route.factionKey) { mutableIntStateOf(FactionCardUi.TAB_OVERVIEW) }
-    val reorder = rememberReorderState()
+    val reorder = rememberReorderState(route.factionKey)
     ReorderBackHandler(reorder)
     val scope = rememberCoroutineScope()
     val card = ui
     val open = card?.access == CardAccess.Open
     val p = route.projectKey
     val back = worldBack(route, deps)
+
+    if (card != null && !open) {
+        CenterColumn {
+            CivilightScreen(
+                title = card.title,
+                smallLine = WorldCopy.TAB_FACTIONS,
+                back = back,
+                sheets = sheets,
+            ) { padding ->
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
+                    when (val access = card.access) {
+                        is CardAccess.Locked -> item(key = "locked") { Box(civilightItem()) { LockedCard(access.text, gate.unlock) } }
+                        is CardAccess.Gone -> item(key = "gone") { Box(civilightItem()) { WorldGoneCard(access, doc, vm, WorldKind.FACTION, route.factionKey, readOnly, gate) } }
+                        CardAccess.Open -> Unit
+                    }
+                }
+            }
+        }
+        return
+    }
 
     WorldImmersiveFrame(
         itemKey = route.factionKey,
@@ -207,13 +234,18 @@ fun FactionCardScreen(route: FactionCardRoute, deps: FeatureDeps) {
                 } else {
                     Column(Modifier.fillMaxWidth()) {
                         val head = card.head
-                        WorldSection(PlaceCopy.SEC_DESCRIPTION, first = true)
+                        WorldSection(
+                            PlaceCopy.SEC_DESCRIPTION,
+                            first = true,
+                            trailing = if (readOnly || card.descriptionLocked) null else WorldCopy.EDIT_DESCRIPTION,
+                            onTrailing = { sheets.open(DescriptionSheet(WorldKind.FACTION.name, route.factionKey)) },
+                        )
                         if (head != null && head.description.isNotEmpty()) {
                             LeadDescription(head.description)
-                        } else if (!readOnly) {
-                            TextAction(WorldCopy.EDIT_DESCRIPTION, { sheets.open(DescriptionSheet(WorldKind.FACTION.name, route.factionKey)) }, color = CivilightTheme.colors.acc)
+                        } else {
+                            CivilightText(WorldCopy.EMPTY_VALUE, CivilightTheme.type.lead, color = CivilightTheme.colors.ink3)
                         }
-                        SameNameLine(doc, WorldKind.FACTION, route.factionKey, readOnly) { sheets.open(MergePickSheet(WorldKind.FACTION.name, route.factionKey)) }
+                        SameNameLine(doc, WorldKind.FACTION, route.factionKey, readOnly, gate.open) { sheets.open(MergePickSheet(WorldKind.FACTION.name, route.factionKey)) }
                         WorldSection(PlaceCopy.fieldsTitle(card.fields.filled.size))
                         BaseRow(
                             card = card,

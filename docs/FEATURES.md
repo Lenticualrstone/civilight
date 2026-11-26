@@ -19,6 +19,8 @@ One row per feature of the area specs in `docs/spec/`. The spec file is the sour
 
 **(0.2.0, 2026-11-24)** Rows `LIB-80` … `LIB-97`, `LRC-48` … `LRC-50` and `DS-65` … `DS-75` were added by hand, and the LIB, LRC, DS and All counts include them. The scope is `docs/status/0.2.0-scope.md`; a note starting `0.2.0:` marks a row whose behaviour changes in 0.2.0. Other areas (for example `CST-53` … `CST-64`) are not yet counted here.
 
+**(0.6.0, 2026-11-26)** Immersive detail frame (`ImmersiveDetailScaffold`), scoped tags (`Tag.scope`, `Term.tagKeys`, `TagSheet`), affiliation basis (`CastSettings.affiliationBasis`, `Faction.baseKey`, `ReorderList`), and redesigned term/place/faction cards are documented in the `0.6.0 changes` sections of `30-cast.md`, `40-world.md`, `60-library-security-files.md`, and `80-design-system.md` (release notes draft: `docs/release-notes/v0.6.0.md`).
+
 | Area | Spec | Features | P0 | P1 | P2 | needsExternal |
 | --- | --- | --- | --- | --- | --- | --- |
 | SCR · 스크립트 (script editor) | `spec/10-script.md` | 69 | 15 | 53 | 1 | 0 |

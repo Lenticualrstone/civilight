@@ -2362,3 +2362,13 @@ Commands: `tools/gw :domain:cast:test :feature:cast:compileDebugKotlin :feature:
 47. **Image picked in the create card.** Default: the image is held by the card and imported only on `만들기` or `만들고 열기`, so `취소` leaves no asset.
 48. **`고정 항목` while the switch is off.** Default: `고정 항목 · 6` and `고정 6`, so the count matches what is shown. This changes TC-F-39's row text for new projects.
 49. **N-47 acceptance fixture.** The scope's acceptance says "bar values on the example project". Default: the JVM tests use the small Fixture P, so the values are written in the test. The example project is checked on the emulator.
+
+
+---
+
+## 9. 0.6.0 changes (2026-11-26)
+
+- **Immersive character profile (`CST-07`, `CST-13`)**: `ProfileScreen` adopts `ImmersiveDetailScaffold` with `RecordImmersiveHero` (background/ambient portrait + holo card), glass lens pill, `ReportBottomChrome` toast clearance, and 2-pane keyed state (`characterKey` on `rememberSaveable`, `TabBody` speech/secret caches, and ViewModel).
+- **Scoped tags (`CST-12`, `CST-75`)**: `Tag.scope` (`CHARACTER`, `TERM`, `PLACE`, `FACTION`, `ALL`; one-way widening only), shared `TagSheet`, and unified `TagSettingsScreen` managing all scopes with hidden-safe usage counts and delete confirmation.
+- **Appearance trace & secret tab fixes**: `AppearanceTrace` reuses `Appearances` (parent episode/chapter hidden respected, hidden `@` mentions masked, 44 dp row targets); `SecretTabGate` relocks on back/leave.
+- **Relation kind permanent delete (`CST-32`)**: Confirm dialog and button use `영구 삭제` (`danger`, no trash entry).

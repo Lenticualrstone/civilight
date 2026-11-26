@@ -211,7 +211,7 @@ object TermCardState {
             candidatesPending = card.candidatesPending,
             groups = groups,
             descriptionLocked = CardText.hasLockedLinks(doc, term.description, hiddenOpen),
-            sameName = ItemLifecycle.sameName(doc, WorldKind.TERM, termKey),
+            sameName = ItemLifecycle.sameName(doc, WorldKind.TERM, termKey, hiddenOpen),
             bulkActions = if (card.candidates.rows.isEmpty() || !index.complete) emptyList() else card.candidates.action.split(WorldCopy.SEP),
             tags = TermTags.tags(doc, termKey).map { TermTagUi(it.key, it.name, it.color) },
             canAddTag = TermTags.canAdd(doc, termKey, editable),
@@ -233,12 +233,22 @@ object TermCardState {
         val reveal = queries.reveal(termKey) ?: return null
         if (reveal.planned) return null
         val doc = queries.doc
+        val unlocked = queries.access.hiddenUnlocked
         val block = reveal.blockKey?.let { doc.index.block(it) }
         val scene = block?.let { doc.index.unit(it.sceneKey) }
-        val sceneHidden = scene != null && (scene.hidden || doc.index.ancestors(scene).any { it.hidden })
+        val anchorUnitKey = when (val a = reveal.record.anchor) {
+            is io.github.lenticualrstone.civilight.model.change.Anchor.UnitStart -> a.unitKey
+            is io.github.lenticualrstone.civilight.model.change.Anchor.UnitEnd -> a.unitKey
+            else -> null
+        }
+        val anchorUnit = anchorUnitKey?.let { doc.index.unit(it) }
+        val ancestorHidden = scene != null && doc.index.ancestors(scene).any { it.hidden }
+        val unitHidden = anchorUnit != null && (anchorUnit.hidden || doc.index.ancestors(anchorUnit).any { it.hidden })
+        if (!unlocked && (ancestorHidden || unitHidden)) return null
+        val sceneHidden = scene != null && scene.hidden
         val label = when {
             block == null -> reveal.episodeLabel
-            sceneHidden && !queries.access.hiddenUnlocked -> reveal.episodeLabel
+            sceneHidden && !unlocked -> reveal.episodeLabel
             else -> queries.codes.sceneOfBlock(block.key) ?: reveal.episodeLabel
         } ?: return null
         return WorldCopy.firstSeen(label)

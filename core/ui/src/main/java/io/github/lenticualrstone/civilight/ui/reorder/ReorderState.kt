@@ -118,7 +118,7 @@ class ReorderState {
 }
 
 @Composable
-fun rememberReorderState(): ReorderState = remember { ReorderState() }
+fun rememberReorderState(key: Any = Unit): ReorderState = remember(key) { ReorderState() }
 
 /** Back closes the mode first (before the screen pops). */
 @Composable

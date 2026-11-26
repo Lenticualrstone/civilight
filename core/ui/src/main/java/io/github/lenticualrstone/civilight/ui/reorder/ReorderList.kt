@@ -16,7 +16,9 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
@@ -141,7 +143,8 @@ private fun <K : Any> ReorderItem(
         }
     }
 
-    val press = if (!enabled) {
+    val active = enabled && keys.size > 1
+    val press = if (!active) {
         Modifier
     } else {
         Modifier
@@ -191,7 +194,7 @@ private fun <K : Any> ReorderItem(
     }
 
     val handle: @Composable () -> Unit = {
-        FoldReveal(selected && enabled, horizontal = true, label = "reorderGrip") {
+        FoldReveal(selected && active, horizontal = true, label = "reorderGrip") {
             Box(
                 Modifier
                     .size(44.dp)
@@ -214,7 +217,7 @@ private fun <K : Any> ReorderItem(
         }
     }
 
-    val a11y = if (!enabled) {
+    val a11y = if (!active) {
         Modifier
     } else {
         Modifier.semantics {
@@ -236,7 +239,15 @@ private fun <K : Any> ReorderItem(
                 scaleY = s
             }
             .then(if (selected) Modifier.tokenShadow(shape, elevation.float(colors.isDark)) else Modifier)
-            .then(if (selected) Modifier.background(colors.raise.copy(alpha = colors.raise.alpha * lift.value), shape) else Modifier)
+            .then(
+                if (selected) Modifier.drawBehind {
+                    val r = 14.dp.toPx()
+                    drawRoundRect(
+                        color = colors.raise.copy(alpha = colors.raise.alpha * lift.value),
+                        cornerRadius = CornerRadius(r, r),
+                    )
+                } else Modifier,
+            )
             .drawWithContent {
                 drawContent()
                 if (!listDragging) return@drawWithContent

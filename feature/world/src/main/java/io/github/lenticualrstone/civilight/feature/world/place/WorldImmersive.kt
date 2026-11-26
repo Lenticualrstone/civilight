@@ -31,9 +31,12 @@ import androidx.compose.ui.unit.sp
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightTabs
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveDetailScaffold
+import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveMath
 import io.github.lenticualrstone.civilight.designsystem.component.LensChip
+import io.github.lenticualrstone.civilight.designsystem.component.ReportBottomChrome
 import io.github.lenticualrstone.civilight.designsystem.component.SectionLabel
 import io.github.lenticualrstone.civilight.designsystem.component.ShardArt
+import io.github.lenticualrstone.civilight.designsystem.component.holoImage
 import io.github.lenticualrstone.civilight.designsystem.component.rememberImmersiveDetailState
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
@@ -90,6 +93,7 @@ fun WorldImmersiveFrame(
     val inDetailPane = LocalPaneRole.current == PaneRole.DETAIL
     val scroll = rememberSaveable(itemKey, saver = ScrollState.Saver) { ScrollState(0) }
     val immersive = rememberImmersiveDetailState(scroll)
+    if (paneHost == null && tabs.size > 1) ReportBottomChrome(ImmersiveMath.BAR_ROW_DP.dp)
     CenterColumn {
         SheetHostLayout(sheets, localSheets = localSheets) {
             BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = paneHost?.panePadding ?: 0.dp)) {
@@ -133,7 +137,7 @@ fun BoxScope.WorldHero(image: CardImageUi?, name: String) {
                 }
                 Crossfade(targetState = bitmap, modifier = Modifier.fillMaxSize(), animationSpec = motion.spec(CivilightMotion.standard), label = "worldHero") { shown ->
                     if (shown != null) {
-                        Image(shown, contentDescription = name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
+                        Image(shown, contentDescription = name, modifier = Modifier.fillMaxSize().holoImage(image.holo), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
                     }
                 }
             }
@@ -167,8 +171,14 @@ fun WorldLensBanner(banner: LensBannerUi?, onLatest: () -> Unit) {
 
 /** A section label of the panel (board `S.sec`: mono 11, `ink3`, 30 above, 10 below; the first one 0 above). */
 @Composable
-fun WorldSection(text: String, first: Boolean = false, modifier: Modifier = Modifier) {
-    SectionLabel(text, modifier.padding(top = if (first) 0.dp else 30.dp, bottom = 10.dp))
+fun WorldSection(
+    text: String,
+    first: Boolean = false,
+    modifier: Modifier = Modifier,
+    trailing: String? = null,
+    onTrailing: (() -> Unit)? = null,
+) {
+    SectionLabel(text, modifier.padding(top = if (first) 0.dp else 30.dp, bottom = 10.dp), trailing = trailing, onTrailing = onTrailing)
 }
 
 /** `설명` (board `X.lead` · `X.p2`): the first paragraph large (Myeongjo 19 / 33, `ink`), the rest 16 / 28 `ink2`. */

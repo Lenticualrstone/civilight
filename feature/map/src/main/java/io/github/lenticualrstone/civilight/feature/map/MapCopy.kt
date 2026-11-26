@@ -116,7 +116,7 @@ object MapCopy {
     const val STEP_NEW_MAP = "새 지도"
 
     // --- 지도 메뉴 `⋯` (WLD-46, WLD-49, WLD-51 entries) ---
-    const val MORE = "지도 메뉴"
+    const val MORE = "메뉴"
 
     // --- WLD-45 레이어 ---
     const val NAME = "이름"

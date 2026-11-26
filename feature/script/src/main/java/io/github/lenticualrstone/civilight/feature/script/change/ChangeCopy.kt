@@ -37,7 +37,7 @@ object ChangeCopy {
 
     /** `+ 새 종류` text field label and its add button. */
     const val NEW_KIND_FIELD = "새 종류"
-    const val ADD = "추가"
+    const val ADD = "더하기"
 
     /** A locked hidden character / item named in a chip (rule 19, SCR-58; the picker's words). */
     const val HIDDEN_CHARACTER = "숨긴 인물"

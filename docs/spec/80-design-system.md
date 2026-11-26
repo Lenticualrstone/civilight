@@ -1709,3 +1709,12 @@ The design system has no app screens of its own; it supplies the parts every scr
 **Q-DS-34 · Tilt values (DS-74).** ±12° clamp, 120 ms low-pass and 8 dp depth are `[PROPOSED]`; check on a device. Tilt stops with the LIB-94 switch (`TODO_COPY_LIB_VIEW_TILT`, default on) or with reduced motion.
 
 **Q-DS-35 · Open rows of the icon list kept as text (D28).** The input row's `고치기` send slot (scope keeps text); `지문으로 보기` · `잠금 풀기` stay b (D31).
+
+
+---
+
+## 7. 0.6.0 changes (2026-11-26)
+
+- **Immersive detail frame (`ImmersiveDetailScaffold`, `ImmersiveMath`)**: Full-bleed pinned hero (`scale 1 → 1.08`, `blur 0 → 22 → 48 dp` over `D = H × 0.5` and extra `0.6 D`, tone `0 → .30`, bottom shade `1 → .4`), docking title (`34 → 17 sp` cover, `40 → 17 sp` inner `> 600 dp`, `smoothstep(p)`, `x: gutter → 64 dp`), fading subtitle (`p 0 … 0.32`, `-12p`), top glass header (`hp: p 0.5 … 0.9`, `36 dp` blur, `1.4` saturation, `72%` bottom fade), glass panel (`24 dp` top radius, dark `.58 → .30` / light `.66 → .38`), pinned bottom glass bar (`64 + 24 dp`, `70%` top fade), and `ReportBottomChrome` integration for `WindowToastHost`.
+- **Shared `ReorderList` (`core:ui`)**: `순서 바꾸기` button and long-press entry, single selected row with `⠿` grip (44 dp), `liftScale` + drop line + haptics, `ReorderBackHandler`, and `위로 옮기기` / `아래로 옮기기` accessibility actions. Disabled for lists with fewer than 2 items.
+- **DS-25 / DS-30 consistency**: Trash confirmations use primary `휴지통으로`/`지우기`; permanent deletes without trash (e.g. relation kinds) use `danger` `영구 삭제`. Menu `⋯` accessibility labels unified to `메뉴`; action verbs unified to `더하기`.

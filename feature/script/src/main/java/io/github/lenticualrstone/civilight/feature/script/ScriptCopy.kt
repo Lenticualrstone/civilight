@@ -89,7 +89,7 @@ object ScriptCopy {
 
     // --- Undo step names (shown by undo history; spec words where one exists) ---
 
-    const val UNDO_ADD_BLOCK = "블록 추가"
+    const val UNDO_ADD_BLOCK = "블록 더하기"
     const val UNDO_SPLIT = "나누기"
     const val UNDO_MERGE = "합치기"
     const val UNDO_DELETE = "지우기"

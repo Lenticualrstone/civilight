@@ -16,8 +16,8 @@ object PageCopy {
     const val SMALL_LINE = "페이지"
     const val BACK = "뒤로"
 
-    /** Label of the `⋯` button (pattern `구조 메뉴`, `<name> 메뉴`). */
-    const val MENU = "페이지 메뉴"
+    /** Label of the `⋯` button (unified to `메뉴`). */
+    const val MENU = "메뉴"
     const val READ_ONLY = "읽기 전용"
 
     /** `페이지 · 세계관 메모`; a page without a section label reads `페이지`. */
@@ -49,8 +49,8 @@ object PageCopy {
     const val UNNAMED = "미정"
 
     // --- Block kinds (`/`, spec §3.1 PageBlock: 본문 · 소제목 · ⌁ 작가 메모) ---
-    /** Title of the `/` sheet, from the hint `/로 블록 추가`. */
-    const val BLOCK_ADD_TITLE = "블록 추가"
+    /** Title of the `/` sheet. */
+    const val BLOCK_ADD_TITLE = "블록 더하기"
     const val BLOCK_PARAGRAPH = "본문"
     const val BLOCK_HEADING = "소제목"
     const val BLOCK_MEMO = MEMO_LABEL

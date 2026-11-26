@@ -550,7 +550,7 @@ private fun ImmersivePanel(
                 if (effect != null) {
                     val visibleFrom = (-top).coerceAtLeast(0f)
                     val visibleH = (viewportPx - top.coerceAtLeast(0f)).coerceIn(0f, size.height - visibleFrom)
-                    if (visibleH >= 1f) {
+                    if (size.width >= 1f && visibleH >= 1f) {
                         blurLayer.renderEffect = effect
                         blurLayer.colorFilter = satFilter
                         blurLayer.record(size = IntSize(size.width.toInt(), visibleH.toInt())) {
@@ -587,6 +587,7 @@ fun ImmersiveHeaderButton(
     val hp: () -> Float = chrome?.headerAlpha ?: { 1f }
     val source = chrome?.source
     val blurLayer = rememberGraphicsLayer()
+    val circle = remember { Path() }
     var selfPos by remember { mutableStateOf(Offset.Zero) }
     val blurPx = with(LocalDensity.current) { ImmersiveMath.BUTTON_BLUR_DP.dp.toPx() }
     val effect = remember(blurPx) { if (Build.VERSION.SDK_INT >= 31) BlurEffect(blurPx, blurPx, TileMode.Clamp) else null }
@@ -599,7 +600,8 @@ fun ImmersiveHeaderButton(
             .drawBehind {
                 val h = hp()
                 if (h >= 1f) return@drawBehind
-                val circle = Path().apply { addOval(Rect(Offset.Zero, size)) }
+                circle.rewind()
+                circle.addOval(Rect(Offset.Zero, size))
                 clipPath(circle) {
                     if (effect != null && source != null) {
                         blurLayer.renderEffect = effect

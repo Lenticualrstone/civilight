@@ -114,13 +114,8 @@ object ProfileModel {
      * `◇ 같은 이름 2 · 노아` (CST-46, `domain:trash` [Fixes.sameNameNotice]). While hidden characters are
      * locked only visible ones count, so the row never reveals a hidden twin (rule 19 §6).
      */
-    fun sameNameNotice(doc: ProjectDoc, characterKey: Key, hiddenUnlocked: Boolean): String? {
-        if (hiddenUnlocked) return Fixes.sameNameNotice(doc, ItemId.character(characterKey))
-        val c = doc.index.character(characterKey) ?: return null
-        val name = c.name.nfc()
-        val count = doc.cast.characters.count { it.deletedAt == null && !it.hidden && it.name.nfc() == name }
-        return if (count < 2) null else CastUiCopy.sameName(count, c.name)
-    }
+    fun sameNameNotice(doc: ProjectDoc, characterKey: Key, hiddenUnlocked: Boolean): String? =
+        Fixes.sameNameNotice(doc, ItemId.character(characterKey), hiddenOpen = hiddenUnlocked)
 
     /**
      * Fixed rows: `표시 이름` while an override is set or it has history, the image slots that hold an

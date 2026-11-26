@@ -93,22 +93,22 @@ object Fixes {
      */
     fun deletedItemFingerprint(subjects: List<Key>): String = "${CheckType.DELETED_ITEM}:${subjects.joinToString(",")}"
 
-    /** Live items of the same kind whose name is exactly [item]'s name (NFC equality, never similarity; CST-46). */
-    fun sameNameCount(doc: ProjectDoc, item: ItemId): Int {
+    /** Live items of the same kind whose name is exactly [item]'s name (NFC equality, never similarity; CST-46). Hidden items are excluded while locked (rule 19). */
+    fun sameNameCount(doc: ProjectDoc, item: ItemId, hiddenOpen: Boolean = false): Int {
         val name = doc.itemName(item)?.nfc() ?: return 0
         val names = when (item.kind) {
-            ItemKind.CHARACTER -> doc.cast.characters.filter { it.deletedAt == null }.map { it.name }
-            ItemKind.PLACE -> doc.world.places.filter { it.deletedAt == null }.map { it.name }
-            ItemKind.TERM -> doc.world.terms.filter { it.deletedAt == null }.map { it.name }
-            ItemKind.FACTION -> doc.world.factions.filter { it.deletedAt == null }.map { it.name }
+            ItemKind.CHARACTER -> doc.cast.characters.filter { it.deletedAt == null && (hiddenOpen || !it.hidden) }.map { it.name }
+            ItemKind.PLACE -> doc.world.places.filter { it.deletedAt == null && (hiddenOpen || !it.hidden) }.map { it.name }
+            ItemKind.TERM -> doc.world.terms.filter { it.deletedAt == null && (hiddenOpen || !it.hidden) }.map { it.name }
+            ItemKind.FACTION -> doc.world.factions.filter { it.deletedAt == null && (hiddenOpen || !it.hidden) }.map { it.name }
             else -> return 0
         }
         return names.count { it.nfc() == name }
     }
 
     /** `◇ 같은 이름 2 · 노아` when another live item has the same name; with the action `합치기`. */
-    fun sameNameNotice(doc: ProjectDoc, item: ItemId): String? {
-        val count = sameNameCount(doc, item)
+    fun sameNameNotice(doc: ProjectDoc, item: ItemId, hiddenOpen: Boolean = false): String? {
+        val count = sameNameCount(doc, item, hiddenOpen)
         if (count < 2) return null
         return "◇ 같은 이름 $count${TrashCopy.SEP}${doc.itemName(item)}"
     }

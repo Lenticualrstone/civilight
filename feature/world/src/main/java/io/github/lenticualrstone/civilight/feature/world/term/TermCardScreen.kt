@@ -96,6 +96,7 @@ import io.github.lenticualrstone.civilight.feature.world.common.lensBannerSlot
 import io.github.lenticualrstone.civilight.feature.world.common.openFromWorld
 import io.github.lenticualrstone.civilight.feature.world.common.stageOf
 import io.github.lenticualrstone.civilight.feature.world.common.worldBack
+import io.github.lenticualrstone.civilight.feature.world.place.WorldHeaderLens
 import io.github.lenticualrstone.civilight.model.Key
 import io.github.lenticualrstone.civilight.model.cast.EntityKind
 import io.github.lenticualrstone.civilight.model.doc.ProjectDoc
@@ -156,7 +157,7 @@ private class TermActions(
  */
 @Composable
 fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
-    val vm = entryViewModel { TermCardViewModel(route.projectKey, route.termKey, WorldEnv.of(deps)) }
+    val vm = entryViewModel(key = "term:${route.termKey}") { TermCardViewModel(route.projectKey, route.termKey, WorldEnv.of(deps)) }
     val ui by vm.ui.collectAsState()
     val doc by vm.doc.collectAsState()
     val readOnly by vm.readOnly.collectAsState()
@@ -244,7 +245,7 @@ fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
                     val density = LocalDensity.current
                     val statusPx = androidx.compose.foundation.layout.WindowInsets.statusBars.getTop(density).toFloat()
                     if (toCandidates) {
-                        LaunchedEffect(Unit) {
+                        LaunchedEffect(route.termKey) {
                             val (y, top) = snapshotFlow { candidatesTop to frameTop }.first { !it.first.isNaN() && !it.second.isNaN() }
                             // The group title lands under the docked head (status bar + 56 dp row) with a little air.
                             val headPx = statusPx + with(density) { (ImmersiveMath.HEADER_ROW_DP + 16f).dp.toPx() }
@@ -268,7 +269,7 @@ fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
                             .then(if (inPane) Modifier.padding(bottom = padding.calculateBottomPadding()) else Modifier),
                         bottomInset = if (inPane) 0.dp else null,
                         hero = { TermHero(CardImages.of(d, WorldKind.TERM, route.termKey, c.head.name), c.head.name) },
-                        actions = { LensChip(lens.text, lens.state, { sheets.open(LensSheet(route.projectKey)) }, small = true) },
+                        actions = { WorldHeaderLens(lens) { sheets.open(LensSheet(route.projectKey)) } },
                         bottomBar = {
                             CivilightTabs(
                                 tabs = TermTab.entries.map { it.label },

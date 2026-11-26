@@ -2192,3 +2192,12 @@ Fixtures: 잿빛 (0.1.0, R-15, fixed voice IDs, no `gameTools`), 유리 정원 (
 | `TODO_COPY_LIB_EXPORT_VERSIONS` | LIB-97 export row | `지난 판도 포함` (pattern of `휴지통도 포함`; `지난 판` is N-29 copy) |
 | `TODO_COPY_LRC_EMPTY_SUB` | LIB-95 / LRC-30 `EmptyLr` sub | none (sub omitted) |
 | `TODO_COPY_SCR_TOUR_*` | LIB-96 script tour steps for U-14 | none (steps omitted) |
+
+
+---
+
+## 9. 0.6.0 changes (2026-11-26)
+
+- **Project Home immersive hero (`LIB-83` / `STO-01`)**: `HomeScreen` adopts `ImmersiveDetailScaffold` with full-bleed project cover hero, docking project title, meta subtitle, header cover edit button, and bottom command bar (or pane host bar in `목록 + 상세`).
+- **Project entry lifecycle**: `ProjectEntryFrame` fixes store release leak (acquire wrapped in `try/finally`) and limits loading delay to first project entry.
+- **Hidden-item safety**: `Fixes.sameNameCount` / `sameNameNotice` exclude locked hidden items across characters, places, terms, and factions (rule 19).

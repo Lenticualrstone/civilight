@@ -181,7 +181,7 @@ object IconButtonCopy {
     const val LIST = "목록"
     const val GRAPH = "관계도"
     const val POINT = "시점"
-    const val ADD_POINT = "시점 추가"
+    const val ADD_POINT = "시점 더하기"
     const val FIELD = "항목"
     const val ADD_FIELD = "항목 넣기"
     const val CAPTION = "설명"

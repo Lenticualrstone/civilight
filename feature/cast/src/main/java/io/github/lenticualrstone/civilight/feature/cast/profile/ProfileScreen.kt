@@ -37,6 +37,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveDetai
 import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveHeaderButton
 import io.github.lenticualrstone.civilight.designsystem.component.ImmersiveMath
 import io.github.lenticualrstone.civilight.designsystem.component.LensChip
+import io.github.lenticualrstone.civilight.designsystem.component.ReportBottomChrome
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
 import io.github.lenticualrstone.civilight.designsystem.component.ToastHost
 import io.github.lenticualrstone.civilight.designsystem.component.rememberImmersiveDetailState
@@ -280,8 +281,8 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    var showEmpty by rememberSaveable { mutableStateOf(false) }
-    var headerExpanded by rememberSaveable { mutableStateOf(false) }
+    var showEmpty by rememberSaveable(c) { mutableStateOf(false) }
+    var headerExpanded by rememberSaveable(c) { mutableStateOf(false) }
     val wide = LocalWindowLayout.current.isInner
     val cover = !wide
     val ui = ProfileUi(shownTab, showEmpty, headerExpanded)
@@ -450,6 +451,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                 val artSlotField = RecordHeroTaps.artField(hasBackground = bgArt != null)
                 val artTaps = RecordHeroTaps.artTaps(editable)
                 val hasSubtitle = !subtitle.isNullOrEmpty()
+                if (paneHost == null) ReportBottomChrome(ImmersiveMath.BAR_ROW_DP.dp)
                 ImmersiveDetailScaffold(
                     title = title,
                     subtitle = subtitle,
@@ -470,7 +472,7 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                         // Board deviation: the board's header has only back and `⋯`; the lens stays on screen here
                         // (values follow it), as the record's floating header had it.
                         RecordHeaderLens(lens) { sheets.open(LensSheet(p)) }
-                        if (editable && gameTools && ui.tab == ProfileTab.GAME_TEXT) {
+                        if (editable && gameTools && activeModularTab.kind == ProfileTabKind.GAME_TEXT && !speechOverride && !secretOverride) {
                             ImmersiveHeaderButton(IconId.Plus, ModularTabCopy.NEW_VOICE_LINE, { sheets.open(VoiceLineSheet(p, c)) })
                         }
                     },
@@ -666,7 +668,7 @@ private fun TabBody(
         ProfileTab.SPEECH -> {
             val c = doc.index.character(characterKey) ?: return
             val lens = doc.castLens
-            val chips = remember(doc, hiddenUnlocked) { RelationViews.addressChips(doc, characterKey, lens, hiddenUnlocked) }
+            val chips = remember(doc, characterKey, hiddenUnlocked) { RelationViews.addressChips(doc, characterKey, lens, hiddenUnlocked) }
             val hidden = RelationViews.hiddenPartnerCount(doc, characterKey, hiddenUnlocked).takeIf { it > 0 }?.let(RelationViews::hiddenRow)
             SpeechTab(c.speechBody.docText, chips, hidden, actions, summary = c.speechSummary, onSummary = secret.summaryEdit)
         }
@@ -676,7 +678,7 @@ private fun TabBody(
             GameTextTab(progress.sectionTitle, progress.fraction, VoiceLines.ORDER_LABEL, VoiceLines.rows(doc, characterKey), ArchiveDocs.sectionTitle(doc, characterKey), archive, actions)
         }
         ProfileTab.SECRET -> {
-            val secretView = remember(doc) { Profile.secretTab(doc, characterKey, doc.castLens) }
+            val secretView = remember(doc, characterKey) { Profile.secretTab(doc, characterKey, doc.castLens) }
             SecretTab(doc, secretView.rows, secretView.body.docText, actions) {
                 if (secret.showLock) SecretLockRow(secret.locked, secret.lockEnabled, secret.onLock)
             }

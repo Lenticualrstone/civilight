@@ -88,8 +88,9 @@ object ItemLifecycle {
         return row.deletedAt != null && row.trashEntryKey?.let { doc.index.trashEntry(it) } != null
     }
 
-    /** `◇ 같은 이름 2 · 노아` (WLD-15 entry) when another live item of the kind has the same name. */
-    fun sameName(doc: ProjectDoc, kind: WorldKind, key: Key): String? = Fixes.sameNameNotice(doc, itemId(kind, key))
+    /** `◇ 같은 이름 2 · 노아` (WLD-15 entry) when another visible live item of the kind has the same name. */
+    fun sameName(doc: ProjectDoc, kind: WorldKind, key: Key, hiddenOpen: Boolean = false): String? =
+        Fixes.sameNameNotice(doc, itemId(kind, key), hiddenOpen)
 
     fun isLive(doc: ProjectDoc, item: ItemId): Boolean = trashable(doc, item)?.deletedAt == null && trashable(doc, item) != null
 

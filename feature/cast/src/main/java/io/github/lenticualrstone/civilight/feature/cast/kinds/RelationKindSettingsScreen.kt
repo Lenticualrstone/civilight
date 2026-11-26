@@ -283,16 +283,16 @@ private fun SheetScope.KindEditContent(sheet: KindEditSheet) {
                 }, Modifier.weight(1f), enabled = RelationKindModel.canSwitch(view.shape, shape))
             }
         }
-        CivilightButton(CastUiCopy.BTN_DELETE, { confirm = sheet.kindKey }, Modifier.fillMaxWidth().padding(top = 20.dp), variant = ButtonVariant.GHOST)
+        CivilightButton(CastUiCopy.BTN_PERMANENT_DELETE, { confirm = sheet.kindKey }, Modifier.fillMaxWidth().padding(top = 20.dp), variant = ButtonVariant.GHOST)
     }
     if (confirm != null) {
-        // No trash entry (TC-13-12): `‘X’ 지우기` title form, `danger` confirm (DS-25, 0.5 review).
+        // No trash entry (TC-13-12): `‘X’ 영구 삭제` title form, `danger` confirm (DS-25, 0.6 consistency).
         ConfirmDialog(
-            title = CastUiCopy.deleteTitle(view.title),
-            confirmLabel = CastUiCopy.BTN_DELETE,
+            title = CastUiCopy.permanentDeleteTitle(view.title),
+            confirmLabel = CastUiCopy.BTN_PERMANENT_DELETE,
             onConfirm = {
                 confirm = null
-                editor.act(CastUiCopy.BTN_DELETE) { d, ctx -> RelationKindModel.delete(d, sheet.kindKey, ctx) }
+                editor.act(CastUiCopy.BTN_PERMANENT_DELETE) { d, ctx -> RelationKindModel.delete(d, sheet.kindKey, ctx) }
                 host.close()
             },
             onDismissRequest = { confirm = null },

@@ -11,8 +11,8 @@ object AssetsCopy {
     /** Command-field hint on this screen (SCR-61). */
     const val SEARCH_HINT = "에셋 이름이나 파일 이름으로 찾기"
 
-    /** The `+` icon's label and the add form's title (as `블록 추가`). */
-    const val ADD_TITLE = "에셋 추가"
+    /** The `+` icon's label and the add form's title. */
+    const val ADD_TITLE = "에셋 더하기"
 
     /** Under a cue kind in the `연출 지시` sheet: opens the add form for that kind (SCR-08 · SCR-61). */
     const val ADD_FOR_CUE = "+ 에셋"
@@ -36,7 +36,7 @@ object AssetsCopy {
     const val PICK_IMAGE = "이미지 고르기"
     const val REMOVE_IMAGE = "빼기"
     const val PICK_PLACE = "장소 고르기"
-    const val ADD = "추가"
+    const val ADD = "더하기"
     const val SAVE = "저장"
     const val CANCEL = "취소"
     const val CHANGE = "바꾸기 ›"

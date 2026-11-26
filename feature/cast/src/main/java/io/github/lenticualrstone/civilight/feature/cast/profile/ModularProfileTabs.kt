@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -140,6 +141,7 @@ internal fun AppearancesTraceTab(
                         Row(
                             Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 44.dp)
                                 .clip(rowShape)
                                 .background(colors.bg.copy(alpha = 0.65f))
                                 .pressable(onClick = { onJumpToBlock(entry.blockKey) }, scaleOnPress = false, shape = rowShape)

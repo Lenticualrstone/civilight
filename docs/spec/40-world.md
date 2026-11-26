@@ -1623,3 +1623,13 @@ Each item names the conflicting or silent sources and the default this spec uses
 - **Q-35 · Lens chip on world heads.** Default: the list head and the term, place and faction card heads only. 연표, map view, map edit and 연표 + 지도 read at `최신` with no chip.
 - **Q-36 · New map entry.** U-15 lists no map kind. Default: the 지도 tab gets the same create row, `＋ 새 지도` (icon list rule "목록마다"), which opens the image picker directly, because image is the only base left.
 - **Q-37 · `때` in the event card.** Default: one optional field with two visible choices (year, or `씬 고르기`); the event kind follows. Empty means an undated world event.
+
+
+---
+
+## 7. 0.6.0 changes (2026-11-26)
+
+- **Immersive term card (`WLD-08`, 3 tabs `개요 · 쓰인 곳 · 연결`)**: Full-bleed reference image hero (with holo), subtitle `처음 나옴 <scene>` (masked when ancestor episode/unit is hidden), header glass lens pill and `⋯`. `개요`: tag chips (`Term.tagKeys`) + `+ 태그`, lead description (`19/33`), alias chips, `첫 공개`, custom fields. `쓰인 곳`: episode `쓰인 흐름` strip (`TermFlow`), speaker-attributed quotes, 44 dp `잇기`/`아님` candidate actions. `연결`: `같은 씬에 나온 것` (`TermSceneNeighbors`), `관련`, `이 용어로 잇는 인물`. Locked/trashed cards stay on the plain non-immersive frame.
+- **Immersive place card (`WLD-09`, 3 tabs `개요 · 소속 · 등장`)**: Hero image (with holo), subtitle `상위 지역 X · 하위 지역 N` (visible sub-places only), editable description header action, and `소속 세력 및 인물` (`하위 지역 포함` switch, `순서 바꾸기` via `ReorderList`, faction base/members, `무소속` group, `숨긴 인물 N · 지문으로 보기`). Locked/trashed cards use the plain non-immersive frame.
+- **Immersive faction card (`WLD-10`, 2 tabs `개요 · 소속`)**: Hero image, `거점` fixed row (`Faction.baseKey`), editable description, and `소속 인물` with shared `ReorderList` (`Faction.memberOrder`).
+- **Affiliation basis (`묶음 기준`)**: Project settings screen to bind `CastSettings.affiliationBasis` (소속 · 거주 · 국적 link fields) explicitly without guessing.

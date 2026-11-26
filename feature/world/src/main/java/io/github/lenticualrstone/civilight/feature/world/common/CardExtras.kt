@@ -192,10 +192,10 @@ fun WorldGoneCard(access: CardAccess.Gone, doc: ProjectDoc?, vm: WorldViewModel,
     }
 }
 
-/** `◇ 같은 이름 2 · 노아` with `합치기` (WLD-15 entry): only when another live item has the same name. */
+/** `◇ 같은 이름 2 · 노아` with `합치기` (WLD-15 entry): only when another visible live item has the same name. */
 @Composable
-fun SameNameLine(doc: ProjectDoc?, kind: WorldKind, key: Key, readOnly: Boolean, onMerge: () -> Unit) {
-    val text = doc?.let { ItemLifecycle.sameName(it, kind, key) }
+fun SameNameLine(doc: ProjectDoc?, kind: WorldKind, key: Key, readOnly: Boolean, hiddenOpen: Boolean = false, onMerge: () -> Unit) {
+    val text = doc?.let { ItemLifecycle.sameName(it, kind, key, hiddenOpen) }
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     FoldRevealValue(text) { line ->

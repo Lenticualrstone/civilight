@@ -1,13 +1,16 @@
 package io.github.lenticualrstone.civilight.feature.world.place
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,6 +35,7 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
+import io.github.lenticualrstone.civilight.designsystem.theme.civilightItem
 import io.github.lenticualrstone.civilight.domain.world.item.OrderList
 import io.github.lenticualrstone.civilight.domain.world.item.WorldKind
 import io.github.lenticualrstone.civilight.feature.world.WorldCopy
@@ -46,6 +50,7 @@ import io.github.lenticualrstone.civilight.feature.world.common.MergePickSheet
 import io.github.lenticualrstone.civilight.feature.world.common.SameNameLine
 import io.github.lenticualrstone.civilight.feature.world.common.WorldEnv
 import io.github.lenticualrstone.civilight.feature.world.common.WorldGoneCard
+import io.github.lenticualrstone.civilight.feature.world.common.cardPadding
 import io.github.lenticualrstone.civilight.feature.world.common.dimmed
 import io.github.lenticualrstone.civilight.feature.world.common.itemSheet
 import io.github.lenticualrstone.civilight.feature.world.common.openFromWorld
@@ -73,7 +78,9 @@ import io.github.lenticualrstone.civilight.ui.picker.rememberHiddenGate
 import io.github.lenticualrstone.civilight.ui.project.EditResult
 import io.github.lenticualrstone.civilight.ui.reorder.ReorderBackHandler
 import io.github.lenticualrstone.civilight.ui.reorder.rememberReorderState
+import io.github.lenticualrstone.civilight.ui.scaffold.CivilightScreen
 import io.github.lenticualrstone.civilight.ui.scaffold.rememberSheetHost
+import io.github.lenticualrstone.civilight.ui.window.CenterColumn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import io.github.lenticualrstone.civilight.navigation.PlaceCard as PlaceCardRoute
@@ -89,7 +96,7 @@ data class ParentPlaceSheet(val placeKey: Key) : SheetKey
  */
 @Composable
 fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
-    val vm = entryViewModel { PlaceCardViewModel(route.projectKey, route.placeKey, WorldEnv.of(deps)) }
+    val vm = entryViewModel(key = "place:${route.placeKey}") { PlaceCardViewModel(route.projectKey, route.placeKey, WorldEnv.of(deps)) }
     val ui by vm.ui.collectAsState()
     val doc by vm.doc.collectAsState()
     val readOnly by vm.readOnly.collectAsState()
@@ -98,7 +105,7 @@ fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
     var tab by rememberSaveable(route.placeKey) { mutableIntStateOf(PlaceCardUi.tabIndex(route.tab)) }
     var showEmpty by rememberSaveable(route.placeKey) { mutableStateOf(false) }
     var expanded by rememberSaveable(route.placeKey) { mutableStateOf(listOf<String>()) }
-    val reorder = rememberReorderState()
+    val reorder = rememberReorderState(route.placeKey)
     ReorderBackHandler(reorder)
     val scope = rememberCoroutineScope()
     val card = ui
@@ -108,6 +115,26 @@ fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
 
     fun move(list: OrderList, key: Key, to: Int) {
         scope.launch { vm.move(list, key, to)?.let { label -> deps.toasts.showFor(p, label) { vm.undoLast() } } }
+    }
+
+    if (card != null && !open) {
+        CenterColumn {
+            CivilightScreen(
+                title = card.title,
+                smallLine = WorldCopy.TAB_PLACES,
+                back = back,
+                sheets = sheets,
+            ) { padding ->
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = cardPadding(padding)) {
+                    when (val access = card.access) {
+                        is CardAccess.Locked -> item(key = "locked") { Box(civilightItem()) { LockedCard(access.text, gate.unlock) } }
+                        is CardAccess.Gone -> item(key = "gone") { Box(civilightItem()) { WorldGoneCard(access, doc, vm, WorldKind.PLACE, route.placeKey, readOnly, gate) } }
+                        CardAccess.Open -> Unit
+                    }
+                }
+            }
+        }
+        return
     }
 
     WorldImmersiveFrame(
@@ -186,6 +213,7 @@ fun PlaceCardScreen(route: PlaceCardRoute, deps: FeatureDeps) {
                         onAddField = { sheets.open(AddFieldSheet(p, EntityKind.PLACE, route.placeKey)) },
                         onSubPlace = { deps.navigator.openFromWorld(PlaceCard(p, it)) },
                         onUnlock = gate.unlock,
+                        hiddenOpen = gate.open,
                         onMerge = { sheets.open(MergePickSheet(WorldKind.PLACE.name, route.placeKey)) },
                     )
                 }
@@ -208,18 +236,24 @@ private fun OverviewTab(
     onAddField: () -> Unit,
     onSubPlace: (Key) -> Unit,
     onUnlock: () -> Unit,
+    hiddenOpen: Boolean,
     onMerge: () -> Unit,
 ) {
     val head = card.head ?: return
     val colors = CivilightTheme.colors
     Column(Modifier.fillMaxWidth()) {
-        WorldSection(PlaceCopy.SEC_DESCRIPTION, first = true)
+        WorldSection(
+            PlaceCopy.SEC_DESCRIPTION,
+            first = true,
+            trailing = if (readOnly || card.descriptionLocked) null else WorldCopy.EDIT_DESCRIPTION,
+            onTrailing = onDescription,
+        )
         if (head.description.isNotEmpty()) {
             LeadDescription(head.description)
-        } else if (!readOnly) {
-            TextAction(WorldCopy.EDIT_DESCRIPTION, onDescription, color = colors.acc)
+        } else {
+            CivilightText(WorldCopy.EMPTY_VALUE, CivilightTheme.type.lead, color = colors.ink3)
         }
-        SameNameLine(doc, WorldKind.PLACE, card.placeKey, readOnly, onMerge)
+        SameNameLine(doc, WorldKind.PLACE, card.placeKey, readOnly, hiddenOpen, onMerge)
         WorldSection(PlaceCopy.fieldsTitle(card.fields.filled.size))
         card.parent?.let { FixedRow(it, onParent) }
         FieldSection(
@@ -231,7 +265,7 @@ private fun OverviewTab(
             onAdd = onAddField,
         )
         if (card.subPlaces.isNotEmpty() || card.hiddenSubPlaces > 0) {
-            WorldSection(PlaceCopy.subPlacesTitle(card.subPlaces.size + card.hiddenSubPlaces))
+            WorldSection(PlaceCopy.subPlacesTitle(card.subPlaces.size))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 card.subPlaces.forEach { sub -> FilterChip(label = sub.name, selected = false, onClick = { onSubPlace(sub.key) }) }
                 if (card.hiddenSubPlaces > 0) {
