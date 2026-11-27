@@ -243,11 +243,44 @@ data class MiniRailAction(
 )
 
 /**
- * (0.4.0) Unobtrusive seam control:
- * - While open: renders an invisible full-height resize drag seam + a compact collapse button tucked cleanly
- *   at the top of the panel edge (never a giant shadowed pill blocking the center of the viewport).
- * - While closed: renders nothing (the collapsed [PanelRail] owns the reopen button + mini icon shortcuts,
- *   eliminating the old duplicate reopen buttons).
+ * Unified 44 dp panel toggle button shared identically by the open panel header and the collapsed [PanelRail]:
+ * same `IconId.Panel` (20 dp), same 44 dp button shape, same outer-corner anchor (`6 dp` from edge, `topInset + 16 dp`).
+ */
+@Composable
+internal fun PanelToggleButton(
+    closed: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    extraActions: List<CustomAccessibilityAction> = emptyList(),
+) {
+    val colors = CivilightTheme.colors
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier
+            .size(PanelRules.REOPEN_SIZE.dp)
+            .pressable(onClick = onClick, scaleOnPress = false, shape = shape)
+            .background(if (closed) androidx.compose.ui.graphics.Color.Transparent else colors.sel, shape)
+            .semantics {
+                contentDescription = PanelRules.label(closed)
+                if (extraActions.isNotEmpty()) customActions = extraActions
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        CivilightIcon(
+            IconId.Panel,
+            contentDescription = null,
+            size = 20.dp,
+            tint = if (closed) colors.ink2 else colors.acc,
+        )
+    }
+}
+
+/**
+ * Unified seam resize + anchored panel toggle control:
+ * - While open: renders the invisible full-height resize drag seam on the divider AND places the identical
+ *   [PanelToggleButton] (`IconId.Panel`) at the exact same outer-corner coordinate as [PanelRail] (no jumping,
+ *   no mismatched `<` badge crowding header actions).
+ * - While closed: renders nothing ([PanelRail] renders the same [PanelToggleButton] at the exact same spot).
  */
 @Composable
 fun PanelSeamButton(
@@ -255,63 +288,47 @@ fun PanelSeamButton(
     side: PanelSide,
     panelDp: () -> Float,
     modifier: Modifier = Modifier,
+    topInset: Dp? = null,
     extraActions: List<CustomAccessibilityAction> = emptyList(),
     dragModifier: Modifier = Modifier,
 ) {
     if (state.closed) return
-    val colors = CivilightTheme.colors
-    val label = PanelRules.label(state.closed)
-    val shape = RoundedCornerShape(10.dp)
-    val statusTop = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    Box(
-        modifier
-            .fillMaxHeight()
-            .layout { measurable, constraints ->
-                val hitW = (32f * density).roundToInt()
-                val p = measurable.measure(constraints.copy(minWidth = hitW, maxWidth = hitW))
-                val seamX = ((panelDp() - 16f) * density).roundToInt().coerceAtLeast(0)
-                layout(constraints.maxWidth, p.height) {
-                    val px = if (side == PanelSide.START) seamX else constraints.maxWidth - seamX - p.width
-                    p.place(IntOffset(px, 0))
-                }
-            },
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        // Full-height invisible resize seam drag target
+    val resolvedTop = topInset ?: androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    Box(modifier.fillMaxHeight()) {
+        // Full-height invisible resize seam drag target along the divider.
         Box(
             Modifier
                 .fillMaxHeight()
-                .width(24.dp)
+                .layout { measurable, constraints ->
+                    val hitW = (24f * density).roundToInt()
+                    val p = measurable.measure(constraints.copy(minWidth = hitW, maxWidth = hitW))
+                    val seamX = ((panelDp() - 12f) * density).roundToInt().coerceAtLeast(0)
+                    layout(constraints.maxWidth, p.height) {
+                        val px = if (side == PanelSide.START) seamX else constraints.maxWidth - seamX - p.width
+                        p.place(IntOffset(px, 0))
+                    }
+                }
                 .then(dragModifier),
         )
-        // Compact, unobtrusive collapse button tucked near the top header corner: drawn 28, touched 44 × 44 (DS-11).
-        Box(
-            Modifier
-                .padding(top = statusTop + 14.dp)
-                .pressable(onClick = state::toggle, scaleOnPress = false, shape = shape, hitTarget = HitTarget.ICON_BUTTON)
-                .size(28.dp)
-                .background(colors.bg.copy(alpha = 0.88f), shape)
-                .insetOutline(colors.line, 1.dp, shape)
-                .semantics {
-                    contentDescription = label
-                    if (extraActions.isNotEmpty()) customActions = extraActions
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            CivilightIcon(
-                IconId.Back,
-                contentDescription = null,
-                size = 14.dp,
-                tint = colors.ink2,
-                modifier = Modifier.graphicsLayer { rotationZ = PanelRules.chevronDegrees(side, state.open) },
-            )
-        }
+        // Identical IconId.Panel toggle anchored at the exact same outer-corner position as PanelRail.
+        PanelToggleButton(
+            closed = false,
+            onClick = state::toggle,
+            extraActions = extraActions,
+            modifier = Modifier
+                .align(if (side == PanelSide.START) Alignment.TopStart else Alignment.TopEnd)
+                .padding(
+                    top = resolvedTop + 16.dp,
+                    start = if (side == PanelSide.START) PanelRules.REOPEN_INSET.dp else 0.dp,
+                    end = if (side == PanelSide.END) PanelRules.REOPEN_INSET.dp else 0.dp,
+                ),
+        )
     }
 }
 
 /**
  * (0.4.0) Customizable mini icon rail shown when a foldable side panel is collapsed:
- * Top reopen button (`IconId.Panel`) + hairline + user-configured [actions] icons.
+ * Top reopen button ([PanelToggleButton]) + hairline + user-configured [actions] icons.
  */
 @Composable
 fun PanelRail(
@@ -350,15 +367,10 @@ fun PanelRail(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
             ) {
-                Box(
-                    Modifier
-                        .size(PanelRules.REOPEN_SIZE.dp)
-                        .pressable(onClick = { state.setClosed(false) }, scaleOnPress = false, shape = RoundedCornerShape(12.dp))
-                        .semantics { contentDescription = PanelCopy.OPEN },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CivilightIcon(IconId.Panel, contentDescription = null, size = 20.dp, tint = colors.acc)
-                }
+                PanelToggleButton(
+                    closed = true,
+                    onClick = { state.setClosed(false) },
+                )
                 if (actions.isNotEmpty()) {
                     Box(
                         Modifier

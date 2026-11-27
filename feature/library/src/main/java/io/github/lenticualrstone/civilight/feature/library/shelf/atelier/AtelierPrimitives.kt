@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -92,6 +93,7 @@ object AtelierCopy {
 
     const val CD_JEWEL_CASE = "CD 케이스"
     const val KINETIC_DECK = "탄성 덱"
+    const val HORIZONTAL_SWIPE = "가로 스와이프"
     const val BENTO_MOSAIC = "모자이크"
     const val FILM_REEL = "필름 릴"
     const val PULSE_TIMELINE = "시간 축"
@@ -99,6 +101,7 @@ object AtelierCopy {
 
     const val FRAG_CD_JEWEL_CASE = "3D 주얼 케이스 · 홀로그램 CD"
     const val FRAG_KINETIC_DECK = "기계식 힌지 텐션 · 부채꼴 덱"
+    const val FRAG_HORIZONTAL_SWIPE = "자연스러운 좌우 스와이프 · 카드"
     const val FRAG_BENTO_MOSAIC = "에디토리얼 격자 · 포커스"
     const val FRAG_FILM_REEL = "35mm 필름 · 내부 패럴랙스"
     const val FRAG_PULSE_TIMELINE = "맥동 노드 · 작업 연대기"
@@ -118,9 +121,9 @@ object AtelierCopy {
     val all: List<String> = listOf(
         GROUP_SPATIAL, GROUP_SPATIAL_SHORT, GROUP_KINETIC, GROUP_KINETIC_SHORT,
         CD_JEWEL_CASE,
-        KINETIC_DECK, BENTO_MOSAIC, FILM_REEL, PULSE_TIMELINE, STUDIO_LIST,
+        KINETIC_DECK, HORIZONTAL_SWIPE, BENTO_MOSAIC, FILM_REEL, PULSE_TIMELINE, STUDIO_LIST,
         FRAG_CD_JEWEL_CASE,
-        FRAG_KINETIC_DECK, FRAG_BENTO_MOSAIC, FRAG_FILM_REEL, FRAG_PULSE_TIMELINE, FRAG_STUDIO_LIST,
+        FRAG_KINETIC_DECK, FRAG_HORIZONTAL_SWIPE, FRAG_BENTO_MOSAIC, FRAG_FILM_REEL, FRAG_PULSE_TIMELINE, FRAG_STUDIO_LIST,
         OPEN, UNLOCK, NEW_PROJECT, LOCKED_PROJECT, RECENT_FILES, MENU,
         FORMAT_SERIAL, FORMAT_SHORT, FORMAT_SETTING, CD_OPEN_LID,
     )
@@ -128,6 +131,7 @@ object AtelierCopy {
     fun label(style: LibraryStyle): String = when (style) {
         LibraryStyle.CD_JEWEL_CASE -> CD_JEWEL_CASE
         LibraryStyle.KINETIC_DECK -> KINETIC_DECK
+        LibraryStyle.HORIZONTAL_SWIPE -> HORIZONTAL_SWIPE
         LibraryStyle.BENTO_MOSAIC -> BENTO_MOSAIC
         LibraryStyle.FILM_REEL -> FILM_REEL
         LibraryStyle.PULSE_TIMELINE -> PULSE_TIMELINE
@@ -137,6 +141,7 @@ object AtelierCopy {
     fun frag(style: LibraryStyle): String = when (style) {
         LibraryStyle.CD_JEWEL_CASE -> FRAG_CD_JEWEL_CASE
         LibraryStyle.KINETIC_DECK -> FRAG_KINETIC_DECK
+        LibraryStyle.HORIZONTAL_SWIPE -> FRAG_HORIZONTAL_SWIPE
         LibraryStyle.BENTO_MOSAIC -> FRAG_BENTO_MOSAIC
         LibraryStyle.FILM_REEL -> FRAG_FILM_REEL
         LibraryStyle.PULSE_TIMELINE -> FRAG_PULSE_TIMELINE
@@ -489,10 +494,11 @@ internal fun AtelierStageFrame(
             glassMode == io.github.lenticualrstone.civilight.designsystem.glass.GlassMode.BLUR_COSTLY
         )
 
-    Box(Modifier.fillMaxSize().background(colors.bg).then(inertModifier)) {
+    Box(Modifier.fillMaxSize().clipToBounds().background(colors.bg).then(inertModifier)) {
         Box(
             Modifier
                 .fillMaxSize()
+                .clipToBounds()
                 .then(
                     if (recordBackdrop) Modifier.glassSource(sceneSource, enabled = true)
                     else Modifier,

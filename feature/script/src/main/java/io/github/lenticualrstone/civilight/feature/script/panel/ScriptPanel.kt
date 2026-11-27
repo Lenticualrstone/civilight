@@ -14,6 +14,10 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightTabs
 import io.github.lenticualrstone.civilight.designsystem.component.TabGap
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import io.github.lenticualrstone.civilight.designsystem.foundation.endHairline
 import io.github.lenticualrstone.civilight.designsystem.foundation.startHairline
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
@@ -75,20 +79,24 @@ fun ScriptSidePanel(
     scrollOf: ((PanelTab) -> ScrollState)? = null,
     /** CNV-47 / r3: the panel's width (320 landscape, 272 portrait, or the writer's ratio). */
     width: Dp = CivilightTheme.sizes.sidePanel,
+    /** Whether the panel sits on the start (left) edge so its hairline & toggle clearance match. */
+    onStartEdge: Boolean = false,
     content: @Composable ColumnScope.(PanelTab) -> Unit,
 ) {
     val tabs = PanelTab.BUILT
     val shown = tab.takeIf { it in tabs } ?: tabs.first()
     val motion = CivilightTheme.motion
     val colors = CivilightTheme.colors
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(modifier.width(width).fillMaxHeight().semantics { paneTitle = ScriptCopy.PANEL_NAME }) {
         GlassBackground(GlassSurface.PANEL, Modifier.matchParentSize())
         OnGlass {
             Column(
                 Modifier
                     .fillMaxHeight()
-                    .startHairline(colors.line)
-                    .padding(top = 20.dp, start = 20.dp, end = 20.dp),
+                    .then(if (onStartEdge) Modifier.endHairline(colors.line) else Modifier.startHairline(colors.line))
+                    // Clears the anchored 44 dp IconId.Panel toggle at statusTop + 16 dp.
+                    .padding(top = statusTop + 68.dp, start = 20.dp, end = 20.dp),
             ) {
                 CivilightTabs(tabs.map { it.label }, tabs.indexOf(shown), { onSelectTab(tabs[it]) }, Modifier.fillMaxWidth(), gap = TabGap.Panel)
                 // SCR-67: a tab change crossfades over 200 ms (reduced motion 120 ms).

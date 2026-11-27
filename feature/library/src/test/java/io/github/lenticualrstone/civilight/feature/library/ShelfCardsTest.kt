@@ -77,31 +77,29 @@ class ShelfCardsTest {
         RecentItem(key = "RI${++n}", projectKey = doc.key, kind = kind, targetKey = target, openedAt = at(at))
 
     @Test
-    fun `LIB-04 the card row holds visible projects then one lock card, never a hidden project's card`() {
+    fun `LIB-04 the card row holds only visible projects and never shows a hidden or lock card`() {
         val ui = build()
         assertTrue(ui.showCards)
-        assertEquals("프로젝트 · 2 · 숨김 1", ui.cardSectionLabel)
+        assertEquals("프로젝트 · 2", ui.cardSectionLabel)
         assertEquals(listOf("잿빛 새벽의 등불", "유리 정원"), ui.cards.map { it.row.title })
         assertTrue(ui.cards.none { it.hiddenOpen })
-        assertEquals("숨긴 프로젝트 1", ui.lockedGroup?.title)
-        assertEquals("이름 · 표지 가림", ui.lockedGroup?.cardSub)
+        assertNull(ui.lockedGroup)
         val cover = ShelfCards.cardItems(ui, wide = false)
-        assertEquals(listOf("project", "project", "lock"), cover.map { it::class.simpleName!!.lowercase().removeSuffix("card") })
-        assertEquals(3, cover.size)
+        assertEquals(listOf("project", "project"), cover.map { it::class.simpleName!!.lowercase().removeSuffix("card") })
+        assertEquals(2, cover.size)
         val inner = ShelfCards.cardItems(ui, wide = true)
-        assertEquals("the wide row adds 새 프로젝트", 4, inner.size)
+        assertEquals("the wide row adds 새 프로젝트", 3, inner.size)
         assertEquals(ShelfCardItem.NewProject, inner.last())
         assertEquals("every card has its own lazy key", inner.size, inner.map { it.key }.toSet().size)
     }
 
     @Test
-    fun `LIB-04 the open group's projects follow as cards and the lock card leaves`() {
+    fun `LIB-04 hidden projects never leak into main card shelf even while unlocked`() {
         val ui = build(access = open)
-        assertEquals(listOf("잿빛 새벽의 등불", "유리 정원", "검은 서약 (가제)"), ui.cards.map { it.row.title })
-        assertEquals(listOf(false, false, true), ui.cards.map { it.hiddenOpen })
-        assertTrue(ui.cards.last().row.protections.hidden)
+        assertEquals(listOf("잿빛 새벽의 등불", "유리 정원"), ui.cards.map { it.row.title })
+        assertTrue(ui.cards.none { it.hiddenOpen })
         assertNull(ui.lockedGroup)
-        assertTrue("its sheets may show while open", ui.shows(oath.key))
+        assertFalse(ui.shows(oath.key))
     }
 
     @Test

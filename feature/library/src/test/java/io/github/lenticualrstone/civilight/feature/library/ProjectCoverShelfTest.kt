@@ -94,28 +94,27 @@ class ProjectCoverShelfTest {
     }
 
     @Test
-    fun `CV-20 a locked hidden project's cover is never read, CV-21 the open group shows it`() {
+    fun `CV-20 a hidden project's cover is never read on the main shelf`() {
         val secret = withCover(oath, "h3")
         assertTrue(secret.project.protections.hidden)
         val list = listOf(shelf(glass, at("2026-11-19T10:00")), shelf(secret, at("2026-11-02T10:00")))
         val lockedUi = build(list, locked)
         assertFalse("h3" in hashesIn(lockedUi))
         assertTrue(lockedUi.cards.none { it.row.key == secret.key })
-        assertEquals("이름 · 표지 가림", lockedUi.lockedGroup?.cardSub)
+        assertNull(lockedUi.lockedGroup)
 
         val openUi = build(list, open)
-        assertEquals("h3", openUi.openGroup!!.rows.single().thumb.hash)
-        val card = openUi.cards.single { it.row.key == secret.key }
-        assertEquals("h3", card.cover.hash)
-        assertTrue(card.hiddenOpen)
+        assertFalse("h3" in hashesIn(openUi))
+        assertNull(openUi.openGroup)
+        assertTrue(openUi.cards.none { it.row.key == secret.key })
     }
 
     @Test
-    fun `CV-22 the cover picker of a hidden project closes on re-lock`() {
+    fun `CV-22 the cover picker of a hidden project closes on the main shelf`() {
         val secret = withCover(oath, "h3")
         val list = listOf(shelf(glass, at("2026-11-19T10:00")), shelf(secret, at("2026-11-02T10:00")))
         val picker = ImagePickSheet(secret.key, ImageOwnerKind.PROJECT, secret.key, ImageSlot.PROJECT_COVER)
-        assertEquals(0, ShelfState.sheetsToClose(build(list, open), listOf(picker)))
+        assertEquals(1, ShelfState.sheetsToClose(build(list, open), listOf(picker)))
         assertEquals(1, ShelfState.sheetsToClose(build(list, locked), listOf(picker)))
         assertEquals(1, ShelfState.sheetsToClose(build(list, locked), listOf(ShelfMenuSheet(glass.key), picker)))
         // A visible project's picker stays.
@@ -128,13 +127,14 @@ class ProjectCoverShelfTest {
     }
 
     @Test
-    fun `CV-24 raising to R-18 with hiding takes the cover off the 서재 at once`() {
+    fun `CV-24 raising to R-18 with hiding takes the cover off the 서재 completely`() {
         val before = withCover(ashen, "h1")
         val after = protect(before, Rating.R18, Protections(hidden = true, captureBlock = true, nameMask = true))
         assertTrue("h1" in hashesIn(build(listOf(shelf(before, at("2026-11-22T08:12"))), locked)))
         val ui = build(listOf(shelf(after, at("2026-11-22T08:12"))), locked)
         assertFalse("h1" in hashesIn(ui))
-        assertEquals("숨긴 프로젝트 1", ui.lockedGroup?.title)
+        assertNull(ui.lockedGroup)
+        assertTrue(ui.rows.isEmpty())
     }
 
     @Test

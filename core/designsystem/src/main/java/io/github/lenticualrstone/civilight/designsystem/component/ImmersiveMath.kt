@@ -81,30 +81,54 @@ object ImmersiveMath {
     /** Tone when the hero cannot blur (API < 31, scrim / opaque glass): stronger, never opaque. Own value. */
     const val TONE_MAX_NO_BLUR: Float = 0.62f
 
-    /** Bottom shade (to top): alpha .68 at 0, .30 at 34 %, 0 at 64 %; opacity 1 → 0.4. */
+    /** Bottom shade (to top): alpha .68 at 0, .30 at 34 %, 0 at 64 %; fades completely out by p 0.75. */
     val SHADE_STOPS: List<Pair<Float, Float>> = listOf(0f to 0.68f, 0.34f to 0.30f, 0.64f to 0f)
-    const val SHADE_DROP: Float = 0.6f
+    const val SHADE_FADE_END: Float = 0.75f
+
+    /** Spring detent thresholds inside 0 … dockDistance (directional hysteresis + flick velocity). */
+    const val SNAP_UP_THRESHOLD: Float = 0.22f
+    const val SNAP_DOWN_THRESHOLD: Float = 0.78f
+    const val SNAP_FLING_PX_S: Float = 350f
 
     const val PANEL_RADIUS_DP: Float = 24f
     const val PANEL_TOP_PAD_DP: Float = 28f
     const val PANEL_BOTTOM_EXTRA_DP: Float = 32f
-    const val PANEL_ALPHA_DARK_START: Float = 0.58f
-    const val PANEL_ALPHA_DARK_END: Float = 0.30f
-    const val PANEL_ALPHA_LIGHT_START: Float = 0.66f
-    const val PANEL_ALPHA_LIGHT_END: Float = 0.38f
+    const val PANEL_ALPHA_DARK_START: Float = 0.74f
+    const val PANEL_ALPHA_DARK_END: Float = 0.86f
+    const val PANEL_ALPHA_LIGHT_START: Float = 0.80f
+    const val PANEL_ALPHA_LIGHT_END: Float = 0.90f
 
     fun clamp01(v: Float): Float = if (v.isNaN()) 0f else v.coerceIn(0f, 1f)
 
     private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
-    /** D. */
+    /** Where the glass content panel starts at scroll 0: right at the top of the bottom bar / inset. */
+    fun panelStartY(viewportHeight: Float, bottomInset: Float = 0f, hasBar: Boolean = true): Float =
+        (viewportHeight - bottomInset - (if (hasBar) BAR_ROW_DP else 0f)).coerceAtLeast(0f)
+
+    /**
+     * Synchronized scroll distance from rest (scroll 0) to docked (panel top touches header bottom):
+     * `panelStartY - headerHeight`. Title, header and panel arrive at the exact same scroll pixel.
+     */
+    fun dockDistance(
+        viewportHeight: Float,
+        statusInset: Float = 0f,
+        bottomInset: Float = 0f,
+        hasBar: Boolean = true,
+    ): Float {
+        if (viewportHeight <= 0f) return 0f
+        return (panelStartY(viewportHeight, bottomInset, hasBar) - headerHeight(statusInset)).coerceAtLeast(1f)
+    }
+
+    /** Legacy fallback D = viewportHeight × 0.5 when no header/panel metrics are supplied. */
     fun distance(viewportHeight: Float): Float = viewportHeight * DISTANCE_FRACTION
 
+    /** p for an explicit dock distance [dockDist]. */
+    fun progressForDistance(scroll: Float, dockDist: Float): Float =
+        if (dockDist <= 0f) 0f else clamp01(scroll / dockDist)
+
     /** p. 0 while the viewport is unknown. */
-    fun progress(scroll: Float, viewportHeight: Float): Float {
-        val d = distance(viewportHeight)
-        return if (d <= 0f) 0f else clamp01(scroll / d)
-    }
+    fun progress(scroll: Float, viewportHeight: Float): Float = progressForDistance(scroll, distance(viewportHeight))
 
     /** smoothstep. */
     fun ease(p: Float): Float {
@@ -115,10 +139,28 @@ object ImmersiveMath {
     /** hp. */
     fun headerAlpha(p: Float): Float = clamp01((p - HEADER_START) / HEADER_SPAN)
 
+    /** q for an explicit dock distance [dockDist]. */
+    fun extraBlurForDistance(scroll: Float, dockDist: Float): Float =
+        if (dockDist <= 0f) 0f else clamp01((scroll - dockDist) / (dockDist * EXTRA_SPAN))
+
     /** q. */
-    fun extraBlurProgress(scroll: Float, viewportHeight: Float): Float {
-        val d = distance(viewportHeight)
-        return if (d <= 0f) 0f else clamp01((scroll - d) / (d * EXTRA_SPAN))
+    fun extraBlurProgress(scroll: Float, viewportHeight: Float): Float = extraBlurForDistance(scroll, distance(viewportHeight))
+
+    /**
+     * Spring detent target inside the hero ↔ docked transition zone (0 < scrollPx < dockPx).
+     * Flicks follow velocity; slow releases use directional hysteresis so small pulls commit crisply.
+     */
+    fun snapTarget(scrollPx: Float, dockPx: Float, startScrollPx: Float, velocityPxPerSec: Float = 0f): Float {
+        if (dockPx <= 0f || scrollPx <= 0f || scrollPx >= dockPx) return scrollPx.coerceAtLeast(0f)
+        if (velocityPxPerSec > SNAP_FLING_PX_S) return dockPx
+        if (velocityPxPerSec < -SNAP_FLING_PX_S) return 0f
+        val p = scrollPx / dockPx
+        val movingUp = scrollPx >= startScrollPx
+        return if (movingUp) {
+            if (p >= SNAP_UP_THRESHOLD) dockPx else 0f
+        } else {
+            if (p <= SNAP_DOWN_THRESHOLD) 0f else dockPx
+        }
     }
 
     /** Reduced motion: one step at p ≥ 0.5 (no interpolation). */
@@ -194,17 +236,17 @@ object ImmersiveMath {
     /** Background-colour tone over the hero: 0 → .30 (0 → .62 without blur). */
     fun toneAlpha(e: Float, canBlur: Boolean = true): Float = (if (canBlur) TONE_MAX else TONE_MAX_NO_BLUR) * e
 
-    /** Bottom shade opacity 1 → 0.4 (p). */
-    fun shadeAlpha(p: Float): Float = 1f - SHADE_DROP * clamp01(p)
+    /** Bottom shade opacity 1 → 0 over p 0 … 0.75 so no dark smear lingers behind the reading panel. */
+    fun shadeAlpha(p: Float): Float = clamp01(1f - clamp01(p) / SHADE_FADE_END)
 
     /**
-     * Panel glass alpha: dark .58 → .30, light .66 → .38 (e). Without blur the panel keeps its start alpha
-     * so the sharp art never shows through more.
+     * Panel glass alpha: dark .74 → .86, light .80 → .90 (e). Reading content stays crisp and legible
+     * while softly blurring the hero backdrop underneath.
      */
     fun panelGlassAlpha(e: Float, dark: Boolean, canBlur: Boolean = true): Float {
         val start = if (dark) PANEL_ALPHA_DARK_START else PANEL_ALPHA_LIGHT_START
         val end = if (dark) PANEL_ALPHA_DARK_END else PANEL_ALPHA_LIGHT_END
-        return if (canBlur) lerp(start, end, e) else start
+        return if (canBlur) lerp(start, end, e) else end
     }
 
     /** Bottom padding inside the panel: bar row + 32 (+ the navigation inset). */
@@ -241,8 +283,11 @@ data class ImmersiveFrame(
     val q: Float,
 ) {
     companion object {
-        fun at(scroll: Float, viewportHeight: Float, reduced: Boolean = false): ImmersiveFrame {
-            val p = ImmersiveMath.progress(scroll, viewportHeight)
+        fun at(scroll: Float, viewportHeight: Float, reduced: Boolean = false): ImmersiveFrame =
+            atDistance(scroll, ImmersiveMath.distance(viewportHeight), reduced)
+
+        fun atDistance(scroll: Float, dockDistance: Float, reduced: Boolean = false): ImmersiveFrame {
+            val p = ImmersiveMath.progressForDistance(scroll, dockDistance)
             return if (reduced) {
                 val s = ImmersiveMath.snapped(p)
                 ImmersiveFrame(p = p, e = s, hp = s, q = 0f)
@@ -251,7 +296,7 @@ data class ImmersiveFrame(
                     p = p,
                     e = ImmersiveMath.ease(p),
                     hp = ImmersiveMath.headerAlpha(p),
-                    q = ImmersiveMath.extraBlurProgress(scroll, viewportHeight),
+                    q = ImmersiveMath.extraBlurForDistance(scroll, dockDistance),
                 )
             }
         }

@@ -44,7 +44,8 @@ class ScriptLayoutTest {
         assertFalse(l.panel)
         assertTrue(l.rail)
         assertEquals(933f - 57f, l.areaWidth)
-        assertEquals(560f, l.columnWidth)
+        assertEquals(640f, l.columnWidth)
+        assertEquals((876f - 640f) / 2f, l.columnStart)
         val p = ScriptLayout.of(704f, panelOpen = false, height = 933f)
         assertTrue(p.rail)
         assertEquals(647f, p.areaWidth)
@@ -62,12 +63,13 @@ class ScriptLayoutTest {
     }
 
     @Test
-    fun `SCR-03 a closed panel gives the area the full width and keeps the 560 column`() {
+    fun `SCR-03 a closed panel gives the area the full width and centers the 640 column`() {
         val l = ScriptLayout.of(800f, panelOpen = false, hidden = true)
         assertFalse(l.panel)
         assertEquals(800f, l.areaWidth)
-        assertEquals(560f, l.columnWidth)
-        assertEquals(560f, ScriptLayout.of(1200f, panelOpen = true).columnWidth)
+        assertEquals(640f, l.columnWidth)
+        assertEquals((800f - 640f) / 2f, l.columnStart)
+        assertEquals(640f, ScriptLayout.of(1200f, panelOpen = true).columnWidth)
     }
 
     @Test
@@ -97,7 +99,8 @@ class ScriptLayoutTest {
         // The choice counts only while the panel is drawn.
         val closed = ScriptLayout.of(1000f, panelOpen = false, area = 600f)
         assertEquals(1000f - ScriptLayout.RAIL_SPACE, closed.areaWidth)
-        assertEquals(560f, closed.columnWidth)
+        assertEquals(640f, closed.columnWidth)
+        assertEquals((closed.areaWidth - 640f) / 2f, closed.columnStart)
     }
 
     @Test
@@ -107,7 +110,7 @@ class ScriptLayoutTest {
         val holding = open.keepingAreaOf(closed)
         assertTrue(holding.panel)
         assertEquals(1000f, holding.areaWidth)
-        assertEquals(560f, holding.columnWidth)
+        assertEquals(640f, holding.columnWidth)
         assertEquals(open.panelWidth, holding.panelWidth)
     }
 

@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
 import io.github.lenticualrstone.civilight.designsystem.component.CheckboxRow
@@ -87,6 +88,13 @@ internal fun SettingsScreen(services: LibraryServices) {
     val settings by vm.settings.collectAsState()
     val sheets = rememberSheetHost()
     val open: (SettingsRootRow) -> Unit = { row -> navigator.push(SettingsRoutes.routeOf(row)) }
+    val context = LocalContext.current
+    val appVersion = remember(context) {
+        runCatching {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(context.packageName, 0)?.versionName
+        }.getOrNull().orEmpty()
+    }
     var activeCategoryName by rememberSaveable { mutableStateOf<String?>(null) }
     val activeCategory = activeCategoryName?.let { name -> SettingsCategory.entries.firstOrNull { it.name == name } }
 
@@ -163,6 +171,22 @@ internal fun SettingsScreen(services: LibraryServices) {
                     leadingIcon = IconId.Book,
                     onClick = { activeCategoryName = SettingsCategory.SUPPORT.name },
                 )
+                if (appVersion.isNotEmpty()) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 20.dp, bottom = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CivilightText(
+                            "${SettingsCopy.SMALL} $appVersion",
+                            CivilightTheme.type.small,
+                            color = CivilightTheme.colors.ink3,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
             SettingsCategory.DISPLAY -> {
                 ThemeSegmented(ui.themeIndex, vm::setTheme, Modifier.padding(top = 4.dp, bottom = 6.dp))
@@ -248,6 +272,12 @@ internal fun SettingsScreen(services: LibraryServices) {
                 SwitchSettingRow(ui.appLock, leadingIcon = IconId.Lock, onChange = vm::setAppLock)
                 LinkRow(ui.hiding, leadingIcon = IconId.EyeOff) { open(SettingsRootRow.HIDING) }
                 SettingsRow(
+                    title = SettingsCopy.HIDDEN_VIEW_TITLE,
+                    subtitle = SettingsCopy.HIDDEN_VIEW_SUB,
+                    leadingIcon = IconId.Lock,
+                    onClick = { navigator.push(io.github.lenticualrstone.civilight.navigation.SettingsHiddenProjects) },
+                )
+                SettingsRow(
                     title = "수위 등급 기본 규칙",
                     subtitle = "전체 · 15세 · R-18 기본 보호 및 내보내기 표시",
                     leadingIcon = IconId.Shield,
@@ -283,6 +313,14 @@ internal fun SettingsScreen(services: LibraryServices) {
             SettingsCategory.SUPPORT -> {
                 SettingsRow(title = SettingsCopy.TRASH, leadingIcon = IconId.Trash, onClick = { open(SettingsRootRow.TRASH) })
                 SettingsRow(title = SettingsCopy.HELP, leadingIcon = IconId.Book, onClick = { open(SettingsRootRow.HELP) })
+                if (appVersion.isNotEmpty()) {
+                    SettingsRow(
+                        title = SettingsCopy.APP_VERSION,
+                        subtitle = appVersion,
+                        leadingIcon = IconId.File,
+                        onClick = {},
+                    )
+                }
             }
         }
     }

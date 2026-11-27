@@ -162,11 +162,11 @@ class ImmersiveMathTest {
 
     @Test
     fun heroScaleBlurToneShade() {
-        val at = listOf(0f, 0.25f, 0.5f, 0.9f, 1f)
-        val scale = listOf(1f, 1f + 0.08f * 0.15625f, 1.04f, 1f + 0.08f * 0.972f, 1.08f)
-        val blur = listOf(0f, 22f * 0.15625f, 11f, 22f * 0.972f, 22f)
-        val tone = listOf(0f, 0.3f * 0.15625f, 0.15f, 0.3f * 0.972f, 0.30f)
-        val shade = listOf(1f, 0.85f, 0.7f, 0.46f, 0.4f)
+        val at = listOf(0f, 0.25f, 0.5f, 0.75f, 1f)
+        val scale = listOf(1f, 1f + 0.08f * 0.15625f, 1.04f, 1f + 0.08f * 0.84375f, 1.08f)
+        val blur = listOf(0f, 22f * 0.15625f, 11f, 22f * 0.84375f, 22f)
+        val tone = listOf(0f, 0.3f * 0.15625f, 0.15f, 0.3f * 0.84375f, 0.30f)
+        val shade = listOf(1f, 2f / 3f, 1f / 3f, 0f, 0f)
         at.forEachIndexed { i, p ->
             val f = frame(p)
             assertEquals("scale $p", scale[i], ImmersiveMath.heroScale(f.e), 1e-4f)
@@ -188,22 +188,35 @@ class ImmersiveMathTest {
         assertEquals(48f, ImmersiveMath.heroBlurDp(end.e, end.q), eps)
         val past = ImmersiveFrame.at(3f * d, h)
         assertEquals(48f, ImmersiveMath.heroBlurDp(past.e, past.q), eps)
-        // Never opaque: tone stays .30, shade .4.
+        // Shade fades completely to 0 so no dark smear stays behind the reading panel.
         assertEquals(0.30f, ImmersiveMath.toneAlpha(end.e), eps)
-        assertEquals(0.4f, ImmersiveMath.shadeAlpha(end.p), eps)
+        assertEquals(0f, ImmersiveMath.shadeAlpha(end.p), eps)
     }
 
     @Test
-    fun panelGlassGetsClearer() {
-        assertEquals(0.58f, ImmersiveMath.panelGlassAlpha(frame(0f).e, dark = true), eps)
-        assertEquals(0.66f, ImmersiveMath.panelGlassAlpha(frame(0f).e, dark = false), eps)
-        assertEquals(0.44f, ImmersiveMath.panelGlassAlpha(frame(0.5f).e, dark = true), eps)
-        assertEquals(0.52f, ImmersiveMath.panelGlassAlpha(frame(0.5f).e, dark = false), eps)
-        assertEquals(0.58f - 0.28f * 0.972f, ImmersiveMath.panelGlassAlpha(frame(0.9f).e, dark = true), eps)
-        assertEquals(0.30f, ImmersiveMath.panelGlassAlpha(frame(1f).e, dark = true), eps)
-        assertEquals(0.38f, ImmersiveMath.panelGlassAlpha(frame(1f).e, dark = false), eps)
+    fun panelGlassStaysLegible() {
+        assertEquals(0.74f, ImmersiveMath.panelGlassAlpha(frame(0f).e, dark = true), eps)
+        assertEquals(0.80f, ImmersiveMath.panelGlassAlpha(frame(0f).e, dark = false), eps)
+        assertEquals(0.80f, ImmersiveMath.panelGlassAlpha(frame(0.5f).e, dark = true), eps)
+        assertEquals(0.85f, ImmersiveMath.panelGlassAlpha(frame(0.5f).e, dark = false), eps)
+        assertEquals(0.86f, ImmersiveMath.panelGlassAlpha(frame(1f).e, dark = true), eps)
+        assertEquals(0.90f, ImmersiveMath.panelGlassAlpha(frame(1f).e, dark = false), eps)
         assertEquals(96f + 20f, ImmersiveMath.panelBottomPadding(20f, hasBar = true), eps)
         assertEquals(88f + 20f, ImmersiveMath.barHeight(20f), eps)
+    }
+
+    @Test
+    fun dockDistanceAndSpringDetentSnap() {
+        val dock = ImmersiveMath.dockDistance(viewportHeight = 800f, statusInset = 28f, bottomInset = 24f, hasBar = true)
+        assertEquals(800f - 24f - 64f - 84f, dock, eps)
+        // Pull up past 22% commits to docked; small nudge falls back to hero.
+        assertEquals(dock, ImmersiveMath.snapTarget(dock * 0.25f, dock, startScrollPx = 0f), eps)
+        assertEquals(0f, ImmersiveMath.snapTarget(dock * 0.15f, dock, startScrollPx = 0f), eps)
+        // Pull down past 78% returns to hero; flicks follow velocity.
+        assertEquals(0f, ImmersiveMath.snapTarget(dock * 0.75f, dock, startScrollPx = dock), eps)
+        assertEquals(dock, ImmersiveMath.snapTarget(dock * 0.85f, dock, startScrollPx = dock), eps)
+        assertEquals(dock, ImmersiveMath.snapTarget(dock * 0.1f, dock, startScrollPx = 0f, velocityPxPerSec = 500f), eps)
+        assertEquals(0f, ImmersiveMath.snapTarget(dock * 0.9f, dock, startScrollPx = dock, velocityPxPerSec = -500f), eps)
     }
 
     @Test
@@ -212,7 +225,7 @@ class ImmersiveMathTest {
         assertEquals(0f, ImmersiveMath.heroBlurDp(f.e, f.q, canBlur = false), eps)
         assertEquals(0.62f, ImmersiveMath.toneAlpha(f.e, canBlur = false), eps)
         assertTrue(ImmersiveMath.toneAlpha(f.e, canBlur = false) < 1f)
-        assertEquals(0.58f, ImmersiveMath.panelGlassAlpha(f.e, dark = true, canBlur = false), eps)
+        assertEquals(0.86f, ImmersiveMath.panelGlassAlpha(f.e, dark = true, canBlur = false), eps)
     }
 
     @Test
@@ -255,9 +268,9 @@ class ImmersiveMathTest {
             assertEquals("heroS@$i", 1f + 0.08f * e, ImmersiveMath.heroScale(f.e), 1e-4f)
             assertEquals("blur@$i", 22f * e + 26f * qs[i], ImmersiveMath.heroBlurDp(f.e, f.q), 1e-3f)
             assertEquals("tone@$i", 0.30f * e, ImmersiveMath.toneAlpha(f.e), 1e-4f)
-            assertEquals("shade@$i", 1f - 0.6f * ps[i], ImmersiveMath.shadeAlpha(f.p), 1e-4f)
-            assertEquals("dark@$i", 0.58f - 0.28f * e, ImmersiveMath.panelGlassAlpha(f.e, dark = true), 1e-4f)
-            assertEquals("light@$i", 0.66f - 0.28f * e, ImmersiveMath.panelGlassAlpha(f.e, dark = false), 1e-4f)
+            assertEquals("shade@$i", (1f - ps[i] / 0.75f).coerceIn(0f, 1f), ImmersiveMath.shadeAlpha(f.p), 1e-4f)
+            assertEquals("dark@$i", 0.74f + 0.12f * e, ImmersiveMath.panelGlassAlpha(f.e, dark = true), 1e-4f)
+            assertEquals("light@$i", 0.80f + 0.10f * e, ImmersiveMath.panelGlassAlpha(f.e, dark = false), 1e-4f)
         }
     }
 

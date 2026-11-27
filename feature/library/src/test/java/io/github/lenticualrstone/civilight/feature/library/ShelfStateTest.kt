@@ -52,14 +52,12 @@ class ShelfStateTest {
     ): ShelfUi = ShelfState.build(list, access, RelockPolicy.ON_LEAVE, recorder, onboarding, NOW, ZONE)
 
     @Test
-    fun `S-01 rows are visible projects newest first, hidden ones only counted`() {
+    fun `S-01 rows are visible projects newest first, hidden ones completely absent from main shelf`() {
         val ui = build()
         assertEquals("프로젝트 · 2", ui.sectionLabel)
         assertEquals(listOf("잿빛 새벽의 등불", "유리 정원"), ui.rows.map { it.title })
         assertEquals(listOf(Rating.R15, Rating.ALL), ui.rows.map { it.rating })
-        assertEquals("숨긴 프로젝트 2", ui.lockedGroup?.title)
-        assertEquals("이름 가림 · 검색 · 위젯 · 알림 제외", ui.lockedGroup?.sub)
-        assertEquals("지문으로 보기", ui.lockedGroup?.button)
+        assertNull(ui.lockedGroup)
         assertNull(ui.openGroup)
         assertFalse(ui.headerRelock)
     }
@@ -67,11 +65,11 @@ class ShelfStateTest {
     @Test
     fun `P-09 to P-11 row meta by format`() {
         val ui = build(access = open)
-        val byTitle = (ui.rows + ui.openGroup!!.rows).associate { it.title to it.meta }
+        val byTitle = ui.rows.associate { it.title to it.meta }
         // The example has 11 live characters (fixture.md conflict 7: 노아 is in the trash).
         assertEquals("1장 7/10 · 인물 11 · 오늘 08:12", byTitle["잿빛 새벽의 등불"])
         assertEquals("단편 · 씬 1개 · 3일 전", byTitle["유리 정원"])
-        assertEquals("설정만 · 인물 1 · 11월 2일", byTitle["검은 서약 (가제)"])
+        assertNull("hidden project stays off main shelf", byTitle["검은 서약 (가제)"])
     }
 
     @Test
@@ -82,15 +80,13 @@ class ShelfStateTest {
     }
 
     @Test
-    fun `LibUnlocked the open group lists hidden projects and the header shows 다시 잠그기`() {
+    fun `hidden projects remain off main shelf even when vault session is unlocked`() {
         val ui = build(access = open)
-        val group = assertNotNull(ui.openGroup).let { ui.openGroup!! }
-        assertEquals("숨긴 프로젝트 2 · 열림", group.header)
-        assertEquals("앱을 떠나면 잠김", group.note)
-        assertEquals(listOf("외전 · 오웬의 시장", "검은 서약 (가제)"), group.rows.map { it.title })
+        assertNull(ui.openGroup)
         assertNull(ui.lockedGroup)
-        assertTrue(ui.headerRelock)
+        assertFalse(ui.headerRelock)
         assertEquals("프로젝트 · 2", ui.sectionLabel)
+        assertEquals(listOf("잿빛 새벽의 등불", "유리 정원"), ui.rows.map { it.title })
     }
 
     @Test
@@ -98,7 +94,7 @@ class ShelfStateTest {
         val unread = projects.map { if (it.doc === oath) it.copy(doc = null) else it }
         val ui = build(unread)
         assertFalse(ui.rows.any { it.key == oath.key })
-        assertEquals("숨긴 프로젝트 2", ui.lockedGroup?.title)
+        assertNull(ui.lockedGroup)
     }
 
     @Test
@@ -132,12 +128,12 @@ class ShelfStateTest {
         val lockedUi = build()
         assertTrue(lockedUi.shows(glass.key))
         assertFalse(lockedUi.shows(oath.key))
-        assertTrue(build(access = open).shows(oath.key))
+        assertFalse("hidden project is shown only in Settings vault", build(access = open).shows(oath.key))
 
-        // After a re-lock or a restart, the hidden project's sheets close from the top down.
+        // Hidden project sheets close on the main shelf.
         val stack = listOf(ShelfMenuSheet(glass.key), ShelfMenuSheet(oath.key), RenameSheet(oath.key))
         assertEquals(2, ShelfState.sheetsToClose(lockedUi, stack))
-        assertEquals(0, ShelfState.sheetsToClose(build(access = open), stack))
+        assertEquals(2, ShelfState.sheetsToClose(build(access = open), stack))
         assertEquals(1, ShelfState.sheetsToClose(lockedUi, listOf(RatingPickSheet(oath.key))))
         assertEquals(1, ShelfState.sheetsToClose(lockedUi, listOf(ExportSheet(oath.key))))
         // The shared rating sheet closes itself, once.

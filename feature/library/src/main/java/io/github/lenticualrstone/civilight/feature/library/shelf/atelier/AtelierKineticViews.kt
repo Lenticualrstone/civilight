@@ -29,6 +29,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -146,6 +151,87 @@ internal fun KineticDeckView(input: ShelfViewInput) {
                     },
                 )
                 }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 6b. 가로 스와이프 (HORIZONTAL_SWIPE) — Natural Flat Horizontal Pager Cards
+//     (Standard native horizontal swipe tension, subtle depth scale, zero 3D skew)
+// ---------------------------------------------------------------------------
+@Composable
+internal fun HorizontalSwipeView(input: ShelfViewInput) {
+    val items = remember(input.ui) { atelierItems(input) }
+    val initialPage = remember(items.size, input.selectedKey) {
+        input.selectedKey?.let { key ->
+            items.indexOfFirst { (it as? ShelfCardItem.Project)?.card?.row?.key == key }.takeIf { it >= 0 }
+        } ?: 0
+    }
+    val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, (items.size - 1).coerceAtLeast(0))) { items.size }
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    val haptics = io.github.lenticualrstone.civilight.designsystem.theme.rememberHaptics()
+    val motion = CivilightTheme.motion
+
+    LaunchedEffect(pagerState.currentPage, input.preview) {
+        if (!input.preview && items.size > 1) {
+            haptics.perform(io.github.lenticualrstone.civilight.designsystem.theme.HapticToken.TICK)
+        }
+    }
+
+    AtelierStageFrame(input, items, pagerState.currentPage) { tilt ->
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .padding(top = input.barTop.dp, bottom = (input.barBottom + 126f).dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            val (cardW, cardH) = AtelierCoverBox.deck(maxWidth, maxHeight)
+            val targetPx = with(density) { cardW.roundToPx() }
+            val sidePad = ((maxWidth - cardW) / 2f).coerceAtLeast(16.dp)
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = sidePad),
+                pageSize = PageSize.Fixed(cardW),
+                pageSpacing = 18.dp,
+                verticalAlignment = Alignment.CenterVertically,
+                userScrollEnabled = !input.preview,
+            ) { page ->
+                val item = items[page]
+                val focused = page == pagerState.currentPage
+                AtelierCoverCard(
+                    item = item,
+                    tilt = tilt,
+                    focused = focused,
+                    sheenBias = {
+                        val off = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                        (-off * 0.45f).coerceIn(-1f, 1f)
+                    },
+                    targetWidthPx = targetPx,
+                    input = input,
+                    modifier = Modifier
+                        .size(cardW, cardH)
+                        .graphicsLayer {
+                            val dist = abs((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).coerceIn(0f, 1f)
+                            val s = 1f - dist * 0.08f
+                            scaleX = s
+                            scaleY = s
+                            alpha = 1f - dist * 0.30f
+                        },
+                    onClick = {
+                        if (focused) {
+                            item.trigger(input)
+                        } else {
+                            scope.launch {
+                                if (motion.reduced) pagerState.scrollToPage(page)
+                                else pagerState.animateScrollToPage(page)
+                            }
+                        }
+                    },
+                )
             }
         }
     }

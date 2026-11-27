@@ -89,14 +89,15 @@ fun WorldImmersiveFrame(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val paneHost = if (CommandScope.of(LocalPaneRole.current) != null) LocalCommandBarHost.current else null
-    val bottomInset = if (paneHost != null && paneHost.panePadding > 0.dp) 0.dp else null
+    val bottomInset = paneHost?.panePadding?.takeIf { it > 0.dp }
     val inDetailPane = LocalPaneRole.current == PaneRole.DETAIL
+    val hasArt = image is CardImageUi.Picked || image is CardImageUi.Preset
     val scroll = rememberSaveable(itemKey, saver = ScrollState.Saver) { ScrollState(0) }
     val immersive = rememberImmersiveDetailState(scroll)
     if (paneHost == null && tabs.size > 1) ReportBottomChrome(ImmersiveMath.BAR_ROW_DP.dp)
     CenterColumn {
         SheetHostLayout(sheets, localSheets = localSheets) {
-            BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = paneHost?.panePadding ?: 0.dp)) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
                 ImmersiveDetailScaffold(
                     title = title,
                     subtitle = subtitle,
@@ -107,6 +108,7 @@ fun WorldImmersiveFrame(
                     state = immersive,
                     onMore = onMore,
                     bottomInset = bottomInset,
+                    hasHeroArt = hasArt,
                     onHeroClick = onHeroClick,
                     heroLabel = onHeroClick?.let { PlaceCopy.PICK_IMAGE },
                     content = content,

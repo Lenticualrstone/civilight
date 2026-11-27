@@ -144,10 +144,10 @@ class Library020Test {
 
         val lib = ViewStyles.options(ViewKind.LIBRARY, AppSettings(), library = libAll)
         assertEquals(
-            listOf("CD 케이스", "탄성 덱", "모자이크", "필름 릴", "시간 축", "스튜디오 목록"),
+            listOf("CD 케이스", "탄성 덱", "가로 스와이프", "모자이크", "필름 릴", "시간 축", "스튜디오 목록"),
             lib.map { it.title },
         )
-        assertEquals(listOf(true) + List(5) { false }, lib.map { it.selected })
+        assertEquals(listOf(true) + List(6) { false }, lib.map { it.selected })
         val cards = ViewStyles.options(ViewKind.CARD, AppSettings(), cards = cardAll)
         assertEquals(listOf("부채꼴 덱", "회전 목마", "겹친 더미", "타로 펼침", "기울어진 벽", "롤로덱스", "목록"), cards.map { it.title })
         assertEquals(LibraryStyle.KINETIC_DECK, ViewStyles.libraryStyleOf(LibraryStyle.KINETIC_DECK.name))

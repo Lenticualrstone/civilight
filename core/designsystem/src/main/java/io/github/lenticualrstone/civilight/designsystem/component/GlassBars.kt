@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,12 @@ import io.github.lenticualrstone.civilight.designsystem.glass.rememberGlassSourc
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.LayoutMetrics
+
+/**
+ * Extra start padding reserved in [TopGlassBar] for a pinned outer chrome control (e.g. the unified
+ * top-left panel toggle button when a collapsible list pane is open).
+ */
+val LocalTopBarStartInset = staticCompositionLocalOf { 0.dp }
 
 /**
  * DS-21 top glass bar: full width from the window top (behind the status bar) to [barHeight] below the
@@ -69,10 +76,12 @@ fun TopGlassBar(
     val type = CivilightTheme.type
     val inset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val start = if (wide) LayoutMetrics.topBarStartInner else LayoutMetrics.topBarStartCover
+    val extraStart = LocalTopBarStartInset.current
     val top = if (wide) LayoutMetrics.topBarContentTopInner else LayoutMetrics.topBarContentTopCover
     val motion = LocalMotion.current
     // S18a: the back button folds in from the start edge and the row's start padding follows on `standard`.
-    val startPadding by animateDpAsState(if (back != null) start - 12.dp else start, motion.move(CivilightMotion.standard), label = "barStart")
+    val baseStart = if (extraStart > 0.dp) extraStart else start
+    val startPadding by animateDpAsState(if (back != null) (baseStart - 12.dp).coerceAtLeast(extraStart) else baseStart, motion.move(CivilightMotion.standard), label = "barStart")
     val lastBack = rememberLastNonNull(back)
     Box(modifier.fillMaxWidth().heightIn(min = barHeight + inset)) {
         GlassBackground(GlassSurface.TOP_BAR, Modifier.matchParentSize())

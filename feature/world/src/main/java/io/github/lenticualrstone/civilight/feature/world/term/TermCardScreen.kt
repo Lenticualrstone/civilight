@@ -259,16 +259,18 @@ fun TermCardScreen(route: TermCardRoute, deps: FeatureDeps) {
                     }
                     val goBack: () -> Unit = back?.onClick ?: { deps.navigator.pop() }
                     val motion = CivilightTheme.motion
+                    val termImage = CardImages.of(d, WorldKind.TERM, route.termKey, c.head.name)
+                    val hasArt = termImage is io.github.lenticualrstone.civilight.feature.world.common.CardImageUi.Picked ||
+                        termImage is io.github.lenticualrstone.civilight.feature.world.common.CardImageUi.Preset
                     ImmersiveDetailScaffold(
                         title = c.head.name,
                         subtitle = c.subtitle,
                         // DS-70: the `목록 + 상세` detail pane has no back (the list is beside it).
                         onBack = if (inDetailPane) null else goBack,
-                        modifier = Modifier
-                            .onGloballyPositioned { frameTop = it.positionInRoot().y }
-                            .then(if (inPane) Modifier.padding(bottom = padding.calculateBottomPadding()) else Modifier),
-                        bottomInset = if (inPane) 0.dp else null,
-                        hero = { TermHero(CardImages.of(d, WorldKind.TERM, route.termKey, c.head.name), c.head.name) },
+                        modifier = Modifier.onGloballyPositioned { frameTop = it.positionInRoot().y },
+                        bottomInset = if (inPane) padding.calculateBottomPadding() else null,
+                        hasHeroArt = hasArt,
+                        hero = { TermHero(termImage, c.head.name) },
                         actions = { WorldHeaderLens(lens) { sheets.open(LensSheet(route.projectKey)) } },
                         bottomBar = {
                             CivilightTabs(

@@ -77,15 +77,17 @@ class PaneSplitAndMotionTest {
 
     @Test
     fun `every list module has its own ratio id`() {
-        assertEquals(PaneSplit.Modules.LIBRARY, ListDetailPairs.moduleOf(Library))
-        assertEquals(PaneSplit.Modules.HOME, ListDetailPairs.moduleOf(ProjectHome("P")))
+        assertNull(ListDetailPairs.moduleOf(Library))
+        assertNull(ListDetailPairs.moduleOf(ProjectHome("P")))
         assertEquals(PaneSplit.Modules.CAST, ListDetailPairs.moduleOf(CastList("P")))
         assertEquals(PaneSplit.Modules.WORLD, ListDetailPairs.moduleOf(World("P")))
         assertEquals(PaneSplit.Modules.TIMELINE, ListDetailPairs.moduleOf(Timeline("P")))
         assertEquals(PaneSplit.Modules.RECORDER, ListDetailPairs.moduleOf(RecorderInbox()))
         assertEquals(PaneSplit.Modules.CHECKS, ListDetailPairs.moduleOf(CheckCenter("P")))
         assertNull(ListDetailPairs.moduleOf(Script("P")))
-        assertTrue(ListDetailPairs.isList(Library))
+        assertTrue(ListDetailPairs.isList(CastList("P")))
+        assertFalse(ListDetailPairs.isList(Library))
+        assertFalse(ListDetailPairs.isList(ProjectHome("P")))
         assertFalse(ListDetailPairs.isList(Script("P")))
     }
 

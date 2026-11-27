@@ -145,6 +145,9 @@ enum class LibraryStyle {
     /** `탄성 덱` — 기계식 힌지 텐션 · 부채꼴 덱. */
     KINETIC_DECK,
 
+    /** `가로 스와이프` — 자연스러운 좌우 스와이프 · 카드. */
+    HORIZONTAL_SWIPE,
+
     /** `모자이크` — 에디토리얼 격자 · 포커스. */
     BENTO_MOSAIC,
 

@@ -62,6 +62,10 @@ data object SettingsCardView : LibraryRoute
 @Serializable
 data object SettingsHiding : LibraryRoute
 
+/** 설정 · 숨긴 항목 보기: dedicated authenticated vault for hidden projects (never shown on main Library). */
+@Serializable
+data object SettingsHiddenProjects : LibraryRoute
+
 /** 설정 · 수위 등급 (LIB-23). */
 @Serializable
 data object SettingsRating : LibraryRoute

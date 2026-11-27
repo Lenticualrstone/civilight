@@ -25,6 +25,13 @@ internal fun HidingSettingsScreen(services: LibraryServices) {
     SettingsFrame(title = SettingsCopy.HIDING, smallLine = SettingsCopy.TITLE, onBack = { navigator.pop() }) {
         CivilightText(SettingsCopy.HIDING_INTRO, type.small, color = colors.ink3)
 
+        io.github.lenticualrstone.civilight.designsystem.component.SettingsRow(
+            title = SettingsCopy.HIDDEN_VIEW_TITLE,
+            subtitle = SettingsCopy.HIDDEN_VIEW_SUB,
+            leadingIcon = io.github.lenticualrstone.civilight.designsystem.icon.IconId.Lock,
+            onClick = { navigator.push(io.github.lenticualrstone.civilight.navigation.SettingsHiddenProjects) },
+        )
+
         SettingsSection(SettingsCopy.RELOCK_WHEN)
         ui.relock.forEach { option ->
             RadioRow(title = option.title, selected = option.selected, onClick = { vm.setRelock(option.policy) }, subtitle = option.sub)

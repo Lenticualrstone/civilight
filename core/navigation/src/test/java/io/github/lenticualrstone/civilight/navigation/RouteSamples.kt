@@ -27,6 +27,7 @@ object RouteSamples {
         SettingsLibraryView,
         SettingsCardView,
         SettingsHiding,
+        SettingsHiddenProjects,
         SettingsRating,
         RatingDefaultsApply(Rating.R18),
         SettingsBackup,

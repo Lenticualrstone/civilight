@@ -13,7 +13,7 @@
 ![Android 10+](https://img.shields.io/badge/Android-10%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
-![version](https://img.shields.io/badge/version-0.6.0(Antigravity)-blue)
+![version](https://img.shields.io/badge/version-0.6.1(Antigravity)-blue)
 ![font license](https://img.shields.io/badge/font-Pretendard%20OFL%201.1-lightgrey)
 
 </div>
@@ -90,7 +90,7 @@ JDK 21 환경이 필요하며, `local.properties` 파일의 `sdk.dir`에 Android
 
 | 항목 | 값 |
 | --- | --- |
-| versionName | `0.6.0(Antigravity)` |
+| versionName | `0.6.1(Antigravity)` |
 | minSdk / targetSdk / compileSdk | 29 / 37 / 37 |
 | Kotlin / AGP | 2.4.21 / 9.4.1 |
 | Compose BOM / Navigation3 | 2026.05.01 / 1.1.2 |

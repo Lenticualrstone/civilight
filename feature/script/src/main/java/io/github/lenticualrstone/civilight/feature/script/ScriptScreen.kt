@@ -1093,34 +1093,35 @@ private fun ScriptFrame(
         val panelWidth = rememberLastNonNull(targetLayout.panelWidth.takeIf { targetLayout.panel }) ?: ScriptLayout.panelWidthFor(widthDp, heightDp)
         val seamShown = targetLayout.panel || targetLayout.rail
         if (seamShown) {
+            val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val railActions = scriptSettings.miniRailScript.mapNotNull { item ->
                 when (item) {
                     io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.TIME ->
                         io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
                             icon = IconId.Clock,
                             label = "시간",
-                            active = panelTab == PanelTab.TIME,
+                            active = !panelState.closed && panelTab == PanelTab.TIME,
                             onClick = { vm.setPanelTab(PanelTab.TIME); panelState.setClosed(false) },
                         )
                     io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.REF ->
                         io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
                             icon = IconId.Book,
                             label = "참고",
-                            active = panelTab == PanelTab.REF,
+                            active = !panelState.closed && panelTab == PanelTab.REF,
                             onClick = { vm.setPanelTab(PanelTab.REF); panelState.setClosed(false) },
                         )
                     io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.PROPS ->
                         io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
                             icon = IconId.Sliders,
                             label = "속성",
-                            active = panelTab == PanelTab.PROPS,
+                            active = !panelState.closed && panelTab == PanelTab.PROPS,
                             onClick = { vm.setPanelTab(PanelTab.PROPS); panelState.setClosed(false) },
                         )
                     io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.MODS ->
                         io.github.lenticualrstone.civilight.ui.window.MiniRailAction(
                             icon = IconId.Grid,
                             label = "모듈",
-                            active = panelTab == PanelTab.MODS,
+                            active = !panelState.closed && panelTab == PanelTab.MODS,
                             onClick = { vm.setPanelTab(PanelTab.MODS); panelState.setClosed(false) },
                         )
                     io.github.lenticualrstone.civilight.model.app.MiniRailScriptItem.OUTLINE ->
@@ -1145,7 +1146,7 @@ private fun ScriptFrame(
                 panelState,
                 panelSide,
                 Modifier.align(if (railOnLeft) Alignment.TopStart else Alignment.TopEnd),
-                topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
+                topInset = statusTop,
                 actions = railActions,
             )
         }
@@ -1161,6 +1162,7 @@ private fun ScriptFrame(
                 onSelectTab = vm::setPanelTab,
                 scrollOf = panelScroll::state,
                 width = panelWidth.dp,
+                onStartEdge = railOnLeft,
             ) { tab ->
                 panel?.takeIf { it.tab == tab }?.let { PanelBody(it, wide = true, actions = actions, c = c, vm = vm) }
             }
@@ -1170,7 +1172,8 @@ private fun ScriptFrame(
                 panelState,
                 panelSide,
                 panelDp = { panelWidth },
-                modifier = Modifier.align(if (railOnLeft) Alignment.CenterStart else Alignment.CenterEnd).fillMaxWidth(),
+                modifier = Modifier.align(if (railOnLeft) Alignment.TopStart else Alignment.TopEnd).fillMaxSize(),
+                topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
             )
         }
         val lastSplit = rememberLastNonNull(split)

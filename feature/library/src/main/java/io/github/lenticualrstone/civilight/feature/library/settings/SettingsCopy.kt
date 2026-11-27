@@ -68,6 +68,12 @@ object SettingsCopy {
     const val APP_LOCK_SUB = "지문으로 열기"
     const val HIDING = "숨기기"
     const val HIDDEN_PROJECTS = "숨긴 프로젝트"
+    const val HIDDEN_VIEW_TITLE = "숨긴 항목 보기"
+    const val HIDDEN_VIEW_SUB = "인증 후 숨긴 프로젝트 확인"
+    const val HIDDEN_VIEW_LOCKED = "잠김"
+    const val HIDDEN_VIEW_LOCKED_SUB = "인증하면 숨긴 프로젝트 표시"
+    const val HIDDEN_VIEW_UNLOCK = "지문으로 보기"
+    const val HIDDEN_VIEW_EMPTY = "숨긴 프로젝트 없음"
     const val RELOCK_WHEN = "다시 잠그는 때"
 
     // 인물 (CST-58): the app-level 인물 템플릿 list.
@@ -82,6 +88,7 @@ object SettingsCopy {
     const val TRASH = "휴지통"
     const val RECORDER = "라이프 레코더"
     const val HELP = "도움말 · 안내 다시 보기"
+    const val APP_VERSION = "앱 버전"
 
     // 설정 · 숨기기 (LIB-64)
     const val HIDING_INTRO = "프로젝트 단위 기본 · 앱 잠금과 별도"

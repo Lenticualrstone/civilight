@@ -38,7 +38,7 @@ class SettingsTest {
         assertEquals("앱 잠금", ui.appLock.title)
         assertEquals("지문으로 열기", ui.appLock.sub)
         assertFalse(ui.appLock.on)
-        assertEquals("숨긴 프로젝트 2 · 다시 잠그는 때", ui.hiding.sub)
+        assertEquals("다시 잠그는 때", ui.hiding.sub)
         assertEquals("앱을 떠날 때", ui.hiding.value)
     }
 

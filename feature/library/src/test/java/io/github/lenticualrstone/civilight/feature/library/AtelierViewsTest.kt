@@ -17,16 +17,16 @@ import org.junit.Test
 
 class AtelierViewsTest {
     @Test
-    fun `all 6 Atelier views are registered and grouped 1 physical 3D + 5 kinetic`() {
-        assertEquals(6, LibraryStyle.entries.size)
+    fun `all 7 Atelier views are registered and grouped 1 physical 3D + 6 kinetic`() {
+        assertEquals(7, LibraryStyle.entries.size)
         assertEquals(1, AtelierRegistry.spatialStyles.size)
-        assertEquals(5, AtelierRegistry.kineticStyles.size)
+        assertEquals(6, AtelierRegistry.kineticStyles.size)
         assertEquals(LibraryStyle.entries.toSet(), ShelfViewRenderers.available)
 
         val entries = ViewPick.entries()
-        assertEquals(6, entries.size)
+        assertEquals(7, entries.size)
         assertEquals(1, entries.count { it.group == PickGroup.SPATIAL })
-        assertEquals(5, entries.count { it.group == PickGroup.KINETIC })
+        assertEquals(6, entries.count { it.group == PickGroup.KINETIC })
         entries.forEach { e ->
             assertTrue("glyph present for ${e.style}", e.glyph.isNotBlank())
             assertTrue("label present for ${e.style}", e.label.isNotBlank())

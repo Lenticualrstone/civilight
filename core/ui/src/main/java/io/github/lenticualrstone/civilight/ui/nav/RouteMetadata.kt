@@ -35,17 +35,16 @@ object RouteMetadata {
 val NavEntry<*>.route: NavKey? get() = metadata[RouteMetadata.ROUTE] as? NavKey
 
 /**
- * The list | detail pairs of CNV-33 (`Two*` boards): 서재 | 프로젝트 홈 · 홈 | 스토리 구조 ·
- * 인물 목록 | 인물 · 용어 목록 | 용어 카드 · 연표 | 사건 · 기록함 | 기록 · 점검 | 원고 위치.
- * Only these pairs share the screen; any other stack shows one screen.
+ * The list | detail pairs of CNV-33 (`Two*` boards): 인물 목록 | 인물 · 용어/장소/세력 목록 | 카드 ·
+ * 연표 | 사건 · 기록함 | 기록 · 점검 | 원고 위치.
+ * Library and ProjectHome stay standalone full-screen views on unfolded displays (avoiding cramped splits
+ * and jarring rail/pane rebuilds on forward navigation).
  */
 object ListDetailPairs {
     fun isList(key: NavKey?): Boolean = moduleOf(key) != null
 
     /** The CNV-47 ratio id (`PaneSplit.Modules`) of a list module, or null for any other route. */
     fun moduleOf(list: NavKey?): String? = when {
-        list == Library -> PaneSplit.Modules.LIBRARY
-        list is ProjectHome -> PaneSplit.Modules.HOME
         list is CastList -> PaneSplit.Modules.CAST
         list is World -> PaneSplit.Modules.WORLD
         list is Timeline -> PaneSplit.Modules.TIMELINE
@@ -55,8 +54,6 @@ object ListDetailPairs {
     }
 
     fun isPair(list: NavKey?, detail: NavKey?): Boolean = when (detail) {
-        is ProjectHome -> list == Library
-        is StoryStructure -> list is ProjectHome && list.projectKey == detail.projectKey
         is CharacterProfile -> list is CastList && list.projectKey == detail.projectKey
         is TermCard -> list is World && list.projectKey == detail.projectKey
         is PlaceCard -> list is World && list.projectKey == detail.projectKey

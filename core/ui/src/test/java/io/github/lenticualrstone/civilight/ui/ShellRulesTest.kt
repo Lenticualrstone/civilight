@@ -48,25 +48,23 @@ class ShellRulesTest {
 
     @Test
     fun `list and detail pairs - CNV-33`() {
-        assertTrue(ListDetailPairs.isPair(Library, ProjectHome("P")))
-        assertTrue(ListDetailPairs.isPair(ProjectHome("P"), StoryStructure("P")))
+        assertFalse(ListDetailPairs.isPair(Library, ProjectHome("P")))
+        assertFalse(ListDetailPairs.isPair(ProjectHome("P"), StoryStructure("P")))
         assertTrue(ListDetailPairs.isPair(CastList("P"), CharacterProfile("P", "C")))
         assertTrue(ListDetailPairs.isPair(World("P"), TermCard("P", "T")))
         assertTrue(ListDetailPairs.isPair(CheckCenter("P"), Script("P")))
         assertFalse(ListDetailPairs.isPair(CastList("P"), CharacterProfile("Q", "C")))
         assertFalse(ListDetailPairs.isPair(World("P"), CharacterProfile("P", "C")))
         assertFalse(ListDetailPairs.isPair(Settings, Script("P")))
-        assertTrue(ListDetailPairs.isList(Library))
+        assertFalse(ListDetailPairs.isList(Library))
+        assertTrue(ListDetailPairs.isList(CastList("P")))
         assertFalse(ListDetailPairs.isList(Script("P")))
     }
 
     @Test
     fun `choosing another row swaps the detail instead of stacking it`() {
-        val stack = mutableListOf<androidx.navigation3.runtime.NavKey>(Library)
+        val stack = mutableListOf<androidx.navigation3.runtime.NavKey>(Library, ProjectHome("Q"))
         val nav = io.github.lenticualrstone.civilight.navigation.BackStackNavigator(stack)
-        nav.openDetail(ProjectHome("P"))
-        nav.openDetail(ProjectHome("Q"))
-        assertEquals(listOf(Library, ProjectHome("Q")), stack)
         nav.push(CastList("Q"))
         nav.openDetail(CharacterProfile("Q", "A"))
         nav.openDetail(CharacterProfile("Q", "B"))

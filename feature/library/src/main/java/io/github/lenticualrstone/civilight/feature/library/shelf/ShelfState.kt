@@ -132,30 +132,23 @@ object ShelfState {
         val live = projects.filter { it.entry.deletedAt == null }.sortedByDescending { it.entry.updatedAt }
         val byKey = live.associateBy { it.entry.key }
         val listing = LibraryListing.of(live.map(::profileOf), access)
-        // A locked hidden project is neither in `rows` nor in `openGroup`, so its cover is never read (U-08 LIB-89).
+        // Hidden projects never appear on the main Library shelf (not even as a lock card or count);
+        // they live exclusively inside Settings > 숨긴 항목 보기 behind biometric authentication.
         fun row(profile: ProjectProfile) = rowOf(byKey.getValue(profile.key), now, zone, fileExists, facts)
-        val openGroup = listing.openGroup.takeIf { it.isNotEmpty() }?.let { hidden ->
-            OpenGroupUi(
-                header = "${HiddenGroupRow(hidden.size).title} · ${ShelfCopy.GROUP_OPEN}",
-                note = Relock.openGroupNote(relockPolicy),
-                rows = hidden.map(::row),
-            )
-        }
         val rows = listing.rows.map(::row)
-        // Both views carry their data, so a `목록 ↔ 카드` switch can animate (CNV-45); [showCards] only says which is on.
-        val cards = rows.map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = false, fileExists) } +
-            openGroup?.rows.orEmpty().map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = true, fileExists) }
+        val cards = rows.map { ShelfCards.card(it, byKey[it.key]?.doc, hiddenOpen = false, fileExists) }
+        val visibleEntries = live.filterNot { it.entry.hidden }.map { it.entry }
         return ShelfUi(
             loaded = loaded,
             sectionLabel = listing.sectionLabel,
             rows = rows,
-            lockedGroup = listing.lockedGroup,
-            openGroup = openGroup,
-            headerRelock = openGroup != null,
-            empty = Onboarding.emptyLibrary(onboarding, live.map { it.entry }),
+            lockedGroup = null,
+            openGroup = null,
+            headerRelock = false,
+            empty = Onboarding.emptyLibrary(onboarding, visibleEntries),
             recorderSub = recorderSub(recorder, live, access, zone),
             showCards = showCards,
-            cardSectionLabel = listing.cardSectionLabel,
+            cardSectionLabel = listing.sectionLabel,
             cards = cards,
             recents = RecentsModel.cards(recentItems, live, now, zone, RecentsModel.WIDE_COUNT),
         )

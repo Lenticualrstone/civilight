@@ -135,7 +135,7 @@ object SettingsState {
         appLock = SettingsSwitchRow(SettingsCopy.APP_LOCK, SettingsCopy.APP_LOCK_SUB, settings.appLock),
         hiding = SettingsLinkRow(
             title = SettingsCopy.HIDING,
-            sub = "${SettingsCopy.HIDDEN_PROJECTS} $hiddenProjects · ${SettingsCopy.RELOCK_WHEN}",
+            sub = SettingsCopy.RELOCK_WHEN,
             value = relockTitle(settings.relockPolicy),
         ),
         templates = SettingsLinkRow(SettingsCopy.TEMPLATES_TITLE, SettingsCopy.templatesSub(visibleTemplates), null),

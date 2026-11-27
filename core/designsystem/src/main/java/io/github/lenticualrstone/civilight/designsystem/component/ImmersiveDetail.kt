@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
@@ -38,10 +39,16 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -95,9 +102,11 @@ import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
 import io.github.lenticualrstone.civilight.designsystem.theme.FixedColors
+import io.github.lenticualrstone.civilight.designsystem.theme.HapticToken
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalGlassMode
 import io.github.lenticualrstone.civilight.designsystem.theme.LocalMotion
 import io.github.lenticualrstone.civilight.designsystem.theme.animatedFraction
+import io.github.lenticualrstone.civilight.designsystem.theme.rememberHaptics
 
 /** Accessibility names of the immersive header buttons (same words as the rest of the app). */
 object ImmersiveDetailCopy {
@@ -114,23 +123,27 @@ object ImmersiveDetailCopy {
 @Stable
 class ImmersiveDetailState(val scrollState: ScrollState) {
     internal var viewportHeightPx by mutableFloatStateOf(0f)
+    internal var dockDistancePx by mutableFloatStateOf(0f)
     internal var reduced by mutableStateOf(false)
+
+    private val activeDistancePx: Float
+        get() = if (dockDistancePx > 0f) dockDistancePx else ImmersiveMath.distance(viewportHeightPx)
 
     /** All driving values of the current frame (p, e, hp, q). Reduced motion: e and hp step at p 0.5. */
     val frame: ImmersiveFrame
-        get() = ImmersiveFrame.at(scrollState.value.toFloat(), viewportHeightPx, reduced)
+        get() = ImmersiveFrame.atDistance(scrollState.value.toFloat(), activeDistancePx, reduced)
 
-    /** p = clamp(scroll / D, 0, 1), D = viewport height × 0.5. */
-    val progress: Float get() = ImmersiveMath.progress(scrollState.value.toFloat(), viewportHeightPx)
+    /** p = clamp(scroll / D, 0, 1), D = panelStartY - headerHeight. */
+    val progress: Float get() = ImmersiveMath.progressForDistance(scrollState.value.toFloat(), activeDistancePx)
 
-    /** smoothstep(p) (title, hero, tone, panel); a 0 / 1 step under reduced motion. */
+    /** smoothstep(p) (hero blur, tone, panel); a 0 / 1 step under reduced motion. */
     val easedProgress: Float get() = frame.e
 
     /** Header glass alpha, p 0.5 … 0.9. */
     val headerAlpha: Float get() = frame.hp
 
     /** D in px (0 until laid out). */
-    val distancePx: Float get() = ImmersiveMath.distance(viewportHeightPx)
+    val distancePx: Float get() = activeDistancePx
 
     /** True once the header glass starts to show (p > 0.5). */
     val headerShown: Boolean by derivedStateOf { frame.hp > 0f }
@@ -143,8 +156,8 @@ class ImmersiveDetailState(val scrollState: ScrollState) {
 fun rememberImmersiveDetailState(scrollState: ScrollState = rememberScrollState()): ImmersiveDetailState =
     remember(scrollState) { ImmersiveDetailState(scrollState) }
 
-/** What header buttons inside the scaffold read: the header alpha and the backdrop they blur. */
-private class ImmersiveChrome(val headerAlpha: () -> Float, val source: GlassSource?)
+/** What header buttons inside the scaffold read: the header alpha, backdrop blur source, and whether hero has art. */
+private class ImmersiveChrome(val headerAlpha: () -> Float, val source: GlassSource?, val hasHeroArt: Boolean)
 
 private val LocalImmersiveChrome = staticCompositionLocalOf<ImmersiveChrome?> { null }
 
@@ -189,6 +202,7 @@ fun ImmersiveDetailScaffold(
     contentGutter: Boolean = true,
     backLabel: String = ImmersiveDetailCopy.BACK,
     bottomInset: Dp? = null,
+    hasHeroArt: Boolean = true,
     onHeroClick: (() -> Unit)? = null,
     heroLabel: String? = null,
     onTitleClick: (() -> Unit)? = null,
@@ -204,6 +218,8 @@ fun ImmersiveDetailScaffold(
     val motion = LocalMotion.current
     val glassMode = LocalGlassMode.current
     val density = LocalDensity.current
+    val haptics = rememberHaptics()
+    val scope = rememberCoroutineScope()
     val canBlur = Build.VERSION.SDK_INT >= 31 && (glassMode == GlassMode.BLUR || glassMode == GlassMode.BLUR_COSTLY)
     val opaque = glassMode == GlassMode.OPAQUE
     val reduced = motion.reduced
@@ -225,18 +241,65 @@ fun ImmersiveDetailScaffold(
     val hasBack = onBack != null
     val hasBar = bottomBar != null
     val hasSubtitle = !subtitle.isNullOrEmpty()
+    val externalBottomBar = bottomInset != null && bottomInset > 0.dp
 
     BoxWithConstraints(modifier.fillMaxSize().background(colors.bg)) {
         val hPx = constraints.maxHeight.toFloat()
         val viewportH = maxHeight
+        val panelStartDp = ImmersiveMath.panelStartY(maxHeight.value, navDp.value, hasBar).dp
+        val panelStartPx = with(density) { panelStartDp.toPx() }
+        val dockDp = ImmersiveMath.dockDistance(maxHeight.value, statusDp.value, navDp.value, hasBar)
+        val dockPx = with(density) { dockDp.dp.toPx() }
         val wide = ImmersiveMath.isWide(maxWidth.value)
         val gutter = ImmersiveMath.gutterDp(wide).dp
-        SideEffect { state.viewportHeightPx = hPx }
+        SideEffect {
+            state.viewportHeightPx = hPx
+            state.dockDistancePx = dockPx
+        }
+
+        // Spring detent tension in the hero <-> docked transition zone (0 < scroll < dockPx).
+        var dragStartScroll by remember(state) { mutableFloatStateOf(0f) }
+        var wasScrolling by remember(state) { mutableStateOf(false) }
+        var flingSnapped by remember(state) { mutableStateOf(false) }
+        val isScrolling = state.scrollState.isScrollInProgress
+        LaunchedEffect(isScrolling, dockPx, reduced) {
+            if (isScrolling && !wasScrolling) {
+                dragStartScroll = state.scrollState.value.toFloat()
+                flingSnapped = false
+            } else if (!isScrolling && wasScrolling && !flingSnapped && dockPx > 1f) {
+                val cur = state.scrollState.value.toFloat()
+                if (cur > 1f && cur < dockPx - 1f) {
+                    val target = ImmersiveMath.snapTarget(cur, dockPx, dragStartScroll, 0f).roundToInt()
+                    if (target != state.scrollState.value) {
+                        haptics.perform(HapticToken.TICK)
+                        state.scrollState.animateScrollTo(target, motion.hingeTension(dampingRatio = 0.84f, stiffness = 420f))
+                    }
+                }
+            }
+            wasScrolling = isScrolling
+        }
+        val detentScroll = remember(state, dockPx, motion, haptics) {
+            object : NestedScrollConnection {
+                override suspend fun onPreFling(available: Velocity): Velocity {
+                    if (dockPx <= 1f) return Velocity.Zero
+                    val cur = state.scrollState.value.toFloat()
+                    if (cur <= 1f || cur >= dockPx - 1f) return Velocity.Zero
+                    val scrollVel = -available.y
+                    val target = ImmersiveMath.snapTarget(cur, dockPx, dragStartScroll, scrollVel).roundToInt()
+                    flingSnapped = true
+                    haptics.perform(HapticToken.TICK)
+                    scope.launch {
+                        state.scrollState.animateScrollTo(target, motion.hingeTension(dampingRatio = 0.84f, stiffness = 420f))
+                    }
+                    return available
+                }
+            }
+        }
 
         val pageSource = rememberGlassSource()
         val heroSource = rememberGlassSource()
 
-        // Title geometry, shared by the drawn title and its tap target (same move and scale).
+        // Title geometry, shared by the drawn title and its tap target (1:1 synced with the rising panel).
         val startSp = ImmersiveMath.titleStartSp(wide)
         var titleHeightPx by remember { mutableIntStateOf(0) }
         var titleWidthPx by remember { mutableIntStateOf(0) }
@@ -251,15 +314,17 @@ fun ImmersiveDetailScaffold(
         val titleTransform: (androidx.compose.ui.graphics.GraphicsLayerScope, Float, Float) -> Unit = { layer, dxDp, dyDp ->
             with(layer) {
                 val d = density.density
-                val e = state.frame.e
+                val f = state.frame
+                // Linear p tracks the rising panel 1:1 (no mid-scroll sprint or dead gap); reduced steps on e.
+                val t = if (reduced) f.e else f.p
                 val lh = titleHeightPx / d
                 val hDp = hPx / d
                 val y0 = ImmersiveMath.titleStartY(hDp, lh, navDp.value, hasBar, hasSubtitle)
                 val y1 = ImmersiveMath.titleDockedY(statusDp.value, lh, wide)
                 transformOrigin = TransformOrigin(0f, 0f)
-                val s = ImmersiveMath.titleScale(e, wide)
-                translationX = (ImmersiveMath.titleX(e, wide, hasBack) + dxDp * s) * d
-                translationY = (ImmersiveMath.titleY(e, y0, y1) + dyDp * s) * d
+                val s = ImmersiveMath.titleScale(t, wide)
+                translationX = (ImmersiveMath.titleX(t, wide, hasBack) + dxDp * s) * d
+                translationY = (ImmersiveMath.titleY(t, y0, y1) + dyDp * s) * d
                 scaleX = s
                 scaleY = s
             }
@@ -283,28 +348,36 @@ fun ImmersiveDetailScaffold(
                         },
                     content = hero,
                 )
+                Spacer(
+                    Modifier.fillMaxSize().drawBehind {
+                        drawRect(colors.bg, alpha = ImmersiveMath.toneAlpha(fadeE(), canBlur))
+                    },
+                )
+            }
+            // Bottom shade sits OUTSIDE heroSource so the glass panel never blurs a dark smear into itself,
+            // and only draws when hero art is present (never turning a coverless light surface into a gray wall).
+            if (hasHeroArt) {
                 val shade = remember {
                     val stops = ImmersiveMath.SHADE_STOPS.map { (at, a) -> (1f - at) to ImageDark.copy(alpha = a) }.sortedBy { it.first }
                     Brush.verticalGradient(*stops.toTypedArray())
                 }
                 Spacer(
                     Modifier.fillMaxSize().drawBehind {
-                        drawRect(colors.bg, alpha = ImmersiveMath.toneAlpha(fadeE(), canBlur))
-                        drawRect(shade, alpha = ImmersiveMath.shadeAlpha(pFade()))
+                        val a = ImmersiveMath.shadeAlpha(pFade())
+                        if (a > 0.001f) drawRect(shade, alpha = a)
                     },
                 )
             }
 
-            Column(Modifier.fillMaxSize().verticalScroll(state.scrollState)) {
-                // The first viewport: transparent over the art. Its tap targets live inside the scroller, so a
-                // vertical drag that starts on them still scrolls; clipped, so nothing reaches under the panel.
-                Box(Modifier.fillMaxWidth().height(viewportH).clipToBounds()) {
+            Column(Modifier.fillMaxSize().nestedScroll(detentScroll).verticalScroll(state.scrollState)) {
+                // Hero spacer ends at panelStartDp so the glass panel rises immediately in lockstep with the title.
+                Box(Modifier.fillMaxWidth().height(panelStartDp).clipToBounds()) {
                     if (onHeroClick != null || heroTargets != null || titleTappable || subtitleTappable) {
                         // Pinned like the hero: moved down by the scroll, so the targets stay over what they mark.
-                        Box(Modifier.matchParentSize().offset { IntOffset(0, state.scrollState.value) }) {
+                        Box(Modifier.fillMaxWidth().height(viewportH).offset { IntOffset(0, state.scrollState.value) }) {
                             if (onHeroClick != null) {
                                 // Not under the tab bar (its gaps and fade would otherwise open the art's picker).
-                                val barDp = if (hasBar) ImmersiveMath.barHeight(navDp.value).dp else 0.dp
+                                val barDp = if (hasBar) ImmersiveMath.barHeight(navDp.value).dp else navDp
                                 Box(
                                     Modifier
                                         .fillMaxWidth()
@@ -346,7 +419,8 @@ fun ImmersiveDetailScaffold(
                 ImmersivePanel(
                     state = state,
                     viewportPx = hPx,
-                    minHeight = viewportH,
+                    panelStartPx = panelStartPx,
+                    minHeight = (viewportH - ImmersiveMath.headerHeight(statusDp.value).dp).coerceAtLeast(0.dp),
                     heroSource = heroSource,
                     canBlur = canBlur,
                     opaque = opaque,
@@ -366,14 +440,27 @@ fun ImmersiveDetailScaffold(
 
         // ---- Bottom glass bar ----
         if (bottomBar != null) {
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(ImmersiveMath.barHeight(navDp.value).dp)) {
+            val barBoxModifier = if (externalBottomBar) {
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(bottom = navDp)
+                    .fillMaxWidth()
+                    .height((ImmersiveMath.BAR_ROW_DP + ImmersiveMath.BAR_FADE_DP).dp)
+            } else {
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .height(ImmersiveMath.barHeight(navDp.value).dp)
+            }
+            val barContentBottom = if (externalBottomBar) ImmersiveMath.BAR_CONTENT_BOTTOM_DP.dp else navDp + ImmersiveMath.BAR_CONTENT_BOTTOM_DP.dp
+            Box(barBoxModifier) {
                 GlassBackground(GlassSurface.BOTTOM_BAR, Modifier.matchParentSize(), source = if (canBlur) pageSource else null)
                 OnGlass {
                     Box(
                         Modifier
                             .align(Alignment.BottomStart)
                             .fillMaxWidth()
-                            .padding(start = gutter, end = gutter, bottom = navDp + ImmersiveMath.BAR_CONTENT_BOTTOM_DP.dp),
+                            .padding(start = gutter, end = gutter, bottom = barContentBottom),
                     ) { bottomBar() }
                 }
             }
@@ -388,7 +475,7 @@ fun ImmersiveDetailScaffold(
                     source = if (canBlur) pageSource else null,
                 )
             }
-            val chrome = remember(hp, pageSource, canBlur) { ImmersiveChrome(hp, if (canBlur) pageSource else null) }
+            val chrome = remember(hp, pageSource, canBlur, hasHeroArt) { ImmersiveChrome(hp, if (canBlur) pageSource else null, hasHeroArt) }
             CompositionLocalProvider(LocalImmersiveChrome provides chrome) {
                 OnGlass {
                     Row(
@@ -414,16 +501,18 @@ fun ImmersiveDetailScaffold(
 
         // ---- Subtitle (fades, never docks) ----
         if (hasSubtitle) {
-            val subStyle = remember(type, density) {
+            val subStyle = remember(type, density, hasHeroArt, colors.ink2) {
                 type.small.copy(
                     fontSize = 14.sp,
                     lineHeight = ImmersiveMath.SUBTITLE_LINE_DP.sp,
-                    color = FixedColors.onImage.copy(alpha = ImmersiveMath.SUBTITLE_ALPHA),
-                    shadow = Shadow(
-                        ImageDark.copy(alpha = ImmersiveMath.SUBTITLE_SHADOW_ALPHA),
-                        Offset(0f, with(density) { 1.dp.toPx() }),
-                        with(density) { ImmersiveMath.SUBTITLE_SHADOW_BLUR_DP.dp.toPx() },
-                    ),
+                    color = if (hasHeroArt) FixedColors.onImage.copy(alpha = ImmersiveMath.SUBTITLE_ALPHA) else colors.ink2,
+                    shadow = if (hasHeroArt) {
+                        Shadow(
+                            ImageDark.copy(alpha = ImmersiveMath.SUBTITLE_SHADOW_ALPHA),
+                            Offset(0f, with(density) { 1.dp.toPx() }),
+                            with(density) { ImmersiveMath.SUBTITLE_SHADOW_BLUR_DP.dp.toPx() },
+                        )
+                    } else null,
                 )
             }
             BasicText(
@@ -473,7 +562,9 @@ fun ImmersiveDetailScaffold(
             )
         }
         val ink = colors.ink
-        val titleColor = remember(ink, hp) { ColorProducer { lerp(FixedColors.onImage, ink, ImmersiveMath.titleInkMix(hp())) } }
+        val titleColor = remember(ink, hp, hasHeroArt) {
+            ColorProducer { if (hasHeroArt) lerp(FixedColors.onImage, ink, ImmersiveMath.titleInkMix(hp())) else ink }
+        }
         Box(
             Modifier
                 .align(Alignment.TopStart)
@@ -494,15 +585,17 @@ fun ImmersiveDetailScaffold(
                     }
                 },
         ) {
-            BasicText(
-                text = title,
-                style = shadowStyle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .clearAndSetSemantics { }
-                    .graphicsLayer { alpha = 1f - ImmersiveMath.titleInkMix(hp()) },
-            )
+            if (hasHeroArt) {
+                BasicText(
+                    text = title,
+                    style = shadowStyle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .clearAndSetSemantics { }
+                        .graphicsLayer { alpha = 1f - ImmersiveMath.titleInkMix(hp()) },
+                )
+            }
             BasicText(
                 text = title,
                 style = titleStyle,
@@ -519,6 +612,7 @@ fun ImmersiveDetailScaffold(
 private fun ImmersivePanel(
     state: ImmersiveDetailState,
     viewportPx: Float,
+    panelStartPx: Float,
     minHeight: androidx.compose.ui.unit.Dp,
     heroSource: GlassSource,
     canBlur: Boolean,
@@ -546,7 +640,7 @@ private fun ImmersivePanel(
             }
             .drawBehind {
                 // Panel top in viewport (= hero source) coordinates; only the visible part is blurred.
-                val top = viewportPx - state.scrollState.value
+                val top = panelStartPx - state.scrollState.value
                 if (effect != null) {
                     val visibleFrom = (-top).coerceAtLeast(0f)
                     val visibleH = (viewportPx - top.coerceAtLeast(0f)).coerceIn(0f, size.height - visibleFrom)
@@ -572,8 +666,8 @@ private fun ImmersivePanel(
 
 /**
  * 44 dp header button of the immersive screen: over the art a dark circle (.34) on a 12 dp backdrop blur,
- * both fading out as the header glass appears; the icon goes white → `ink` with it. Outside the scaffold it
- * draws a plain `ink` icon. [contentDescription] is required (terse, e.g. [ImmersiveDetailCopy.MORE]).
+ * both fading out as the header glass appears; the icon goes white → `ink` with it. Outside the scaffold
+ * or when there is no hero art it draws a plain `ink` icon. [contentDescription] is required.
  */
 @Composable
 fun ImmersiveHeaderButton(
@@ -584,8 +678,9 @@ fun ImmersiveHeaderButton(
 ) {
     val chrome = LocalImmersiveChrome.current
     val ink = CivilightTheme.colors.ink
-    val hp: () -> Float = chrome?.headerAlpha ?: { 1f }
-    val source = chrome?.source
+    val hasArt = chrome?.hasHeroArt ?: false
+    val hp: () -> Float = if (hasArt) (chrome?.headerAlpha ?: { 1f }) else ({ 1f })
+    val source = if (hasArt) chrome?.source else null
     val blurLayer = rememberGraphicsLayer()
     val circle = remember { Path() }
     var selfPos by remember { mutableStateOf(Offset.Zero) }
@@ -599,7 +694,7 @@ fun ImmersiveHeaderButton(
             .onGloballyPositioned { selfPos = it.positionInRoot() }
             .drawBehind {
                 val h = hp()
-                if (h >= 1f) return@drawBehind
+                if (!hasArt || h >= 1f) return@drawBehind
                 circle.rewind()
                 circle.addOval(Rect(Offset.Zero, size))
                 clipPath(circle) {
@@ -620,13 +715,15 @@ fun ImmersiveHeaderButton(
             icon,
             contentDescription = null,
             size = CivilightTheme.sizes.icon,
-            tint = FixedColors.onImage,
-            modifier = Modifier
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(lerp(FixedColors.onImage, ink, ImmersiveMath.titleInkMix(hp())), blendMode = BlendMode.SrcIn)
-                },
+            tint = if (hasArt) FixedColors.onImage else ink,
+            modifier = if (hasArt) {
+                Modifier
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(lerp(FixedColors.onImage, ink, ImmersiveMath.titleInkMix(hp())), blendMode = BlendMode.SrcIn)
+                    }
+            } else Modifier,
         )
     }
 }

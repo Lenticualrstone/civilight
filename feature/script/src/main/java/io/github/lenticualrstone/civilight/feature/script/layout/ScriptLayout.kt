@@ -50,7 +50,7 @@ data class ScriptLayout(
         const val RAIL_SPACE = RAIL + 1f
 
         const val COLUMN_START = 40f
-        const val COLUMN_MAX = 560f
+        const val COLUMN_MAX = 640f
 
         /** Space kept between the column and the panel's hairline. */
         const val PANEL_GAP = 16f
@@ -98,7 +98,14 @@ data class ScriptLayout(
                 else -> width
             }
             val room = areaWidth - COLUMN_START - (if (panel) PANEL_GAP else 0f)
-            return ScriptLayout(true, panel, areaWidth, COLUMN_START, room.coerceIn(0f, COLUMN_MAX), if (panel) width - areaWidth else base, rail)
+            val colW = room.coerceIn(0f, COLUMN_MAX)
+            // Center the reading column horizontally when the side panel is closed and extra horizontal room exists.
+            val colStart = if (!panel && areaWidth > colW + COLUMN_START * 2f) {
+                (areaWidth - colW) / 2f
+            } else {
+                COLUMN_START
+            }
+            return ScriptLayout(true, panel, areaWidth, colStart, colW, if (panel) width - areaWidth else base, rail)
         }
     }
 }

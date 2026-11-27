@@ -38,7 +38,9 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import io.github.lenticualrstone.civilight.designsystem.component.LocalTopBarStartInset
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
@@ -307,6 +309,9 @@ fun SplitPanes(
         val closed = panel.closed
         val notify by rememberUpdatedState(onPanelClosedChange)
         LaunchedEffect(closed) { notify?.invoke(closed) }
+        val railTopInset = railTop ?: WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        // Reserve top-left slot in the open list pane's header for the unified anchored IconId.Panel toggle.
+        val leftStartInset = if (collapsible && hasDetail) PanelRules.RAIL.dp else 0.dp
         // DS-65: the frame's one bottom bar spans both panes and blurs both, so the panes are its glass source.
         val source = rememberGlassSource()
         Box(Modifier.fillMaxSize().then(if (bottomBar != null) Modifier.glassSource(source) else Modifier)) {
@@ -316,15 +321,18 @@ fun SplitPanes(
                 panelIn = { if (collapsible) panel.panelIn else 1f },
                 leftAlpha = { if (collapsible) panel.panelAlpha else 1f },
                 leftGone = { collapsible && panel.gone },
-                left = { Box(Modifier.collapsedPanel(closed)) { left() } },
+                left = {
+                    CompositionLocalProvider(LocalTopBarStartInset provides leftStartInset) {
+                        Box(Modifier.collapsedPanel(closed)) { left() }
+                    }
+                },
                 right = right,
                 divider = { Box(Modifier.fillMaxSize().background(colors.line)) },
             )
             // Under the frame's bottom bar (which blurs it), above the panes.
             if (collapsible) {
-                val top = railTop ?: WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
                 val railActions = rememberProjectMiniRailActions(module, panel)
-                PanelRail(panel, PanelSide.START, Modifier.align(Alignment.TopStart), topInset = top, actions = railActions)
+                PanelRail(panel, PanelSide.START, Modifier.align(Alignment.TopStart), topInset = railTopInset, actions = railActions)
             }
         }
         if (bottomBar != null) {
@@ -346,7 +354,8 @@ fun SplitPanes(
                 panel,
                 PanelSide.START,
                 panelDp = { state.leftDp },
-                modifier = Modifier.align(Alignment.CenterStart),
+                modifier = Modifier.align(Alignment.TopStart).fillMaxSize(),
+                topInset = railTopInset,
                 extraActions = if (!panel.closed && state.resizable) ratios else emptyList(),
                 dragModifier = Modifier.horizontalSwipe(
                     enabled = !panel.closed && state.resizable,
@@ -465,7 +474,11 @@ private fun SplitLayout(
     divider: @Composable () -> Unit,
 ) {
     Layout(
-        contents = listOf({ Box(Modifier.graphicsLayer { alpha = leftAlpha() }) { left() } }, divider, { Box { right() } }),
+        contents = listOf(
+            { Box(Modifier.clipToBounds().graphicsLayer { alpha = leftAlpha(); clip = true }) { left() } },
+            divider,
+            { Box(Modifier.clipToBounds()) { right() } },
+        ),
         modifier = Modifier.fillMaxSize(),
     ) { (l, d, r), constraints ->
         val total = constraints.maxWidth

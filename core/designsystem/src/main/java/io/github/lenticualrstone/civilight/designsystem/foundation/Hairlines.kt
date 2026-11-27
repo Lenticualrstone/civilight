@@ -35,6 +35,12 @@ fun Modifier.startHairline(color: Color, width: Dp = 1.dp): Modifier = drawBehin
     drawRect(color, Offset.Zero, Size(width.toPx(), size.height))
 }
 
+/** A 1 dp line at the end edge (start-side panel inset). */
+fun Modifier.endHairline(color: Color, width: Dp = 1.dp): Modifier = drawBehind {
+    val w = width.toPx()
+    drawRect(color, Offset(size.width - w, 0f), Size(w, size.height))
+}
+
 /** A 1 dp line at the bottom edge. */
 fun Modifier.bottomHairline(color: Color, width: Dp = 1.dp): Modifier = drawBehind {
     val w = width.toPx()

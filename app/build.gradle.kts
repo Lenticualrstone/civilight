@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.lenticualrstone.civilight"
         minSdk = 29
         targetSdk = 37
-        versionCode = 17
-        versionName = "0.6.0(Antigravity)"
+        versionCode = 18
+        versionName = "0.6.1(Antigravity)"
     }
     // Release signing is read from outside the repo: $CIVILIGHT_SIGNING or ~/.civilight-signing/signing.properties
     val signingFile = file(System.getenv("CIVILIGHT_SIGNING") ?: "${System.getProperty("user.home")}/.civilight-signing/signing.properties")

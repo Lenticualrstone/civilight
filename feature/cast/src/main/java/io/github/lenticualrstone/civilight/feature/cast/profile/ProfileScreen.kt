@@ -441,23 +441,27 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
             },
         ) {
             // Sized from the pane (BoxWithConstraints), never from the window: the record works in the inner right pane.
-            BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = paneHost?.panePadding ?: 0.dp)) {
+            val frameBottomInset = paneHost?.panePadding?.takeIf { it > 0.dp }
+            BoxWithConstraints(Modifier.fillMaxSize()) {
                 val paneWide = ImmersiveMath.isWide(maxWidth.value)
                 val bgArt = remember(doc, c, paneWide) { CharacterImages.background(doc, c, inner = paneWide) }
                 val cardPortrait = remember(doc, c) { CharacterImages.image(doc, c, ImagePlace.CARD) }
                 // Hero: the back layer (background, else the portrait while `초상 앰비언트 블러` is on) and the portrait
                 // card (holo on: the tilting holo card) are independent; both draw when both apply.
                 val hero = RecordHeroLayout.layers(bgArt, cardPortrait, portraitBack = appSettings.portraitAmbientBlur)
+                val hasArt = hero.back != null || hero.card != null
                 val artSlotField = RecordHeroTaps.artField(hasBackground = bgArt != null)
                 val artTaps = RecordHeroTaps.artTaps(editable)
                 val hasSubtitle = !subtitle.isNullOrEmpty()
+                val effectiveBottom = frameBottomInset ?: bottomInset
                 if (paneHost == null) ReportBottomChrome(ImmersiveMath.BAR_ROW_DP.dp)
                 ImmersiveDetailScaffold(
                     title = title,
                     subtitle = subtitle,
                     onBack = if (inDetailPane) null else ({ deps.navigator.pop() }),
                     backLabel = CastUiCopy.BACK,
-                    bottomInset = bottomInset,
+                    bottomInset = effectiveBottom,
+                    hasHeroArt = hasArt,
                     onHeroClick = if (artTaps) ({ actions.onFixed(artSlotField) }) else null,
                     heroLabel = RecordHeroTaps.label(artSlotField),
                     onTitleClick = titleField?.let { f -> { actions.onFixed(f) } },
@@ -465,9 +469,9 @@ fun ProfileScreen(route: CharacterProfile, deps: FeatureDeps) {
                     onSubtitleClick = subtitleField?.let { f -> { actions.onFixed(f) } },
                     subtitleClickLabel = subtitleField?.let(RecordHeroTaps::label),
                     heroTargets = if (artTaps) ({
-                        RecordHeroTargets(hero, hasSubtitle, bottomInset) { actions.onFixed(RecordHeroTaps.cardField) }
+                        RecordHeroTargets(hero, hasSubtitle, effectiveBottom) { actions.onFixed(RecordHeroTaps.cardField) }
                     }) else null,
-                    hero = { RecordImmersiveHero(hero, hasSubtitle = hasSubtitle, navInset = bottomInset) },
+                    hero = { RecordImmersiveHero(hero, hasSubtitle = hasSubtitle, navInset = effectiveBottom) },
                     actions = {
                         // Board deviation: the board's header has only back and `⋯`; the lens stays on screen here
                         // (values follow it), as the record's floating header had it.
