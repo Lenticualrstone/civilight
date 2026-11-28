@@ -122,11 +122,12 @@ fun TwoSidedSwipeRow(
                 ButtonsRow(edit, editWidth, EDIT_BUTTON.dp, progress = BlockSwipe.editProgress(drag.offset, editPx), reduced = motion.reduced, atStart = false)
             }
         }
-        // The block only slides; its hit area moves with it, so it never covers the revealed buttons.
+        // Only mask with opaque `bg` while actively sliding over swipe buttons so ambient glow shines through at rest.
+        val revealing = BlockSwipe.showsReference(drag.offset, refOn) || BlockSwipe.showsEdit(drag.offset, editOn)
         Box(
             Modifier
                 .offset { IntOffset(drag.offset.roundToInt(), 0) }
-                .background(colors.bg),
+                .then(if (revealing) Modifier.background(colors.bg) else Modifier),
         ) { content() }
     }
 }

@@ -259,8 +259,8 @@ fun ScriptInputBar(
                             lineTo(w - strokePx / 2f, h)
                         }
                         val rimBrush = Brush.verticalGradient(
-                            0f to colors.edge.copy(alpha = if (colors.isDark) 0.90f else 0.95f),
-                            0.45f to colors.edge.copy(alpha = 0.32f),
+                            0f to if (colors.isDark) Color.White.copy(alpha = 0.24f) else colors.edge.copy(alpha = 0.20f),
+                            0.45f to if (colors.isDark) Color.White.copy(alpha = 0.08f) else colors.edge.copy(alpha = 0.07f),
                             1f to Color.Transparent,
                         )
                         drawPath(archPath, brush = rimBrush, style = Stroke(width = strokePx))
@@ -355,7 +355,7 @@ private fun ComposerModeTabs(
     Row(
         Modifier
             .clip(pillShape)
-            .background(colors.tint.copy(alpha = 0.72f))
+            .background(colors.tint)
             .insetOutline(colors.line, 1.dp, pillShape)
             .padding(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -367,8 +367,8 @@ private fun ComposerModeTabs(
             Box(
                 Modifier
                     .clip(tabShape)
-                    .background(if (isSelected) colors.sel else Color.Transparent)
-                    .then(if (isSelected) Modifier.insetOutline(colors.acc.copy(alpha = 0.45f), 1.dp, tabShape) else Modifier)
+                    .background(if (isSelected) colors.hl else Color.Transparent)
+                    .then(if (isSelected) Modifier.insetOutline(colors.acc.copy(alpha = 0.35f), 1.dp, tabShape) else Modifier)
                     .pressable(onClick = { onSelect(tab) }, hitTarget = HitTarget.CHIP, shape = tabShape, scaleOnPress = false)
                     .heightIn(min = 28.dp)
                     .padding(horizontal = 10.dp, vertical = 4.dp)
@@ -385,7 +385,7 @@ private fun ComposerModeTabs(
                         lineHeight = 15.sp,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                     ),
-                    color = if (isSelected) colors.acc else colors.ink3,
+                    color = if (isSelected) colors.acc else colors.ink2,
                     maxLines = 1,
                 )
             }
@@ -410,11 +410,7 @@ private fun RowScope.PlaceArea(
     ) {
         when (place) {
             is InputPlace.SceneEnd -> {
-                if (state.sceneMode) {
-                    CivilightText(ScriptInputCopy.TAB_SCENE, PLACE_BOLD, color = colors.acc, maxLines = 1)
-                } else {
-                    SceneEndLabel(place.number, state.sceneFlash)
-                }
+                // Keep normal writing clean (top bar already displays the current scene); show compact Undo/Redo when available.
                 if (!ScriptInputRules.showsToolRow(state, context.readOnly) && (context.canUndo || context.canRedo)) {
                     CompactHistoryIcon(IconId.Undo, ScriptInputCopy.TOOL_UNDO_NAME, context.canUndo, actions.onUndo)
                     CompactHistoryIcon(IconId.Redo, ScriptInputCopy.TOOL_REDO_NAME, context.canRedo, actions.onRedo)
@@ -589,7 +585,7 @@ private fun InputFieldRow(
                         Modifier
                             .size(LEADING_SLOT_SIZE)
                             .clip(slotShape)
-                            .background(colors.tint.copy(alpha = 0.8f))
+                            .background(colors.tint)
                             .insetOutline(colors.line, 1.dp, slotShape),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -751,7 +747,7 @@ private fun SendButton(state: ScriptInputState, enabled: Boolean, onClick: () ->
             .heightIn(min = 38.dp)
             .widthIn(min = if (slot == SendSlot.ICON) 38.dp else 0.dp)
             .clip(shape)
-            .background(if (enabled) colors.pri else colors.tint.copy(alpha = 0.72f))
+            .background(if (enabled) colors.pri else colors.tint)
             .padding(horizontal = if (slot == SendSlot.ICON) 0.dp else 13.dp)
             .semantics { contentDescription = name; role = Role.Button },
         contentAlignment = Alignment.Center,

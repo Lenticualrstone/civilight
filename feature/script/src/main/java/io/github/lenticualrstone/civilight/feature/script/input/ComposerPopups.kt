@@ -269,7 +269,7 @@ private fun SpeakerQuickList(
                     Modifier
                         .size(28.dp)
                         .clip(CircleShape)
-                        .background(if (isSelected) colors.acc.copy(alpha = 0.16f) else colors.tint.copy(alpha = 0.6f))
+                        .background(if (isSelected) colors.hl else colors.tint)
                         .pressable(onClick = { onToggleCo(ch.key) }, hitTarget = HitTarget.SMALL, shape = CircleShape)
                         .semantics { contentDescription = "${ch.name} 다중 화자"; role = Role.Checkbox },
                     contentAlignment = Alignment.Center,

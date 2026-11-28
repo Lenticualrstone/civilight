@@ -126,12 +126,9 @@ internal fun PlotTimelineStrip(
                     Modifier
                         .widthIn(min = 122.dp, max = 180.dp)
                         .clip(shape)
-                        .background(
-                            if (isCurrent) colors.sel
-                            else colors.tint.copy(alpha = if (colors.isDark) 0.56f else 0.72f),
-                        )
+                        .background(if (isCurrent) colors.hl else colors.tint)
                         .insetOutline(
-                            if (isCurrent || isEditing) colors.acc.copy(alpha = 0.72f) else colors.line,
+                            if (isCurrent || isEditing) colors.acc.copy(alpha = 0.55f) else colors.line,
                             1.dp,
                             shape,
                         )
@@ -177,7 +174,7 @@ internal fun PlotTimelineStrip(
                             .fillMaxWidth()
                             .height(2.dp)
                             .clip(CircleShape)
-                            .background(colors.line.copy(alpha = 0.6f)),
+                            .background(colors.line),
                     ) {
                         Box(
                             Modifier
@@ -195,8 +192,8 @@ internal fun PlotTimelineStrip(
                     Row(
                         Modifier
                             .clip(pillShape)
-                            .background(if (branchActive) colors.acc.copy(alpha = 0.20f) else colors.tint.copy(alpha = 0.7f))
-                            .insetOutline(if (branchActive) colors.acc else colors.edge, 1.dp, pillShape)
+                            .background(if (branchActive) colors.hl else colors.tint)
+                            .insetOutline(if (branchActive) colors.acc else colors.line, 1.dp, pillShape)
                             .pressable(
                                 onClick = { onSelectBranch(if (branchActive) null else branch.key) },
                                 hitTarget = HitTarget.CHIP,
@@ -227,7 +224,7 @@ internal fun PlotTimelineStrip(
                 Row(
                     Modifier
                         .clip(addShape)
-                        .background(colors.tint.copy(alpha = 0.45f))
+                        .background(colors.tint)
                         .insetOutline(colors.line, 1.dp, addShape)
                         .pressable(onClick = onNewScene, hitTarget = HitTarget.CHIP, shape = addShape)
                         .padding(horizontal = 12.dp, vertical = 12.dp),
@@ -364,7 +361,7 @@ internal fun BranchManuscriptArea(
                     surface = GlassSurface.PANEL,
                     modifier = Modifier.matchParentSize(),
                     shape = shape,
-                    fill = colors.sel.copy(alpha = if (colors.isDark) 0.72f else 0.84f),
+                    fill = colors.glass,
                 )
                 OnGlass {
                     Column(

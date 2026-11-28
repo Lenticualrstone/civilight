@@ -991,7 +991,7 @@ private fun ScriptFrame(
                                 Box(
                                     Modifier
                                         .fillMaxSize()
-                                        .background(colors.tint.copy(alpha = 0.82f), slotShape)
+                                        .background(colors.tint, slotShape)
                                         .insetOutline(colors.line, 1.dp, slotShape),
                                     contentAlignment = Alignment.Center,
                                 ) {
@@ -1007,8 +1007,8 @@ private fun ScriptFrame(
                                 Box(
                                     Modifier
                                         .fillMaxSize()
-                                        .background(colors.sel.copy(alpha = 0.72f), slotShape)
-                                        .insetOutline(colors.acc.copy(alpha = 0.45f), 1.dp, slotShape),
+                                        .background(colors.hl, slotShape)
+                                        .insetOutline(colors.acc.copy(alpha = 0.35f), 1.dp, slotShape),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     CivilightIcon(
