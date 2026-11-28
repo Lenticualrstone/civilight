@@ -433,42 +433,59 @@ private fun BranchBlockCard(
     Row(
         Modifier
             .fillMaxWidth()
-            .alpha(if (dimmed) 0.48f else 1f)
+            .alpha(if (dimmed) 0.42f else 1f)
             .padding(horizontal = 24.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        if (kind == BlockKind.DIALOGUE) {
-            Column(
-                Modifier.width(52.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
+        when (kind) {
+            BlockKind.DIALOGUE -> {
                 CharacterPortraitTile(
                     doc = doc,
                     characterKey = speaker?.key,
                     displayName = speaker?.name.orEmpty(),
                     shape = profileShape,
-                    size = 40.dp,
+                    size = 38.dp,
                 )
-                if (speaker != null) {
-                    val label = if (block.coSpeakerKeys.isNotEmpty()) "${speaker.name} 외 ${block.coSpeakerKeys.size}명" else speaker.name
-                    CivilightText(label, type.micro, color = colors.ink2, maxLines = 1)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    if (speaker != null) {
+                        val label = if (block.coSpeakerKeys.isNotEmpty()) "${speaker.name} 외 ${block.coSpeakerKeys.size}명" else speaker.name
+                        CivilightText(
+                            label,
+                            type.speakerName.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                            color = colors.acc,
+                            maxLines = 1,
+                        )
+                    }
+                    CivilightText(text, type.line, color = colors.ink)
                 }
             }
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val textColor = when (kind) {
-                BlockKind.DIALOGUE -> colors.ink
-                BlockKind.MEMO -> colors.ink3
-                else -> colors.ink2
+            BlockKind.MEMO -> {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    val pillShape = RoundedCornerShape(10.dp)
+                    Box(
+                        Modifier
+                            .clip(pillShape)
+                            .background(colors.tint)
+                            .insetOutline(colors.line, 1.dp, pillShape)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        CivilightText("// $text", type.number.copy(fontSize = 12.sp), color = colors.ink3)
+                    }
+                }
             }
-            val style = when (kind) {
-                BlockKind.DIALOGUE -> type.line
-                BlockKind.MEMO -> type.dir
-                else -> type.body
+            else -> {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    CivilightText(
+                        text,
+                        type.body.copy(
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        ),
+                        color = colors.ink2,
+                    )
+                }
             }
-            CivilightText(if (kind == BlockKind.MEMO) "// $text" else text, style, color = textColor)
         }
         if (onDelete != null) {
             Box(

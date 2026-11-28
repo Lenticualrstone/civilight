@@ -3,7 +3,9 @@ package io.github.lenticualrstone.civilight.feature.script.ui
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +19,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -34,6 +38,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,6 +50,7 @@ import io.github.lenticualrstone.civilight.designsystem.component.SceneHead
 import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
 import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
 import io.github.lenticualrstone.civilight.designsystem.foundation.PressAction
+import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.text.DecoratedText
 import io.github.lenticualrstone.civilight.designsystem.text.DecorationRange
@@ -82,15 +90,16 @@ fun SpanKind.decoration(): InlineDecoration = when (this) {
 fun BlockRow.layout(showParens: Boolean, editing: Boolean = false): RunLayout =
     RunLayout.of(runs, showParens = showParens || editing, linkLook = { linkLooks[it.linkKey] ?: LinkLook(SpanKind.LINK) })
 
-/** Text style of a text block by kind (DS-42; system text mono 13 / 22, memo `dir`). */
+/** Text style of a text block by kind (0.7.2 Sonnet-Create typography: centered italic narration, crisp dialogue, mono comment). */
 @Composable
 fun blockTextStyle(kind: BlockKind?): Pair<TextStyle, androidx.compose.ui.graphics.Color> {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     return when (kind) {
         BlockKind.DIALOGUE -> type.line to colors.ink
-        BlockKind.SYSTEM -> type.number.merge(TextStyle(fontSize = 13.sp, lineHeight = 22.sp)) to colors.ink2
-        BlockKind.MEMO -> type.dir to colors.ink3
+        BlockKind.NARRATION -> type.body.merge(TextStyle(fontStyle = FontStyle.Italic, textAlign = TextAlign.Center)) to colors.ink2
+        BlockKind.SYSTEM -> type.number.merge(TextStyle(fontSize = 12.5.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)) to colors.ink2
+        BlockKind.MEMO -> type.number.merge(TextStyle(fontSize = 12.sp, lineHeight = 20.sp)) to colors.ink3
         else -> type.body to colors.ink2
     }
 }
@@ -134,8 +143,13 @@ fun BlockView(
     val settings = deps?.settings?.collectAsState()?.value
     val profileShape = settings?.profileShape ?: io.github.lenticualrstone.civilight.model.app.ProfileShape.SQUARE
     val inner = io.github.lenticualrstone.civilight.ui.window.LocalWindowLayout.current.isInner
-    val safeWidth = if (inner) 64.dp else 56.dp
-    val portraitSize = if (inner) 48.dp else 44.dp
+    val avatarSize = if (inner) 42.dp else 38.dp
+    val avatarColWidth = if (row.coSpeakers.isNotEmpty()) {
+        val count = (row.coSpeakers.size + 1).coerceAtMost(3)
+        val miniSize = if (inner) 32.dp else 28.dp
+        val step = if (inner) 13.dp else 11.dp
+        miniSize + step * (count - 1)
+    } else avatarSize
 
     val afterLine = if (look.afterTarget) Modifier.drawBehind {
         val y = size.height + 6.dp.toPx()
@@ -155,160 +169,232 @@ fun BlockView(
     Box(modifier.then(afterLine)) {
     BlockFrame(selected || look.tag != null, frameTap) {
         AddressHints(row.addressHints)
-        if (row.kind == BlockKind.NARRATION) {
-            // (0.7.0) Manuscript visual diet: narration flows cleanly full-width without a heavy left badge box.
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                val slot = row.slot(numbered)
-                if (slot != null) {
-                    SlotLine(slot.label, listOfNotNull(slot.sub, look.tag).joinToString(" · ").ifEmpty { null }, slot.number)
-                } else if (look.tag != null) {
-                    SlotLine(io.github.lenticualrstone.civilight.domain.script.Labels.kindLabel(row.kind), look.tag, row.number)
-                }
-                Box {
-                    RunsText(row, showParens, onTapText, onTapTarget, openCandidate, onDoubleTapBlock)
-                    popover?.invoke()
-                }
-            }
-        } else Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            // (0.7.0) Left column:
-            // - DIALOGUE: character portrait (or multi-speaker cluster) + name, omitted on consecutive same-speaker turns.
-            // - Legacy kinds (DIRECTION/CHOICE/SYSTEM/MEMO): compact visual badge.
-            Column(
-                modifier = Modifier.width(safeWidth),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (row.kind == BlockKind.DIALOGUE) {
-                    if (!groupedWithPrev) {
-                        val speaker = row.speaker
-                        val charKey = speaker?.characterKey
-                        val openCard: (() -> Unit)? = if (charKey != null && doc != null && deps != null) {
-                            { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.CharacterProfile(doc.project.key, charKey)) }
-                        } else null
-                        if (row.coSpeakers.isNotEmpty() && speaker != null) {
-                            val allSpeakers = (listOf(speaker) + row.coSpeakers).take(3)
-                            val miniSize = if (inner) 34.dp else 30.dp
-                            val step = if (inner) 12.dp else 10.dp
-                            Box(
-                                Modifier
-                                    .width(safeWidth)
-                                    .height(miniSize + 4.dp),
-                                contentAlignment = Alignment.CenterStart,
-                            ) {
-                                allSpeakers.forEachIndexed { idx, sp ->
-                                    Box(Modifier.padding(start = step * idx)) {
-                                        io.github.lenticualrstone.civilight.ui.image.CharacterPortraitTile(
-                                            doc = doc,
-                                            characterKey = sp.characterKey,
-                                            displayName = sp.text,
-                                            shape = profileShape,
-                                            size = miniSize,
-                                            onClick = if (idx == 0) openCard else null,
-                                        )
+        when (row.kind) {
+            // (0.7.2) Sonnet-Create `lineBubble`: Avatar on the left, Speaker Name (accent semibold) right above the dialogue text.
+            BlockKind.DIALOGUE -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    val speaker = row.speaker
+                    val charKey = speaker?.characterKey
+                    val openCard: (() -> Unit)? = if (charKey != null && doc != null) {
+                        { deps.navigator.push(io.github.lenticualrstone.civilight.navigation.CharacterProfile(doc.project.key, charKey)) }
+                    } else null
+                    Box(
+                        modifier = Modifier.width(avatarColWidth),
+                        contentAlignment = Alignment.TopStart,
+                    ) {
+                        if (!groupedWithPrev) {
+                            if (row.coSpeakers.isNotEmpty() && speaker != null) {
+                                val allSpeakers = (listOf(speaker) + row.coSpeakers).take(3)
+                                val miniSize = if (inner) 32.dp else 28.dp
+                                val step = if (inner) 13.dp else 11.dp
+                                Box(Modifier.height(miniSize + 2.dp), contentAlignment = Alignment.CenterStart) {
+                                    allSpeakers.forEachIndexed { idx, sp ->
+                                        Box(Modifier.padding(start = step * idx)) {
+                                            io.github.lenticualrstone.civilight.ui.image.CharacterPortraitTile(
+                                                doc = doc,
+                                                characterKey = sp.characterKey,
+                                                displayName = sp.text,
+                                                shape = profileShape,
+                                                size = miniSize,
+                                                onClick = if (idx == 0) openCard else null,
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                            CivilightText(
-                                "${speaker.text} 외 ${row.coSpeakers.size}명",
-                                CivilightTheme.type.micro,
-                                color = colors.acc,
-                                maxLines = 2,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        } else {
-                            io.github.lenticualrstone.civilight.ui.image.CharacterPortraitTile(
-                                doc = doc,
-                                characterKey = charKey,
-                                displayName = speaker?.text.orEmpty(),
-                                shape = profileShape,
-                                size = portraitSize,
-                                onClick = openCard,
-                            )
-                            if (speaker != null) {
-                                CivilightText(
-                                    speaker.text,
-                                    CivilightTheme.type.micro,
-                                    color = if (charKey != null) colors.ink2 else colors.ink3,
-                                    maxLines = 2,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth(),
+                            } else {
+                                io.github.lenticualrstone.civilight.ui.image.CharacterPortraitTile(
+                                    doc = doc,
+                                    characterKey = charKey,
+                                    displayName = speaker?.text.orEmpty(),
+                                    shape = profileShape,
+                                    size = avatarSize,
+                                    onClick = openCard,
                                 )
                             }
                         }
                     }
-                } else {
-                    val (badgeIcon, badgeLabel, badgeTint) = when (row.kind) {
-                        BlockKind.DIRECTION -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.Spark, "연출", colors.acc)
-                        BlockKind.CHOICE -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.Split, "선택지", colors.acc)
-                        BlockKind.SYSTEM -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.Exclaim, "시스템", colors.ink2)
-                        BlockKind.MEMO -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.Paper, "메모", colors.warn)
-                        else -> Triple(io.github.lenticualrstone.civilight.designsystem.icon.IconId.File, "블록", colors.ink3)
-                    }
-                    Box(
-                        Modifier
-                            .size(30.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(colors.tint),
-                        contentAlignment = Alignment.Center,
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
-                        io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon(
-                            badgeIcon,
-                            contentDescription = null,
-                            size = 15.dp,
-                            tint = badgeTint,
-                        )
+                        if (speaker != null && (!groupedWithPrev || numbered || look.tag != null || row.speakerMarks.isNotEmpty() || speaker.realName != null)) {
+                            val displayName = if (row.coSpeakers.isNotEmpty()) "${speaker.text} 외 ${row.coSpeakers.size}명" else speaker.text
+                            val nameColor = when (speaker.look) {
+                                SpeakerLook.NAMED -> colors.acc
+                                SpeakerLook.MISSING -> colors.warn
+                                else -> colors.ink3
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                CivilightText(
+                                    displayName,
+                                    type.speakerName.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                                    color = nameColor,
+                                    maxLines = 1,
+                                )
+                                if (speaker.realName != null) {
+                                    CivilightText("(${speaker.realName})", type.micro, color = colors.ink3, maxLines = 1)
+                                }
+                                if (numbered) {
+                                    CivilightText("· ${row.number}", type.micro, color = colors.ink3, maxLines = 1)
+                                }
+                                if (look.tag != null) {
+                                    CivilightText("· ${look.tag}", type.micro, color = colors.acc, maxLines = 1)
+                                }
+                                if (row.speakerMarks.isNotEmpty()) {
+                                    CivilightText(
+                                        row.speakerMarks.joinToString(" ") { it.glyph.toString() },
+                                        type.micro,
+                                        color = colors.acc,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                        Box {
+                            RunsText(row, showParens, onTapText, onTapTarget, openCandidate, onDoubleTapBlock)
+                            popover?.invoke()
+                        }
                     }
-                    CivilightText(
-                        badgeLabel,
-                        CivilightTheme.type.micro,
-                        color = badgeTint,
-                        maxLines = 1,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
                 }
             }
 
-            // Right content column: metadata line + block body + inline popover
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (row.kind == BlockKind.DIALOGUE) {
-                    val speaker = row.speaker
-                    if (speaker != null && (numbered || look.tag != null || row.speakerMarks.isNotEmpty() || speaker.realName != null)) {
-                        ScriptSpeakerLine(
-                            speaker, numbered, row.number.takeIf { numbered }, row.speakerMarks,
-                            extraLabel = look.tag,
-                            onClick = onSpeaker,
-                        )
+            // (0.7.2) Sonnet-Create `instructionBlock`: centered italic stage direction, max 480 dp, zero left badge clutter.
+            BlockKind.NARRATION -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (numbered || look.tag != null) {
+                        val meta = listOfNotNull(
+                            row.number.takeIf { numbered },
+                            look.tag,
+                        ).joinToString(" · ")
+                        if (meta.isNotEmpty()) {
+                            CivilightText(meta, type.micro, color = colors.ink3, maxLines = 1)
+                        }
                     }
-                } else {
-                    val slot = row.slot(numbered)
-                    if (slot != null) {
-                        SlotLine(slot.label, listOfNotNull(slot.sub, look.tag).joinToString(" · ").ifEmpty { null }, slot.number)
-                    } else if (look.tag != null) {
-                        SlotLine(io.github.lenticualrstone.civilight.domain.script.Labels.kindLabel(row.kind), look.tag, row.number)
-                    }
-                }
-                when (row.kind) {
-                    BlockKind.DIRECTION -> CivilightText(row.text, type.dir, color = colors.ink3)
-                    BlockKind.CHOICE -> row.options.forEach { option ->
-                        OptionView(option, selected, onTap = onTapOption?.let { tap -> { tap(option) } })
-                    }
-                    null -> CivilightText(row.text, type.body, color = colors.ink2)
-                    else -> Box {
+                    Box(Modifier.widthIn(max = 480.dp)) {
                         RunsText(row, showParens, onTapText, onTapTarget, openCandidate, onDoubleTapBlock)
                         popover?.invoke()
                     }
                 }
+            }
+
+            // (0.7.2) Programming-comment style memo (`// ...`): quiet centered mono pill without a bulky left box.
+            BlockKind.MEMO -> {
+                val pillShape = RoundedCornerShape(10.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (numbered || look.tag != null) {
+                        val meta = listOfNotNull("주석 메모", row.number.takeIf { numbered }, look.tag).joinToString(" · ")
+                        CivilightText(meta, type.micro, color = colors.ink3, maxLines = 1)
+                    }
+                    Box(
+                        Modifier
+                            .widthIn(max = 520.dp)
+                            .clip(pillShape)
+                            .background(colors.tint)
+                            .insetOutline(colors.line, 1.dp, pillShape)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        RunsText(row, showParens, onTapText, onTapTarget, openCandidate, onDoubleTapBlock, prefixOverride = "// ")
+                        popover?.invoke()
+                    }
+                }
+            }
+
+            // (0.7.2) Lightweight centered stage cue for legacy/game-tools DIRECTION blocks (no heavy 56dp left square).
+            BlockKind.DIRECTION -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (numbered || look.tag != null) {
+                        val meta = listOfNotNull("연출", row.number.takeIf { numbered }, look.tag).joinToString(" · ")
+                        CivilightText(meta, type.micro, color = colors.acc, maxLines = 1)
+                    }
+                    Row(
+                        Modifier.widthIn(max = 480.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon(
+                            io.github.lenticualrstone.civilight.designsystem.icon.IconId.Spark,
+                            contentDescription = null,
+                            size = 13.dp,
+                            tint = colors.acc,
+                        )
+                        CivilightText(
+                            row.text.ifBlank { "연출 큐" },
+                            type.dir.merge(TextStyle(fontStyle = FontStyle.Italic, textAlign = TextAlign.Center)),
+                            color = colors.ink2,
+                        )
+                    }
+                }
+            }
+
+            BlockKind.SYSTEM -> {
+                val pillShape = RoundedCornerShape(10.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (numbered || look.tag != null) {
+                        val meta = listOfNotNull("시스템", row.number.takeIf { numbered }, look.tag).joinToString(" · ")
+                        CivilightText(meta, type.micro, color = colors.ink3, maxLines = 1)
+                    }
+                    Box(
+                        Modifier
+                            .widthIn(max = 480.dp)
+                            .clip(pillShape)
+                            .background(colors.tint)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        RunsText(row, showParens, onTapText, onTapTarget, openCandidate, onDoubleTapBlock)
+                        popover?.invoke()
+                    }
+                }
+            }
+
+            BlockKind.CHOICE -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    val slot = row.slot(numbered)
+                    if (slot != null) {
+                        SlotLine(slot.label, listOfNotNull(slot.sub, look.tag).joinToString(" · ").ifEmpty { null }, slot.number)
+                    }
+                    row.options.forEach { option ->
+                        OptionView(option, selected, onTap = onTapOption?.let { tap -> { tap(option) } })
+                    }
+                }
+            }
+
+            null -> {
+                CivilightText(row.text, type.body, color = colors.ink2)
             }
         }
     }
@@ -425,10 +511,11 @@ private fun RunsText(
     onTapTarget: ((BlockTap) -> Boolean)?,
     openCandidate: TermCandidate?,
     onDoubleTapBlock: (() -> Unit)? = null,
+    prefixOverride: String? = null,
 ) {
     val (style, color) = blockTextStyle(row.kind)
     val layout = remember(row, showParens) { row.layout(showParens) }
-    val prefix = row.memoPrefix?.let { "$it  " }.orEmpty()
+    val prefix = prefixOverride ?: row.memoPrefix?.let { "$it  " }.orEmpty()
     val suffix = row.textMarks.joinToString("") { " ${it.glyph}" }
     val text = prefix + layout.text + suffix
     val decorations = remember(layout, prefix, row.termCandidates, openCandidate) {
@@ -479,23 +566,86 @@ private fun dottedIndices(start: Int, marks: List<MarkModel>): Set<Int> =
     marks.mapIndexedNotNull { i, m -> if (m.dotted) start + i * 2 + 1 else null }.toSet()
 
 /**
- * Scene head (SCR-46, DS-43): head text and the `전환 문구` line; tap → `씬 · 장소와 때`; `⋯`
- * (`씬 4 메뉴`) → the scene menu (SCR-47) when [onMenu] is given; `sel` while that menu is open.
+ * (0.7.2) Sonnet-Create style scene boundary:
+ * - First scene (`ordinal == 1`): clean start with no heavy top header (Scene 1 lives cleanly in the top Plot Timeline),
+ *   showing only a tiny centered `숨김` pill if it is an unlocked hidden scene.
+ * - Subsequent scenes (`ordinal > 1`, inserted via `[ 장면 ]` mode or `---`): centered mono capsule `[ 제목 ]` flanked
+ *   by thin hairlines, or a clean 1 dp divider line when untitled. Tap opens `장소 · 때`, long press opens scene menu.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HeadView(row: HeadRow, selected: Boolean, onOpen: () -> Unit, onMenu: (() -> Unit)?) {
-    // DS-08: wraps between 어절 only (emulator QA: `때 없 / 음` in the 1:2 split's 280 dp column).
-    val title = remember(row.title) { HeadLines.unbroken(row.title) }
-    val subtitle = HeadLines.subtitle(row)
-    val subtitleShown = remember(subtitle) { subtitle?.let(HeadLines::unbroken) }
-    SceneHead(
-        title = title,
-        modifier = Modifier.pressable(PressAction.Click(onOpen), role = Role.Button, scaleOnPress = false),
-        // SCR-58 `[PROPOSED]`: an unlocked hidden scene's head carries a small `숨김` tag.
-        subtitle = subtitleShown,
-        menu = onMenu?.let { IconAction(ScriptCopy.sceneMenuLabel(row.ordinal), it) },
-        selected = selected,
-    )
+    val colors = CivilightTheme.colors
+    val type = CivilightTheme.type
+    val store = io.github.lenticualrstone.civilight.ui.project.LocalProjectStore.current
+    val doc = store?.doc?.collectAsState()?.value
+    val customTitle = remember(doc, row.sceneKey) {
+        doc?.index?.unit(row.sceneKey)?.title?.trim().orEmpty()
+    }
+    val sub = remember(row.transitionLine, row.hiddenTag) {
+        listOfNotNull(
+            row.transitionLine?.takeUnless { it.contains("없음") },
+            io.github.lenticualrstone.civilight.feature.script.scenes.SceneCopy.HIDDEN.takeIf { row.hiddenTag },
+        ).joinToString(" · ").ifEmpty { null }
+    }
+
+    if (row.ordinal == 1 && !row.hiddenTag) {
+        Spacer(Modifier.fillMaxWidth().height(4.dp))
+        return
+    }
+
+    val chipShape = CircleShape
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .selectedRowBackground(selected, colors.sel, colors.acc, outset = 0.dp)
+            .combinedClickable(
+                onClick = onOpen,
+                onLongClick = onMenu,
+            )
+            .padding(horizontal = 24.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (customTitle.isEmpty()) {
+            // Untitled scene transition: Sonnet-Create clean 1 dp horizontal divider.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .height(1.dp)
+                    .background(colors.line),
+            )
+        } else {
+            // Titled scene transition: centered mono pill chip flanked by delicate hairlines.
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(Modifier.weight(1f).height(1.dp).background(colors.line))
+                Box(
+                    Modifier
+                        .clip(chipShape)
+                        .background(colors.tint)
+                        .insetOutline(colors.line, 1.dp, chipShape)
+                        .padding(horizontal = 14.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CivilightText(
+                        customTitle,
+                        type.number.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp),
+                        color = colors.ink2,
+                        maxLines = 1,
+                    )
+                }
+                Box(Modifier.weight(1f).height(1.dp).background(colors.line))
+            }
+        }
+        if (sub != null) {
+            CivilightText(sub, type.micro, color = colors.ink3, maxLines = 1, textAlign = TextAlign.Center)
+        }
+    }
 }
 
 /** A locked hidden scene: one row; tapping starts the unlock (rule 19). */

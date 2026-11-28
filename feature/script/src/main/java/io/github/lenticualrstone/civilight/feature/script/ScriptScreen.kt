@@ -618,7 +618,7 @@ private fun ScriptFrame(
     val upperSettled = split == null && kotlin.math.abs(upperHeight - heightDp) < 0.5f
     val motion = CivilightTheme.motion
     var zenMode by rememberSaveable { mutableStateOf(false) }
-    var coverTimelineOpen by rememberSaveable { mutableStateOf(false) }
+    var coverTimelineOpen by rememberSaveable { mutableStateOf(true) }
     var leadingPopupOpen by remember { mutableStateOf(false) }
     var shakeCount by remember { mutableIntStateOf(0) }
     val activeBranchKey by vm.activeBranchKey.collectAsState()
