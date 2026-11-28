@@ -220,3 +220,33 @@ fun ScriptViewModel.moveSceneInEpisode(sceneKey: Key, afterSceneKey: Key?) {
         }
     }
 }
+
+/**
+ * (0.7.3) Safely removes ONLY the scene boundary (`sceneKey`) by merging its blocks into the previous scene
+ * (`SceneActions.merge`), matching Sonnet-Create's divider deletion where blocks below are never lost.
+ */
+fun ScriptViewModel.removeSceneDivider(sceneKey: Key) {
+    if (readOnly) return
+    enqueue {
+        var blockedMessage: String? = null
+        val outcome = runOp("장면 구분선 지움") { d ->
+            when (val plan = SceneActions.merge(d, sceneKey, actionCtx())) {
+                is io.github.lenticualrstone.civilight.domain.story.scene.MergePlan.Ready ->
+                    ScriptOps.Outcome(plan.preview.result, toast = "장면 구분선 지움 · 아래 글은 앞 장면에 합침")
+                is io.github.lenticualrstone.civilight.domain.story.scene.MergePlan.Blocked -> {
+                    blockedMessage = plan.reason
+                    null
+                }
+                io.github.lenticualrstone.civilight.domain.story.scene.MergePlan.NotOffered -> {
+                    blockedMessage = "첫 장면 구분선은 지울 수 없음"
+                    null
+                }
+            }
+        }
+        if (outcome != null) {
+            outcome.toast?.let(::showUndoToast)
+        } else {
+            blockedMessage?.let { showUndoToast(it) }
+        }
+    }
+}

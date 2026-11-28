@@ -100,28 +100,55 @@ fun ScriptTopBar(
     /** (0.7.0) Optional Plot Timeline strip toggle on cover/narrow screens. */
     onTimelineToggle: (() -> Unit)? = null,
     timelineShown: Boolean = false,
+    /** (0.7.3) Optional strip (Plot Timeline) tucked snugly right under the header inside the same glass bar. */
+    bottomStrip: (@Composable () -> Unit)? = null,
 ) {
-    // (0.2.0, SCR-01, U-14.13) `이 씬 · 1-7` · `타임라인` · `읽기 집중` · `찾기` · `표시`.
-    TopGlassBar(title = title, smallLine = line, back = back, wide = wide, barHeight = LayoutMetrics.topBarScript) {
-        if (positionLabel != null) LensChip(positionLabel, LensChipState.SCRIPT_POSITION, onPositionLabel)
-        if (onTimelineToggle != null) CivilightIconButton(
-            IconId.Outline,
-            if (timelineShown) "플롯 타임라인 닫기" else "플롯 타임라인",
-            onTimelineToggle,
-            tint = if (timelineShown) CivilightTheme.colors.acc else CivilightTheme.colors.ink2,
-        )
-        if (onZenToggle != null) CivilightIconButton(
-            IconId.Eye,
-            "집중 읽기",
-            onZenToggle,
-            tint = CivilightTheme.colors.ink2,
-        )
-        if (onFind != null) io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton(
-            io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.SEARCH, onFind,
-        )
-        if (onLayers != null) io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton(
-            io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.DISPLAY_LAYERS, onLayers,
-        )
+    val colors = CivilightTheme.colors
+    // (0.7.3) Slim 68 dp top bar height eliminates the dead vertical gap above the Plot Timeline strip.
+    Column(Modifier.fillMaxWidth()) {
+        TopGlassBar(
+            title = title,
+            smallLine = line,
+            back = back,
+            wide = wide,
+            barHeight = if (bottomStrip != null) 66.dp else 76.dp,
+        ) {
+            if (positionLabel != null) LensChip(positionLabel, LensChipState.SCRIPT_POSITION, onPositionLabel)
+            if (onTimelineToggle != null) CivilightIconButton(
+                IconId.Outline,
+                if (timelineShown) "플롯 타임라인 닫기" else "플롯 타임라인",
+                onTimelineToggle,
+                tint = if (timelineShown) colors.acc else colors.ink2,
+            )
+            if (onZenToggle != null) CivilightIconButton(
+                IconId.Eye,
+                "집중 읽기",
+                onZenToggle,
+                tint = colors.ink2,
+            )
+            if (onFind != null) io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton(
+                io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.SEARCH, onFind,
+            )
+            if (onLayers != null) io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton(
+                io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.DISPLAY_LAYERS, onLayers,
+            )
+        }
+        if (bottomStrip != null) {
+            Box(Modifier.fillMaxWidth()) {
+                GlassBackground(
+                    surface = GlassSurface.DOCK,
+                    modifier = Modifier.matchParentSize(),
+                    fill = colors.glass.copy(alpha = if (colors.isDark) 0.54f else 0.64f),
+                )
+                OnGlass {
+                    Column(Modifier.fillMaxWidth()) {
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(colors.line))
+                        bottomStrip()
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(colors.line))
+                    }
+                }
+            }
+        }
     }
 }
 

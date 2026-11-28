@@ -179,6 +179,16 @@ fun Manuscript(
     liftedRow: String? = null,
     /** (0.5.0) User-chosen vertical breathing spacing between script blocks. */
     blockSpacing: io.github.lenticualrstone.civilight.model.app.BlockSpacing = io.github.lenticualrstone.civilight.model.app.BlockSpacing.NORMAL,
+    /** (0.7.3) Newly created scene key whose title pill plays a 1-shot typewriter reveal. */
+    revealingSceneKey: Key? = null,
+    /** (0.7.3) Block key currently being edited in the composer (dimmed to 0.42 opacity). */
+    editingBlockKey: Key? = null,
+    /** (0.7.3) Inline rehearsal: block key currently playing typewriter reveal. */
+    typewriterBlockKey: Key? = null,
+    /** (0.7.3) Inline rehearsal: external TTS char progress for the typewriter block. */
+    typewriterProgress: Int? = null,
+    /** (0.7.3) Inline rehearsal: playback speed multiplier. */
+    typewriterSpeed: Float = 1f,
 ) {
     val motion = CivilightTheme.motion
     val column = if (layout.wide) Modifier.padding(start = layout.columnStart.dp).width(layout.columnWidth.dp) else Modifier.fillMaxWidth()
@@ -280,6 +290,7 @@ fun Manuscript(
                         selected = headMenuOpen == row.sceneKey,
                         onOpen = { actions.onOpenHead(row.sceneKey) },
                         onMenu = { actions.onHeadMenu(row.sceneKey) },
+                        revealTitle = row.sceneKey == revealingSceneKey,
                     )
                     is HiddenSceneRow -> HiddenSceneView(row, actions.onUnlockHidden)
                     is EmptySceneRow ->
@@ -315,6 +326,10 @@ fun Manuscript(
                                     inheritedHint = false,
                                     look = look,
                                     groupedWithPrev = groupedWithPrev,
+                                    dimmedEditing = row.blockKey == editingBlockKey,
+                                    typewriterReveal = row.blockKey == typewriterBlockKey,
+                                    typewriterProgress = if (row.blockKey == typewriterBlockKey) typewriterProgress else null,
+                                    typewriterSpeed = typewriterSpeed,
                                     onDoubleTapBlock = if (!readOnly && !previewOnly && !row.editLocked) {
                                         actions.onDoubleTapBlock?.let { cb -> { cb(row) } }
                                     } else null,

@@ -98,4 +98,22 @@ class Script070FeatureTest {
         assertEquals(p1, p2, 0.0001f)
         assertTrue(p1 in 0.85f..1.20f)
     }
+
+    @Test
+    fun `removing scene divider via merge preserves all blocks below the boundary`() {
+        val scenes = doc.manuscript.liveScenes.filter { doc.index.numberingUnitKeyOfScene(it.key) == K.EPISODE_1_7 }
+        assertTrue(scenes.size >= 2)
+        val first = scenes[0]
+        val second = scenes[1]
+        val beforeFirst = doc.manuscript.liveBlocksOf(first.key).size
+        val beforeSecond = doc.manuscript.liveBlocksOf(second.key).size
+        val plan = io.github.lenticualrstone.civilight.domain.actions.SceneActions.merge(
+            doc,
+            second.key,
+            ActionContext(now = 5000L, device = "test"),
+        )
+        assertTrue(plan is io.github.lenticualrstone.civilight.domain.story.scene.MergePlan.Ready)
+        val mergedDoc = (plan as io.github.lenticualrstone.civilight.domain.story.scene.MergePlan.Ready).preview.result
+        assertEquals(beforeFirst + beforeSecond, mergedDoc.manuscript.liveBlocksOf(first.key).size)
+    }
 }

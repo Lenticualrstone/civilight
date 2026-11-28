@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
@@ -90,17 +91,21 @@ fun SpanKind.decoration(): InlineDecoration = when (this) {
 fun BlockRow.layout(showParens: Boolean, editing: Boolean = false): RunLayout =
     RunLayout.of(runs, showParens = showParens || editing, linkLook = { linkLooks[it.linkKey] ?: LinkLook(SpanKind.LINK) })
 
-/** Text style of a text block by kind (0.7.2 Sonnet-Create typography: centered italic narration, crisp dialogue, mono comment). */
+/** Text style of a text block by kind (0.7.3 Sonnet-Create typography: real Serif Italic narration, Monospace memo, FontSynthesis.All for markdown). */
 @Composable
 fun blockTextStyle(kind: BlockKind?): Pair<TextStyle, androidx.compose.ui.graphics.Color> {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     return when (kind) {
-        BlockKind.DIALOGUE -> type.line to colors.ink
-        BlockKind.NARRATION -> type.body.merge(TextStyle(fontStyle = FontStyle.Italic, textAlign = TextAlign.Center)) to colors.ink2
-        BlockKind.SYSTEM -> type.number.merge(TextStyle(fontSize = 12.5.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)) to colors.ink2
-        BlockKind.MEMO -> type.number.merge(TextStyle(fontSize = 12.sp, lineHeight = 20.sp)) to colors.ink3
-        else -> type.body to colors.ink2
+        BlockKind.DIALOGUE -> type.line.copy(fontSynthesis = androidx.compose.ui.text.font.FontSynthesis.All) to colors.ink
+        BlockKind.NARRATION -> SonnetScriptStyle.narrationStyle() to colors.ink2
+        BlockKind.SYSTEM -> SonnetScriptStyle.monoChipStyle(12f).copy(
+            fontWeight = FontWeight.Normal,
+            letterSpacing = 0.sp,
+            textAlign = TextAlign.Center,
+        ) to colors.ink2
+        BlockKind.MEMO -> SonnetScriptStyle.memoStyle() to colors.ink3
+        else -> type.body.copy(fontSynthesis = androidx.compose.ui.text.font.FontSynthesis.All) to colors.ink2
     }
 }
 
@@ -133,6 +138,14 @@ fun BlockView(
     groupedWithPrev: Boolean = false,
     /** (0.7.0) Double-tap on a block immediately starts editing (`고치기`). */
     onDoubleTapBlock: (() -> Unit)? = null,
+    /** (0.7.3) Dim block to 0.42 opacity while being edited in the composer (Sonnet-Create). */
+    dimmedEditing: Boolean = false,
+    /** (0.7.3) Inline rehearsal typewriter reveal on the newly arrived dialogue block. */
+    typewriterReveal: Boolean = false,
+    /** (0.7.3) External TTS char progress for typewriter sync (null = internal speed timer). */
+    typewriterProgress: Int? = null,
+    /** (0.7.3) Internal typewriter playback speed multiplier. */
+    typewriterSpeed: Float = 1f,
 ) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
@@ -166,7 +179,7 @@ fun BlockView(
     } else {
         Modifier.pressable(PressAction.Click({ onTapText(null) }), role = Role.Button, scaleOnPress = false)
     }
-    Box(modifier.then(afterLine)) {
+    Box(modifier.then(afterLine).alpha(if (dimmedEditing) 0.42f else 1f)) {
     BlockFrame(selected || look.tag != null, frameTap) {
         AddressHints(row.addressHints)
         when (row.kind) {
@@ -225,7 +238,11 @@ fun BlockView(
                         if (speaker != null && (!groupedWithPrev || numbered || look.tag != null || row.speakerMarks.isNotEmpty() || speaker.realName != null)) {
                             val displayName = if (row.coSpeakers.isNotEmpty()) "${speaker.text} 외 ${row.coSpeakers.size}명" else speaker.text
                             val nameColor = when (speaker.look) {
-                                SpeakerLook.NAMED -> colors.acc
+                                SpeakerLook.NAMED -> SonnetScriptStyle.speakerAccent(
+                                    speaker.characterKey ?: speaker.text,
+                                    colors.isDark,
+                                    colors.acc,
+                                )
                                 SpeakerLook.MISSING -> colors.warn
                                 else -> colors.ink3
                             }
@@ -258,9 +275,22 @@ fun BlockView(
                                 }
                             }
                         }
-                        Box {
-                            RunsText(row, showParens, onTapText, onTapTarget, openCandidate, onDoubleTapBlock)
-                            popover?.invoke()
+                        if (typewriterReveal) {
+                            val (style, color) = blockTextStyle(row.kind)
+                            val layout = remember(row, showParens) { row.layout(showParens) }
+                            TypewriterText(
+                                text = layout.text,
+                                style = style,
+                                color = color,
+                                progress = typewriterProgress,
+                                speed = typewriterSpeed,
+                                showsCaret = true,
+                            )
+                        } else {
+                            Box {
+                                RunsText(row, showParens, onTapText, onTapTarget, openCandidate, onDoubleTapBlock)
+                                popover?.invoke()
+                            }
                         }
                     }
                 }
@@ -514,6 +544,7 @@ private fun RunsText(
     prefixOverride: String? = null,
 ) {
     val (style, color) = blockTextStyle(row.kind)
+    val colors = CivilightTheme.colors
     val layout = remember(row, showParens) { row.layout(showParens) }
     val prefix = prefixOverride ?: row.memoPrefix?.let { "$it  " }.orEmpty()
     val suffix = row.textMarks.joinToString("") { " ${it.glyph}" }
@@ -526,10 +557,20 @@ private fun RunsText(
                 DecorationRange(layout.toDisplay(c.start) + prefix.length, layout.toDisplay(c.end) + prefix.length, kind)
             }
     }
+    val linkRanges = remember(layout, prefix) {
+        layout.spans.filter { it.kind == SpanKind.LINK }.map { (it.start + prefix.length) until (it.end + prefix.length) }
+    }
+    val annotated = remember(text, colors, linkRanges, row.kind) {
+        if (row.kind == BlockKind.DIALOGUE || row.kind == BlockKind.NARRATION) {
+            SonnetScriptStyle.styledAnnotated(text, colors, linkRanges)
+        } else {
+            AnnotatedString(text)
+        }
+    }
     val dotted = remember(row.textMarks, text) { dottedIndices(text.length - suffix.length, row.textMarks) }
     var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
     DecoratedText(
-        AnnotatedString(text),
+        annotated,
         style,
         modifier = Modifier
             .fillMaxWidth()
@@ -574,7 +615,14 @@ private fun dottedIndices(start: Int, marks: List<MarkModel>): Set<Int> =
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun HeadView(row: HeadRow, selected: Boolean, onOpen: () -> Unit, onMenu: (() -> Unit)?) {
+fun HeadView(
+    row: HeadRow,
+    selected: Boolean,
+    onOpen: () -> Unit,
+    onMenu: (() -> Unit)?,
+    /** (0.7.3) Newly created scene title plays Sonnet-Create 1-shot typewriter ink reveal. */
+    revealTitle: Boolean = false,
+) {
     val colors = CivilightTheme.colors
     val type = CivilightTheme.type
     val store = io.github.lenticualrstone.civilight.ui.project.LocalProjectStore.current
@@ -617,7 +665,7 @@ fun HeadView(row: HeadRow, selected: Boolean, onOpen: () -> Unit, onMenu: (() ->
                     .background(colors.line),
             )
         } else {
-            // Titled scene transition: centered mono pill chip flanked by delicate hairlines.
+            // Titled scene transition: centered true-Monospace pill chip flanked by delicate hairlines.
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -632,12 +680,22 @@ fun HeadView(row: HeadRow, selected: Boolean, onOpen: () -> Unit, onMenu: (() ->
                         .padding(horizontal = 14.dp, vertical = 5.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CivilightText(
-                        customTitle,
-                        type.number.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp),
-                        color = colors.ink2,
-                        maxLines = 1,
-                    )
+                    val chipStyle = SonnetScriptStyle.monoChipStyle(10.5f)
+                    if (revealTitle) {
+                        TypewriterText(
+                            text = customTitle,
+                            style = chipStyle,
+                            color = colors.ink2,
+                            showsCaret = false,
+                        )
+                    } else {
+                        CivilightText(
+                            customTitle,
+                            chipStyle,
+                            color = colors.ink2,
+                            maxLines = 1,
+                        )
+                    }
                 }
                 Box(Modifier.weight(1f).height(1.dp).background(colors.line))
             }
@@ -664,18 +722,24 @@ fun HiddenSceneView(row: HiddenSceneRow, onUnlock: () -> Unit) {
     }
 }
 
-/** The virtual first line of an empty scene: speaker line (inherited or `화자 없음`) and an empty line. */
+/** (0.7.3) Sonnet-Create style quiet centered prompt for an empty scene. */
 @Composable
 fun EmptySceneView(row: EmptySceneRow, speaker: SpeakerModel?, onTap: () -> Unit) {
-    BlockFrame(false, Modifier.pressable(PressAction.Click(onTap), role = Role.Button, scaleOnPress = false)) {
-        ScriptSpeakerLine(
-            speaker ?: SpeakerModel(ScriptCopy.NO_SPEAKER, null, SpeakerLook.UNSET, null),
-            selected = false,
-            number = null,
-            marks = emptyList(),
-            extraLabel = ScriptCopy.INHERITED_SPEAKER.takeIf { speaker != null && speaker == row.speaker },
+    val colors = CivilightTheme.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .pressable(PressAction.Click(onTap), role = Role.Button, scaleOnPress = false)
+            .padding(horizontal = 24.dp, vertical = 56.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        CivilightText(
+            "아래 입력바에서 대사 · 지문 · 장면을 입력",
+            CivilightTheme.type.small,
+            color = colors.ink3,
+            textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(CivilightTheme.type.line.lineHeight.value.dp))
     }
 }
 

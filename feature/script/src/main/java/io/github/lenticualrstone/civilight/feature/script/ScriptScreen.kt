@@ -66,8 +66,12 @@ import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
 import io.github.lenticualrstone.civilight.designsystem.glass.OnGlass
 import io.github.lenticualrstone.civilight.feature.script.input.ComposerLeadingPopup
 import io.github.lenticualrstone.civilight.feature.script.ui.BranchManuscriptArea
+import io.github.lenticualrstone.civilight.feature.script.ui.InlineRehearsalEngine
+import io.github.lenticualrstone.civilight.feature.script.ui.InlineRehearsalOverlay
 import io.github.lenticualrstone.civilight.feature.script.ui.PlotTimelineStrip
+import io.github.lenticualrstone.civilight.feature.script.ui.SceneDividerMenuOverlay
 import io.github.lenticualrstone.civilight.feature.script.ui.ScriptAmbientGlow
+import io.github.lenticualrstone.civilight.feature.script.ui.rememberInlineRehearsal
 import io.github.lenticualrstone.civilight.ui.image.CharacterPortraitTile
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenu
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuEntry
@@ -620,10 +624,30 @@ private fun ScriptFrame(
     var zenMode by rememberSaveable { mutableStateOf(false) }
     var coverTimelineOpen by rememberSaveable { mutableStateOf(true) }
     var leadingPopupOpen by remember { mutableStateOf(false) }
+    var dividerMenuSceneKey by remember { mutableStateOf<Key?>(null) }
     var shakeCount by remember { mutableIntStateOf(0) }
+    val rehearsal = rememberInlineRehearsal()
     val activeBranchKey by vm.activeBranchKey.collectAsState()
     val activeBranch = remember(doc, c.unitKey, activeBranchKey) { BranchOps.branchOf(doc, c.unitKey, activeBranchKey) }
     val branches = remember(doc, c.unitKey) { BranchOps.branchesOf(doc, c.unitKey) }
+    // Track newly created scenes for 1-shot Sonnet-Create typewriter reveal on their centered pill.
+    val episodeSceneKeys = remember(doc, c.unitKey) {
+        doc.manuscript.liveScenes.filter { doc.index.numberingUnitKeyOfScene(it.key) == c.unitKey }.map { it.key }
+    }
+    var knownSceneKeys by remember { mutableStateOf<Set<Key>?>(null) }
+    var revealingSceneKey by remember { mutableStateOf<Key?>(null) }
+    LaunchedEffect(episodeSceneKeys) {
+        val prev = knownSceneKeys
+        knownSceneKeys = episodeSceneKeys.toSet()
+        if (prev != null) {
+            val added = episodeSceneKeys.lastOrNull { it !in prev }
+            if (added != null) {
+                revealingSceneKey = added
+                kotlinx.coroutines.delay(2600L)
+                if (revealingSceneKey == added) revealingSceneKey = null
+            }
+        }
+    }
     // Select mode, zen reading mode, and tabletop put the panel out of the way (the writer's choice stays).
     val panelHidden = selecting || tabletop != null || zenMode
     val baseLayout = ScriptLayout.of(widthDp, panelOpen, height = heightDp, hidden = panelHidden)
@@ -831,8 +855,19 @@ private fun ScriptFrame(
     }
     LaunchedEffect(vm) { vm.commandRequests.collect { runCommand(it) } }
     LocalBackHandler.current(selecting && sheets.top == null) { vm.leaveSelect() }
-    LocalBackHandler.current(zenMode && sheets.top == null) { zenMode = false }
+    LocalBackHandler.current(zenMode && sheets.top == null) {
+        if (rehearsal.active) rehearsal.stop() else zenMode = false
+    }
     LocalBackHandler.current(activeBranch != null && sheets.top == null && !selecting && !zenMode) { vm.switchBranch(null) }
+    InlineRehearsalEngine(
+        state = rehearsal,
+        rows = rows,
+        onScrollToLatest = { idx ->
+            scope.launch {
+                if (idx >= 0) listState.animateScrollToItem(idx)
+            }
+        },
+    )
     // Back with an `이 뒤에` mark clears it (the draft stays). Back never ends 고치기: that would drop the edit.
     LocalBackHandler.current(draft.mark is DraftMark.After && sheets.top == null && !selecting) { vm.closeMark() }
 
@@ -1049,6 +1084,11 @@ private fun ScriptFrame(
                 .then(if (upperSettled) Modifier.fillMaxHeight() else Modifier.height(upperHeight.dp))
                 .width(layout.areaWidth.dp),
         ) {
+            val showTimeline = !selecting && !zenMode && (wide || coverTimelineOpen || branches.isNotEmpty())
+            val displayedRows = if (rehearsal.active) rows.take(rehearsal.count) else rows
+            val rehearsalTypewriterKey = if (rehearsal.active) {
+                (displayedRows.lastOrNull() as? BlockRow)?.takeIf { it.kind == BlockKind.DIALOGUE }?.blockKey
+            } else null
             GlassScaffold(
                 topBar = {
                     AnimatedVisibility(visible = !zenMode, enter = motion.enter(CivilightMotion.standard), exit = motion.exit(CivilightMotion.standard)) {
@@ -1076,6 +1116,27 @@ private fun ScriptFrame(
                                     },
                                     onTimelineToggle = if (!wide) ({ coverTimelineOpen = !coverTimelineOpen }) else null,
                                     timelineShown = coverTimelineOpen || branches.isNotEmpty(),
+                                    bottomStrip = if (showTimeline) {
+                                        {
+                                            PlotTimelineStrip(
+                                                doc = doc,
+                                                unitKey = c.unitKey,
+                                                currentSceneKey = sceneKey,
+                                                activeBranchKey = activeBranchKey,
+                                                readOnly = c.readOnly,
+                                                unlocked = gate.open,
+                                                onJumpScene = { targetScene ->
+                                                    val jumpKey = rows.firstOrNull { it is HeadRow && it.sceneKey == targetScene }?.key
+                                                        ?: rows.firstOrNull { it.sceneKey == targetScene }?.key
+                                                    if (jumpKey != null) vm.aboveInput.tryEmit(jumpKey)
+                                                },
+                                                onSceneWhere = { targetScene -> sheets.open(SceneWhereSheet(route.projectKey, targetScene)) },
+                                                onMoveScene = vm::moveSceneInEpisode,
+                                                onSelectBranch = vm::switchBranch,
+                                                onNewScene = if (c.readOnly) null else ({ vm.nextScene(sceneKey) }),
+                                            )
+                                        }
+                                    } else null,
                                 )
                             }
                         }
@@ -1116,35 +1177,41 @@ private fun ScriptFrame(
                             )
                         }
                         if (zenMode) {
-                            val readAloudReady = remember(doc, c.unitKey, gate.open) { LayersModel.readAloudEnabled(doc, c.unitKey, gate.open) }
-                            val zenShape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
-                            val navPad = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                            Box(
-                                Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(bottom = navPad + 16.dp)
-                                    .tokenShadow(zenShape, CivilightTheme.elevation.popover(colors))
-                                    .then(Modifier),
-                            ) {
-                                Box(Modifier.then(Modifier)) {
+                            if (rehearsal.active) {
+                                InlineRehearsalOverlay(
+                                    state = rehearsal,
+                                    rows = rows,
+                                    onExitZen = { zenMode = false },
+                                    modifier = Modifier.align(Alignment.BottomCenter),
+                                )
+                            } else {
+                                val hasBlocks = remember(rows) { rows.any { it is BlockRow } }
+                                val zenShape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+                                val navPad = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                                Box(
+                                    Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = navPad + 16.dp)
+                                        .tokenShadow(zenShape, CivilightTheme.elevation.popover(colors)),
+                                ) {
                                     GlassBackground(
                                         surface = GlassSurface.POPOVER,
                                         modifier = Modifier.matchParentSize(),
                                         shape = zenShape,
-                                        fill = colors.glass.copy(alpha = if (colors.isDark) 0.70f else 0.80f),
+                                        fill = colors.glass.copy(alpha = if (colors.isDark) 0.72f else 0.84f),
                                     )
                                     OnGlass {
                                         Row(
                                             Modifier
-                                                .insetOutline(colors.edge, 1.dp, zenShape)
+                                                .insetOutline(colors.edge.copy(alpha = if (colors.isDark) 0.30f else 0.16f), 1.dp, zenShape)
                                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
-                                            if (readAloudReady) {
+                                            if (hasBlocks) {
                                                 Row(
                                                     Modifier
-                                                        .pressable(onClick = startReadAloud, hitTarget = HitTarget.CHIP, shape = zenShape)
+                                                        .pressable(onClick = { rehearsal.start() }, hitTarget = HitTarget.CHIP, shape = zenShape)
                                                         .background(colors.pri, zenShape)
                                                         .padding(horizontal = 12.dp, vertical = 8.dp),
                                                     horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -1169,6 +1236,20 @@ private fun ScriptFrame(
                                 }
                             }
                         }
+                        dividerMenuSceneKey?.let { menuScene ->
+                            val sceneTitle = doc.index.unit(menuScene)?.title.orEmpty()
+                            val canMerge = remember(doc, menuScene) {
+                                episodeSceneKeys.indexOf(menuScene) > 0 && !c.readOnly
+                            }
+                            SceneDividerMenuOverlay(
+                                title = sceneTitle,
+                                canRemoveDivider = canMerge,
+                                onEditWhere = { sheets.open(SceneWhereSheet(route.projectKey, menuScene)) },
+                                onRemoveDividerOnly = { vm.removeSceneDivider(menuScene) },
+                                onOpenFullSceneMenu = { sheets.open(UnitMenuSheet(route.projectKey, menuScene)) },
+                                onDismiss = { dividerMenuSceneKey = null },
+                            )
+                        }
                         Box(
                             Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding() + TOAST_GAP),
                             contentAlignment = Alignment.BottomCenter,
@@ -1179,7 +1260,6 @@ private fun ScriptFrame(
                 },
             ) { padding ->
                 with(density) { bottomPadPx = padding.calculateBottomPadding().roundToPx() }
-                val showTimeline = !selecting && !zenMode && (wide || coverTimelineOpen || branches.isNotEmpty())
                 Box(Modifier.fillMaxSize()) {
                     // (0.7.0, Labs) Subtle undulating ambient glow recorded into GlassScaffold's glassSource.
                     if (scriptSettings.scriptAmbientGlow) {
@@ -1194,56 +1274,28 @@ private fun ScriptFrame(
                             onToggle = { key -> vm.toggleChecked(key, rows) },
                             onDrop = vm::moveBlocks,
                         )
-                    } else Column(Modifier.fillMaxSize()) {
-                        if (showTimeline) {
-                            PlotTimelineStrip(
-                                doc = doc,
-                                unitKey = c.unitKey,
-                                currentSceneKey = sceneKey,
-                                activeBranchKey = activeBranchKey,
-                                readOnly = c.readOnly,
-                                unlocked = gate.open,
-                                modifier = Modifier.padding(top = padding.calculateTopPadding()),
-                                onJumpScene = { targetScene ->
-                                    val jumpKey = rows.firstOrNull { it is HeadRow && it.sceneKey == targetScene }?.key
-                                        ?: rows.firstOrNull { it.sceneKey == targetScene }?.key
-                                    if (jumpKey != null) vm.aboveInput.tryEmit(jumpKey)
-                                },
-                                onSceneWhere = { targetScene -> sheets.open(SceneWhereSheet(route.projectKey, targetScene)) },
-                                onMoveScene = vm::moveSceneInEpisode,
-                                onSelectBranch = vm::switchBranch,
-                                onNewScene = if (c.readOnly) null else ({ vm.nextScene(sceneKey) }),
-                            )
-                        }
-                        val bodyPadding = if (showTimeline) {
-                            androidx.compose.foundation.layout.PaddingValues(
-                                top = 4.dp,
-                                bottom = padding.calculateBottomPadding(),
-                            )
-                        } else {
-                            padding
-                        }
-                        if (activeBranch != null) {
-                            BranchManuscriptArea(
-                                doc = doc,
-                                branch = activeBranch,
-                                padding = bodyPadding,
-                                layout = layout,
-                                profileShape = scriptSettings.profileShape,
-                                readOnly = c.readOnly,
-                                onBackToMain = { vm.switchBranch(null) },
-                                onAdopt = { vm.adoptBranch(activeBranch.key) },
-                                onDeleteBranch = { vm.deleteActiveBranch(activeBranch.key) },
-                                onDeleteBlock = { blockKey -> vm.deleteBranchBlock(activeBranch.key, blockKey) },
-                            )
-                        } else Manuscript(
-                        rows = rows,
+                    } else if (activeBranch != null) {
+                        BranchManuscriptArea(
+                            doc = doc,
+                            branch = activeBranch,
+                            padding = padding,
+                            layout = layout,
+                            profileShape = scriptSettings.profileShape,
+                            readOnly = c.readOnly,
+                            onBackToMain = { vm.switchBranch(null) },
+                            onAdopt = { vm.adoptBranch(activeBranch.key) },
+                            onDeleteBranch = { vm.deleteActiveBranch(activeBranch.key) },
+                            onDeleteBlock = { blockKey -> vm.deleteBranchBlock(activeBranch.key, blockKey) },
+                        )
+                    } else {
+                        Manuscript(
+                        rows = displayedRows,
                         editor = editor,
                         showParens = doc.app.view.script.layers.paren,
-                        readOnly = c.readOnly,
+                        readOnly = c.readOnly || rehearsal.active,
                         entered = entered,
                         listState = listState,
-                        padding = bodyPadding,
+                        padding = padding,
                         layout = layout,
                         actions = ManuscriptActions(
                             onTapBlock = { row, offset -> vm.tapBlock(row.blockKey, row.isText, offset) },
@@ -1254,7 +1306,7 @@ private fun ScriptFrame(
                             onOpenHead = { scene -> sheets.open(SceneWhereSheet(route.projectKey, scene)) },
                             onHeadMenu = { scene ->
                                 keyboard?.hide()
-                                sheets.open(UnitMenuSheet(route.projectKey, scene))
+                                dividerMenuSceneKey = scene
                             },
                             onUnlockHidden = gate.unlock,
                             onNewScene = if (c.readOnly) null else ({ vm.nextScene(null) }),
@@ -1338,6 +1390,11 @@ private fun ScriptFrame(
                         revealedSide = revealedSide,
                         liftedRow = blockMenu?.liftedRow,
                         blockSpacing = scriptSettings.blockSpacing,
+                        revealingSceneKey = revealingSceneKey,
+                        editingBlockKey = editKey,
+                        typewriterBlockKey = rehearsalTypewriterKey,
+                        typewriterProgress = rehearsal.spokenChars,
+                        typewriterSpeed = rehearsal.speed,
                     )
                     }
                 }

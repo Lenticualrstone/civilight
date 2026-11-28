@@ -101,7 +101,7 @@ internal fun PlotTimelineStrip(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 6.dp, bottom = 4.dp),
+            .padding(vertical = 7.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
@@ -112,127 +112,129 @@ internal fun PlotTimelineStrip(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Sonnet-Create `PLOT` mono header label
+            CivilightText(
+                "PLOT",
+                SonnetScriptStyle.monoChipStyle(10f),
+                color = colors.ink3,
+                maxLines = 1,
+                modifier = Modifier.padding(end = 2.dp),
+            )
+
             scenes.forEachIndexed { idx, scene ->
                 val isCurrent = activeBranchKey == null && scene.key == currentSceneKey
                 val isEditing = editingSceneKey == scene.key
                 val blocks = remember(doc, scene.key) { doc.manuscript.liveBlocksOf(scene.key) }
                 val dialogueCount = remember(blocks) { blocks.count { it.kind.known == BlockKind.DIALOGUE } }
-                val chars = remember(blocks) { blocks.sumOf { it.runs.plainText.length } }
-                val minutes = remember(chars) { (chars / 320).coerceAtLeast(if (chars > 0) 1 else 0) }
-                val dialogueRatio = if (blocks.isEmpty()) 0f else (dialogueCount.toFloat() / blocks.size.toFloat()).coerceIn(0.08f, 1f)
-                val shape = RoundedCornerShape(14.dp)
+                val sceneBranches = branchesByScene[scene.key].orEmpty()
+                val titleText = scene.title.orEmpty().trim()
+                val titleLine = if (titleText.isEmpty()) "S#${idx + 1}" else "S#${idx + 1} · $titleText"
+                val metaLine = buildString {
+                    append("대사 $dialogueCount")
+                    if (sceneBranches.isNotEmpty()) append(" · 분기 ${sceneBranches.size}")
+                }
+                val shape = RoundedCornerShape(10.dp)
+                val glowShape = RoundedCornerShape(13.dp)
 
-                Column(
+                // Sonnet-Create SceneCard: surface fill, 2dp accent stroke + 3dp outer accent halo when current.
+                Box(
                     Modifier
-                        .widthIn(min = 122.dp, max = 180.dp)
-                        .clip(shape)
-                        .background(if (isCurrent) colors.hl else colors.tint)
-                        .insetOutline(
-                            if (isCurrent || isEditing) colors.acc.copy(alpha = 0.55f) else colors.line,
-                            1.dp,
-                            shape,
-                        )
-                        .combinedClickable(
-                            onClick = {
-                                editingSceneKey = null
-                                if (activeBranchKey != null) onSelectBranch(null)
-                                onJumpScene(scene.key)
-                            },
-                            onLongClick = {
-                                if (!readOnly) editingSceneKey = if (isEditing) null else scene.key
-                            },
-                        )
-                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                        .then(
+                            if (isCurrent || isEditing) Modifier
+                                .clip(glowShape)
+                                .background(colors.acc.copy(alpha = 0.12f))
+                                .padding(3.dp)
+                            else Modifier,
+                        ),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        CivilightText(
-                            "S#${idx + 1}",
-                            type.number.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
-                            color = if (isCurrent) colors.acc else colors.ink3,
-                            maxLines = 1,
-                        )
-                        CivilightText(
-                            scene.title.orEmpty().ifBlank { "제목 없음" },
-                            type.chip.copy(fontSize = 12.sp, fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium),
-                            color = if (isCurrent) colors.ink else colors.ink2,
-                            maxLines = 1,
-                        )
-                    }
-                    CivilightText(
-                        if (minutes > 0) "대사 ${dialogueCount} · 약 ${minutes}분" else "대사 ${dialogueCount}",
-                        type.micro,
-                        color = colors.ink3,
-                        maxLines = 1,
-                    )
-                    // Subtle 2 dp bottom accent bar reflecting scene dialogue density.
-                    Box(
+                    Column(
                         Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .clip(CircleShape)
-                            .background(colors.line),
+                            .widthIn(min = 98.dp, max = 168.dp)
+                            .clip(shape)
+                            .background(if (colors.isDark) colors.raise else colors.raise.copy(alpha = 0.92f))
+                            .insetOutline(
+                                if (isCurrent || isEditing) colors.acc else colors.line,
+                                if (isCurrent || isEditing) 1.75.dp else 1.dp,
+                                shape,
+                            )
+                            .combinedClickable(
+                                onClick = {
+                                    editingSceneKey = null
+                                    if (activeBranchKey != null) onSelectBranch(null)
+                                    onJumpScene(scene.key)
+                                },
+                                onLongClick = {
+                                    if (!readOnly) editingSceneKey = if (isEditing) null else scene.key
+                                },
+                            )
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth(dialogueRatio)
-                                .fillMaxHeight()
-                                .background(if (isCurrent) colors.acc else colors.ink3.copy(alpha = 0.45f)),
+                        CivilightText(
+                            titleLine,
+                            SonnetScriptStyle.monoChipStyle(10f),
+                            color = if (isCurrent) colors.acc else colors.ink2,
+                            maxLines = 1,
+                        )
+                        CivilightText(
+                            metaLine,
+                            type.micro.copy(fontSize = 10.sp),
+                            color = colors.ink3,
+                            maxLines = 1,
                         )
                     }
                 }
 
-                // Zero-clutter branch chips: only appear when branches exist on this scene.
-                branchesByScene[scene.key].orEmpty().forEach { branch ->
-                    val branchActive = activeBranchKey == branch.key
-                    val pillShape = RoundedCornerShape(14.dp)
-                    Row(
-                        Modifier
-                            .clip(pillShape)
-                            .background(if (branchActive) colors.hl else colors.tint)
-                            .insetOutline(if (branchActive) colors.acc else colors.line, 1.dp, pillShape)
-                            .pressable(
-                                onClick = { onSelectBranch(if (branchActive) null else branch.key) },
-                                hitTarget = HitTarget.CHIP,
-                                shape = pillShape,
+                // Sonnet-Create branch lane: `⑂` symbol + dashed capsule (solid accent when active).
+                if (sceneBranches.isNotEmpty()) {
+                    CivilightText("⑂", type.chip.copy(fontSize = 13.sp), color = colors.acc, maxLines = 1)
+                    sceneBranches.forEach { branch ->
+                        val branchActive = activeBranchKey == branch.key
+                        val pillShape = CircleShape
+                        Box(
+                            Modifier
+                                .clip(pillShape)
+                                .background(if (branchActive) colors.acc else colors.hl)
+                                .then(
+                                    if (!branchActive) Modifier.dashedBorder(colors.acc.copy(alpha = 0.72f), cornerRadius = 16.dp, strokeWidth = 1.dp, dashDp = 3.dp, gapDp = 2.5.dp)
+                                    else Modifier,
+                                )
+                                .pressable(
+                                    onClick = { onSelectBranch(if (branchActive) null else branch.key) },
+                                    hitTarget = HitTarget.CHIP,
+                                    shape = pillShape,
+                                )
+                                .padding(horizontal = 11.dp, vertical = 5.dp)
+                                .semantics {
+                                    role = Role.Tab
+                                    selected = branchActive
+                                    contentDescription = branch.name
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CivilightText(
+                                "${branch.name} · ${branch.blocks.size}",
+                                type.chip.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                                color = if (branchActive) colors.onpri else colors.acc,
+                                maxLines = 1,
                             )
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
-                            .semantics {
-                                role = Role.Tab
-                                selected = branchActive
-                                contentDescription = branch.name
-                            },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        CivilightIcon(IconId.Branch, contentDescription = null, size = 14.dp, tint = colors.acc)
-                        CivilightText(
-                            branch.name,
-                            type.chip.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                            color = if (branchActive) colors.acc else colors.ink,
-                            maxLines = 1,
-                        )
+                        }
                     }
                 }
             }
 
             if (onNewScene != null && !readOnly) {
-                val addShape = RoundedCornerShape(14.dp)
+                val addShape = RoundedCornerShape(10.dp)
                 Row(
                     Modifier
                         .clip(addShape)
-                        .background(colors.tint)
-                        .insetOutline(colors.line, 1.dp, addShape)
+                        .dashedBorder(colors.ink3.copy(alpha = 0.40f), cornerRadius = 10.dp, strokeWidth = 1.25.dp, dashDp = 4.dp, gapDp = 3.dp)
                         .pressable(onClick = onNewScene, hitTarget = HitTarget.CHIP, shape = addShape)
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
-                    CivilightIcon(IconId.Plus, contentDescription = null, size = 14.dp, tint = colors.ink2)
-                    CivilightText("장면", type.chip.copy(fontSize = 12.sp), color = colors.ink2, maxLines = 1)
+                    CivilightText("＋ 장면", type.chip.copy(fontSize = 11.sp), color = colors.ink3, maxLines = 1)
                 }
             }
         }

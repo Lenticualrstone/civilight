@@ -2,6 +2,7 @@ package io.github.lenticualrstone.civilight.designsystem.component
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -12,11 +13,13 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -209,12 +212,51 @@ fun ScriptInputBar(
         Modifier.fillMaxWidth()
     }
 
-    Box(
+    Column(
         modifier
             .windowInsetsPadding(KeyboardLift)
             .fillMaxWidth(),
-        contentAlignment = Alignment.BottomCenter,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        // (0.7.3) Sonnet-Create floating glass capsule banner while editing a block.
+        if (state.editing) {
+            val editPlace = ScriptInputRules.place(state) as? InputPlace.Editing
+            val bannerShape = CircleShape
+            Box(
+                Modifier
+                    .padding(horizontal = 16.dp)
+                    .tokenShadow(bannerShape, CivilightTheme.elevation.popover(colors))
+                    .clip(bannerShape),
+            ) {
+                GlassBackground(
+                    surface = GlassSurface.POPOVER,
+                    modifier = Modifier.matchParentSize(),
+                    shape = bannerShape,
+                    fill = colors.glass.copy(alpha = if (colors.isDark) 0.72f else 0.84f),
+                )
+                OnGlass {
+                    Row(
+                        Modifier
+                            .insetOutline(colors.edge.copy(alpha = if (colors.isDark) 0.35f else 0.18f), 1.dp, bannerShape)
+                            .padding(start = 12.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        CivilightIcon(IconId.Edit, contentDescription = null, size = 13.dp, tint = colors.acc)
+                        CivilightText(
+                            editPlace?.let { ScriptInputCopy.editing(it.number) } ?: IconButtonCopy.EDIT,
+                            PLACE_BOLD,
+                            color = colors.ink,
+                            maxLines = 1,
+                        )
+                        MarkButton(IconId.Split, IconButtonCopy.SPLIT, enabled = ScriptInputRules.canSplit(state), reason = null, onClick = actions.onSplit)
+                        MarkButton(IconId.Merge, IconButtonCopy.MERGE, enabled = mergeOffReason == null, reason = mergeOffReason, onClick = actions.onMerge)
+                        MarkClose { actions.onEvent(ScriptInputEvent.CloseMark) }
+                    }
+                }
+            }
+        }
         Box(
             dockModifier
                 .tokenShadow(DOCK_SHAPE, CivilightTheme.elevation.popover(colors))
@@ -350,44 +392,64 @@ private fun ComposerModeTabs(
     onSelect: (ComposerTab) -> Unit,
 ) {
     val colors = CivilightTheme.colors
+    val motion = LocalMotion.current
     val tabs = if (editing) listOf(ComposerTab.DIALOGUE, ComposerTab.NARRATION) else ComposerTab.entries
     val pillShape = RoundedCornerShape(16.dp)
-    Row(
+    val tabShape = RoundedCornerShape(14.dp)
+    val tabWidth = 48.dp
+    val tabGap = 2.dp
+    val activeIdx = tabs.indexOf(active).coerceAtLeast(0)
+    // (0.7.3) Sonnet-Create sliding capsule highlight gliding smoothly between `대사 | 지문 | 장면`.
+    val indicatorOffset by animateDpAsState(
+        targetValue = (tabWidth + tabGap) * activeIdx,
+        animationSpec = motion.move(CivilightMotion.standard),
+        label = "modeTabSlide",
+    )
+    Box(
         Modifier
             .clip(pillShape)
             .background(colors.tint)
             .insetOutline(colors.line, 1.dp, pillShape)
             .padding(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        tabs.forEach { tab ->
-            val isSelected = tab == active
-            val tabShape = RoundedCornerShape(14.dp)
-            Box(
-                Modifier
-                    .clip(tabShape)
-                    .background(if (isSelected) colors.hl else Color.Transparent)
-                    .then(if (isSelected) Modifier.insetOutline(colors.acc.copy(alpha = 0.35f), 1.dp, tabShape) else Modifier)
-                    .pressable(onClick = { onSelect(tab) }, hitTarget = HitTarget.CHIP, shape = tabShape, scaleOnPress = false)
-                    .heightIn(min = 28.dp)
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                    .semantics {
-                        role = Role.Tab
-                        selected = isSelected
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                CivilightText(
-                    tab.label,
-                    CivilightTheme.type.chip.copy(
-                        fontSize = 12.sp,
-                        lineHeight = 15.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                    ),
-                    color = if (isSelected) colors.acc else colors.ink2,
-                    maxLines = 1,
-                )
+        Box(
+            Modifier
+                .offset(x = indicatorOffset)
+                .width(tabWidth)
+                .height(28.dp)
+                .clip(tabShape)
+                .background(colors.hl)
+                .insetOutline(colors.acc.copy(alpha = 0.35f), 1.dp, tabShape),
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(tabGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            tabs.forEach { tab ->
+                val isSelected = tab == active
+                Box(
+                    Modifier
+                        .width(tabWidth)
+                        .height(28.dp)
+                        .clip(tabShape)
+                        .pressable(onClick = { onSelect(tab) }, hitTarget = HitTarget.CHIP, shape = tabShape, scaleOnPress = false)
+                        .semantics {
+                            role = Role.Tab
+                            selected = isSelected
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CivilightText(
+                        tab.label,
+                        CivilightTheme.type.chip.copy(
+                            fontSize = 12.sp,
+                            lineHeight = 15.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        ),
+                        color = if (isSelected) colors.acc else colors.ink2,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }
@@ -424,10 +486,11 @@ private fun RowScope.PlaceArea(
                 MarkClose { actions.onEvent(ScriptInputEvent.CloseMark) }
             }
             is InputPlace.Editing -> {
-                CivilightText(ScriptInputCopy.editing(place.number), PLACE_BOLD, Modifier.weight(1f, fill = false), color = colors.ink, maxLines = 1)
-                MarkButton(IconId.Split, IconButtonCopy.SPLIT, enabled = ScriptInputRules.canSplit(state), reason = null, onClick = actions.onSplit)
-                MarkButton(IconId.Merge, IconButtonCopy.MERGE, enabled = mergeOffReason == null, reason = mergeOffReason, onClick = actions.onMerge)
-                MarkClose { actions.onEvent(ScriptInputEvent.CloseMark) }
+                // Edit controls are elevated into the floating glass edit banner above the dock.
+                if (!ScriptInputRules.showsToolRow(state, context.readOnly) && (context.canUndo || context.canRedo)) {
+                    CompactHistoryIcon(IconId.Undo, ScriptInputCopy.TOOL_UNDO_NAME, context.canUndo, actions.onUndo)
+                    CompactHistoryIcon(IconId.Redo, ScriptInputCopy.TOOL_REDO_NAME, context.canRedo, actions.onRedo)
+                }
             }
         }
     }
