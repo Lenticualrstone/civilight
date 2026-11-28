@@ -110,6 +110,8 @@ data class BlockRow(
     /** `#043`. */
     val number: String,
     val speaker: SpeakerModel?,
+    /** (0.7.0) Additional speakers for simultaneous/chorus dialogue. */
+    val coSpeakers: List<SpeakerModel> = emptyList(),
     /** Text runs of dialogue, narration, system text and memos. */
     val runs: List<TextRun>,
     /** How each link run is drawn, by link key. */
@@ -202,6 +204,16 @@ object ScriptRows {
         val termMarks = terms?.of(block) ?: BlockTerms.NONE
         val kind = block.kind.known
         val speaker = if (kind == BlockKind.DIALOGUE) speakerOf(row.speaker, block) else null
+        val coSpeakers = if (kind == BlockKind.DIALOGUE && block.coSpeakerKeys.isNotEmpty()) {
+            block.coSpeakerKeys.mapNotNull { coKey ->
+                val ch = doc.index.character(coKey)
+                when {
+                    ch == null || ch.deletedAt != null -> null
+                    ch.hidden && !unlocked -> SpeakerModel(Manuscript.SpeakerLabel.Hidden.TEXT, null, SpeakerLook.HIDDEN, coKey)
+                    else -> SpeakerModel(ch.name, null, SpeakerLook.NAMED, coKey)
+                }
+            }
+        } else emptyList()
         val marks = row.marks.map { MarkModel(it.glyph.first(), it.dotted) }
         val speakerMarks = mutableListOf<MarkModel>()
         val textMarks = mutableListOf<MarkModel>()
@@ -226,6 +238,7 @@ object ScriptRows {
             kind = kind,
             number = Labels.number(block.number),
             speaker = speaker,
+            coSpeakers = coSpeakers,
             runs = block.runs,
             linkLooks = linkLooks(doc, block, unlocked),
             // SCR-08: cues read with Korean effect names (`화면 효과 페이드`).

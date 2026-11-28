@@ -12,6 +12,7 @@ import io.github.lenticualrstone.civilight.domain.script.Manuscript
 import io.github.lenticualrstone.civilight.domain.script.Replace
 import io.github.lenticualrstone.civilight.domain.script.Runs
 import io.github.lenticualrstone.civilight.domain.script.ScriptWrite
+import io.github.lenticualrstone.civilight.domain.script.WriteDraft
 import io.github.lenticualrstone.civilight.feature.script.input.Draft
 import io.github.lenticualrstone.civilight.feature.script.input.DraftEffect
 import io.github.lenticualrstone.civilight.feature.script.input.DraftMark
@@ -168,6 +169,11 @@ fun ScriptViewModel.onDraftText(text: String, selStart: Int, selEnd: Int, smartP
 
 fun ScriptViewModel.pickChipSpeaker(key: Key?) = setDraft(Drafts.pickSpeaker(draftFlow.value, key))
 
+fun ScriptViewModel.toggleChipCoSpeaker(key: Key) = setDraft(Drafts.toggleCoSpeaker(draftFlow.value, key))
+
+fun ScriptViewModel.selectComposerTab(tab: io.github.lenticualrstone.civilight.designsystem.component.ComposerTab) =
+    setDraft(Drafts.selectComposerTab(draftFlow.value, tab))
+
 fun ScriptViewModel.pickChipKind(kind: BlockKind) = setDraft(Drafts.pickKind(draftFlow.value, kind))
 
 fun ScriptViewModel.openDraftParen() = setDraft(Drafts.openParen(draftFlow.value))
@@ -298,13 +304,68 @@ fun ScriptViewModel.sendDraft(targetScene: Key?) {
                 if (block != null) saveLastPosition(m.blockKey, Runs.length(block.runs))
             }
             else -> {
+                // (0.7.0) 3-mode scene tab & inline shorthand (`--- [title]` → new scene, `// text` → memo).
+                when (val intent = Drafts.sendIntent(draft)) {
+                    is Drafts.SendIntent.NewScene -> {
+                        val unit = unitKey ?: return@enqueue
+                        var createdScene: Key? = null
+                        runOp(WriteCopy.UNDO_NEXT_SCENE) { d ->
+                            NextScene.createTitled(d, unit, projectKey, targetScene, intent.title, actionCtx())?.let { (out, key) ->
+                                createdScene = key
+                                ScriptOps.Outcome(out)
+                            }
+                        } ?: return@enqueue
+                        val sKey = createdScene ?: return@enqueue
+                        lastNextScene = sKey
+                        setDraft(
+                            Drafts.sent(draftFlow.value).copy(
+                                sceneMode = false,
+                                kind = BlockKind.DIALOGUE,
+                            ),
+                        )
+                        aboveInput.tryEmit(ScriptRowKeys.head(sKey))
+                        return@enqueue
+                    }
+                    is Drafts.SendIntent.Memo -> {
+                        val branchKey = activeBranchFlow.value
+                        if (branchKey != null) {
+                            appendToBranch(branchKey, Drafts.toWrite(draft.copy(kind = BlockKind.MEMO, runs = intent.runs), game))
+                            return@enqueue
+                        }
+                        val position = (m as? DraftMark.After)?.let { BlockPosition.After(it.blockKey) }
+                            ?: targetScene?.let { BlockPosition.SceneEnd(it) } ?: return@enqueue
+                        val memoWrite = WriteDraft(BlockKind.MEMO, intent.runs)
+                        if (ScriptWrite.send(doc, position, memoWrite, game, ctx()) == null) return@enqueue
+                        revealKind(BlockKind.MEMO)
+                        var created: Key? = null
+                        runOp(WriteCopy.UNDO_SEND) { d ->
+                            ScriptWrite.send(d, position, memoWrite, game, ctx())?.let {
+                                created = it.blockKey
+                                ScriptOps.Outcome(it.doc, created = it.blockKey)
+                            }
+                        } ?: return@enqueue
+                        val key = created ?: return@enqueue
+                        setDraft(if (draftFlow.value.runs == draft.runs) Drafts.sent(draftFlow.value) else draftFlow.value.copy(mark = DraftMark.None))
+                        markNew(key, FRESH_SENT)
+                        editorFlow.update { it.copy(selected = null) }
+                        aboveInput.tryEmit(ScriptRowKeys.block(key))
+                        return@enqueue
+                    }
+                    Drafts.SendIntent.Normal -> Unit
+                }
+                val branchKey = activeBranchFlow.value
+                if (branchKey != null) {
+                    appendToBranch(branchKey, Drafts.toWrite(draft, game))
+                    return@enqueue
+                }
                 val position = (m as? DraftMark.After)?.let { BlockPosition.After(it.blockKey) }
                     ?: targetScene?.let { BlockPosition.SceneEnd(it) } ?: return@enqueue
-                if (ScriptWrite.send(doc, position, Drafts.toWrite(draft, game), game, ctx()) == null) return@enqueue
-                revealKind(draft.kind)
+                val write = Drafts.toWrite(draft, game)
+                if (ScriptWrite.send(doc, position, write, game, ctx()) == null) return@enqueue
+                revealKind(write.kind)
                 var created: Key? = null
                 runOp(WriteCopy.UNDO_SEND) { d ->
-                    ScriptWrite.send(d, position, Drafts.toWrite(draft, game), game, ctx())?.let {
+                    ScriptWrite.send(d, position, write, game, ctx())?.let {
                         created = it.blockKey
                         ScriptOps.Outcome(it.doc, created = it.blockKey)
                     }
@@ -444,16 +505,30 @@ object NextScene {
         projectKey: Key,
         targetScene: Key?,
         ctx: io.github.lenticualrstone.civilight.domain.actions.ActionContext,
+    ): Pair<ProjectDoc, Key>? = createTitled(doc, unitKey, projectKey, targetScene, title = null, ctx = ctx)
+
+    /** (0.7.0) Creates a new scene with an optional title (used by the `[장면]` tab and `--- title` shorthand). */
+    fun createTitled(
+        doc: ProjectDoc,
+        unitKey: Key,
+        projectKey: Key,
+        targetScene: Key?,
+        title: String?,
+        ctx: io.github.lenticualrstone.civilight.domain.actions.ActionContext,
     ): Pair<ProjectDoc, Key>? {
         val scene = targetScene?.let { doc.index.unit(it) }?.takeIf { doc.manuscript.isLiveUnit(it.key) }
-        return if (scene != null) {
+        val cleanTitle = title?.trim()?.takeIf { it.isNotEmpty() }
+        val (createdDoc, newKey) = if (scene != null) {
             val pre = SceneActions.prefillAfter(doc, scene.key)
             SceneActions.create(doc, scene.parentKey, scene.key, ctx, place = pre.place, time = pre.time, transitionMode = pre.transitionMode)
         } else {
             val parent = unitKey.takeIf { it != projectKey }
             val last = doc.index.children(parent).lastOrNull()?.key
             SceneActions.create(doc, parent, last, ctx)
-        }
+        } ?: return null
+        if (cleanTitle == null) return createdDoc to newKey
+        val updatedUnits = createdDoc.story.units.map { u -> if (u.key == newKey) u.copy(title = cleanTitle) else u }
+        return createdDoc.copy(story = createdDoc.story.copy(units = updatedUnits)) to newKey
     }
 }
 

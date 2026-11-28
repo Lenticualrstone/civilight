@@ -229,4 +229,8 @@ internal class SettingsViewModel(private val services: LibraryServices) : ViewMo
     fun setCustomProfileTabs(tabs: List<io.github.lenticualrstone.civilight.model.app.ProfileTabConfig>) {
         viewModelScope.launch { settingsStore.setCustomProfileTabs(tabs) }
     }
+
+    fun setScriptAmbientGlow(on: Boolean) {
+        viewModelScope.launch { settingsStore.setScriptAmbientGlow(on) }
+    }
 }

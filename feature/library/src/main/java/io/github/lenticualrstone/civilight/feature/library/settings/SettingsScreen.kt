@@ -286,6 +286,13 @@ internal fun SettingsScreen(services: LibraryServices) {
             }
             SettingsCategory.LABS -> {
                 SwitchRow(
+                    title = SettingsCopy.SCRIPT_AMBIENT_GLOW,
+                    subtitle = SettingsCopy.SCRIPT_AMBIENT_GLOW_SUB,
+                    checked = settings.scriptAmbientGlow,
+                    onCheckedChange = vm::setScriptAmbientGlow,
+                    leadingIcon = IconId.Wave,
+                )
+                SwitchRow(
                     title = SettingsCopy.TYPEWRITER_SCROLL,
                     subtitle = SettingsCopy.TYPEWRITER_SCROLL_SUB,
                     checked = settings.typewriterScroll,

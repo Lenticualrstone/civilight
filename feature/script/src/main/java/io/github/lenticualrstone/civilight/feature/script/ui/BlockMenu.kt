@@ -79,6 +79,7 @@ enum class BlockMenuItem(val label: String, val group: Group) {
     INSERT_AFTER(IconButtonCopy.INSERT_AFTER, Group.EDIT),
     KIND(IconButtonCopy.KIND, Group.EDIT),
     SCENE_CUT(IconButtonCopy.SCENE_CUT, Group.EDIT),
+    BRANCH("다른 전개 쓰기", Group.EDIT),
     PLANT(WriteCopy.PLANT, Group.MARKS),
     MENTION_OR_PAYOFF(WriteCopy.MENTION_OR_PAYOFF, Group.MARKS),
     DISPLAY_NAME(WriteCopy.BLOCK_DISPLAY_NAME, Group.MARKS),
@@ -100,6 +101,7 @@ enum class BlockMenuItem(val label: String, val group: Group) {
             INSERT_AFTER -> IconId.InsertAfter
             KIND -> IconId.Kind
             SCENE_CUT -> IconId.SceneCut
+            BRANCH -> IconId.Branch
             PLANT -> IconId.Pin
             MENTION_OR_PAYOFF -> IconId.Check
             DISPLAY_NAME -> IconId.Label
@@ -152,6 +154,7 @@ object BlockMenu {
                 add(BlockMenuItem.INSERT_AFTER)
                 add(BlockMenuItem.KIND)
                 add(BlockMenuItem.SCENE_CUT)
+                add(BlockMenuItem.BRANCH)
                 // `복선 심기` on every kind but `작가 메모` (as in 속성); `다시 언급 · 거두기` whenever 속성 offers it.
                 if (kind != BlockKind.MEMO) add(BlockMenuItem.PLANT)
                 add(BlockMenuItem.MENTION_OR_PAYOFF)

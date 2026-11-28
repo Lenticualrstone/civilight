@@ -32,6 +32,8 @@ data class Block(
     val kind: OpenEnum<BlockKind>,
     /** Dialogue only; null = `화자 없음`. */
     val speakerKey: Key? = null,
+    /** (0.7.0) Optional additional speakers for simultaneous/chorus dialogue; empty for single-speaker lines. */
+    val coSpeakerKeys: List<Key> = emptyList(),
     /** Text of dialogue, narration, system and memo blocks. */
     @EncodeDefault val runs: List<TextRun> = emptyList(),
     /** Dialogue only, used when `stagePositionEnabled`. */

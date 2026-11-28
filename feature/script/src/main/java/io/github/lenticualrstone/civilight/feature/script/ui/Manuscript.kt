@@ -149,6 +149,8 @@ class ManuscriptActions(
     val onLiftedBounds: (rowKey: String, bounds: Rect) -> Unit = { _, _ -> },
     /** Which side of which row is open (one row at a time). */
     val onSwipe: (rowKey: String?, side: SwipeSide) -> Unit = { _, _ -> },
+    /** (0.7.0) Double-tap on a block immediately enters edit mode (`고치기`). */
+    val onDoubleTapBlock: ((row: BlockRow) -> Unit)? = null,
 )
 
 /**
@@ -296,6 +298,15 @@ fun Manuscript(
                             // CNV-40: no swipe while a block is being typed.
                             val side = if (revealedRow == row.key) revealedSide else SwipeSide.CLOSED
                             val look = actions.look(row).let { if (side != SwipeSide.CLOSED) it.copy(numbered = true) else it }
+                            val groupedWithPrev = prev is BlockRow &&
+                                row.kind == BlockKind.DIALOGUE &&
+                                prev.kind == BlockKind.DIALOGUE &&
+                                row.sceneKey == prev.sceneKey &&
+                                row.speaker?.characterKey != null &&
+                                row.speaker.characterKey == prev.speaker?.characterKey &&
+                                row.coSpeakers.map { it.characterKey } == prev.coSpeakers.map { it.characterKey } &&
+                                editor.selected != row.blockKey &&
+                                look.tag == null
                             SwipeBlock(row, side, actions, enter, enabled = !previewOnly, bounds = bounds, scrolling = { listState.isScrollInProgress }) {
                                 BlockView(
                                     row = row,
@@ -303,6 +314,10 @@ fun Manuscript(
                                     showParens = showParens,
                                     inheritedHint = false,
                                     look = look,
+                                    groupedWithPrev = groupedWithPrev,
+                                    onDoubleTapBlock = if (!readOnly && !previewOnly && !row.editLocked) {
+                                        actions.onDoubleTapBlock?.let { cb -> { cb(row) } }
+                                    } else null,
                                     onTapText = { offset ->
                                         actions.onReveal(null)
                                         actions.onTapBlock(row, offset)

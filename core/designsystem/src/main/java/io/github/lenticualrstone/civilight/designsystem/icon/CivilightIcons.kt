@@ -207,6 +207,27 @@ enum class IconId(val pathData: String) {
 
     /** (0.4.0) Sparkles / visual cue / direction icon. */
     Spark("M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"),
+
+    /** (0.7.0) Redo icon (mirrored Undo). */
+    Redo("M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"),
+
+    /** (0.7.0) Play triangle for rehearsal / TTS read-aloud. */
+    Play("M8 5.5l11 6.5-11 6.5z"),
+
+    /** (0.7.0) Stop square for rehearsal / TTS read-aloud. */
+    Stop("M6.5 6.5h11v11h-11z"),
+
+    /** (0.7.0) Branch fork icon for lightweight episode IF branches. */
+    Branch("M7 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM17 7a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 9v6M7 15c0-4 10-2 10-4"),
+
+    /** (0.7.0) Open eye icon for Zen reading mode. */
+    Eye("M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"),
+
+    /** (0.7.0) Paperclip icon for attachment slot in narration / scene input modes. */
+    Attach("M21 11.5l-8.5 8.5a5 5 0 0 1-7.1-7.1l9.2-9.2a3.3 3.3 0 0 1 4.7 4.7l-9.2 9.2a1.6 1.6 0 0 1-2.3-2.3l8.5-8.5"),
+
+    /** (0.7.0) Speaker wave icon for TTS voice toggle in rehearsal. */
+    Volume("M11 5L6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"),
     ;
 
     companion object {

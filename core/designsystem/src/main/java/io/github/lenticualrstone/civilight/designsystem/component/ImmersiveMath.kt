@@ -93,10 +93,10 @@ object ImmersiveMath {
     const val PANEL_RADIUS_DP: Float = 24f
     const val PANEL_TOP_PAD_DP: Float = 28f
     const val PANEL_BOTTOM_EXTRA_DP: Float = 32f
-    const val PANEL_ALPHA_DARK_START: Float = 0.74f
-    const val PANEL_ALPHA_DARK_END: Float = 0.86f
-    const val PANEL_ALPHA_LIGHT_START: Float = 0.80f
-    const val PANEL_ALPHA_LIGHT_END: Float = 0.90f
+    const val PANEL_ALPHA_DARK_START: Float = 0.56f
+    const val PANEL_ALPHA_DARK_END: Float = 0.64f
+    const val PANEL_ALPHA_LIGHT_START: Float = 0.62f
+    const val PANEL_ALPHA_LIGHT_END: Float = 0.70f
 
     fun clamp01(v: Float): Float = if (v.isNaN()) 0f else v.coerceIn(0f, 1f)
 

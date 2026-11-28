@@ -195,12 +195,12 @@ class ImmersiveMathTest {
 
     @Test
     fun panelGlassStaysLegible() {
-        assertEquals(0.74f, ImmersiveMath.panelGlassAlpha(frame(0f).e, dark = true), eps)
-        assertEquals(0.80f, ImmersiveMath.panelGlassAlpha(frame(0f).e, dark = false), eps)
-        assertEquals(0.80f, ImmersiveMath.panelGlassAlpha(frame(0.5f).e, dark = true), eps)
-        assertEquals(0.85f, ImmersiveMath.panelGlassAlpha(frame(0.5f).e, dark = false), eps)
-        assertEquals(0.86f, ImmersiveMath.panelGlassAlpha(frame(1f).e, dark = true), eps)
-        assertEquals(0.90f, ImmersiveMath.panelGlassAlpha(frame(1f).e, dark = false), eps)
+        assertEquals(0.56f, ImmersiveMath.panelGlassAlpha(frame(0f).e, dark = true), eps)
+        assertEquals(0.62f, ImmersiveMath.panelGlassAlpha(frame(0f).e, dark = false), eps)
+        assertEquals(0.60f, ImmersiveMath.panelGlassAlpha(frame(0.5f).e, dark = true), eps)
+        assertEquals(0.66f, ImmersiveMath.panelGlassAlpha(frame(0.5f).e, dark = false), eps)
+        assertEquals(0.64f, ImmersiveMath.panelGlassAlpha(frame(1f).e, dark = true), eps)
+        assertEquals(0.70f, ImmersiveMath.panelGlassAlpha(frame(1f).e, dark = false), eps)
         assertEquals(96f + 20f, ImmersiveMath.panelBottomPadding(20f, hasBar = true), eps)
         assertEquals(88f + 20f, ImmersiveMath.barHeight(20f), eps)
     }
@@ -225,7 +225,7 @@ class ImmersiveMathTest {
         assertEquals(0f, ImmersiveMath.heroBlurDp(f.e, f.q, canBlur = false), eps)
         assertEquals(0.62f, ImmersiveMath.toneAlpha(f.e, canBlur = false), eps)
         assertTrue(ImmersiveMath.toneAlpha(f.e, canBlur = false) < 1f)
-        assertEquals(0.86f, ImmersiveMath.panelGlassAlpha(f.e, dark = true, canBlur = false), eps)
+        assertEquals(0.64f, ImmersiveMath.panelGlassAlpha(f.e, dark = true, canBlur = false), eps)
     }
 
     @Test
@@ -269,8 +269,8 @@ class ImmersiveMathTest {
             assertEquals("blur@$i", 22f * e + 26f * qs[i], ImmersiveMath.heroBlurDp(f.e, f.q), 1e-3f)
             assertEquals("tone@$i", 0.30f * e, ImmersiveMath.toneAlpha(f.e), 1e-4f)
             assertEquals("shade@$i", (1f - ps[i] / 0.75f).coerceIn(0f, 1f), ImmersiveMath.shadeAlpha(f.p), 1e-4f)
-            assertEquals("dark@$i", 0.74f + 0.12f * e, ImmersiveMath.panelGlassAlpha(f.e, dark = true), 1e-4f)
-            assertEquals("light@$i", 0.80f + 0.10f * e, ImmersiveMath.panelGlassAlpha(f.e, dark = false), 1e-4f)
+            assertEquals("dark@$i", 0.56f + 0.08f * e, ImmersiveMath.panelGlassAlpha(f.e, dark = true), 1e-4f)
+            assertEquals("light@$i", 0.62f + 0.08f * e, ImmersiveMath.panelGlassAlpha(f.e, dark = false), 1e-4f)
         }
     }
 

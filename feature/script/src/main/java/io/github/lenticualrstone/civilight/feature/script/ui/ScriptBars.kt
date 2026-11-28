@@ -95,10 +95,27 @@ fun ScriptTopBar(
     onLayers: (() -> Unit)?,
     onFind: (() -> Unit)? = null,
     back: io.github.lenticualrstone.civilight.designsystem.component.IconAction? = null,
+    /** (0.7.0) Optional Zen reading mode toggle (`IconId.Eye`). */
+    onZenToggle: (() -> Unit)? = null,
+    /** (0.7.0) Optional Plot Timeline strip toggle on cover/narrow screens. */
+    onTimelineToggle: (() -> Unit)? = null,
+    timelineShown: Boolean = false,
 ) {
-    // (0.2.0, SCR-01, U-14.13) `이 씬 · 1-7` · `찾기` (icon `search`, a) · `표시` (icon `layers`, a).
+    // (0.2.0, SCR-01, U-14.13) `이 씬 · 1-7` · `타임라인` · `읽기 집중` · `찾기` · `표시`.
     TopGlassBar(title = title, smallLine = line, back = back, wide = wide, barHeight = LayoutMetrics.topBarScript) {
         if (positionLabel != null) LensChip(positionLabel, LensChipState.SCRIPT_POSITION, onPositionLabel)
+        if (onTimelineToggle != null) CivilightIconButton(
+            IconId.Outline,
+            if (timelineShown) "플롯 타임라인 닫기" else "플롯 타임라인",
+            onTimelineToggle,
+            tint = if (timelineShown) CivilightTheme.colors.acc else CivilightTheme.colors.ink2,
+        )
+        if (onZenToggle != null) CivilightIconButton(
+            IconId.Eye,
+            "집중 읽기",
+            onZenToggle,
+            tint = CivilightTheme.colors.ink2,
+        )
         if (onFind != null) io.github.lenticualrstone.civilight.designsystem.component.CivilightIconButton(
             io.github.lenticualrstone.civilight.designsystem.icon.IconButtonSpec.SEARCH, onFind,
         )

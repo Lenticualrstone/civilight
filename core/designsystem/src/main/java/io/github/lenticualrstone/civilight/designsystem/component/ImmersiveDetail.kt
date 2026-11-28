@@ -95,6 +95,7 @@ import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassMode
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSource
 import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
+import io.github.lenticualrstone.civilight.designsystem.glass.LocalGlassSource
 import io.github.lenticualrstone.civilight.designsystem.glass.OnGlass
 import io.github.lenticualrstone.civilight.designsystem.glass.glassSource
 import io.github.lenticualrstone.civilight.designsystem.glass.rememberGlassSource
@@ -476,24 +477,27 @@ fun ImmersiveDetailScaffold(
                 )
             }
             val chrome = remember(hp, pageSource, canBlur, hasHeroArt) { ImmersiveChrome(hp, if (canBlur) pageSource else null, hasHeroArt) }
-            CompositionLocalProvider(LocalImmersiveChrome provides chrome) {
-                OnGlass {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                top = statusDp + ImmersiveMath.BUTTON_TOP_DP.dp,
-                                start = gutter - ImmersiveMath.BUTTON_EDGE_PULL_DP.dp,
-                                end = gutter - ImmersiveMath.BUTTON_EDGE_PULL_DP.dp,
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (onBack != null) ImmersiveHeaderButton(IconId.Back, backLabel, onBack)
-                        Spacer(Modifier.weight(1f))
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            actions()
-                            if (onMore != null) ImmersiveHeaderButton(IconId.More, ImmersiveDetailCopy.MORE, onMore)
-                        }
+            // Provide pageSource to header actions (lens pills, chips) so they frost-blur the hero/page live
+            // instead of falling back to opaque scrim inside OnGlass.
+            CompositionLocalProvider(
+                LocalImmersiveChrome provides chrome,
+                LocalGlassSource provides (if (canBlur) pageSource else null),
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            top = statusDp + ImmersiveMath.BUTTON_TOP_DP.dp,
+                            start = gutter - ImmersiveMath.BUTTON_EDGE_PULL_DP.dp,
+                            end = gutter - ImmersiveMath.BUTTON_EDGE_PULL_DP.dp,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (onBack != null) ImmersiveHeaderButton(IconId.Back, backLabel, onBack)
+                    Spacer(Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        actions()
+                        if (onMore != null) ImmersiveHeaderButton(IconId.More, ImmersiveDetailCopy.MORE, onMore)
                     }
                 }
             }

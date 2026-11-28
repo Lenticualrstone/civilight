@@ -54,6 +54,20 @@ data class StoryIndexFile(
     override val ext: JsonObject? = null,
 ) : HasExt
 
+/** (0.7.0) Lightweight episode-local IF branch forked from a main block (never affects global lens/checks). */
+@Serializable
+data class EpisodeBranch(
+    val key: Key,
+    val name: String,
+    /** Scene containing the fork point. */
+    val sceneKey: Key,
+    /** Main-route block directly before the branch diverges; null = scene start. */
+    val parentBlockKey: Key? = null,
+    @EncodeDefault val blocks: List<Block> = emptyList(),
+    @EncodeDefault val createdAt: io.github.lenticualrstone.civilight.model.Timestamp = 0L,
+    override val ext: JsonObject? = null,
+) : HasExt
+
 /** `story/<numbering unit key>.json`: blocks of one numbering unit and its discarded voice IDs. */
 @Serializable
 data class EpisodeFile(
@@ -61,6 +75,8 @@ data class EpisodeFile(
     val unitKey: Key,
     @EncodeDefault val blocks: List<Block> = emptyList(),
     @EncodeDefault val discardedVoiceIds: List<DiscardedVoiceId> = emptyList(),
+    /** (0.7.0) Optional episode-local IF branches; omitted when empty for full backward compatibility. */
+    val branches: List<EpisodeBranch> = emptyList(),
     override val ext: JsonObject? = null,
 ) : HasExt
 

@@ -48,10 +48,18 @@ import io.github.lenticualrstone.civilight.designsystem.foundation.bottomHairlin
 import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
 import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
 import io.github.lenticualrstone.civilight.designsystem.foundation.topHairline
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassMode
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
+import io.github.lenticualrstone.civilight.designsystem.glass.LocalGlassSource
+import io.github.lenticualrstone.civilight.designsystem.glass.OnGlass
+import io.github.lenticualrstone.civilight.designsystem.glass.glassSource
+import io.github.lenticualrstone.civilight.designsystem.glass.rememberGlassSource
 import io.github.lenticualrstone.civilight.designsystem.icon.CivilightIcon
 import io.github.lenticualrstone.civilight.designsystem.icon.IconId
 import io.github.lenticualrstone.civilight.designsystem.component.selectedRowBackground
 import io.github.lenticualrstone.civilight.designsystem.theme.CivilightTheme
+import io.github.lenticualrstone.civilight.designsystem.theme.LocalGlassMode
 import io.github.lenticualrstone.civilight.designsystem.theme.ContentSwap
 import io.github.lenticualrstone.civilight.designsystem.theme.FoldRevealValue
 import io.github.lenticualrstone.civilight.designsystem.theme.ValueSwap
@@ -222,65 +230,99 @@ private fun UnfoldedStudioHome(
     onDismissStart: () -> Unit,
     selectedKey: String?,
 ) {
+    val colors = CivilightTheme.colors
+    val glassMode = LocalGlassMode.current
+    val canBlur = android.os.Build.VERSION.SDK_INT >= 31 && (glassMode == GlassMode.BLUR || glassMode == GlassMode.BLUR_COSTLY)
+    val studioSource = rememberGlassSource()
+    val hasArt = ui.cover.hash != null || ui.cover.presetId != null
     val scroll = rememberScrollState()
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(scroll)
-            .padding(
-                top = padding.calculateTopPadding() + 16.dp,
-                bottom = padding.calculateBottomPadding() + 28.dp,
-                start = 28.dp,
-                end = 28.dp,
-            ),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        if (tripleColumn) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                // Column 1 (weight 2): Identity card + QuickWrite/Resume + Onboarding checklist
-                Column(Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    StudioIdentityCard(ui, onEditCover, onResume, onStartRoute)
-                    FoldRevealValue(ui.start, label = "studioStart") { s ->
-                        StudioCard {
-                            StartChecklistOnly(s, onStartRoute, onDismissStart)
-                        }
-                    }
-                }
-                // Column 2 (weight 1): Story flow (current chapter & episodes)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    StudioStoryCard(ui, onEpisode, selectedKey, onOpenStory = { onShortcut(HomeShortcut.STORY) })
-                }
-                // Column 3 (weight 1): Workspaces hub
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    StudioCard {
-                        SectionLabel(HomeCopy.WORK)
-                        ShortcutList(ui.shortcuts, onShortcut, Modifier.padding(top = 6.dp))
-                    }
-                }
+    Box(Modifier.fillMaxSize()) {
+        // Ambient full-bleed frosted backdrop so unfolded studio cards frost-blur the project cover/atmosphere.
+        Box(Modifier.fillMaxSize().glassSource(studioSource, enabled = canBlur)) {
+            if (hasArt) {
+                HomeHero(ui.cover, Modifier.fillMaxSize())
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(colors.bg.copy(alpha = if (colors.isDark) 0.54f else 0.60f)),
+                )
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.radialGradient(
+                                colors = listOf(
+                                    colors.acc.copy(alpha = if (colors.isDark) 0.14f else 0.09f),
+                                    colors.tint.copy(alpha = 0.35f),
+                                    colors.bg,
+                                ),
+                            ),
+                        ),
+                )
             }
-        } else {
-            StudioIdentityCard(ui, onEditCover, onResume, onStartRoute)
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.Top,
+        }
+        androidx.compose.runtime.CompositionLocalProvider(LocalGlassSource provides (if (canBlur) studioSource else null)) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scroll)
+                    .padding(
+                        top = padding.calculateTopPadding() + 16.dp,
+                        bottom = padding.calculateBottomPadding() + 28.dp,
+                        start = 28.dp,
+                        end = 28.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                Column(Modifier.weight(1.15f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    FoldRevealValue(ui.start, label = "studioStartMid") { s ->
-                        StudioCard {
-                            StartChecklistOnly(s, onStartRoute, onDismissStart)
+                if (tripleColumn) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        // Column 1 (weight 2): Identity card + QuickWrite/Resume + Onboarding checklist
+                        Column(Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            StudioIdentityCard(ui, onEditCover, onResume, onStartRoute)
+                            FoldRevealValue(ui.start, label = "studioStart") { s ->
+                                StudioCard {
+                                    StartChecklistOnly(s, onStartRoute, onDismissStart)
+                                }
+                            }
+                        }
+                        // Column 2 (weight 1): Story flow (current chapter & episodes)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            StudioStoryCard(ui, onEpisode, selectedKey, onOpenStory = { onShortcut(HomeShortcut.STORY) })
+                        }
+                        // Column 3 (weight 1): Workspaces hub
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            StudioCard {
+                                SectionLabel(HomeCopy.WORK)
+                                ShortcutList(ui.shortcuts, onShortcut, Modifier.padding(top = 6.dp))
+                            }
                         }
                     }
-                    StudioStoryCard(ui, onEpisode, selectedKey, onOpenStory = { onShortcut(HomeShortcut.STORY) })
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    StudioCard {
-                        SectionLabel(HomeCopy.WORK)
-                        ShortcutList(ui.shortcuts, onShortcut, Modifier.padding(top = 6.dp))
+                } else {
+                    StudioIdentityCard(ui, onEditCover, onResume, onStartRoute)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Column(Modifier.weight(1.15f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            FoldRevealValue(ui.start, label = "studioStartMid") { s ->
+                                StudioCard {
+                                    StartChecklistOnly(s, onStartRoute, onDismissStart)
+                                }
+                            }
+                            StudioStoryCard(ui, onEpisode, selectedKey, onOpenStory = { onShortcut(HomeShortcut.STORY) })
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            StudioCard {
+                                SectionLabel(HomeCopy.WORK)
+                                ShortcutList(ui.shortcuts, onShortcut, Modifier.padding(top = 6.dp))
+                            }
+                        }
                     }
                 }
             }
@@ -292,14 +334,26 @@ private fun UnfoldedStudioHome(
 private fun StudioCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val colors = CivilightTheme.colors
     val shape = RoundedCornerShape(20.dp)
-    Column(
+    Box(
         modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(colors.raise)
-            .insetOutline(colors.line, 1.dp, shape)
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-    ) { content() }
+            .clip(shape),
+    ) {
+        GlassBackground(
+            surface = GlassSurface.PANEL,
+            modifier = Modifier.matchParentSize(),
+            shape = shape,
+            fill = colors.glass.copy(alpha = if (colors.isDark) 0.58f else 0.66f),
+        )
+        OnGlass {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .insetOutline(colors.edge, 1.dp, shape)
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+            ) { content() }
+        }
+    }
 }
 
 @Composable

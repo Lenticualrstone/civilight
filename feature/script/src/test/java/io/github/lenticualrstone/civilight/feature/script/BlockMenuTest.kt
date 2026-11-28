@@ -7,6 +7,7 @@ import io.github.lenticualrstone.civilight.feature.script.motion.BlockPress
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenu
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuItem
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuOpen
+import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuItem.BRANCH
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuItem.DELETE
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuItem.DISPLAY_NAME
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuItem.EDIT
@@ -29,13 +30,13 @@ class BlockMenuTest {
     @Test
     fun `a dialogue block lists every action in order, 지우기 last and apart`() {
         val items = BlockMenu.items(edit = true, editLocked = false, kind = BlockKind.DIALOGUE)
-        assertEquals(listOf(EDIT, INSERT_AFTER, KIND, SCENE_CUT, PLANT, MENTION_OR_PAYOFF, DISPLAY_NAME, TIME, REF, PROPS, DELETE), items)
+        assertEquals(listOf(EDIT, INSERT_AFTER, KIND, SCENE_CUT, BRANCH, PLANT, MENTION_OR_PAYOFF, DISPLAY_NAME, TIME, REF, PROPS, DELETE), items)
         assertTrue(BlockMenu.dividerBefore(items, items.indexOf(DELETE)))
         assertTrue(DELETE.warning)
         assertTrue(items.filter { it != DELETE }.none { it.warning })
         // Lines between the four groups only.
         assertEquals(3, items.indices.count { BlockMenu.dividerBefore(items, it) })
-        assertEquals(6f * 2 + 48f * 11 + 9f * 3, BlockMenu.heightDp(items), 0f)
+        assertEquals(6f * 2 + 48f * 12 + 9f * 3, BlockMenu.heightDp(items), 0f)
     }
 
     @Test

@@ -105,6 +105,8 @@ data class AppSettings(
     val profileTabPreset: ProfileTabPreset = ProfileTabPreset.STANDARD,
     /** (0.5.0) User-customized character profile tabs (empty = use [profileTabPreset] defaults). */
     val customProfileTabs: List<ProfileTabConfig> = emptyList(),
+    /** (0.7.0, Labs) Subtle undulating ambient glow behind the script manuscript so global frosted glass shines through. */
+    val scriptAmbientGlow: Boolean = false,
 ) {
     /**
      * Whether [module]'s side panel (list or script panel) is closed (0.2.3, r3). Without a choice of its own,

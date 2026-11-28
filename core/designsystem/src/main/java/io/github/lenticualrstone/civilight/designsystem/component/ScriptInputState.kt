@@ -16,6 +16,13 @@ enum class InputKind(val label: String, val speakerDimmed: Boolean) {
     MEMO(ScriptInputCopy.KIND_MEMO, true),
 }
 
+/** (0.7.0) Streamlined 3-mode composer tabs matching Sonnet-Create (`대사 | 지문 | 장면`). */
+enum class ComposerTab(val label: String) {
+    DIALOGUE(ScriptInputCopy.TAB_DIALOGUE),
+    NARRATION(ScriptInputCopy.TAB_NARRATION),
+    SCENE(ScriptInputCopy.TAB_SCENE),
+}
+
 /** The speaker chip's value: a character [key] and the [label] the chip shows (`리엔`). */
 data class InputSpeaker(val key: String, val label: String)
 
@@ -55,8 +62,22 @@ data class ScriptInputState(
     val sceneFlash: Int = 0,
     val imeVisible: Boolean = false,
     val focused: Boolean = false,
+    /** (0.7.0) Additional speakers for simultaneous/chorus dialogue. */
+    val coSpeakers: List<InputSpeaker> = emptyList(),
+    /** (0.7.0) True when the `[장면]` composer tab is selected (sending creates a new scene). */
+    val sceneMode: Boolean = false,
+    /** (0.7.0) Incremented on empty send attempts to drive subtle shake feedback. */
+    val shakeCount: Int = 0,
 ) {
     val editing: Boolean get() = mark is InputMark.Editing
+
+    /** Active 3-mode composer tab. */
+    val activeTab: ComposerTab
+        get() = when {
+            sceneMode && !editing -> ComposerTab.SCENE
+            kind == InputKind.DIALOGUE -> ComposerTab.DIALOGUE
+            else -> ComposerTab.NARRATION
+        }
 }
 
 /** Things that happen to the input bar. */
@@ -122,6 +143,7 @@ data class InputContext(
     /** A block for `◆`: the `고치기` block or the selected block (SCR-16). */
     val hasTargetBlock: Boolean = false,
     val canUndo: Boolean = false,
+    val canRedo: Boolean = false,
 )
 
 /** The pure reducer of the input bar (JVM tested). */
@@ -217,16 +239,18 @@ object ScriptInputRules {
     fun normalized(text: String): String = text.trim()
 
     /** Whether the draft holds content for its kind (SCR-70 content rule). */
-    fun hasContent(state: ScriptInputState, hasCues: Boolean = false): Boolean = when (state.kind) {
-        InputKind.CHOICE -> choiceOptions(state.text).size >= MIN_CHOICE_LINES
-        InputKind.DIRECTION -> state.text.isNotBlank() || hasCues
-        else -> state.text.isNotBlank()
+    fun hasContent(state: ScriptInputState, hasCues: Boolean = false): Boolean = when {
+        state.sceneMode && !state.editing -> true
+        state.kind == InputKind.CHOICE -> choiceOptions(state.text).size >= MIN_CHOICE_LINES
+        state.kind == InputKind.DIRECTION -> state.text.isNotBlank() || hasCues
+        else -> state.text.isNotBlank() || (state.kind == InputKind.NARRATION && hasCues)
     }
 
     /** Whether a place to write exists: the `고치기` block, the `이 뒤에` block or a scene in view. */
-    fun hasTarget(state: ScriptInputState): Boolean = when (state.mark) {
-        is InputMark.Editing, is InputMark.After -> true
-        InputMark.None -> state.sceneNumber != null
+    fun hasTarget(state: ScriptInputState): Boolean = when {
+        state.sceneMode && !state.editing -> true
+        state.mark is InputMark.Editing || state.mark is InputMark.After -> true
+        else -> state.sceneNumber != null
     }
 
     /** `보내기` (or the `고치기` button) is on. */
@@ -281,6 +305,16 @@ object ScriptInputRules {
 /** Copy of the input bar and its read-only row (SCR-70, SCR-16, SCR-60). */
 object ScriptInputCopy {
     const val PLACEHOLDER = "쓰기…"
+    const val PLACEHOLDER_DIALOGUE = "대사 쓰기…"
+    const val PLACEHOLDER_NARRATION = "지문 · 서술 쓰기… (// 메모)"
+    const val PLACEHOLDER_SCENE = "새 장면 제목…"
+    const val TAB_DIALOGUE = "대사"
+    const val TAB_NARRATION = "지문"
+    const val TAB_SCENE = "장면"
+    const val TOOL_REDO_NAME = "다시 실행"
+    const val LEADING_SPEAKER = "화자 고르기"
+    const val LEADING_ATTACH = "첨부 · 연출"
+    const val LEADING_SCENE = "장면 설정"
     const val SPEAKER = "화자"
     const val KIND = "종류"
     const val NO_SPEAKER = "화자 없음"

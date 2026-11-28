@@ -211,6 +211,15 @@ class ScriptViewModel(
         .flatMapLatest { if (it is ProjectLoad.Ready) projectStore?.undoState?.map { u -> u.canUndo } ?: flowOf(false) else flowOf(false) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /** (0.7.0) The toolbar's redo is enabled. */
+    val canRedo: StateFlow<Boolean> = state
+        .flatMapLatest { if (it is ProjectLoad.Ready) projectStore?.undoState?.map { u -> u.canRedo } ?: flowOf(false) else flowOf(false) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** (0.7.0) Active episode-local IF branch key (null = main route). */
+    internal val activeBranchFlow = MutableStateFlow<Key?>(null)
+    val activeBranchKey: StateFlow<Key?> = activeBranchFlow.asStateFlow()
+
     private val _entered = MutableStateFlow<Set<Key>>(emptySet())
 
     /** The blocks just created; each enters from 8 dp below (SCR-12, SCR-67). A set, so quick adds do not cut each other. */
@@ -955,6 +964,15 @@ class ScriptViewModel(
         enqueue {
             commitNow()
             undo()
+        }
+    }
+
+    /** (0.7.0) Toolbar redo: reapplies the last undone step of the project's history. */
+    fun redoStep() {
+        if (isReadOnly) return
+        enqueue {
+            commitNow()
+            redo()
         }
     }
 

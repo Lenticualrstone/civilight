@@ -21,8 +21,8 @@ enum class GlassMode {
     }
 }
 
-/** Which glass surface is drawn; bars get edge masks, chips use the 12 dp blur. */
-enum class GlassSurface { TOP_BAR, BOTTOM_BAR, SHEET, PANEL, POPOVER, BANNER, CHIP }
+/** Which glass surface is drawn; bars get edge masks, chips use the 12 dp blur, DOCK is an unmasked arched tray. */
+enum class GlassSurface { TOP_BAR, BOTTOM_BAR, DOCK, SHEET, PANEL, POPOVER, BANNER, CHIP }
 
 /**
  * Edge mask of a bar: fully opaque over [opaqueFraction] of the height measured from the anchored edge,

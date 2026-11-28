@@ -32,6 +32,7 @@ data class WriteDraft(
     val runs: List<TextRun>,
     val speakerKey: Key? = null,
     val cues: List<DirectionCue>? = null,
+    val coSpeakerKeys: List<Key> = emptyList(),
 )
 
 /** SCR-70 validation and the draft's lines (pure). */
@@ -255,9 +256,14 @@ object ScriptWrite {
             cues = if (draft.kind == BlockKind.DIRECTION && gameTools) draft.cues.orEmpty() else emptyList(),
             options = options,
         )
-        // BlockOps.insert of 0.1.0 keeps runs for text kinds only; the 연출 text line is set here (SCR-08).
+        // BlockOps.insert of 0.1.0 keeps runs for text kinds only; the 연출 text line and co-speakers are set here.
         val placed = ins.doc.index.block(ins.blockKey)!!
-        val out = if (draft.kind == BlockKind.DIRECTION && placed.runs != runs) ins.doc.replaceBlock(placed.copy(runs = runs)) else ins.doc
+        val coSpeakers = if (draft.kind == BlockKind.DIALOGUE) draft.coSpeakerKeys.filter { it != draft.speakerKey }.distinct() else emptyList()
+        val updated = placed.copy(
+            runs = if (draft.kind == BlockKind.DIRECTION) runs else placed.runs,
+            coSpeakerKeys = coSpeakers,
+        )
+        val out = if (updated != placed) ins.doc.replaceBlock(updated) else ins.doc
         return Sent(out, ins.blockKey, ins.number)
     }
 
@@ -305,6 +311,7 @@ object ScriptWrite {
             else -> converted.copy(
                 runs = DraftRules.normalized(draft.runs),
                 speakerKey = if (to == BlockKind.DIALOGUE) draft.speakerKey else null,
+                coSpeakerKeys = if (to == BlockKind.DIALOGUE) draft.coSpeakerKeys.filter { it != draft.speakerKey }.distinct() else emptyList(),
                 cues = if (to == BlockKind.DIRECTION) draft.cues ?: block.cues else converted.cues,
             )
         }
@@ -334,7 +341,7 @@ object ScriptWrite {
             runs = back, speakerKey = updated.speakerKey, inheritSpeaker = false,
         )
         val placed = ins.doc.index.block(ins.blockKey)!!
-        var out = ins.doc.replaceBlock(placed.copy(runs = back, stage = updated.stage))
+        var out = ins.doc.replaceBlock(placed.copy(runs = back, stage = updated.stage, coSpeakerKeys = updated.coSpeakerKeys))
         out = Containers.splitRejections(out, blockKey, ins.blockKey, frontRuns.plainText)
         return Split(out, blockKey, ins.blockKey, updated.number, ins.number)
     }

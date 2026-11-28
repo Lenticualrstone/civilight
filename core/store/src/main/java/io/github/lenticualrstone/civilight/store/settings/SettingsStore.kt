@@ -135,6 +135,9 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     }
     suspend fun setCustomProfileTabs(value: List<ProfileTabConfig>) = update { it.copy(customProfileTabs = value) }
 
+    // (0.7.0, Labs) Script ambient glow backdrop
+    suspend fun setScriptAmbientGlow(value: Boolean) = update { it.copy(scriptAmbientGlow = value) }
+
     companion object {
         val KEY = stringPreferencesKey("appSettings")
     }

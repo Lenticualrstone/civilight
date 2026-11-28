@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.lenticualrstone.civilight.designsystem.component.CivilightText
+import io.github.lenticualrstone.civilight.designsystem.component.ComposerTab
 import io.github.lenticualrstone.civilight.designsystem.component.GlassScaffold
 import io.github.lenticualrstone.civilight.designsystem.component.InputContext
 import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputActions
@@ -56,6 +57,18 @@ import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputBar
 import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputEvent
 import io.github.lenticualrstone.civilight.designsystem.component.ScriptInputReadOnlyRow
 import io.github.lenticualrstone.civilight.designsystem.component.SwipeSide
+import io.github.lenticualrstone.civilight.designsystem.foundation.HitTarget
+import io.github.lenticualrstone.civilight.designsystem.foundation.insetOutline
+import io.github.lenticualrstone.civilight.designsystem.foundation.pressable
+import io.github.lenticualrstone.civilight.designsystem.foundation.tokenShadow
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassBackground
+import io.github.lenticualrstone.civilight.designsystem.glass.GlassSurface
+import io.github.lenticualrstone.civilight.designsystem.glass.OnGlass
+import io.github.lenticualrstone.civilight.feature.script.input.ComposerLeadingPopup
+import io.github.lenticualrstone.civilight.feature.script.ui.BranchManuscriptArea
+import io.github.lenticualrstone.civilight.feature.script.ui.PlotTimelineStrip
+import io.github.lenticualrstone.civilight.feature.script.ui.ScriptAmbientGlow
+import io.github.lenticualrstone.civilight.ui.image.CharacterPortraitTile
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenu
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuEntry
 import io.github.lenticualrstone.civilight.feature.script.ui.BlockMenuItem
@@ -604,8 +617,15 @@ private fun ScriptFrame(
     )
     val upperSettled = split == null && kotlin.math.abs(upperHeight - heightDp) < 0.5f
     val motion = CivilightTheme.motion
-    // Select mode and tabletop put the panel out of the way for a while: no panel and no rail (the writer's choice stays).
-    val panelHidden = selecting || tabletop != null
+    var zenMode by rememberSaveable { mutableStateOf(false) }
+    var coverTimelineOpen by rememberSaveable { mutableStateOf(false) }
+    var leadingPopupOpen by remember { mutableStateOf(false) }
+    var shakeCount by remember { mutableIntStateOf(0) }
+    val activeBranchKey by vm.activeBranchKey.collectAsState()
+    val activeBranch = remember(doc, c.unitKey, activeBranchKey) { BranchOps.branchOf(doc, c.unitKey, activeBranchKey) }
+    val branches = remember(doc, c.unitKey) { BranchOps.branchesOf(doc, c.unitKey) }
+    // Select mode, zen reading mode, and tabletop put the panel out of the way (the writer's choice stays).
+    val panelHidden = selecting || tabletop != null || zenMode
     val baseLayout = ScriptLayout.of(widthDp, panelOpen, height = heightDp, hidden = panelHidden)
     val paneSplit = rememberPaneSplitState(PaneSplit.Modules.SCRIPT_PANEL, widthDp, ScriptLayout.of(widthDp, panelOpen = true, height = heightDp).areaWidth)
     val targetLayout = if (baseLayout.panel && paneSplit.resizable) ScriptLayout.of(widthDp, true, area = paneSplit.leftDp, height = heightDp) else baseLayout
@@ -633,6 +653,7 @@ private fun ScriptFrame(
     var blockMenu by remember { mutableStateOf<BlockMenuOpen?>(null) }
     val wide = layout.wide
     val canUndo by vm.canUndo.collectAsState()
+    val canRedo by vm.canRedo.collectAsState()
     val entered by vm.entered.collectAsState()
     val target by vm.target.collectAsState()
     val toasts = LocalToasts.current
@@ -810,13 +831,15 @@ private fun ScriptFrame(
     }
     LaunchedEffect(vm) { vm.commandRequests.collect { runCommand(it) } }
     LocalBackHandler.current(selecting && sheets.top == null) { vm.leaveSelect() }
+    LocalBackHandler.current(zenMode && sheets.top == null) { zenMode = false }
+    LocalBackHandler.current(activeBranch != null && sheets.top == null && !selecting && !zenMode) { vm.switchBranch(null) }
     // Back with an `이 뒤에` mark clears it (the draft stays). Back never ends 고치기: that would drop the edit.
     LocalBackHandler.current(draft.mark is DraftMark.After && sheets.top == null && !selecting) { vm.closeMark() }
 
-    // --- The input bar (SCR-70) ---
+    // --- The input bar (SCR-70 / 0.7.0 Docked Glass Arch) ---
     var imeUp by remember { mutableStateOf(false) }
     var fieldFocused by remember { mutableStateOf(false) }
-    val inputState = Drafts.inputState(draft, doc, sceneNumber, flash, imeUp, fieldFocused)
+    val inputState = Drafts.inputState(draft, doc, sceneNumber, flash, imeUp, fieldFocused, shakeCount)
     val editKey = (draft.mark as? DraftMark.Edit)?.blockKey
     val mergeReason = editKey?.let { MergeCheck.reason(doc, it, draft.kind, draft.speakerKey) }?.let(WriteCopy::mergeReason)
     val colors = CivilightTheme.colors
@@ -850,11 +873,12 @@ private fun ScriptFrame(
             }
         },
         onSend = {
+            leadingPopupOpen = false
             val sentSpeaker = if (draft.kind == BlockKind.DIALOGUE && draft.mark == null) draft.speakerKey else null
             vm.sendDraft(sceneKey)
             revealedRow = null
             // (0.5.0, Labs) Smart speaker swap: after sending a dialogue block, pre-select the previous partner speaker.
-            if (scriptSettings.smartSpeakerSwap && sentSpeaker != null) {
+            if (scriptSettings.smartSpeakerSwap && sentSpeaker != null && activeBranch == null) {
                 val partner = rows.asReversed()
                     .filterIsInstance<BlockRow>()
                     .firstOrNull { it.kind == BlockKind.DIALOGUE && it.speaker?.characterKey != null && it.speaker.characterKey != sentSpeaker }
@@ -871,6 +895,15 @@ private fun ScriptFrame(
         onLink = { sheets.open(DraftLinkSheetKey(route.projectKey)) },
         onChange = { (editKey ?: editor.selected)?.let { b -> vm.changeSheetFor(b)?.let(sheets::open) } },
         onUndo = vm::undoStep,
+        onRedo = vm::redoStep,
+        onSelectTab = { tab ->
+            leadingPopupOpen = false
+            vm.selectComposerTab(tab)
+        },
+        onLeadingSlot = {
+            leadingPopupOpen = !leadingPopupOpen
+        },
+        onEmptySend = { shakeCount++ },
     )
     val bottomContent: @Composable () -> Unit = {
         val mode = when {
@@ -903,18 +936,93 @@ private fun ScriptFrame(
                     modifier = Modifier.tourTarget(ScriptTourSteps.COMMAND),
                     context = InputContext(
                         readOnly = false,
-                        hasCues = game && draft.kind == BlockKind.DIRECTION && draft.cues.isNotEmpty(),
+                        hasCues = game && draft.cues.isNotEmpty(),
                         hasTargetBlock = editor.selected != null,
                         canUndo = canUndo,
+                        canRedo = canRedo,
                     ),
                     mergeOffReason = mergeReason,
                     // SCR-74 [DEFAULT]: `다음 씬` is off while it would only pile onto an empty scene.
                     nextSceneEnabled = NextScene.emptyAfter(doc, c.unitKey, route.projectKey, sceneKey, vm.lastNextScene) == null,
-                    speakerMenuOpen = sheets.top is ChipSpeakerSheetKey,
+                    speakerMenuOpen = leadingPopupOpen || sheets.top is ChipSpeakerSheetKey,
                     kindMenuOpen = sheets.top is KindMenuSheetKey,
                     visualTransformation = transformation,
-                    // SCR-08: cue chips only with `게임 제작 도구` on, under `연출`.
-                    cues = if (game && draft.kind == BlockKind.DIRECTION) {
+                    wide = wide,
+                    leadingSlot = {
+                        val slotShape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+                        when (inputState.activeTab) {
+                            ComposerTab.DIALOGUE -> {
+                                val primaryKey = draft.speakerKey
+                                val primaryName = inputState.speaker?.label.orEmpty()
+                                if (draft.coSpeakerKeys.isNotEmpty() && primaryKey != null) {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        val second = draft.coSpeakerKeys.first()
+                                        val secondName = doc.index.character(second)?.name.orEmpty()
+                                        Box(Modifier.align(Alignment.BottomEnd)) {
+                                            CharacterPortraitTile(
+                                                doc = doc,
+                                                characterKey = second,
+                                                displayName = secondName,
+                                                shape = scriptSettings.profileShape,
+                                                size = 28.dp,
+                                            )
+                                        }
+                                        Box(Modifier.align(Alignment.TopStart)) {
+                                            CharacterPortraitTile(
+                                                doc = doc,
+                                                characterKey = primaryKey,
+                                                displayName = primaryName,
+                                                shape = scriptSettings.profileShape,
+                                                size = 30.dp,
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    CharacterPortraitTile(
+                                        doc = doc,
+                                        characterKey = primaryKey,
+                                        displayName = primaryName,
+                                        shape = scriptSettings.profileShape,
+                                        size = 42.dp,
+                                    )
+                                }
+                            }
+                            ComposerTab.NARRATION -> {
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .background(colors.tint.copy(alpha = 0.82f), slotShape)
+                                        .insetOutline(colors.line, 1.dp, slotShape),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CivilightIcon(
+                                        IconId.Attach,
+                                        contentDescription = null,
+                                        size = 18.dp,
+                                        tint = if (draft.cues.isNotEmpty()) colors.acc else colors.ink2,
+                                    )
+                                }
+                            }
+                            ComposerTab.SCENE -> {
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .background(colors.sel.copy(alpha = 0.72f), slotShape)
+                                        .insetOutline(colors.acc.copy(alpha = 0.45f), 1.dp, slotShape),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CivilightIcon(
+                                        IconId.Pin,
+                                        contentDescription = null,
+                                        size = 18.dp,
+                                        tint = colors.acc,
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    // SCR-08: cue chips only with `게임 제작 도구` on, under `연출` or narration with cues attached.
+                    cues = if (game && (draft.kind == BlockKind.DIRECTION || draft.cues.isNotEmpty())) {
                         {
                             DraftCueChips(doc, draft.cues, onRemove = vm::removeDraftCue, onAdd = {
                                 sheets.open(DraftCueSheetKey(route.projectKey, c.unitKey))
@@ -943,39 +1051,140 @@ private fun ScriptFrame(
         ) {
             GlassScaffold(
                 topBar = {
-                    AnimatedContent(selecting, transitionSpec = { motion.barSwap() }, contentAlignment = Alignment.TopStart, label = "scriptTopBar") { sel ->
-                        if (sel) {
-                            SelectTopBar(header.line, onAll = { vm.checkAll(rows, headerScene) }, onDone = vm::leaveSelect)
-                        } else {
-                            ScriptTopBar(
-                                title = doc.project.name,
-                                // SCR-60: `읽기 전용 · 편집 불가` replaces the position line.
-                                line = if (c.readOnly) WriteCopy.READ_ONLY_LINE else header.line,
-                                positionLabel = header.positionLabel,
-                                wide = wide,
-                                onPositionLabel = {
-                                    sheets.open(io.github.lenticualrstone.civilight.feature.script.synergy.ScriptOutlineSheetKey(route.projectKey, c.unitKey))
-                                },
-                                onLayers = ::openLayers,
-                                onFind = { openFind() },
-                                back = if (io.github.lenticualrstone.civilight.ui.nav.LocalPaneRole.current == io.github.lenticualrstone.civilight.ui.nav.PaneRole.DETAIL) null
-                                else io.github.lenticualrstone.civilight.designsystem.component.IconAction("뒤로") { deps.navigator.pop() },
-                            )
+                    AnimatedVisibility(visible = !zenMode, enter = motion.enter(CivilightMotion.standard), exit = motion.exit(CivilightMotion.standard)) {
+                        AnimatedContent(selecting, transitionSpec = { motion.barSwap() }, contentAlignment = Alignment.TopStart, label = "scriptTopBar") { sel ->
+                            if (sel) {
+                                SelectTopBar(header.line, onAll = { vm.checkAll(rows, headerScene) }, onDone = vm::leaveSelect)
+                            } else {
+                                ScriptTopBar(
+                                    title = doc.project.name,
+                                    // SCR-60: `읽기 전용 · 편집 불가` replaces the position line.
+                                    line = if (c.readOnly) WriteCopy.READ_ONLY_LINE else header.line,
+                                    positionLabel = header.positionLabel,
+                                    wide = wide,
+                                    onPositionLabel = {
+                                        sheets.open(io.github.lenticualrstone.civilight.feature.script.synergy.ScriptOutlineSheetKey(route.projectKey, c.unitKey))
+                                    },
+                                    onLayers = ::openLayers,
+                                    onFind = { openFind() },
+                                    back = if (io.github.lenticualrstone.civilight.ui.nav.LocalPaneRole.current == io.github.lenticualrstone.civilight.ui.nav.PaneRole.DETAIL) null
+                                    else io.github.lenticualrstone.civilight.designsystem.component.IconAction("뒤로") { deps.navigator.pop() },
+                                    onZenToggle = {
+                                        leadingPopupOpen = false
+                                        keyboard?.hide()
+                                        zenMode = true
+                                    },
+                                    onTimelineToggle = if (!wide) ({ coverTimelineOpen = !coverTimelineOpen }) else null,
+                                    timelineShown = coverTimelineOpen || branches.isNotEmpty(),
+                                )
+                            }
                         }
                     }
                 },
-                bottomBar = { AnimatedVisibility(split == null, enter = motion.enter(CivilightMotion.foldOpen), exit = motion.exit(CivilightMotion.foldClose)) { bottomContent() } },
+                bottomBar = { AnimatedVisibility(split == null && !zenMode, enter = motion.enter(CivilightMotion.foldOpen), exit = motion.exit(CivilightMotion.foldClose)) { bottomContent() } },
                 overlay = { padding ->
-                    Box(
-                        Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding() + TOAST_GAP),
-                        contentAlignment = Alignment.BottomCenter,
-                    ) {
-                        ToastHost(message = toast?.text, actionLabel = toast?.actionLabel, onAction = toast?.onAction?.let { { toasts.act() } })
+                    Box(Modifier.fillMaxSize()) {
+                        if (leadingPopupOpen && !selecting && !zenMode && !c.readOnly && !previewOnly) {
+                            val popupStart = if (wide) ((layout.areaWidth - 640f).coerceAtLeast(0f) / 2f + 14f).dp else 14.dp
+                            ComposerLeadingPopup(
+                                tab = inputState.activeTab,
+                                doc = doc,
+                                sceneKey = sceneKey,
+                                unlocked = gate.open,
+                                gameTools = game,
+                                profileShape = scriptSettings.profileShape,
+                                primarySpeakerKey = draft.speakerKey,
+                                coSpeakerKeys = draft.coSpeakerKeys,
+                                bottomOffset = padding.calculateBottomPadding(),
+                                startPadding = popupStart,
+                                onSelectSpeaker = vm::pickChipSpeaker,
+                                onToggleCoSpeaker = vm::toggleChipCoSpeaker,
+                                onOpenFullSpeakerPicker = { sheets.open(ChipSpeakerSheetKey(route.projectKey, sceneKey)) },
+                                onInsertMemoPrefix = {
+                                    val cur = draft.text
+                                    if (!cur.trimStart().startsWith("//")) {
+                                        val next = "// $cur"
+                                        vm.onDraftText(next, next.length, next.length, smartPunctuation = scriptSettings.smartPunctuation)
+                                    }
+                                },
+                                onOpenCuePicker = { sheets.open(DraftCueSheetKey(route.projectKey, c.unitKey)) },
+                                onOpenLinkPicker = { sheets.open(DraftLinkSheetKey(route.projectKey)) },
+                                onQuickNewScene = { vm.nextScene(sceneKey) },
+                                onEditCurrentSceneWhere = { sceneKey?.let { sheets.open(SceneWhereSheet(route.projectKey, it)) } },
+                                onOpenOutline = { sheets.open(io.github.lenticualrstone.civilight.feature.script.synergy.ScriptOutlineSheetKey(route.projectKey, c.unitKey)) },
+                                onDismiss = { leadingPopupOpen = false },
+                            )
+                        }
+                        if (zenMode) {
+                            val readAloudReady = remember(doc, c.unitKey, gate.open) { LayersModel.readAloudEnabled(doc, c.unitKey, gate.open) }
+                            val zenShape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+                            val navPad = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                            Box(
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = navPad + 16.dp)
+                                    .tokenShadow(zenShape, CivilightTheme.elevation.popover(colors))
+                                    .then(Modifier),
+                            ) {
+                                Box(Modifier.then(Modifier)) {
+                                    GlassBackground(
+                                        surface = GlassSurface.POPOVER,
+                                        modifier = Modifier.matchParentSize(),
+                                        shape = zenShape,
+                                        fill = colors.glass.copy(alpha = if (colors.isDark) 0.70f else 0.80f),
+                                    )
+                                    OnGlass {
+                                        Row(
+                                            Modifier
+                                                .insetOutline(colors.edge, 1.dp, zenShape)
+                                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            if (readAloudReady) {
+                                                Row(
+                                                    Modifier
+                                                        .pressable(onClick = startReadAloud, hitTarget = HitTarget.CHIP, shape = zenShape)
+                                                        .background(colors.pri, zenShape)
+                                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                ) {
+                                                    CivilightIcon(IconId.Play, contentDescription = null, size = 14.dp, tint = colors.onpri)
+                                                    CivilightText("리허설", type.chip, color = colors.onpri, maxLines = 1)
+                                                }
+                                            }
+                                            Row(
+                                                Modifier
+                                                    .pressable(onClick = { zenMode = false }, hitTarget = HitTarget.CHIP, shape = zenShape)
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                CivilightIcon(IconId.Edit, contentDescription = null, size = 14.dp, tint = colors.ink)
+                                                CivilightText("쓰기로 돌아가기", type.chip, color = colors.ink, maxLines = 1)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Box(
+                            Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding() + TOAST_GAP),
+                            contentAlignment = Alignment.BottomCenter,
+                        ) {
+                            ToastHost(message = toast?.text, actionLabel = toast?.actionLabel, onAction = toast?.onAction?.let { { toasts.act() } })
+                        }
                     }
                 },
             ) { padding ->
                 with(density) { bottomPadPx = padding.calculateBottomPadding().roundToPx() }
+                val showTimeline = !selecting && !zenMode && (wide || coverTimelineOpen || branches.isNotEmpty())
                 Box(Modifier.fillMaxSize()) {
+                    // (0.7.0, Labs) Subtle undulating ambient glow recorded into GlassScaffold's glassSource.
+                    if (scriptSettings.scriptAmbientGlow) {
+                        ScriptAmbientGlow(Modifier.matchParentSize())
+                    }
                     if (selecting) {
                         SelectList(
                             rows = selectRows,
@@ -985,17 +1194,60 @@ private fun ScriptFrame(
                             onToggle = { key -> vm.toggleChecked(key, rows) },
                             onDrop = vm::moveBlocks,
                         )
-                    } else Manuscript(
+                    } else Column(Modifier.fillMaxSize()) {
+                        if (showTimeline) {
+                            PlotTimelineStrip(
+                                doc = doc,
+                                unitKey = c.unitKey,
+                                currentSceneKey = sceneKey,
+                                activeBranchKey = activeBranchKey,
+                                readOnly = c.readOnly,
+                                unlocked = gate.open,
+                                modifier = Modifier.padding(top = padding.calculateTopPadding()),
+                                onJumpScene = { targetScene ->
+                                    val jumpKey = rows.firstOrNull { it is HeadRow && it.sceneKey == targetScene }?.key
+                                        ?: rows.firstOrNull { it.sceneKey == targetScene }?.key
+                                    if (jumpKey != null) vm.aboveInput.tryEmit(jumpKey)
+                                },
+                                onSceneWhere = { targetScene -> sheets.open(SceneWhereSheet(route.projectKey, targetScene)) },
+                                onMoveScene = vm::moveSceneInEpisode,
+                                onSelectBranch = vm::switchBranch,
+                                onNewScene = if (c.readOnly) null else ({ vm.nextScene(sceneKey) }),
+                            )
+                        }
+                        val bodyPadding = if (showTimeline) {
+                            androidx.compose.foundation.layout.PaddingValues(
+                                top = 4.dp,
+                                bottom = padding.calculateBottomPadding(),
+                            )
+                        } else {
+                            padding
+                        }
+                        if (activeBranch != null) {
+                            BranchManuscriptArea(
+                                doc = doc,
+                                branch = activeBranch,
+                                padding = bodyPadding,
+                                layout = layout,
+                                profileShape = scriptSettings.profileShape,
+                                readOnly = c.readOnly,
+                                onBackToMain = { vm.switchBranch(null) },
+                                onAdopt = { vm.adoptBranch(activeBranch.key) },
+                                onDeleteBranch = { vm.deleteActiveBranch(activeBranch.key) },
+                                onDeleteBlock = { blockKey -> vm.deleteBranchBlock(activeBranch.key, blockKey) },
+                            )
+                        } else Manuscript(
                         rows = rows,
                         editor = editor,
                         showParens = doc.app.view.script.layers.paren,
                         readOnly = c.readOnly,
                         entered = entered,
                         listState = listState,
-                        padding = padding,
+                        padding = bodyPadding,
                         layout = layout,
                         actions = ManuscriptActions(
                             onTapBlock = { row, offset -> vm.tapBlock(row.blockKey, row.isText, offset) },
+                            onDoubleTapBlock = { row -> vm.swipeEdit(row.blockKey) },
                             onTapOption = { row, option -> option.optionKey?.let { vm.tapOption(row.blockKey, it) } },
                             onSpeaker = { row -> vm.tapBlock(row.blockKey, row.isText, null) },
                             onTapEmptyScene = { scene -> vm.tapEmptyScene(scene) },
@@ -1087,6 +1339,7 @@ private fun ScriptFrame(
                         liftedRow = blockMenu?.liftedRow,
                         blockSpacing = scriptSettings.blockSpacing,
                     )
+                    }
                 }
             }
         }
@@ -1239,6 +1492,7 @@ private fun blockActions(
         BlockMenuItem.KIND -> ({ sheets.open(KindMenuSheetKey(route.projectKey, blockKey = key)) })
         // SCR-49: not the last block → `씬 나누기` below it; the last → `다음 씬 만들기` after its scene.
         BlockMenuItem.SCENE_CUT -> ({ sheets.open(ScriptOps.newSceneSheet(doc, route.projectKey, key, row.sceneKey, unitKey)) })
+        BlockMenuItem.BRANCH -> ({ vm.createBranchAt(row.sceneKey, key) })
         BlockMenuItem.PLANT -> ({ if (!vm.readOnly) sheets.open(io.github.lenticualrstone.civilight.feature.script.input.PlantSheetKey(route.projectKey, key)) })
         BlockMenuItem.MENTION_OR_PAYOFF -> ({ if (!vm.readOnly) sheets.open(io.github.lenticualrstone.civilight.feature.script.input.MarkPickSheetKey(route.projectKey, key)) })
         BlockMenuItem.DISPLAY_NAME, BlockMenuItem.PROPS -> ({ openPanel(PanelTab.PROPS) })

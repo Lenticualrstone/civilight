@@ -43,6 +43,10 @@ data class Draft(
     val parenOpen: Boolean = false,
     /** An empty `()` drawn at this raw offset until its first letter (SCR-16 `( )`). */
     val pendingParenAt: Int? = null,
+    /** (0.7.0) Additional speakers for simultaneous dialogue. */
+    val coSpeakerKeys: List<Key> = emptyList(),
+    /** (0.7.0) True when the `[장면]` tab is active (sending creates a new scene). */
+    val sceneMode: Boolean = false,
 ) {
     val text: String get() = rawText(runs)
     val editing: Boolean get() = mark is DraftMark.Edit
@@ -235,7 +239,51 @@ object Drafts {
         return d.copy(runs = runs, selStart = caret, selEnd = caret, parenOpen = false, pendingParenAt = null)
     }
 
-    fun pickSpeaker(d: Draft, key: Key?): Draft = d.copy(speakerKey = key)
+    fun pickSpeaker(d: Draft, key: Key?): Draft = d.copy(speakerKey = key, coSpeakerKeys = d.coSpeakerKeys.filterNot { it == key })
+
+    /** (0.7.0) Toggles [key] in the multi-speaker set (primary + [Draft.coSpeakerKeys]). */
+    fun toggleCoSpeaker(d: Draft, key: Key): Draft = when {
+        d.speakerKey == null -> d.copy(speakerKey = key, coSpeakerKeys = emptyList())
+        d.speakerKey == key -> {
+            val promoted = d.coSpeakerKeys.firstOrNull()
+            d.copy(speakerKey = promoted, coSpeakerKeys = d.coSpeakerKeys.drop(1))
+        }
+        key in d.coSpeakerKeys -> d.copy(coSpeakerKeys = d.coSpeakerKeys - key)
+        else -> d.copy(coSpeakerKeys = d.coSpeakerKeys + key)
+    }
+
+    /** (0.7.0) Switches between `[대사 | 지문 | 장면]` composer tabs without losing typed text. */
+    fun selectComposerTab(d: Draft, tab: io.github.lenticualrstone.civilight.designsystem.component.ComposerTab): Draft = when (tab) {
+        io.github.lenticualrstone.civilight.designsystem.component.ComposerTab.DIALOGUE ->
+            d.copy(kind = BlockKind.DIALOGUE, sceneMode = false, parenOpen = false, pendingParenAt = null)
+        io.github.lenticualrstone.civilight.designsystem.component.ComposerTab.NARRATION ->
+            d.copy(kind = BlockKind.NARRATION, sceneMode = false, parenOpen = false, pendingParenAt = null)
+        io.github.lenticualrstone.civilight.designsystem.component.ComposerTab.SCENE ->
+            if (d.editing) d else d.copy(sceneMode = true, parenOpen = false, pendingParenAt = null)
+    }
+
+    /** (0.7.0) Inline shorthand parsing (`// comment` -> MEMO, `--- [title]` -> new scene). */
+    sealed interface SendIntent {
+        data class NewScene(val title: String?) : SendIntent
+        data class Memo(val runs: List<TextRun>) : SendIntent
+        data object Normal : SendIntent
+    }
+
+    fun sendIntent(d: Draft): SendIntent {
+        if (d.editing) return SendIntent.Normal
+        val trimmed = d.text.trim()
+        if (d.sceneMode) return SendIntent.NewScene(trimmed.takeIf { it.isNotEmpty() })
+        if (trimmed == "---" || trimmed == "***") return SendIntent.NewScene(null)
+        if (trimmed.startsWith("--- ")) return SendIntent.NewScene(trimmed.removePrefix("--- ").trim().takeIf { it.isNotEmpty() })
+        if (trimmed.startsWith("//")) {
+            val lead = d.text.indexOf("//")
+            val afterSlash = lead + 2
+            val stripEnd = if (afterSlash < d.text.length && d.text[afterSlash] == ' ') afterSlash + 1 else afterSlash
+            val stripped = Runs.normalize(RunEdit.replace(d.runs, 0, stripEnd, ""))
+            if (rawText(stripped).isNotBlank()) return SendIntent.Memo(stripped)
+        }
+        return SendIntent.Normal
+    }
 
     /** A cue chip added at the end of the draft's cues (SCR-08, switch on). */
     fun addCue(d: Draft, cue: DirectionCue): Draft = d.copy(cues = d.cues + cue)
@@ -243,7 +291,7 @@ object Drafts {
     /** A cue chip's `✕` (SCR-08): it leaves the draft; the block keeps it until the send. */
     fun removeCue(d: Draft, cueKey: Key): Draft = d.copy(cues = d.cues.filterNot { it.key == cueKey })
 
-    fun pickKind(d: Draft, kind: BlockKind): Draft = d.copy(kind = kind, parenOpen = false, pendingParenAt = null)
+    fun pickKind(d: Draft, kind: BlockKind): Draft = d.copy(kind = kind, sceneMode = false, parenOpen = false, pendingParenAt = null)
 
     /** Right swipe `이 뒤에` (SCR-73): the draft is kept; not during `고치기`. */
     fun insertAfter(d: Draft, blockKey: Key): Draft = if (d.editing) d else d.copy(mark = DraftMark.After(blockKey))
@@ -259,8 +307,10 @@ object Drafts {
         return Draft(
             runs = runs, selStart = end, selEnd = end, cues = block.cues,
             speakerKey = if (block.kind.known == BlockKind.DIALOGUE) block.speakerKey else aside.speakerKey,
+            coSpeakerKeys = if (block.kind.known == BlockKind.DIALOGUE) block.coSpeakerKeys else aside.coSpeakerKeys,
             kind = block.kind.known ?: BlockKind.NARRATION,
             mark = DraftMark.Edit(block.key), aside = aside,
+            sceneMode = false,
         )
     }
 
@@ -384,8 +434,17 @@ object Drafts {
     private enum class Gone { REMOVED, LOCKED }
 
     /** The domain draft; [gameTools] off hands null cues, so stored cues stay untouched (scope §8). */
-    fun toWrite(d: Draft, gameTools: Boolean): WriteDraft =
-        WriteDraft(d.kind, d.runs, d.speakerKey.takeIf { d.kind == BlockKind.DIALOGUE }, d.cues.takeIf { gameTools })
+    fun toWrite(d: Draft, gameTools: Boolean): WriteDraft {
+        // Under the unified 3-kind composer, a narration draft with attached cues writes as DIRECTION.
+        val effectiveKind = if (d.kind == BlockKind.NARRATION && gameTools && d.cues.isNotEmpty()) BlockKind.DIRECTION else d.kind
+        return WriteDraft(
+            kind = effectiveKind,
+            runs = d.runs,
+            speakerKey = d.speakerKey.takeIf { effectiveKind == BlockKind.DIALOGUE },
+            cues = d.cues.takeIf { gameTools },
+            coSpeakerKeys = if (effectiveKind == BlockKind.DIALOGUE) d.coSpeakerKeys else emptyList(),
+        )
+    }
 
     /**
      * (Double-tap guard) A queued send, `나누기` or `합치기` of [captured] still applies only while the live draft
@@ -425,9 +484,10 @@ object Drafts {
     }
 
     /** The bar's view state: [sceneNumber] of the scene in view, the label of the chip speaker. */
-    fun inputState(d: Draft, doc: ProjectDoc, sceneNumber: Int?, sceneFlash: Int, ime: Boolean, focused: Boolean): ScriptInputState {
+    fun inputState(d: Draft, doc: ProjectDoc, sceneNumber: Int?, sceneFlash: Int, ime: Boolean, focused: Boolean, shakeCount: Int = 0): ScriptInputState {
         fun number(key: Key): String = doc.index.block(key)?.let { Labels.number(it.number).removePrefix("#") } ?: ""
         val speaker = d.speakerKey?.let { key -> Labels.speakerName(doc, key)?.let { InputSpeaker(key, it) } }
+        val coSpeakers = d.coSpeakerKeys.mapNotNull { key -> Labels.speakerName(doc, key)?.let { InputSpeaker(key, it) } }
         val mark = when (val m = d.mark) {
             DraftMark.None -> InputMark.None
             is DraftMark.After -> InputMark.After(number(m.blockKey))
@@ -445,6 +505,9 @@ object Drafts {
             sceneFlash = sceneFlash,
             imeVisible = ime,
             focused = focused,
+            coSpeakers = coSpeakers,
+            sceneMode = d.sceneMode,
+            shakeCount = shakeCount,
         )
     }
 }

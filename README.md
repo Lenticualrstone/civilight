@@ -13,7 +13,7 @@
 ![Android 10+](https://img.shields.io/badge/Android-10%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
-![version](https://img.shields.io/badge/version-0.6.1(Antigravity)-blue)
+![version](https://img.shields.io/badge/version-0.7.0(Antigravity)-blue)
 ![font license](https://img.shields.io/badge/font-Pretendard%20OFL%201.1-lightgrey)
 
 </div>
@@ -29,10 +29,12 @@ Civilight는 **원고(스크립트) · 인물 · 세계 · 연표 · 지도 · �
 ## 주요 기능
 
 ### 스크립트 (원고)
-* 대사 · 나레이션 · 괄호 지문 · 연출 지시 · 선택지 · 시스템 텍스트 · 작가 메모(`⌁`) 블록 지원
-* 채팅형 하단 입력바 (화자 자동 이어쓰기, 종류 칩, 6줄 입력, `/` 단축 명령, `@` 항목 잇기)
-* 블록 좌우 밀기 액션, 길게 누르기 통합 메뉴, 복선(`심기 · 다시 언급 · 거두기`), 에피소드 판 남기기
-* 씬 단위 위치 표기(`1-7 씬 3`), 씬 나누기 · 합치기 · 옮기기, 대본 PDF / 대사 표 CSV / 게임 엔진 JSON 내보내기
+* **3종 통합 입력(`대사 · 지문 · 장면`) & 아치형 프로스트 글래스 입력바**: 상단 둥근 아치형 블러 입력바, 좌측 고정 컨텍스트 슬롯(캐릭터 초상화·다중 화자 / 첨부·`//` 주석 메모·연출 큐 / 씬 설정)과 위로 열리는 블러 팝업, `//` 주석·`---` 장면 전환 인라인 단축, `Tab` 모드 전환·`Ctrl/Cmd+Enter` 전송, 실행 취소/다시 실행(`↶ ↷`)
+* **원고 시각화 & 빠른 편집**: 지문 좌측 배지 다이어트, 동일 화자 연속 대사 초상 생략, 다중 화자 중첩 초상(`리엔 외 N명`), 블록 더블탭 즉시 고치기
+* **상단 플롯 타임라인 & 제로 클러터 IF 분기**: 씬 카드 가로 스트립(대사 수·예상 시간·밀도 바, 길게 눌러 씬 순서 이동), 롱프레스 `다른 전개 쓰기`로 본편과 분리된 에피소드 분기 작성 및 `본편 채택`(이전 본편 자동 `지난 판` 보관)
+* **집중 읽기(Zen) & TTS 자동 리허설**: UI를 숨기는 집중 읽기 모드, 자동 재생·속도 조절(`0.5× · 1× · 1.5× · 2×`)·화자별 피치 캐스팅 Android TTS 낭독·글자 동기화 타이프라이터·다음 화자 입력 중 표시
+* 기존 6종 블록(연출 · 선택지 · 시스템 · 작가 메모) 100% 호환, 블록 좌우 밀기 액션, 길게 누르기 통합 메뉴, 복선(`심기 · 다시 언급 · 거두기`), 대본 PDF / 대사 표 CSV / 게임 엔진 JSON 내보내기
+* **실험실 · 원고 일렁이는 빛 배경**: 라이프 레코더에서 영감을 받은 은은한 일렁이는 빛을 원고 뒤에 배치해 상단바·아치형 입력바·팝업의 전역 프로스트 블러 효과를 극대화 (`설정 › 실험실`)
 
 ### 스토리 · 시점 · 때 · 점검
 * 몰입 상세 화면 틀 기반 프로젝트 홈(전체 화면 표지 히어로·도킹 헤더), 이어 쓰기, 사용자 정의 이야기 단계 (장 · 에피소드 · 씬)
@@ -90,7 +92,7 @@ JDK 21 환경이 필요하며, `local.properties` 파일의 `sdk.dir`에 Android
 
 | 항목 | 값 |
 | --- | --- |
-| versionName | `0.6.1(Antigravity)` |
+| versionName | `0.7.0(Antigravity)` |
 | minSdk / targetSdk / compileSdk | 29 / 37 / 37 |
 | Kotlin / AGP | 2.4.21 / 9.4.1 |
 | Compose BOM / Navigation3 | 2026.05.01 / 1.1.2 |

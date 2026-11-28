@@ -175,7 +175,9 @@ object SettingsCopy {
     const val CAT_FOLDABLE_SUB = "미니 아이콘 레일 · 스크롤 저항감 · 기울임 반응"
     const val CAT_SECURITY_SUB = "Drive 백업 · 복구 암호 · 앱 잠금 · 숨기기"
     const val CAT_LABS = "실험실"
-    const val CAT_LABS_SUB = "타자기 스크롤 · 화자 자동 교대 · 라이프 레코더"
+    const val CAT_LABS_SUB = "원고 일렁이는 배경 · 타자기 스크롤 · 화자 자동 교대 · 라이프 레코더"
+    const val SCRIPT_AMBIENT_GLOW = "원고 일렁이는 빛 배경"
+    const val SCRIPT_AMBIENT_GLOW_SUB = "스크립트 뒤에 은은한 빛을 깔아 유리 블러 강조"
     const val CAT_SUPPORT_SUB = "휴지통 · 도움말 · 안내 다시 보기"
 
     const val PORTRAIT_AMBIENT_BLUR = "초상 앰비언트 블러"
